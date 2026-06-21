@@ -1,0 +1,23 @@
+option('hosted',
+       type: 'boolean',
+       value: true,
+       description: 'Enable hosted platform support (standard C stdlib — malloc/free, file I/O). Disable for bare-metal / freestanding toolchains.',
+)
+
+option('glib',
+       type: 'feature',
+       value: 'auto',
+       description: 'Enable GLib object and main loop integration.',
+)
+
+option('wy',
+       type: 'feature',
+       value: 'enabled',
+       description: 'Enable wy library for easy interaction in C projects'
+)
+
+option('wyrm',
+       type: 'feature',
+       value: 'enabled',
+       description: 'Enable wyrm standalone interpreter'
+)

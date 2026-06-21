@@ -1,7 +1,17 @@
-*.ss~
-*.ss#*
-.#*.ss
+# IDE / Editor files
+.vs
+.vscode
+.idea
+*~
+*.swp
+*.bak
+CMakeSettings.json
+cmake-build-*
+buildDir
 
-*.scm~
-*.scm#*
-.#*.scm
+# Builds
+out
+build
+build.*
+build-*
+
