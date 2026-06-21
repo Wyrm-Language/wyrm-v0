@@ -1,6 +1,7 @@
 test_cwyrm_sources = files(
     'main.cpp',
     'test_atomics.cpp',
+    'test_stack.cpp',
     'test_wyrm.cpp',
 )
 

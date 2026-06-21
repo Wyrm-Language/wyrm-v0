@@ -13,6 +13,10 @@ static inline void* wyrm_memcpy(void* dest, const void* src, wyrm_uword len) {
     return memcpy(dest, src, (size_t) len);
 }
 
+static inline void* wyrm_memmove(void* dest, const void* src, wyrm_uword len) {
+    return memmove(dest, src, (size_t) len);
+}
+
 static inline void wyrm_memset(void* buffer, int ch, wyrm_uword len)
 {
     memset(buffer, ch, (size_t) len);

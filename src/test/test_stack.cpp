@@ -1,0 +1,169 @@
+#include <doctest/doctest.h>
+#include <wyrm/internal_api.h>
+
+static const int STACK_CAP = 16;
+
+static wyrm_stack make_stack(wyrm_value* mem)
+{
+    wyrm_stack s;
+    wyrm_stack_init_f(&s, mem, (wyrm_uword)STACK_CAP);
+    return s;
+}
+
+static wyrm_primitive prim_uword(wyrm_uword v)
+{
+    wyrm_primitive p;
+    p.uword = v;
+    return p;
+}
+
+static wyrm_exec_result test_exec_fn(wyrm_fiber_ref fiber)
+{
+    WYRM_UNUSED(fiber);
+    return wyrm_make_exec_result(WYRM_EXEC_DONE, 0);
+}
+
+
+TEST_SUITE("stack") {
+    TEST_CASE("push and pop round-trip") {
+        wyrm_value mem[STACK_CAP];
+        wyrm_stack s = make_stack(mem);
+
+        CHECK(wyrm_stack_push(&s, WYRM_NULL, prim_uword(42)) == WYRM_ERR_NONE);
+        CHECK(s.top == s.entries_begin + 1);
+
+        wyrm_type_ref out_type = reinterpret_cast<wyrm_type_ref>(1);
+        wyrm_primitive out_val = prim_uword(0);
+        CHECK(wyrm_stack_pop(&s, &out_type, &out_val) == WYRM_ERR_NONE);
+        CHECK(out_type == WYRM_NULL);
+        CHECK(out_val.uword == 42);
+        CHECK(s.top == s.entries_begin);
+    }
+
+    TEST_CASE("LIFO order") {
+        wyrm_value mem[STACK_CAP];
+        wyrm_stack s = make_stack(mem);
+
+        wyrm_stack_push(&s, WYRM_NULL, prim_uword(1));
+        wyrm_stack_push(&s, WYRM_NULL, prim_uword(2));
+        wyrm_stack_push(&s, WYRM_NULL, prim_uword(3));
+
+        wyrm_primitive out;
+        wyrm_stack_pop(&s, WYRM_NULL, &out); CHECK(out.uword == 3);
+        wyrm_stack_pop(&s, WYRM_NULL, &out); CHECK(out.uword == 2);
+        wyrm_stack_pop(&s, WYRM_NULL, &out); CHECK(out.uword == 1);
+    }
+
+    TEST_CASE("pop from empty returns WYRM_ERR_EMPTY") {
+        wyrm_value mem[STACK_CAP];
+        wyrm_stack s = make_stack(mem);
+        wyrm_primitive out;
+        CHECK(wyrm_stack_pop(&s, WYRM_NULL, &out) == WYRM_ERR_EMPTY);
+    }
+
+    TEST_CASE("push when full returns WYRM_ERR_NOMEM") {
+        wyrm_value mem[STACK_CAP];
+        wyrm_stack s = make_stack(mem);
+        for (int i = 0; i < STACK_CAP; i++) {
+            REQUIRE(wyrm_stack_push(&s, WYRM_NULL, prim_uword((wyrm_uword)i)) == WYRM_ERR_NONE);
+        }
+        CHECK(wyrm_stack_push(&s, WYRM_NULL, prim_uword(0)) == WYRM_ERR_NOMEM);
+    }
+
+    TEST_CASE("null self returns WYRM_ERR_INVAL") {
+        CHECK(wyrm_stack_push(WYRM_NULL, WYRM_NULL, prim_uword(0)) == WYRM_ERR_INVAL);
+        CHECK(wyrm_stack_pop(WYRM_NULL, WYRM_NULL, WYRM_NULL) == WYRM_ERR_INVAL);
+        CHECK(wyrm_stack_start_frame(WYRM_NULL, WYRM_NULL, 0, WYRM_NULL) == WYRM_ERR_INVAL);
+        CHECK(wyrm_stack_pop_frame(WYRM_NULL, WYRM_NULL, 0) == WYRM_ERR_INVAL);
+    }
+
+    TEST_CASE("start_frame sets base and pushes args") {
+        wyrm_value mem[STACK_CAP];
+        wyrm_stack s = make_stack(mem);
+
+        // One value already on the stack (simulates caller context)
+        wyrm_stack_push(&s, WYRM_NULL, prim_uword(99));
+
+        wyrm_value args[2];
+        args[0].type = WYRM_NULL; args[0].data = prim_uword(10);
+        args[1].type = WYRM_NULL; args[1].data = prim_uword(20);
+
+        CHECK(wyrm_stack_start_frame(&s, args, 2, test_exec_fn) == WYRM_ERR_NONE);
+
+        // saved-base-ptr slot + 2 args = 3 entries total above the initial value
+        CHECK(s.top  == s.entries_begin + 5);
+        // base points just past the saved-base-ptr slot
+        CHECK(s.base == s.entries_begin + 3);
+        // saved slot holds the old base (entries_begin)
+        CHECK((s.base - 2)->data.value_ptr == s.entries_begin);
+    }
+
+    TEST_CASE("pop_frame with no preserve collapses frame") {
+        wyrm_value mem[STACK_CAP];
+        wyrm_stack s = make_stack(mem);
+
+        wyrm_stack_push(&s, WYRM_NULL, prim_uword(1));
+
+        wyrm_value args[1];
+        args[0].type = WYRM_NULL; args[0].data = prim_uword(42);
+        REQUIRE(wyrm_stack_start_frame(&s, args, 1, test_exec_fn) == WYRM_ERR_NONE);
+
+        wyrm_exec_fn out_fn = WYRM_NULL;
+        CHECK(wyrm_stack_pop_frame(&s, &out_fn, 0) == WYRM_ERR_NONE);
+        CHECK(s.base == s.entries_begin);
+        CHECK(s.top  == s.entries_begin + 1);  // original value survives
+        CHECK(out_fn == test_exec_fn);
+    }
+
+    TEST_CASE("pop_frame preserves results at call site") {
+        wyrm_value mem[STACK_CAP];
+        wyrm_stack s = make_stack(mem);
+
+        // Caller pushes one value
+        wyrm_stack_push(&s, WYRM_NULL, prim_uword(99));
+
+        // Enter frame with 2 args
+        wyrm_value args[2];
+        args[0].type = WYRM_NULL; args[0].data = prim_uword(1);
+        args[1].type = WYRM_NULL; args[1].data = prim_uword(2);
+        REQUIRE(wyrm_stack_start_frame(&s, args, 2, test_exec_fn) == WYRM_ERR_NONE);
+
+        // Callee pushes 2 scratch values then 1 result at top
+        wyrm_stack_push(&s, WYRM_NULL, prim_uword(77));  // scratch
+        wyrm_stack_push(&s, WYRM_NULL, prim_uword(55));  // result to preserve
+
+        // Pop frame preserving 1 result
+        wyrm_exec_fn out_fn = WYRM_NULL;
+        CHECK(wyrm_stack_pop_frame(&s, &out_fn, 1) == WYRM_ERR_NONE);
+        CHECK(s.base == s.entries_begin);
+        // Stack: [99, 55]
+        CHECK(s.top == s.entries_begin + 2);
+        CHECK(out_fn == test_exec_fn);
+
+        wyrm_primitive out;
+        wyrm_stack_pop(&s, WYRM_NULL, &out); CHECK(out.uword == 55);
+        wyrm_stack_pop(&s, WYRM_NULL, &out); CHECK(out.uword == 99);
+    }
+
+    TEST_CASE("pop_frame with too few entries returns WYRM_ERR_RANGE") {
+        wyrm_value mem[STACK_CAP];
+        wyrm_stack s = make_stack(mem);
+
+        wyrm_stack_push(&s, WYRM_NULL, prim_uword(0));
+        REQUIRE(wyrm_stack_start_frame(&s, WYRM_NULL, 0, test_exec_fn) == WYRM_ERR_NONE);
+
+        // Frame has 0 entries, preserving 1 should fail
+        wyrm_exec_fn out_fn = WYRM_NULL;
+        CHECK(wyrm_stack_pop_frame(&s, &out_fn, 1) == WYRM_ERR_RANGE);
+    }
+
+    TEST_CASE("pop_frame with no outer frame returns WYRM_ERR_INVAL") {
+        wyrm_value mem[STACK_CAP];
+        wyrm_stack s = make_stack(mem);
+
+        wyrm_stack_push(&s, WYRM_NULL, prim_uword(42));
+        // base == entries_begin — no frame was started
+        wyrm_exec_fn out_fn = WYRM_NULL;
+        CHECK(wyrm_stack_pop_frame(&s, &out_fn, 0) == WYRM_ERR_INVAL);
+    }
+}
