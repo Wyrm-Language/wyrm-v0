@@ -1,7 +1,7 @@
 cfg = configuration_data()
 
 doctest_dep = dependency('doctest', fallback: ['doctest', 'doctest_dep'])
-# glib_dep = dependency('glib-2.0', version: '>=2.56', required: get_option('glib'))
+glib_dep = dependency('glib-2.0', version: '>=2.56', required: get_option('glib'))
 
 
 # -----------------------------------------------------------------------------
@@ -35,11 +35,11 @@ if get_option('hosted')
     modules += ports_hosted
 endif
 
-# if glib_dep.found()
-#    cfg.set('WYRM_HAVE_GLIB', 1)
-#    subdir('platform.glib')        # sets platform_glib
-#    modules += platform_glib
-# endif
+if glib_dep.found()
+    cfg.set('WYRM_HAVE_GLIB', 1)
+    subdir('platform/glib')
+    modules += platform_glib
+endif
 
 # wy_opt = get_option('wy')
 # wyrm_opt = get_option('wyrm')
@@ -117,7 +117,7 @@ subdir('test')
 
 summary({
     'hosted' : get_option('hosted'),
-#    'glib'   : glib_dep.found(),
+    'glib'   : glib_dep.found(),
 #    'wy'     : not wy_opt.disabled(),
 #    'wyrm'   : not wyrm_opt.disabled(),
 }, section: 'Configuration', bool_yn: true)

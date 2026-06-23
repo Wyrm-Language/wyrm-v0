@@ -16,21 +16,34 @@ extern "C" {
 
 struct wyrm_exec_result;
 struct wyrm_fiber;
+struct wyrm_object_type;
+struct wyrm_object_header;
+struct wyrm_main_loop;
 union wyrm_primitive;
 struct wyrm_stack;
+struct wyrm_thread;
 struct wyrm_type;
+struct wyrm_main_loop_vt;
 struct wyrm_value;
 
 #ifndef __cplusplus
 typedef struct wyrm_exec_result wyrm_exec_result;
 typedef struct wyrm_fiber wyrm_fiber;
+typedef struct wyrm_object_type wyrm_object_type;
+typedef struct wyrm_object_header wyrm_object_header;
+typedef struct wyrm_main_loop wyrm_main_loop;
+typedef struct wyrm_main_loop_vt wyrm_main_loop_vt;
 typedef union wyrm_primitive wyrm_primitive;
 typedef struct wyrm_stack wyrm_stack;
+typedef struct wyrm_thread wyrm_thread;
 typedef struct wyrm_type wyrm_type;
 typedef struct wyrm_value wyrm_value;
 #endif
 
 typedef wyrm_fiber* wyrm_fiber_ref;
+typedef const wyrm_object_type* wyrm_object_type_ref;
+typedef struct wyrm_main_loop* wyrm_main_loop_ref;
+typedef wyrm_thread* wyrm_thread_ref;
 typedef const wyrm_type* wyrm_type_ref;
 
 // ----------------------------------------------------------------------------
@@ -168,6 +181,35 @@ struct wyrm_value
     wyrm_primitive data;
 };
 
+
+// ----------------------------------------------------------------------------
+// Wyrm Object
+// ----------------------------------------------------------------------------
+
+/**
+ * @brief Object Definition
+ *
+ * Like other VM systems, we reference objects by the object header.
+ * Objects are expected to have object header as the first structural
+ * member to allow safe type casting.
+ */
+struct wyrm_object_header
+{
+    wyrm_object_type_ref type;
+};
+
+/**
+ * @brief Object Type Definition
+ *
+ * The Object Type defines the structure and operations that are supported
+ * on the memory associated with an object header.
+ */
+typedef struct wyrm_object_type
+{
+    wyrm_object_type_ref super;
+} wyrm_object_type;
+
+
 // ----------------------------------------------------------------------------
 // Stack
 // ----------------------------------------------------------------------------
@@ -193,6 +235,96 @@ struct wyrm_fiber
     wyrm_exec_fn pending_fn; ///< Non-NULL → fiber is pending; NULL → done or exception.
     wyrm_value exception;    ///< type != NULL → an exception is set.
 };
+
+// ----------------------------------------------------------------------------
+// Wyrm Main Loop
+// ----------------------------------------------------------------------------
+
+/**
+ * I/O condition flags for file descriptor events
+ */
+enum wyrm_io_flag
+{
+    WYRM_IO_IN = 1,
+    WYRM_IO_PRI = 2,
+    WYRM_IO_OUT = 4,
+    WYRM_IO_ERR = 8,
+    WYRM_IO_HUP = 16,
+    WYRM_IO_NVAL = 32,
+};
+
+/**
+ * I/O condition type.
+ *
+ * A combination of wyrm_io_flag values bitwise OR'd together to indicate the
+ * reason for IO handling entry.
+ */
+typedef wyrm_uword wyrm_io_condition;
+
+/**
+ * @brief Main loop source priority abstraction
+ *
+ * Priority values are backend-agnostic and intentionally limited to a small
+ * portable set.
+ */
+enum wyrm_priority
+{
+    WYRM_PRIORITY_HIGH,
+    WYRM_PRIORITY_DEFAULT,
+    WYRM_PRIORITY_IDLE,
+};
+
+typedef enum wyrm_priority wyrm_priority;
+
+/**
+ * Source callback for idle and timer events
+ *
+ * This registered callback is invoked according to the registered event type.
+ * The `user_data` primitive is registered with the main loop and will be
+ * treated as a purely opaque value. If using object reference or memory,
+ * then the memory _MUST_ be referenced / managed externally and kept
+ * for the lifespan of the callback.
+ */
+typedef bool (*wyrm_source_cb)(wyrm_primitive user_data);
+
+/**
+ * Source callback for file descriptor events
+ */
+typedef bool (*wyrm_source_handle_cb)(wyrm_handle handle, wyrm_io_condition condition, wyrm_primitive user_data);
+
+/**
+ * Main loop virtual table
+ */
+typedef struct wyrm_main_loop_vt
+{
+    wyrm_error (*add_fd)(wyrm_main_loop_ref ref, wyrm_primitive *out, wyrm_handle fd, wyrm_io_condition events, wyrm_priority priority, wyrm_source_handle_cb cb, wyrm_primitive ud);
+    wyrm_error (*add_timer)(wyrm_main_loop_ref self, wyrm_primitive *out, uint32_t ms, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
+    wyrm_error (*add_idle)(wyrm_main_loop_ref self, wyrm_primitive *out, wyrm_source_cb cb, wyrm_primitive ud);
+    wyrm_error (*add_wakeable)(wyrm_main_loop_ref self, wyrm_primitive *out, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
+    wyrm_error (*trigger)(wyrm_main_loop_ref self, wyrm_primitive src);
+    wyrm_error (*remove)(wyrm_main_loop_ref self, wyrm_primitive src);
+    wyrm_error (*iterate)(wyrm_main_loop_ref self, bool may_block);
+    wyrm_error (*run)(wyrm_main_loop_ref self);
+    wyrm_error (*quit)(wyrm_main_loop_ref self);
+} wyrm_main_loop_vt;
+
+/**
+ * Main Loop Abstraction
+ */
+typedef struct wyrm_main_loop
+{
+    const wyrm_main_loop_vt *vt;
+} wyrm_main_loop;
+
+// ----------------------------------------------------------------------------
+// Wyrm Thread (OS)
+// ----------------------------------------------------------------------------
+
+struct wyrm_thread
+{
+    int placeholder_;
+};
+
 
 
 #ifdef __cplusplus
