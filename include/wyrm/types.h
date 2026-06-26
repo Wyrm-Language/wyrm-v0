@@ -79,9 +79,10 @@ typedef struct wyrm_allocator {
 enum wyrm_exec_state_tag
 {
     WYRM_EXEC_DONE = 0,      ///< Normal return. stack_values indicates the count of values returned.
-    WYRM_EXEC_EXCEPTION = 1, ///< Unhandled condition raised. fiber->exception holds the value.
-    WYRM_EXEC_PENDING = 2,   ///< Callee pushed a new frame; fiber->pending_fn is the next call.
-    // WYRM_EXEC_DELEGATE -- TBD, tail call
+    // WYRM_EXEC_EXCEPTION, ///< Unhandled condition raised. fiber->exception holds the value. TODO
+    // WYRM_EXEC_PENDING,   ///< Callee pushed a new frame; fiber->pending_fn is the next call. TODO
+    WYRM_EXEC_DELEGATE,     ///< Tail call; reset stack
+    WYRM_EXEC_CONTINUE,     ///< Continue with the current stack
 };
 typedef wyrm_ushort wyrm_exec_state;
 
@@ -214,6 +215,20 @@ typedef struct wyrm_object_type
 // Stack
 // ----------------------------------------------------------------------------
 
+/**
+ * @struct wyrm_stack
+ *
+ * Stack primitive for the Wyrm interpreter. Stack space is defined by a
+ * pointer range (entries_begin, entries_end); Stack grows upward from
+ * begin toward end.
+ *
+ * Stack shape:
+ *      [base - 2] Previous base pointer;
+ *      [base - 1] Continuation meant to expand after base
+ *      [base]
+ *      ...  Current value of the stack
+ *      [top]
+ */
 struct wyrm_stack
 {
     wyrm_value* entries_begin;

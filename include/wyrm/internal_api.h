@@ -10,6 +10,19 @@ extern "C" {
 
 #define WYRM_FIXME_STACK_BASE_PTR_TYPE WYRM_NULL  // TODO: define a real frame-header type
 #define WYRM_FIXME_STACK_CONT_TYPE     WYRM_NULL  // TODO: define a real continuation-slot type
+#define WYRM_FIXME_TYPE_INT WYRM_NULL
+
+// ----------------------------------------------------------------------------
+// Integer
+// ----------------------------------------------------------------------------
+
+static inline wyrm_value wyrm_make_int(wyrm_word value)
+{
+    wyrm_value v;
+    v.data.word = value;
+    v.type = WYRM_FIXME_TYPE_INT;
+    return v;
+}
 
 // ----------------------------------------------------------------------------
 // Allocator
@@ -96,9 +109,17 @@ static inline void wyrm_stack_init_f(wyrm_stack* self, wyrm_value* memory, wyrm_
  *
  * @param self Pointer to the stack
  */
-static inline wyrm_uword wyrm_stack_capacity_remaining(wyrm_stack* self)
+static inline wyrm_uword wyrm_stack_capacity_remaining_f(wyrm_stack* self)
 {
     return self->entries_end - self->top;
+}
+
+/**
+ * Get total argument on stack
+ */
+static inline wyrm_uword wyrm_stack_arg_count_f(wyrm_stack* self)
+{
+    return (wyrm_uword)(self->top - self->base);
 }
 
 
@@ -110,10 +131,9 @@ static inline wyrm_uword wyrm_stack_capacity_remaining(wyrm_stack* self)
  * @param value Primitive value
  * @return WYRM_ERR_NONE on success, WYRM_ERR_INVAL if self is NULL, WYRM_ERR_NOMEM if stack is full
  */
-static inline wyrm_error wyrm_stack_push(wyrm_stack* self, wyrm_type_ref type_ref, wyrm_primitive value)
+static inline wyrm_error wyrm_stack_push_f(wyrm_stack* self, wyrm_type_ref type_ref, wyrm_primitive value)
 {
-    if (self == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (self->top == self->entries_end) { return WYRM_ERR_NOMEM; }
+    if (self->top >= self->entries_end) { return WYRM_ERR_NOMEM; }
     self->top->type = type_ref;
     self->top->data = value;
     self->top++;
@@ -132,7 +152,7 @@ static inline wyrm_error wyrm_stack_push(wyrm_stack* self, wyrm_type_ref type_re
 static inline wyrm_error wyrm_stack_pop(wyrm_stack* self, wyrm_type_ref* type_ref, wyrm_primitive* value)
 {
     if (self == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (self->top == self->entries_begin) { return WYRM_ERR_EMPTY; }
+    if (self->top <= self->entries_begin) { return WYRM_ERR_EMPTY; }
     self->top--;
     if (type_ref != WYRM_NULL) { *type_ref = self->top->type; }
     if (value != WYRM_NULL)    { *value    = self->top->data; }
@@ -140,78 +160,185 @@ static inline wyrm_error wyrm_stack_pop(wyrm_stack* self, wyrm_type_ref* type_re
 }
 
 /**
- * Start a new stack frame.
+ * Push continuation to the stack.
  *
- * Pushes two header slots below the new base:
- *   base[-2]  saved base pointer (restored by wyrm_stack_pop_frame)
- *   base[-1]  continuation function (returned by wyrm_stack_pop_frame)
- * Then pushes arg_count argument values above base.
+ * Set the next continuation for the next set of results. The base pointer
+ * marks the space where arguments to the continuation are stored.
  *
- * @param self         Stack
- * @param args         Array of arguments (may be NULL if arg_count == 0)
- * @param arg_count    Number of arguments
- * @param continuation Function to invoke when this frame's result is ready (may be NULL)
+ * @memberof wyrm_stack
+ *
+ * @param self Stack
+ * @param cont_fn Function to invoke when this frame's result is ready (may be NULL)
  * @return WYRM_ERR_NONE on success, WYRM_ERR_INVAL if self is NULL, WYRM_ERR_NOMEM if full
  */
-static inline wyrm_error wyrm_stack_start_frame(wyrm_stack* self, wyrm_value* args, wyrm_uword arg_count, wyrm_exec_fn continuation)
+static inline wyrm_error wyrm_stack_push_continuation_f(wyrm_stack* self, wyrm_exec_fn cont_fn)
 {
-    if (self == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if ((arg_count + 2) > wyrm_stack_capacity_remaining(self)) { return WYRM_ERR_NOMEM; }
+    wyrm_value* saved_base = self->top;
+    if (saved_base >= self->entries_end) { return WYRM_ERR_NOMEM; }
+
+    wyrm_value* cont = saved_base + 1;
+    if (cont >= self->entries_end) { return WYRM_ERR_NOMEM; }
 
     // base[-2]: saved base pointer
-    self->top->type = WYRM_FIXME_STACK_BASE_PTR_TYPE;
-    self->top->data.value_ptr = self->base;
-    self->top++;
+    saved_base->type = WYRM_FIXME_STACK_BASE_PTR_TYPE;
+    saved_base->data.value_ptr = self->base;
 
     // base[-1]: continuation
-    self->top->type = WYRM_FIXME_STACK_CONT_TYPE;
-    self->top->data.cb = continuation;
-    self->top++;
+    cont->type = WYRM_FIXME_STACK_CONT_TYPE;
+    cont->data.cb = cont_fn;
 
+    self->top  = cont + 1;
     self->base = self->top;
-
-    for (wyrm_uword i = 0; i < arg_count; i++) {
-        *self->top = args[i];
-        self->top++;
-    }
-    WYRM_ASSERT(self->top <= self->entries_end);
-
     return WYRM_ERR_NONE;
 }
 
 
 /**
- * Pop a stack frame, preserving the top N values as results.
+ * Pop a stack frame, keeping top N values at the stack top.
  *
- * Restores the base pointer saved by wyrm_stack_start_frame, then moves
- * preserve_count values from the top of the current frame to where the
+ * Restores the base pointer saved by wyrm_stack_push_continuation_f, then
+ * moves preserve_count values from the top of the current frame to where the
  * saved-base-pointer slot was, collapsing the frame.
+ *
+ * @memberof wyrm_stack
  *
  * @param self           Stack
  * @param preserve_count Number of top-of-frame values to keep as results
  * @return WYRM_ERR_NONE on success
- *         WYRM_ERR_INVAL if self is NULL or no outer frame exists
+ *         WYRM_ERR_INVAL if top stack values invalid
  *         WYRM_ERR_RANGE if current frame holds fewer than preserve_count values
  */
-static inline wyrm_error wyrm_stack_pop_frame(wyrm_stack* self, wyrm_exec_fn* out_continuation, wyrm_uword preserve_count)
+static inline wyrm_error wyrm_stack_pop_continuation_f(wyrm_stack* self, wyrm_exec_fn* out_continuation, wyrm_uword preserve_count)
 {
-    if (self == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (self->base <= self->entries_begin) { return WYRM_ERR_INVAL; }
+    WYRM_ASSERT(self != WYRM_NULL && out_continuation != WYRM_NULL);
     if ((wyrm_uword)(self->top - self->base) < preserve_count) { return WYRM_ERR_RANGE; }
+    if (self->base <= self->entries_begin) { return WYRM_ERR_EMPTY; }
+    wyrm_value* cont = self->base - 1;
+    if (cont <= self->entries_begin) { return WYRM_ERR_EMPTY; }
+    wyrm_value* old_base_value = cont - 1;
 
-    // Verify expected type (stack corruption otherwise)
-    wyrm_value* frame_slot = self->base - 2;
-    if (frame_slot[0].type != WYRM_FIXME_STACK_BASE_PTR_TYPE) { return WYRM_ERR_INVAL; }
-    if (frame_slot[1].type != WYRM_FIXME_STACK_CONT_TYPE) { return WYRM_ERR_INVAL; }
+    // Verify expected type and save (stack corruption otherwise)
+    if (old_base_value->type != WYRM_FIXME_STACK_BASE_PTR_TYPE) { return WYRM_ERR_INVAL; }
+    wyrm_value* old_base = old_base_value->data.value_ptr;
 
-    // Grab old base (verified ok), move pointers up, return
-    wyrm_value* old_base   = frame_slot->data.value_ptr;
-    if (out_continuation != WYRM_NULL) { *out_continuation = frame_slot[1].data.cb; }
-    wyrm_memmove(frame_slot, self->top - preserve_count, preserve_count * sizeof(wyrm_value));
-    self->top  = frame_slot + preserve_count;
+    if (cont->type != WYRM_FIXME_STACK_CONT_TYPE) { return WYRM_ERR_INVAL; }
+    *out_continuation = cont->data.cb;
+
+    // Grab base to restore and find continuation
+    wyrm_memmove(old_base_value, self->top - preserve_count, preserve_count * sizeof(wyrm_value));
+    self->top  = old_base_value + preserve_count;
     self->base = old_base;
     return WYRM_ERR_NONE;
 }
+
+/**
+ * Replace the top of the stack.
+ * @memberof wyrm_stack
+ */
+static inline wyrm_error wyrm_stack_replace_frame_f(wyrm_stack* self, wyrm_uword preserve_count)
+{
+    if ((wyrm_uword)(self->top - self->base) < preserve_count) { return WYRM_ERR_RANGE; }
+    wyrm_memmove(self->base, self->top - preserve_count, preserve_count * sizeof(wyrm_value));
+    self->top = self->base + preserve_count;
+    return WYRM_ERR_NONE;
+}
+
+/**
+ * Push array of values to the stack.
+ * @memberof wyrm_stack
+ */
+static inline wyrm_error wyrm_stack_push_array_f(wyrm_stack* self, wyrm_value* array, wyrm_uword count)
+{
+    if (count == 0) { return WYRM_ERR_NONE; }
+    if ((wyrm_uword)(self->entries_end - self->top) < count) { return WYRM_ERR_NOMEM; }
+    wyrm_memmove(self->top, array, count * sizeof(wyrm_value));
+    self->top += count;
+    return WYRM_ERR_NONE;
+}
+
+// ----------------------------------------------------------------------------
+// Fiber Startup
+// ----------------------------------------------------------------------------
+
+static inline wyrm_uword wyrm_fiber_value_count_f(wyrm_fiber_ref self)
+{
+    return wyrm_stack_arg_count_f(&self->value_stack);
+}
+
+
+static inline wyrm_value* wyrm_fiber_value_n(wyrm_fiber_ref self, wyrm_uword index)
+{
+    return &self->value_stack.base[index];
+}
+
+static inline wyrm_error wyrm_fiber_push_value_f(wyrm_fiber_ref self, wyrm_value value)
+{
+    return wyrm_stack_push_f(&self->value_stack, value.type, value.data);
+}
+
+static inline wyrm_error wyrm_fiber_exec_f(wyrm_fiber_ref self)
+{
+    wyrm_error last_error = WYRM_ERR_NONE;
+    wyrm_exec_fn pending = self->pending_fn; self->pending_fn = WYRM_NULL;
+
+    // No pending function, nothing to execute
+    if (pending == WYRM_NULL) { return WYRM_ERR_NONE; }
+
+    // Execute until error
+    while (last_error == WYRM_ERR_NONE) {
+        wyrm_exec_result result = pending(self);
+
+        if (result.state == WYRM_EXEC_DELEGATE) {
+            last_error = wyrm_stack_replace_frame_f(&self->value_stack, result.stack_values);
+            if (self->pending_fn != WYRM_NULL) {
+                pending = self->pending_fn; self->pending_fn = WYRM_NULL;
+            } else if (last_error == WYRM_ERR_NONE) {
+                last_error = WYRM_ERR_INVAL;
+            }
+        } else if (result.state == WYRM_EXEC_CONTINUE) {
+            if (self->pending_fn != WYRM_NULL) {
+                pending = self->pending_fn; self->pending_fn = WYRM_NULL;
+            } else {
+                last_error = WYRM_ERR_INVAL;
+            }
+        } else if (result.state == WYRM_EXEC_DONE) {
+            last_error = wyrm_stack_pop_continuation_f(&self->value_stack, &pending, result.stack_values);
+            if (last_error == WYRM_ERR_EMPTY) { last_error = WYRM_ERR_NONE; break; }
+            if (!pending) { break; }
+        } else {
+            last_error = WYRM_ERR_INVAL;
+        }
+    }
+    return last_error;
+}
+
+static inline wyrm_error wyrm_fiber_push_continuation(wyrm_fiber_ref self, wyrm_exec_fn fn, wyrm_value* arg, wyrm_uword arg_count)
+{
+    wyrm_error last_error = wyrm_stack_push_continuation_f(&self->value_stack, fn);
+    if (last_error != WYRM_ERR_NONE) { return last_error; }
+
+    last_error = wyrm_stack_push_array_f(&self->value_stack, arg, arg_count);
+    if (last_error != WYRM_ERR_NONE) {
+        wyrm_exec_fn garbage;
+        wyrm_stack_pop_continuation_f(&self->value_stack, &garbage, 0);
+        return last_error;
+    }
+
+    return WYRM_ERR_NONE;
+}
+
+static inline wyrm_error wyrm_fiber_set_entry_f(wyrm_fiber_ref self, wyrm_exec_fn fn)
+{
+    self->pending_fn = fn;
+    return WYRM_ERR_NONE;
+}
+
+static inline void wyrm_fiber_init(wyrm_fiber_ref self, wyrm_value* stack, wyrm_uword stack_size)
+{
+    wyrm_stack_init_f(&self->value_stack, stack, stack_size);
+    self->pending_fn = WYRM_NULL;
+}
+
 
 
 // ----------------------------------------------------------------------------

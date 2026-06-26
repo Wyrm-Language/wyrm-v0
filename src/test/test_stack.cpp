@@ -29,7 +29,7 @@ TEST_SUITE("stack") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
-        CHECK(wyrm_stack_push(&s, WYRM_NULL, prim_uword(42)) == WYRM_ERR_NONE);
+        CHECK(wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(42)) == WYRM_ERR_NONE);
         CHECK(s.top == s.entries_begin + 1);
 
         wyrm_type_ref out_type = reinterpret_cast<wyrm_type_ref>(1);
@@ -44,9 +44,9 @@ TEST_SUITE("stack") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
-        wyrm_stack_push(&s, WYRM_NULL, prim_uword(1));
-        wyrm_stack_push(&s, WYRM_NULL, prim_uword(2));
-        wyrm_stack_push(&s, WYRM_NULL, prim_uword(3));
+        wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(1));
+        wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(2));
+        wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(3));
 
         wyrm_primitive out;
         wyrm_stack_pop(&s, WYRM_NULL, &out); CHECK(out.uword == 3);
@@ -65,76 +65,79 @@ TEST_SUITE("stack") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
         for (int i = 0; i < STACK_CAP; i++) {
-            REQUIRE(wyrm_stack_push(&s, WYRM_NULL, prim_uword((wyrm_uword)i)) == WYRM_ERR_NONE);
+            REQUIRE(wyrm_stack_push_f(&s, WYRM_NULL, prim_uword((wyrm_uword)i)) == WYRM_ERR_NONE);
         }
-        CHECK(wyrm_stack_push(&s, WYRM_NULL, prim_uword(0)) == WYRM_ERR_NOMEM);
+        CHECK(wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(0)) == WYRM_ERR_NOMEM);
     }
 
     TEST_CASE("null self returns WYRM_ERR_INVAL") {
-        CHECK(wyrm_stack_push(WYRM_NULL, WYRM_NULL, prim_uword(0)) == WYRM_ERR_INVAL);
+        // Only non-_f functions perform null checks; _f functions use WYRM_ASSERT
         CHECK(wyrm_stack_pop(WYRM_NULL, WYRM_NULL, WYRM_NULL) == WYRM_ERR_INVAL);
-        CHECK(wyrm_stack_start_frame(WYRM_NULL, WYRM_NULL, 0, WYRM_NULL) == WYRM_ERR_INVAL);
-        CHECK(wyrm_stack_pop_frame(WYRM_NULL, WYRM_NULL, 0) == WYRM_ERR_INVAL);
     }
 
-    TEST_CASE("start_frame sets base and pushes args") {
+    TEST_CASE("push_continuation_f sets base and push_array_f adds args") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
         // One value already on the stack (simulates caller context)
-        wyrm_stack_push(&s, WYRM_NULL, prim_uword(99));
+        wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(99));
+
+        CHECK(wyrm_stack_push_continuation_f(&s, test_exec_fn) == WYRM_ERR_NONE);
+
+        // base advances past the 2 header slots
+        CHECK(s.base == s.entries_begin + 3);
 
         wyrm_value args[2];
         args[0].type = WYRM_NULL; args[0].data = prim_uword(10);
         args[1].type = WYRM_NULL; args[1].data = prim_uword(20);
 
-        CHECK(wyrm_stack_start_frame(&s, args, 2, test_exec_fn) == WYRM_ERR_NONE);
+        CHECK(wyrm_stack_push_array_f(&s, args, 2) == WYRM_ERR_NONE);
 
-        // saved-base-ptr slot + 2 args = 3 entries total above the initial value
+        // 1 existing + 2 headers + 2 args
         CHECK(s.top  == s.entries_begin + 5);
-        // base points just past the saved-base-ptr slot
-        CHECK(s.base == s.entries_begin + 3);
         // saved slot holds the old base (entries_begin)
         CHECK((s.base - 2)->data.value_ptr == s.entries_begin);
     }
 
-    TEST_CASE("pop_frame with no preserve collapses frame") {
+    TEST_CASE("pop_continuation_f with no preserve collapses frame") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
-        wyrm_stack_push(&s, WYRM_NULL, prim_uword(1));
+        wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(1));
 
         wyrm_value args[1];
         args[0].type = WYRM_NULL; args[0].data = prim_uword(42);
-        REQUIRE(wyrm_stack_start_frame(&s, args, 1, test_exec_fn) == WYRM_ERR_NONE);
+        REQUIRE(wyrm_stack_push_continuation_f(&s, test_exec_fn) == WYRM_ERR_NONE);
+        REQUIRE(wyrm_stack_push_array_f(&s, args, 1) == WYRM_ERR_NONE);
 
         wyrm_exec_fn out_fn = WYRM_NULL;
-        CHECK(wyrm_stack_pop_frame(&s, &out_fn, 0) == WYRM_ERR_NONE);
+        CHECK(wyrm_stack_pop_continuation_f(&s, &out_fn, 0) == WYRM_ERR_NONE);
         CHECK(s.base == s.entries_begin);
         CHECK(s.top  == s.entries_begin + 1);  // original value survives
         CHECK(out_fn == test_exec_fn);
     }
 
-    TEST_CASE("pop_frame preserves results at call site") {
+    TEST_CASE("pop_continuation_f preserves results at call site") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
         // Caller pushes one value
-        wyrm_stack_push(&s, WYRM_NULL, prim_uword(99));
+        wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(99));
 
         // Enter frame with 2 args
         wyrm_value args[2];
         args[0].type = WYRM_NULL; args[0].data = prim_uword(1);
         args[1].type = WYRM_NULL; args[1].data = prim_uword(2);
-        REQUIRE(wyrm_stack_start_frame(&s, args, 2, test_exec_fn) == WYRM_ERR_NONE);
+        REQUIRE(wyrm_stack_push_continuation_f(&s, test_exec_fn) == WYRM_ERR_NONE);
+        REQUIRE(wyrm_stack_push_array_f(&s, args, 2) == WYRM_ERR_NONE);
 
         // Callee pushes 2 scratch values then 1 result at top
-        wyrm_stack_push(&s, WYRM_NULL, prim_uword(77));  // scratch
-        wyrm_stack_push(&s, WYRM_NULL, prim_uword(55));  // result to preserve
+        wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(77));  // scratch
+        wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(55));  // result to preserve
 
         // Pop frame preserving 1 result
         wyrm_exec_fn out_fn = WYRM_NULL;
-        CHECK(wyrm_stack_pop_frame(&s, &out_fn, 1) == WYRM_ERR_NONE);
+        CHECK(wyrm_stack_pop_continuation_f(&s, &out_fn, 1) == WYRM_ERR_NONE);
         CHECK(s.base == s.entries_begin);
         // Stack: [99, 55]
         CHECK(s.top == s.entries_begin + 2);
@@ -145,25 +148,25 @@ TEST_SUITE("stack") {
         wyrm_stack_pop(&s, WYRM_NULL, &out); CHECK(out.uword == 99);
     }
 
-    TEST_CASE("pop_frame with too few entries returns WYRM_ERR_RANGE") {
+    TEST_CASE("pop_continuation_f with too few entries returns WYRM_ERR_RANGE") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
-        wyrm_stack_push(&s, WYRM_NULL, prim_uword(0));
-        REQUIRE(wyrm_stack_start_frame(&s, WYRM_NULL, 0, test_exec_fn) == WYRM_ERR_NONE);
+        wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(0));
+        REQUIRE(wyrm_stack_push_continuation_f(&s, test_exec_fn) == WYRM_ERR_NONE);
 
         // Frame has 0 entries, preserving 1 should fail
         wyrm_exec_fn out_fn = WYRM_NULL;
-        CHECK(wyrm_stack_pop_frame(&s, &out_fn, 1) == WYRM_ERR_RANGE);
+        CHECK(wyrm_stack_pop_continuation_f(&s, &out_fn, 1) == WYRM_ERR_RANGE);
     }
 
-    TEST_CASE("pop_frame with no outer frame returns WYRM_ERR_INVAL") {
+    TEST_CASE("pop_continuation_f with no outer frame returns WYRM_ERR_EMPTY") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
-        wyrm_stack_push(&s, WYRM_NULL, prim_uword(42));
+        wyrm_stack_push_f(&s, WYRM_NULL, prim_uword(42));
         // base == entries_begin — no frame was started
         wyrm_exec_fn out_fn = WYRM_NULL;
-        CHECK(wyrm_stack_pop_frame(&s, &out_fn, 0) == WYRM_ERR_INVAL);
+        CHECK(wyrm_stack_pop_continuation_f(&s, &out_fn, 0) == WYRM_ERR_EMPTY);
     }
 }

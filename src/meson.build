@@ -42,7 +42,7 @@ if glib_dep.found()
 endif
 
 # wy_opt = get_option('wy')
-# wyrm_opt = get_option('wyrm')
+wyrm_opt = get_option('wyrm')
 
 #if wyrm_opt.enabled() and wy_opt.disabled()
 #    error('wyrm option requires wy to be enabled')
@@ -109,9 +109,9 @@ cwyrm_lib_dep = declare_dependency(
 install_headers('../include/wyrm.h')
 install_subdir('../include/wyrm', install_dir: get_option('includedir'))
 
-# if not wyrm_opt.disabled()
-#     subdir('wyrm')
-# endif
+if not wyrm_opt.disabled()
+    subdir('wyrm')
+endif
 
 subdir('test')
 
