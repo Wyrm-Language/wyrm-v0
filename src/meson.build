@@ -112,6 +112,13 @@ cwyrm_lib_dep = declare_dependency(
 install_headers('../include/wyrm.h')
 install_subdir('../include/wyrm', install_dir: get_option('includedir'))
 
+pkgconfig = import('pkgconfig')
+pkgconfig.generate(cwyrm_lib,
+    name:        'cwyrm',
+    description: 'Wyrm C runtime library',
+    version:     meson.project_version(),
+)
+
 if not wyrm_opt.disabled()
     subdir('wyrm')
 endif
