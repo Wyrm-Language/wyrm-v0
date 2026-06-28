@@ -13,6 +13,18 @@ extern "C" {
 #define WYRM_FIXME_TYPE_INT WYRM_NULL
 
 // ----------------------------------------------------------------------------
+// Primitive
+// ----------------------------------------------------------------------------
+
+#define WYRM_PRIMITIVE_PTR(dtype, v) ((dtype*) (v).ptr)
+
+static inline wyrm_primitive wyrm_primitive_null() { const wyrm_primitive v = {.ptr = WYRM_NULL}; return v; }
+static inline wyrm_primitive wyrm_primitive_int(wyrm_word value) { const wyrm_primitive v = {.word = value}; return v; }
+static inline wyrm_primitive wyrm_primitive_ptr(void* value) { const wyrm_primitive v = {.ptr = value}; return v; }
+
+
+
+// ----------------------------------------------------------------------------
 // Integer
 // ----------------------------------------------------------------------------
 
@@ -332,13 +344,6 @@ static inline wyrm_error wyrm_fiber_set_entry_f(wyrm_fiber_ref self, wyrm_exec_f
     self->pending_fn = fn;
     return WYRM_ERR_NONE;
 }
-
-static inline void wyrm_fiber_init(wyrm_fiber_ref self, wyrm_value* stack, wyrm_uword stack_size)
-{
-    wyrm_stack_init_f(&self->value_stack, stack, stack_size);
-    self->pending_fn = WYRM_NULL;
-}
-
 
 
 // ----------------------------------------------------------------------------

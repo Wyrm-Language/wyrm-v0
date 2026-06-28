@@ -14,10 +14,12 @@ extern "C" {
 // Forward Definitions
 // ----------------------------------------------------------------------------
 
+struct wyrm_context;
 struct wyrm_exec_result;
 struct wyrm_fiber;
+struct wyrm_machine;
+struct wyrm_object;
 struct wyrm_object_type;
-struct wyrm_object_header;
 struct wyrm_main_loop;
 union wyrm_primitive;
 struct wyrm_stack;
@@ -27,10 +29,12 @@ struct wyrm_main_loop_vt;
 struct wyrm_value;
 
 #ifndef __cplusplus
+typedef struct wyrm_context wyrm_context;
 typedef struct wyrm_exec_result wyrm_exec_result;
 typedef struct wyrm_fiber wyrm_fiber;
+typedef struct wyrm_machine wyrm_machine;
 typedef struct wyrm_object_type wyrm_object_type;
-typedef struct wyrm_object_header wyrm_object_header;
+typedef struct wyrm_object wyrm_object;
 typedef struct wyrm_main_loop wyrm_main_loop;
 typedef struct wyrm_main_loop_vt wyrm_main_loop_vt;
 typedef union wyrm_primitive wyrm_primitive;
@@ -129,7 +133,6 @@ typedef wyrm_exec_result (*wyrm_exec_fn)(wyrm_fiber_ref fiber);
 struct wyrm_type
 {
     wyrm_type_ref parent;
-    const char* name;
 
     /// fn destroy(self: Self) -> None
     wyrm_exec_fn destroy;
@@ -164,6 +167,7 @@ union wyrm_primitive {
     wyrm_atomic_word ref_count;
     wyrm_atomic_word* ref_count_ptr;
     wyrm_sys_thread_id thread_id;
+    void* ptr;
 };
 
 enum {
@@ -194,9 +198,9 @@ struct wyrm_value
  * Objects are expected to have object header as the first structural
  * member to allow safe type casting.
  */
-struct wyrm_object_header
+struct wyrm_object
 {
-    wyrm_object_type_ref type;
+    const wyrm_object_type* type;
 };
 
 /**
@@ -207,6 +211,7 @@ struct wyrm_object_header
  */
 typedef struct wyrm_object_type
 {
+    wyrm_object head;
     wyrm_object_type_ref super;
 } wyrm_object_type;
 
@@ -246,9 +251,10 @@ struct wyrm_stack
 
 struct wyrm_fiber
 {
+    wyrm_context* parent;
     wyrm_stack value_stack;
     wyrm_exec_fn pending_fn; ///< Non-NULL → fiber is pending; NULL → done or exception.
-    wyrm_value exception;    ///< type != NULL → an exception is set.
+    /* wyrm_value exception; -- TODO */
 };
 
 // ----------------------------------------------------------------------------
@@ -331,6 +337,7 @@ typedef struct wyrm_main_loop
     const wyrm_main_loop_vt *vt;
 } wyrm_main_loop;
 
+
 // ----------------------------------------------------------------------------
 // Wyrm Thread (OS)
 // ----------------------------------------------------------------------------
@@ -340,7 +347,29 @@ struct wyrm_thread
     int placeholder_;
 };
 
+// ----------------------------------------------------------------------------
+// Wyrm Context
+// ----------------------------------------------------------------------------
 
+struct wyrm_context
+{
+    wyrm_machine* parent;
+    wyrm_fiber* current_fiber;
+    wyrm_main_loop* main_loop;
+
+    wyrm_primitive wakeable_source;
+};
+
+
+// ----------------------------------------------------------------------------
+// Wyrm Machine
+// ----------------------------------------------------------------------------
+
+struct wyrm_machine
+{
+    wyrm_allocator* allocator;
+    wyrm_context* context;
+};
 
 #ifdef __cplusplus
 }
