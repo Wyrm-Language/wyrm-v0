@@ -21,6 +21,7 @@ struct wyrm_machine;
 struct wyrm_object;
 struct wyrm_object_type;
 struct wyrm_main_loop;
+struct wyrm_object_list;
 union wyrm_primitive;
 struct wyrm_stack;
 struct wyrm_thread;
@@ -37,6 +38,7 @@ typedef struct wyrm_object_type wyrm_object_type;
 typedef struct wyrm_object wyrm_object;
 typedef struct wyrm_main_loop wyrm_main_loop;
 typedef struct wyrm_main_loop_vt wyrm_main_loop_vt;
+typedef struct wyrm_object_list wyrm_object_list;
 typedef union wyrm_primitive wyrm_primitive;
 typedef struct wyrm_stack wyrm_stack;
 typedef struct wyrm_thread wyrm_thread;
@@ -215,6 +217,16 @@ typedef struct wyrm_object_type
     wyrm_object_type_ref super;
 } wyrm_object_type;
 
+/**
+ * List of wyrm objects
+ */
+struct wyrm_object_list
+{
+    wyrm_allocator* allocator;
+    wyrm_object** objects;
+    wyrm_uword count;
+    wyrm_uword capacity;
+};
 
 // ----------------------------------------------------------------------------
 // Stack

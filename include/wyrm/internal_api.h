@@ -22,6 +22,19 @@ static inline wyrm_primitive wyrm_primitive_null() { const wyrm_primitive v = {.
 static inline wyrm_primitive wyrm_primitive_int(wyrm_word value) { const wyrm_primitive v = {.word = value}; return v; }
 static inline wyrm_primitive wyrm_primitive_ptr(void* value) { const wyrm_primitive v = {.ptr = value}; return v; }
 
+// ----------------------------------------------------------------------------
+// Utility Math Functions
+// ----------------------------------------------------------------------------
+
+/**
+ * Get the next array size given current capacity and initial capacity
+ */
+WYRM_INLINE wyrm_uword wyrm_next_array_capacity(wyrm_uword current_capacity, wyrm_uword initial)
+{
+    if (current_capacity >= WYRM_UWORD_HALF) return WYRM_UWORD_MAX;
+    return current_capacity == 0 ? initial : current_capacity * 2;
+}
+
 
 
 // ----------------------------------------------------------------------------

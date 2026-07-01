@@ -48,6 +48,14 @@
 #endif
 #endif
 
+#ifndef WYRM_INLINE
+#ifdef __cplusplus
+#define WYRM_INLINE inline
+#else
+#define WYRM_INLINE static inline
+#endif
+#endif
+
 #define WYRM_ASSERT_ALWAYS() WYRM_ASSERT(false)
 
 #define WYRM_UNUSED(x) (void)(x)
@@ -75,6 +83,7 @@
 #define WYRM_PLATFORM_UWORD_DEFINED 1
 #define WYRM_PRI_UWORD PRIx64
 #define WYRM_UWORD_MAX UINT64_MAX
+#define WYRM_UWORD_HALF (0x8000000000000000u)
 typedef uint64_t wyrm_uword;
 #endif
 
@@ -90,6 +99,7 @@ typedef double wyrm_float;
 typedef uint32_t wyrm_uword;
 #define WYRM_PLATFORM_UWORD_DEFINED 1
 #define WYRM_UWORD_MAX UINT32_MAX
+#define WYRM_UWORD_HALF (0x80000000u)
 #define WYRM_PRI_UWORD PRIx32
 #endif
 typedef uint16_t wyrm_ushort;

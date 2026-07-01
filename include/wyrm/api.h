@@ -19,6 +19,11 @@ static inline wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
 wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc);
 wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context);
 
+WYRM_INLINE void wyrm_object_list_init_s(wyrm_object_list* object_list, wyrm_allocator* allocator, wyrm_object** obj_list, wyrm_uword capacity);
+WYRM_INLINE void wyrm_object_list_init_f(wyrm_object_list* object_list, wyrm_allocator* allocator);
+WYRM_INLINE wyrm_object* wyrm_object_list_idx_f(wyrm_object_list* object_list, wyrm_uword idx);
+WYRM_INLINE wyrm_error wyrm_object_list_push(wyrm_object_list* object_list, wyrm_object* obj);
+
 /* ---------- wyrm_fiber inlines --------- */
 static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)
 {
@@ -34,9 +39,10 @@ static inline wyrm_machine* wyrm_context_get_machine(wyrm_context* self)
 }
 
 
-
 #ifdef __cplusplus
 }
 #endif
+
+#include "api_impl.h"
 
 #endif
