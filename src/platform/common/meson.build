@@ -1,5 +1,5 @@
 platform_common = {
-    'sources'      : files('allocator_static.c'),
+    'sources'      : files('allocator_null.c', 'allocator_static.c'),
     'inc'          : [],
     'deps'         : [],
     'public_inc'   : [],
