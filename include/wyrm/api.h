@@ -16,6 +16,18 @@ wyrm_error wyrm_context_init_s(wyrm_context* self, wyrm_main_loop* loop);
 wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber);
 static inline wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
 
+void wyrm_dict_init_s(wyrm_dict* self,
+    wyrm_allocator* allocator,
+    wyrm_uword count,
+    wyrm_key_hash_value* dense,
+    wyrm_uword dense_capacity,
+    wyrm_uword* sparse,
+    wyrm_uword sparse_capacity);
+void wyrm_dict_init_f(wyrm_dict* self, wyrm_allocator* allocator);
+void wyrm_dict_finalize_f(wyrm_dict* self);
+wyrm_value* wyrm_dict_get(wyrm_dict* self, wyrm_type_tag tag, wyrm_primitive value);
+wyrm_error wyrm_dict_set(wyrm_dict* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value);
+
 wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc);
 wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context);
 
@@ -23,6 +35,8 @@ WYRM_INLINE void wyrm_object_list_init_s(wyrm_object_list* object_list, wyrm_all
 WYRM_INLINE void wyrm_object_list_init_f(wyrm_object_list* object_list, wyrm_allocator* allocator);
 WYRM_INLINE wyrm_object* wyrm_object_list_idx_f(wyrm_object_list* object_list, wyrm_uword idx);
 WYRM_INLINE wyrm_error wyrm_object_list_push(wyrm_object_list* object_list, wyrm_object* obj);
+
+bool wyrm_primitive_eq(wyrm_type_tag lhs_type, wyrm_primitive lhs, wyrm_type_tag rhs_type, wyrm_primitive rhs);
 
 /* ---------- wyrm_fiber inlines --------- */
 static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)

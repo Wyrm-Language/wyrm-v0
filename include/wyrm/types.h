@@ -15,6 +15,7 @@ extern "C" {
 // ----------------------------------------------------------------------------
 
 struct wyrm_context;
+struct wyrm_dict;
 struct wyrm_exec_result;
 struct wyrm_fiber;
 struct wyrm_machine;
@@ -25,12 +26,12 @@ struct wyrm_object_list;
 union wyrm_primitive;
 struct wyrm_stack;
 struct wyrm_thread;
-struct wyrm_type;
 struct wyrm_main_loop_vt;
 struct wyrm_value;
 
 #ifndef __cplusplus
 typedef struct wyrm_context wyrm_context;
+typedef struct wyrm_dict wyrm_dict;
 typedef struct wyrm_exec_result wyrm_exec_result;
 typedef struct wyrm_fiber wyrm_fiber;
 typedef struct wyrm_machine wyrm_machine;
@@ -42,7 +43,6 @@ typedef struct wyrm_object_list wyrm_object_list;
 typedef union wyrm_primitive wyrm_primitive;
 typedef struct wyrm_stack wyrm_stack;
 typedef struct wyrm_thread wyrm_thread;
-typedef struct wyrm_type wyrm_type;
 typedef struct wyrm_value wyrm_value;
 #endif
 
@@ -50,7 +50,25 @@ typedef wyrm_fiber* wyrm_fiber_ref;
 typedef const wyrm_object_type* wyrm_object_type_ref;
 typedef struct wyrm_main_loop* wyrm_main_loop_ref;
 typedef wyrm_thread* wyrm_thread_ref;
-typedef const wyrm_type* wyrm_type_ref;
+
+// ----------------------------------------------------------------------------
+// Standardized Enumerations
+// ----------------------------------------------------------------------------
+
+/**
+ * Type tag definitions
+ */
+typedef enum wyrm_type_tag
+{
+    WYRM_TYPE_TAG_NIL = 0,
+    WYRM_TYPE_TAG_WORD,
+    WYRM_TYPE_TAG_UWORD,
+
+
+    WYRM_TYPE_TAG_STACK_BASE_PTR,
+    WYRM_TYPE_TAG_STACK_CONTINUATION_FRAME
+} wyrm_type_tag;
+
 
 // ----------------------------------------------------------------------------
 // Allocator
@@ -132,14 +150,6 @@ typedef wyrm_exec_result (*wyrm_exec_fn)(wyrm_fiber_ref fiber);
 // Wyrm Type
 // ----------------------------------------------------------------------------
 
-struct wyrm_type
-{
-    wyrm_type_ref parent;
-
-    /// fn destroy(self: Self) -> None
-    wyrm_exec_fn destroy;
-};
-
 
 // ----------------------------------------------------------------------------
 // Primitive Master Union
@@ -184,7 +194,7 @@ static_assert(WYRM_PRIMITIVE_SIZE >= sizeof(uintptr_t), "Primitive must allow st
 
 struct wyrm_value
 {
-    wyrm_type_ref type;
+    wyrm_type_tag type;
     wyrm_primitive data;
 };
 
@@ -226,6 +236,39 @@ struct wyrm_object_list
     wyrm_object** objects;
     wyrm_uword count;
     wyrm_uword capacity;
+};
+
+
+// ----------------------------------------------------------------------------
+// Core Objects
+// ----------------------------------------------------------------------------
+
+/**
+ * Key Hash Value
+ */
+typedef struct wyrm_key_hash_value
+{
+    wyrm_value key;
+    wyrm_uword key_hash;
+    wyrm_value value;
+} wyrm_key_hash_value;
+
+/**
+ * Dictionary type
+ */
+struct wyrm_dict
+{
+    wyrm_object obj;
+
+    wyrm_allocator* allocator;
+
+    wyrm_uword count;
+
+    wyrm_key_hash_value* dense;
+    wyrm_uword dense_capacity;
+
+    wyrm_uword* sparse;
+    wyrm_uword sparse_capacity;
 };
 
 // ----------------------------------------------------------------------------

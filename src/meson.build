@@ -13,8 +13,10 @@ cwyrm_lib_inc = include_directories('.', '../include')
 cwyrm_sources = files(
     'context.c',
     'cwyrm.c',
+    'dict.c',
     'fiber.c',
     'machine.c',
+    'primitive.c',
 )
 
 # Each modules module sets a dict named with keys:
