@@ -14,41 +14,47 @@ extern "C" {
 // Forward Definitions
 // ----------------------------------------------------------------------------
 
+struct wyrm_allocator;
+struct wyrm_allocator_vt;
+struct wyrm_box;
 struct wyrm_context;
 struct wyrm_dict;
 struct wyrm_exec_result;
 struct wyrm_fiber;
+struct wyrm_gc_object;
 struct wyrm_machine;
-struct wyrm_object;
-struct wyrm_object_type;
 struct wyrm_main_loop;
 struct wyrm_object_list;
 union wyrm_primitive;
 struct wyrm_stack;
+struct wyrm_string;
 struct wyrm_thread;
 struct wyrm_main_loop_vt;
 struct wyrm_value;
 
 #ifndef __cplusplus
+typedef struct wyrm_allocator wyrm_allocator;
+typedef struct wyrm_allocator_vt wyrm_allocator_vt;
+typedef struct wyrm_box wyrm_box;
 typedef struct wyrm_context wyrm_context;
 typedef struct wyrm_dict wyrm_dict;
 typedef struct wyrm_exec_result wyrm_exec_result;
 typedef struct wyrm_fiber wyrm_fiber;
+typedef struct wyrm_gc_object wyrm_gc_object;
 typedef struct wyrm_machine wyrm_machine;
 typedef struct wyrm_object_type wyrm_object_type;
 typedef struct wyrm_object wyrm_object;
 typedef struct wyrm_main_loop wyrm_main_loop;
 typedef struct wyrm_main_loop_vt wyrm_main_loop_vt;
-typedef struct wyrm_object_list wyrm_object_list;
 typedef union wyrm_primitive wyrm_primitive;
 typedef struct wyrm_stack wyrm_stack;
+typedef struct wyrm_string wyrm_string;
 typedef struct wyrm_thread wyrm_thread;
 typedef struct wyrm_value wyrm_value;
 #endif
 
 typedef wyrm_fiber* wyrm_fiber_ref;
-typedef const wyrm_object_type* wyrm_object_type_ref;
-typedef struct wyrm_main_loop* wyrm_main_loop_ref;
+typedef wyrm_main_loop* wyrm_main_loop_ref;
 typedef wyrm_thread* wyrm_thread_ref;
 
 // ----------------------------------------------------------------------------
@@ -56,7 +62,7 @@ typedef wyrm_thread* wyrm_thread_ref;
 // ----------------------------------------------------------------------------
 
 /**
- * Type tag definitions
+ * Primitive Types
  */
 typedef enum wyrm_type_tag
 {
@@ -69,26 +75,33 @@ typedef enum wyrm_type_tag
     WYRM_TYPE_TAG_STACK_CONTINUATION_FRAME
 } wyrm_type_tag;
 
+/**
+ * Garbage collected types
+ */
+typedef enum wyrm_gc_type_tag
+{
+    WYRM_GC_TYPE_BOX = 0,
+    WYRM_GC_TYPE_STR
+} wyrm_gc_type;
+
 
 // ----------------------------------------------------------------------------
 // Allocator
 // ----------------------------------------------------------------------------
 
-struct wyrm_allocator;
-
 /// @brief Virtual table for allocator
 typedef struct wyrm_allocator_vt {
-    void* (*alloc)(struct wyrm_allocator* self, wyrm_uword len);
-    void* (*realloc)(struct wyrm_allocator* self, void* buffer, wyrm_uword new_sz);
-    void (*free)(struct wyrm_allocator* self, void* buffer);
+    void* (*alloc)(wyrm_allocator* self, wyrm_uword len);
+    void* (*realloc)(wyrm_allocator* self, void* buffer, wyrm_uword new_sz);
+    void (*free)(wyrm_allocator* self, void* buffer);
 } wyrm_allocator_vt;
 
 /// @brief Allocator data structure
 ///
 /// The base data structure for an allocator.
-typedef struct wyrm_allocator {
-    const struct wyrm_allocator_vt* clz;
-} wyrm_allocator;
+struct wyrm_allocator {
+    const wyrm_allocator_vt* clz;
+};
 
 
 // ----------------------------------------------------------------------------
@@ -172,13 +185,10 @@ union wyrm_primitive {
     wyrm_float_s fp_s;
     wyrm_uintptr tagged_ptr;
     wyrm_error error;
-    wyrm_primitive* primitive_ptr;
-    wyrm_value* value_ptr;
-    const wyrm_primitive* const_primitive_ptr;
     wyrm_exec_fn cb;
     wyrm_atomic_word ref_count;
-    wyrm_atomic_word* ref_count_ptr;
     wyrm_sys_thread_id thread_id;
+    wyrm_value* value_ptr;
     void* ptr;
 };
 
@@ -200,44 +210,50 @@ struct wyrm_value
 
 
 // ----------------------------------------------------------------------------
-// Wyrm Object
+// Wyrm GC Info
 // ----------------------------------------------------------------------------
 
-/**
- * @brief Object Definition
- *
- * Like other VM systems, we reference objects by the object header.
- * Objects are expected to have object header as the first structural
- * member to allow safe type casting.
- */
-struct wyrm_object
+enum
 {
-    const wyrm_object_type* type;
+    WYRM_GC_STATIC          = 0x001,
+    WYRM_GC_FLAG_MARKED     = 0x004,
+    WYRM_GC_FLAG_FINALIZED  = 0x008,
 };
 
-/**
- * @brief Object Type Definition
- *
- * The Object Type defines the structure and operations that are supported
- * on the memory associated with an object header.
- */
-typedef struct wyrm_object_type
+struct wyrm_gc_object
 {
-    wyrm_object head;
-    wyrm_object_type_ref super;
-} wyrm_object_type;
-
-/**
- * List of wyrm objects
- */
-struct wyrm_object_list
-{
-    wyrm_allocator* allocator;
-    wyrm_object** objects;
-    wyrm_uword count;
-    wyrm_uword capacity;
+    wyrm_gc_object* next;
+    wyrm_uword flags;
+    wyrm_gc_type gc_type;
 };
 
+// ----------------------------------------------------------------------------
+// Wyrm Box
+// ----------------------------------------------------------------------------
+
+struct wyrm_box
+{
+    wyrm_gc_object head;
+    wyrm_value value;
+};
+
+// ----------------------------------------------------------------------------
+// Wyrm String
+// ----------------------------------------------------------------------------
+
+struct wyrm_string
+{
+    wyrm_gc_object head;
+    const char* str;
+    wyrm_uword len;
+    wyrm_uword hash;
+};
+
+
+
+// ----------------------------------------------------------------------------
+// Wyrm Object
+// ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
 // Core Objects
@@ -258,7 +274,7 @@ typedef struct wyrm_key_hash_value
  */
 struct wyrm_dict
 {
-    wyrm_object obj;
+    wyrm_gc_object obj;
 
     wyrm_allocator* allocator;
 
@@ -413,6 +429,9 @@ struct wyrm_context
     wyrm_main_loop* main_loop;
 
     wyrm_primitive wakeable_source;
+
+    wyrm_gc_object* first;
+    wyrm_gc_object* last;
 };
 
 

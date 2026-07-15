@@ -12,63 +12,45 @@ extern "C" {
 #define WYRM_OBJECT_LIST_INITIAL_SZ 4
 #endif
 
-/**
- * Initialize object list with given allocator and object list
- *
- * allocator must be WYRM_NULL or the object array passed into the object list
- * must be allocated from the allocator.
- */
-WYRM_INLINE void wyrm_object_list_init_s(wyrm_object_list* object_list, wyrm_allocator* allocator, wyrm_object** obj_list, wyrm_uword capacity)
+
+WYRM_INLINE void wyrm_string_finalize_f(wyrm_context* context, wyrm_string* self)
 {
-    WYRM_ASSERT(object_list != WYRM_NULL);
-    WYRM_ASSERT(obj_list != WYRM_NULL || capacity == 0);
-    object_list->allocator = allocator;
-    object_list->count = 0;
-    object_list->objects = obj_list;
-    object_list->capacity = capacity;
+    wyrm_context_gc_free(context, (void*) self->str);
+    self->str = WYRM_NULL;
+    self->len = 0;
+    self->hash = 0;
 }
 
-/**
- * Initialize object list with given allocator and object list
- */
-WYRM_INLINE void wyrm_object_list_init_f(wyrm_object_list* object_list, wyrm_allocator* allocator)
+/* ------------------------------------------------------------------------- */
+/* GC Info */
+/* ------------------------------------------------------------------------- */
+
+WYRM_INLINE void wyrm_gc_info_init_s(wyrm_gc_object* self, wyrm_gc_type gc_type)
 {
-    WYRM_ASSERT(object_list != WYRM_NULL && allocator != WYRM_NULL);
-    wyrm_object_list_init_s(object_list, allocator, WYRM_NULL, 0);
+    self->flags = 0;
+    self->gc_type = gc_type;
+    self->next = WYRM_NULL;
 }
 
-/**
- * Get index of list given by idx
- */
-WYRM_INLINE wyrm_object* wyrm_object_list_idx_f(wyrm_object_list* object_list, wyrm_uword idx)
+WYRM_INLINE void wyrm_gc_info_finalize_f(wyrm_context* context, wyrm_gc_object* self)
 {
-    WYRM_ASSERT(object_list != WYRM_NULL && idx < object_list->count);
-    return object_list->objects[idx];
-}
+    if (!self) { return; }
+    self->flags |= WYRM_GC_FLAG_FINALIZED;
 
-/**
- * Push item onto object list
- */
-WYRM_INLINE wyrm_error wyrm_object_list_push(wyrm_object_list* object_list, wyrm_object* obj)
-{
-    if (object_list == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    wyrm_uword new_count = object_list->count + 1;
+    switch (self->gc_type)
+    {
+    case WYRM_GC_TYPE_STR:
+        wyrm_string_finalize_f(context, (wyrm_string*) self);
+        break;
 
-    if (new_count > object_list->capacity) {
-        wyrm_uword update_capacity = wyrm_next_array_capacity(object_list->capacity, WYRM_OBJECT_LIST_INITIAL_SZ);
-        wyrm_object** resized = (wyrm_object**) wyrm_allocator_realloc(
-            object_list->allocator,
-            object_list->objects,
-            update_capacity * sizeof(wyrm_object*));
-        if (resized == WYRM_NULL) { return WYRM_ERR_NOMEM; }
-        object_list->objects = resized;
-        object_list->capacity = update_capacity;
+    case WYRM_GC_TYPE_BOX:
+    default:
+        break;
     }
 
-    object_list->objects[object_list->count] = obj;
-    object_list->count = new_count;
-    return WYRM_ERR_NONE;
 }
+
+
 
 #ifdef __cplusplus
 }

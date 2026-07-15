@@ -16,6 +16,8 @@ cwyrm_sources = files(
     'dict.c',
     'fiber.c',
     'machine.c',
+    'wbox.c',
+    'wstring.c',
     'primitive.c',
 )
 

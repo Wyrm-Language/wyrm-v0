@@ -14,9 +14,10 @@ extern "C" {
 
 #define WYRM_PRIMITIVE_PTR(dtype, v) ((dtype*) (v).ptr)
 
-static inline wyrm_primitive wyrm_primitive_null() { const wyrm_primitive v = {.ptr = WYRM_NULL}; return v; }
+static inline wyrm_primitive wyrm_primitive_null(void) { const wyrm_primitive v = {.ptr = WYRM_NULL}; return v; }
 static inline wyrm_primitive wyrm_primitive_int(wyrm_word value) { const wyrm_primitive v = {.word = value}; return v; }
 static inline wyrm_primitive wyrm_primitive_ptr(void* value) { const wyrm_primitive v = {.ptr = value}; return v; }
+
 
 // ----------------------------------------------------------------------------
 // Utility Math Functions

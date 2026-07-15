@@ -41,6 +41,22 @@ public:
 
     bool cleared() const { return allocations_.empty(); }
     void check() { REQUIRE(cleared()); }
+    void check_watched_free() { REQUIRE(must_free_.empty()); }
+
+    void set_locked(bool locked) { locked_ = locked; }
+
+    template<typename T>
+    void watch(T* var)
+    {
+        void* vptr = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(var));
+
+        auto ll = std::find(must_free_.begin(), must_free_.end(), vptr);
+        if (ll == must_free_.end())
+        {
+            must_free_.push_back(vptr);
+        }
+    }
+
 
 private:
     static test_allocator_fixture& get_self(wyrm_allocator* self)
@@ -56,6 +72,7 @@ private:
     static void* n_alloc(wyrm_allocator* self, wyrm_uword len)
     {
         auto& thiz = get_self(self);
+        if (thiz.locked_) { return WYRM_NULL; }
         auto buf = std::malloc(len);
         thiz.allocations_.push_back(buf);
         return buf;
@@ -64,6 +81,8 @@ private:
     static void* n_realloc(wyrm_allocator* self, void* buffer, wyrm_uword len)
     {
         auto& thiz = get_self(self);
+
+        if (thiz.locked_) { return WYRM_NULL; }
 
         if (buffer) {
             if (!thiz.is_valid(buffer)) { throw test_allocator_failure("realloc of unallocated buffer"); }
@@ -86,6 +105,7 @@ private:
         if (buffer) {
             if (!thiz.is_valid(buffer)) { throw test_allocator_failure("double free detected"); }
             thiz.allocations_.remove(buffer);
+            thiz.must_free_.remove(buffer);
             std::free(buffer);
         }
     }
@@ -95,7 +115,10 @@ private:
         .realloc = n_realloc,
         .free = n_free
     };
+
     std::list<void*> allocations_;
+    std::list<void*> must_free_;
+    bool locked_ = false;
 };
 
 #endif

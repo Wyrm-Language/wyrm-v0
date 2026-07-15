@@ -16,6 +16,28 @@ wyrm_error wyrm_context_init_s(wyrm_context* self, wyrm_main_loop* loop);
 wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber);
 static inline wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
 
+
+
+
+wyrm_error wyrm_box_new(wyrm_context* self, wyrm_box** out);
+
+
+wyrm_error wyrm_string_strdup(wyrm_context* machine, const char* src, wyrm_string** out_str);
+WYRM_INLINE void wyrm_string_finalize_f(wyrm_context* context, wyrm_string* self);
+
+
+
+
+// SCAFFOLDING - TO BE REMOVED
+void* wyrm_context_gc_alloc(wyrm_context* context, wyrm_uword dsize);
+void wyrm_context_gc_free(wyrm_context* context, void* ptr);
+wyrm_error wyrm_context_gc_init(wyrm_context* context, wyrm_gc_object* gc_info, wyrm_gc_type gc_type);
+void wyrm_context_push_gc(wyrm_context* context, wyrm_gc_object* gc_info);
+void wyrm_context_gc_start_mark(wyrm_context* machine);
+void wyrm_context_gc_sweep_f(wyrm_context* machine);
+
+
+
 void wyrm_dict_init_s(wyrm_dict* self,
     wyrm_allocator* allocator,
     wyrm_uword count,
@@ -31,10 +53,22 @@ wyrm_error wyrm_dict_set(wyrm_dict* self, wyrm_type_tag key_type, wyrm_primitive
 wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc);
 wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context);
 
-WYRM_INLINE void wyrm_object_list_init_s(wyrm_object_list* object_list, wyrm_allocator* allocator, wyrm_object** obj_list, wyrm_uword capacity);
-WYRM_INLINE void wyrm_object_list_init_f(wyrm_object_list* object_list, wyrm_allocator* allocator);
-WYRM_INLINE wyrm_object* wyrm_object_list_idx_f(wyrm_object_list* object_list, wyrm_uword idx);
-WYRM_INLINE wyrm_error wyrm_object_list_push(wyrm_object_list* object_list, wyrm_object* obj);
+
+/* ---- Utility Functions ----- */
+
+WYRM_INLINE wyrm_uword wyrm_hash_buffer(const char* start, const char* end)
+{
+    wyrm_uword hash = 0;
+    for (const char* cur = start; cur != end; ++cur) {
+        hash = hash + (wyrm_uword)(*cur);
+    }
+    return hash;
+}
+
+
+/* ---- GC Objects ----- */
+WYRM_INLINE void wyrm_gc_info_init_s(wyrm_gc_object* self, wyrm_gc_type gc_type);
+WYRM_INLINE void wyrm_gc_info_finalize_f(wyrm_context* context, wyrm_gc_object* self);
 
 bool wyrm_primitive_eq(wyrm_type_tag lhs_type, wyrm_primitive lhs, wyrm_type_tag rhs_type, wyrm_primitive rhs);
 
