@@ -26,6 +26,7 @@ enum wyrm_error {
     WYRM_ERR_CHILDREN,  ///< Container has children
     WYRM_ERR_RANGE,     ///< Out of range
     WYRM_ERR_CYCLE,     ///< Cycle detected
+    WYRM_ERR_KEY,       ///< Key not found
 
     WYRM_ERR_EXISTS,
     WYRM_ERR_NOMEM,

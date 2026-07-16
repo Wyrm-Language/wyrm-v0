@@ -69,7 +69,7 @@ typedef enum wyrm_type_tag
     WYRM_TYPE_TAG_NIL = 0,
     WYRM_TYPE_TAG_WORD,
     WYRM_TYPE_TAG_UWORD,
-
+    WYRM_TYPE_TAG_SYMBOL,
 
     WYRM_TYPE_TAG_STACK_BASE_PTR,
     WYRM_TYPE_TAG_STACK_CONTINUATION_FRAME
@@ -189,6 +189,7 @@ union wyrm_primitive {
     wyrm_atomic_word ref_count;
     wyrm_sys_thread_id thread_id;
     wyrm_value* value_ptr;
+    const char* symtab_entry;
     void* ptr;
 };
 
@@ -248,8 +249,6 @@ struct wyrm_string
     wyrm_uword len;
     wyrm_uword hash;
 };
-
-
 
 // ----------------------------------------------------------------------------
 // Wyrm Object
@@ -439,10 +438,14 @@ struct wyrm_context
 // Wyrm Machine
 // ----------------------------------------------------------------------------
 
+struct wyrm_machine_symtab;
+
 struct wyrm_machine
 {
     wyrm_allocator* allocator;
     wyrm_context* context;
+
+    struct wyrm_machine_symtab* symtab;
 };
 
 #ifdef __cplusplus

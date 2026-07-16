@@ -9,6 +9,14 @@ extern "C" {
 
 const char* wyrm_lib_implementation(void);
 
+wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc);
+wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context);
+wyrm_error wyrm_machine_finalize_f(wyrm_machine* self);
+
+wyrm_error wyrm_machine_find_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out);
+wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out);
+
+
 void wyrm_fiber_init(wyrm_fiber* self, wyrm_value* stack, wyrm_uword stack_size);
 static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self);
 
@@ -50,8 +58,7 @@ void wyrm_dict_finalize_f(wyrm_dict* self);
 wyrm_value* wyrm_dict_get(wyrm_dict* self, wyrm_type_tag tag, wyrm_primitive value);
 wyrm_error wyrm_dict_set(wyrm_dict* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value);
 
-wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc);
-wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context);
+
 
 
 /* ---- Utility Functions ----- */
