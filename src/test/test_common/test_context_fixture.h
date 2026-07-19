@@ -20,7 +20,7 @@ struct test_context_fixture : test_machine_fixture
     test_context_fixture()
         : context{}
     {
-        wyrm_context_init_s(&context, main_loop.ptr());
+        wyrm_context_init_s(&context, main_loop);
         wyrm_machine_attach_context(get_machine_ptr(), &context);
     }
 

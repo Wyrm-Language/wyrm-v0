@@ -27,6 +27,20 @@ namespace wyrmxx
         explicit out_of_memory(const char* ext = "") : except_base{WYRM_ERR_NOMEM, ext} {}
     };
 
+    inline void check_wyrm_error(wyrm_error err, const char* ext = "")
+    {
+        switch (err) {
+        case WYRM_ERR_NOMEM:
+            throw out_of_memory(ext);
+
+        case WYRM_ERR_NONE:
+            return;
+
+        default:
+            throw except_base{err, ext};
+        }
+    }
+
 }
 
 #endif

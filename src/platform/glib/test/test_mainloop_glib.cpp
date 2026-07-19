@@ -3,11 +3,22 @@
 #include <wyrm/platform/glib/mainloop.h>
 #include <wyrm/platform/hosted/allocator_cmem.h>
 
+#include <wyrmxx/main_loop.h>
+#include <wyrmxx/platform/glib/mainloop.h>
+
 #include "test_common/test_main_loop.h"
 #include "test_common/test_allocator_fixture.h"
 
 TEST_SUITE("platform_glib_main_loop")
 {
+    TEST_CASE("init/deinit") {
+        test_allocator_fixture ta;
+        wyrmxx::glib_mainloop loop{ ta };
+        loop.release();
+        ta.check();
+    }
+
+
     TEST_CASE("wakeable source can be triggered") {
         test_allocator_fixture ta;
 

@@ -7,16 +7,17 @@
 #include <variant>
 
 #include <wyrm/internal_api.h>
+#include <wyrmxx/main_loop.h>
 
-class test_main_loop_fixture
+class test_main_loop_fixture_
 {
 public:
     struct ext_loop {
         wyrm_main_loop loop;
-        test_main_loop_fixture* self;
+        test_main_loop_fixture_* self;
     };
 
-    test_main_loop_fixture()
+    test_main_loop_fixture_()
         : loop_{ .loop = { .vt = &vt_ }, .self = this }
     {}
 
@@ -84,7 +85,7 @@ private:
 
     using source_list = std::list<std::unique_ptr<source>>;
 
-    static test_main_loop_fixture& get_self(wyrm_main_loop_ref self)
+    static test_main_loop_fixture_& get_self(wyrm_main_loop_ref self)
     {
         return *reinterpret_cast<ext_loop*>(self)->self;
     }
@@ -174,6 +175,22 @@ private:
     ext_loop loop_;
     source_list sources_;
     bool quit_ = false;
+};
+
+class test_main_loop_fixture : public wyrmxx::main_loop
+{
+public:
+    test_main_loop_fixture(const test_main_loop_fixture&) = delete;
+    test_main_loop_fixture& operator=(const test_main_loop_fixture&) = delete;
+
+    test_main_loop_fixture()
+        : main_loop{nullptr}
+    {
+        self_ = p_.ptr();
+    }
+
+private:
+    test_main_loop_fixture_ p_;
 };
 
 #endif

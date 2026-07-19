@@ -9,9 +9,9 @@ TEST_SUITE("context")
     TEST_CASE("init succeeds and registers a wakeable") {
         test_main_loop_fixture loop;
         wyrm_context ctx;
-        REQUIRE(wyrm_context_init_s(&ctx, loop.ptr()) == WYRM_ERR_NONE);
-        CHECK(ctx.main_loop == loop.ptr());
-        CHECK(ctx.wakeable_source.ptr != WYRM_NULL);
+        REQUIRE(wyrm_context_init_s(&ctx, loop) == WYRM_ERR_NONE);
+        REQUIRE_EQ(ctx.main_loop, loop.ptr());
+        REQUIRE_NE(ctx.wakeable_source.ptr, WYRM_NULL);
     }
 
     TEST_CASE("attach_fiber with invalid parent") {

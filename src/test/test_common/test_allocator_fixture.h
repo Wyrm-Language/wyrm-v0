@@ -38,6 +38,7 @@ public:
     }
 
     wyrmxx::allocator get() { return wyrmxx::allocator{ptr()}; }
+    operator wyrm_allocator*() & { return &allocator_.a; }
 
     ext_alloc& allocator() { return allocator_; }
     wyrm_allocator* ptr() { return &allocator_.a; }
