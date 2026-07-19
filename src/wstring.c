@@ -14,7 +14,7 @@ wyrm_error wyrm_string_strdup(wyrm_context* context, const char* src, wyrm_strin
    if (buffer == WYRM_NULL || new_str == WYRM_NULL) { last_error = WYRM_ERR_NOMEM; goto err_out; }
 
    wyrm_memcpy(buffer, src, src_len + 1);
-   last_error = wyrm_context_gc_init(context, &new_str->head, WYRM_GC_TYPE_STR);
+   last_error = wyrm_context_gc_init(context, &new_str->head, WYRM_TYPE_TAG_STR);
    if (last_error != WYRM_ERR_NONE) { goto err_out; }
 
    new_str->str = buffer;

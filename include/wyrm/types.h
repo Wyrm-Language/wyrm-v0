@@ -18,7 +18,7 @@ struct wyrm_allocator;
 struct wyrm_allocator_vt;
 struct wyrm_box;
 struct wyrm_context;
-struct wyrm_dict;
+struct wyrm_table;
 struct wyrm_exec_result;
 struct wyrm_fiber;
 struct wyrm_gc_object;
@@ -37,7 +37,7 @@ typedef struct wyrm_allocator wyrm_allocator;
 typedef struct wyrm_allocator_vt wyrm_allocator_vt;
 typedef struct wyrm_box wyrm_box;
 typedef struct wyrm_context wyrm_context;
-typedef struct wyrm_dict wyrm_dict;
+typedef struct wyrm_table wyrm_table;
 typedef struct wyrm_exec_result wyrm_exec_result;
 typedef struct wyrm_fiber wyrm_fiber;
 typedef struct wyrm_gc_object wyrm_gc_object;
@@ -58,8 +58,10 @@ typedef wyrm_main_loop* wyrm_main_loop_ref;
 typedef wyrm_thread* wyrm_thread_ref;
 
 // ----------------------------------------------------------------------------
-// Standardized Enumerations
+// Standardized Enumerations and Values
 // ----------------------------------------------------------------------------
+
+#define WYRM_HASH_INVALID WYRM_UWORD_MAX
 
 /**
  * Primitive Types
@@ -67,22 +69,22 @@ typedef wyrm_thread* wyrm_thread_ref;
 typedef enum wyrm_type_tag
 {
     WYRM_TYPE_TAG_NIL = 0,
+
     WYRM_TYPE_TAG_WORD,
     WYRM_TYPE_TAG_UWORD,
+
+    WYRM_TYPE_TAG_FUNCTION,
+
     WYRM_TYPE_TAG_SYMBOL,
+    WYRM_TYPE_TAG_VALUE_PTR,
 
-    WYRM_TYPE_TAG_STACK_BASE_PTR,
-    WYRM_TYPE_TAG_STACK_CONTINUATION_FRAME
+    WYRM_GC_PATH_START,
+    WYRM_TYPE_TAG_BOX,
+    WYRM_TYPE_TAG_STR,
+
+    WYRM_SLOW_PATH_START,
+    WYRM_TYPE_TAG_TABLE
 } wyrm_type_tag;
-
-/**
- * Garbage collected types
- */
-typedef enum wyrm_gc_type_tag
-{
-    WYRM_GC_TYPE_BOX = 0,
-    WYRM_GC_TYPE_STR
-} wyrm_gc_type;
 
 
 // ----------------------------------------------------------------------------
@@ -191,6 +193,9 @@ union wyrm_primitive {
     wyrm_value* value_ptr;
     const char* symtab_entry;
     void* ptr;
+
+    wyrm_gc_object* gc_object;
+    wyrm_string* str;
 };
 
 enum {
@@ -225,7 +230,7 @@ struct wyrm_gc_object
 {
     wyrm_gc_object* next;
     wyrm_uword flags;
-    wyrm_gc_type gc_type;
+    wyrm_type_tag gc_type;
 };
 
 // ----------------------------------------------------------------------------
@@ -251,11 +256,7 @@ struct wyrm_string
 };
 
 // ----------------------------------------------------------------------------
-// Wyrm Object
-// ----------------------------------------------------------------------------
-
-// ----------------------------------------------------------------------------
-// Core Objects
+// Wyrm Table
 // ----------------------------------------------------------------------------
 
 /**
@@ -271,7 +272,7 @@ typedef struct wyrm_key_hash_value
 /**
  * Dictionary type
  */
-struct wyrm_dict
+struct wyrm_table
 {
     wyrm_gc_object obj;
 
@@ -285,6 +286,7 @@ struct wyrm_dict
     wyrm_uword* sparse;
     wyrm_uword sparse_capacity;
 };
+
 
 // ----------------------------------------------------------------------------
 // Stack

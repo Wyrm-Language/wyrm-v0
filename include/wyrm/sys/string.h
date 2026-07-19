@@ -13,6 +13,11 @@ static inline void* wyrm_memcpy(void* dest, const void* src, wyrm_uword len) {
     return memcpy(dest, src, (size_t) len);
 }
 
+static inline int wyrm_memcmp(const void* dest, const void* src, wyrm_uword len)
+{
+    return memcmp(dest, src, len);
+}
+
 static inline void* wyrm_memmove(void* dest, const void* src, wyrm_uword len) {
     return memmove(dest, src, (size_t) len);
 }

@@ -106,7 +106,7 @@ void wyrm_context_push_gc(wyrm_context* context, wyrm_gc_object* gc_info)
 
 
 
-wyrm_error wyrm_context_gc_init(wyrm_context* context, wyrm_gc_object* gc_info, wyrm_gc_type gc_type)
+wyrm_error wyrm_context_gc_init(wyrm_context* context, wyrm_gc_object* gc_info, wyrm_type_tag gc_type)
 {
     if (gc_info == WYRM_NULL) { return WYRM_ERR_INVAL; }
 

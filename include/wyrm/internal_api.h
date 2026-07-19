@@ -202,11 +202,11 @@ static inline wyrm_error wyrm_stack_push_continuation_f(wyrm_stack* self, wyrm_e
     if (cont >= self->entries_end) { return WYRM_ERR_NOMEM; }
 
     // base[-2]: saved base pointer
-    saved_base->type = WYRM_TYPE_TAG_STACK_BASE_PTR;
+    saved_base->type = WYRM_TYPE_TAG_VALUE_PTR;
     saved_base->data.value_ptr = self->base;
 
     // base[-1]: continuation
-    cont->type = WYRM_TYPE_TAG_STACK_CONTINUATION_FRAME;
+    cont->type = WYRM_TYPE_TAG_FUNCTION;
     cont->data.cb = cont_fn;
 
     self->top  = cont + 1;
@@ -240,10 +240,10 @@ static inline wyrm_error wyrm_stack_pop_continuation_f(wyrm_stack* self, wyrm_ex
     wyrm_value* old_base_value = cont - 1;
 
     // Verify expected type and save (stack corruption otherwise)
-    if (old_base_value->type != WYRM_TYPE_TAG_STACK_BASE_PTR) { return WYRM_ERR_INVAL; }
+    if (old_base_value->type != WYRM_TYPE_TAG_VALUE_PTR) { return WYRM_ERR_INVAL; }
     wyrm_value* old_base = old_base_value->data.value_ptr;
 
-    if (cont->type != WYRM_TYPE_TAG_STACK_CONTINUATION_FRAME) { return WYRM_ERR_INVAL; }
+    if (cont->type != WYRM_TYPE_TAG_FUNCTION) { return WYRM_ERR_INVAL; }
     *out_continuation = cont->data.cb;
 
     // Grab base to restore and find continuation

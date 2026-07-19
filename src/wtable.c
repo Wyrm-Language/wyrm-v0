@@ -1,6 +1,6 @@
 #include <wyrm.h>
 
-void wyrm_dict_init_s(wyrm_dict* self,
+void wyrm_table_init_s(wyrm_table* self,
     wyrm_allocator* allocator,
     wyrm_uword count,
     wyrm_key_hash_value* dense,
@@ -8,7 +8,7 @@ void wyrm_dict_init_s(wyrm_dict* self,
     wyrm_uword* sparse,
     wyrm_uword sparse_capacity)
 {
-    wyrm_memset(self, 0, sizeof(wyrm_dict));
+    wyrm_memset(self, 0, sizeof(wyrm_table));
     self->allocator = allocator;
     self->count = count;
     self->dense = dense;
@@ -17,12 +17,12 @@ void wyrm_dict_init_s(wyrm_dict* self,
     self->sparse_capacity = sparse_capacity;
 }
 
-void wyrm_dict_init_f(wyrm_dict* self, wyrm_allocator* allocator)
+void wyrm_table_init_f(wyrm_table* self, wyrm_allocator* allocator)
 {
-    wyrm_dict_init_s(self, allocator, 0, WYRM_NULL, 0, WYRM_NULL, 0);
+    wyrm_table_init_s(self, allocator, 0, WYRM_NULL, 0, WYRM_NULL, 0);
 }
 
-void wyrm_dict_finalize_f(wyrm_dict* self)
+void wyrm_table_finalize_f(wyrm_table* self)
 {
     self->count = 0;
     self->dense_capacity = 0;
@@ -32,18 +32,18 @@ void wyrm_dict_finalize_f(wyrm_dict* self)
 }
 
 
-wyrm_value* wyrm_dict_get(wyrm_dict* self, wyrm_type_tag tag, wyrm_primitive value)
+wyrm_value* wyrm_table_get(wyrm_table* self, wyrm_type_tag tag, wyrm_primitive value)
 {
     if (self == WYRM_NULL) {return WYRM_NULL; }
     for (wyrm_uword i = 0; i < self->count; i++) {
-        if (wyrm_primitive_eq(self->dense[i].key.type, self->dense[i].key.data, tag, value)) {
+        if (wyrm_op_eq(self->dense[i].key.type, self->dense[i].key.data, tag, value)) {
             return &self->dense[i].value;
         }
     }
     return WYRM_NULL;
 }
 
-WYRM_INLINE wyrm_error _expand_dict(wyrm_dict* self, wyrm_uword count)
+WYRM_INLINE wyrm_error _expand_dict(wyrm_table* self, wyrm_uword count)
 {
     if (count > self->dense_capacity) {
         wyrm_uword new_cap = wyrm_next_array_capacity(self->dense_capacity, 4);
@@ -66,12 +66,12 @@ WYRM_INLINE wyrm_error _expand_dict(wyrm_dict* self, wyrm_uword count)
 
 
 
-wyrm_error wyrm_dict_set(wyrm_dict* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value)
+wyrm_error wyrm_table_set(wyrm_table* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value)
 {
     wyrm_error last_error = WYRM_ERR_NONE;
     if (self == WYRM_NULL) { return WYRM_ERR_INVAL; }
 
-    wyrm_value* slot = wyrm_dict_get(self, key_type, key_value);
+    wyrm_value* slot = wyrm_table_get(self, key_type, key_value);
 
     if (!slot) {
         wyrm_uword new_count = self->count + 1;
