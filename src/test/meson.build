@@ -4,6 +4,7 @@ test_cwyrm_sources = files(
     'test_context.cpp',
     'test_machine.cpp',
     'test_stack.cpp',
+    'test_state.cpp',
     'test_wstring.cpp',
     'test_wtable.cpp',
     'test_wyrm.cpp',

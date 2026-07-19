@@ -32,11 +32,11 @@ void wyrm_table_finalize_f(wyrm_table* self)
 }
 
 
-wyrm_value* wyrm_table_get(wyrm_table* self, wyrm_type_tag tag, wyrm_primitive value)
+wyrm_value* wyrm_table_get(wyrm_state* state, wyrm_table* self, wyrm_type_tag tag, wyrm_primitive value)
 {
     if (self == WYRM_NULL) {return WYRM_NULL; }
     for (wyrm_uword i = 0; i < self->count; i++) {
-        if (wyrm_op_eq(self->dense[i].key.type, self->dense[i].key.data, tag, value)) {
+        if (wyrm_op_eq(state, self->dense[i].key.type, self->dense[i].key.data, tag, value)) {
             return &self->dense[i].value;
         }
     }
@@ -66,12 +66,12 @@ WYRM_INLINE wyrm_error _expand_dict(wyrm_table* self, wyrm_uword count)
 
 
 
-wyrm_error wyrm_table_set(wyrm_table* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value)
+wyrm_error wyrm_table_set(wyrm_state* state, wyrm_table* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value)
 {
     wyrm_error last_error = WYRM_ERR_NONE;
     if (self == WYRM_NULL) { return WYRM_ERR_INVAL; }
 
-    wyrm_value* slot = wyrm_table_get(self, key_type, key_value);
+    wyrm_value* slot = wyrm_table_get(state, self, key_type, key_value);
 
     if (!slot) {
         wyrm_uword new_count = self->count + 1;

@@ -9,9 +9,15 @@ extern "C" {
 
 const char* wyrm_lib_implementation(void);
 
-WYRM_INLINE bool wyrm_op_eq(wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs);
-WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_type_tag vt, wyrm_primitive v);
+WYRM_INLINE void wyrm_state_init_s(wyrm_state* state);
 
+WYRM_INLINE wyrm_state* wyrm_state_new(wyrm_allocator* mem);
+WYRM_INLINE wyrm_error wyrm_state_delete(wyrm_state* state);
+WYRM_INLINE bool wyrm_state_check_flag_f(wyrm_state* state, wyrm_state_flag flag);
+
+
+WYRM_INLINE bool wyrm_op_eq(wyrm_state* state, wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs);
+WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_state* state, wyrm_type_tag vt, wyrm_primitive v);
 
 
 wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc);
@@ -61,8 +67,8 @@ void wyrm_table_init_s(wyrm_table* self,
     wyrm_uword sparse_capacity);
 void wyrm_table_init_f(wyrm_table* self, wyrm_allocator* allocator);
 void wyrm_table_finalize_f(wyrm_table* self);
-wyrm_value* wyrm_table_get(wyrm_table* self, wyrm_type_tag tag, wyrm_primitive value);
-wyrm_error wyrm_table_set(wyrm_table* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value);
+wyrm_value* wyrm_table_get(wyrm_state* state, wyrm_table* self, wyrm_type_tag tag, wyrm_primitive value);
+wyrm_error wyrm_table_set(wyrm_state* state, wyrm_table* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value);
 
 
 

@@ -13,11 +13,62 @@ extern "C" {
 #endif
 
 /* ------------------------------------------------------------------------- */
+/* State Initialization                                                      */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Initialize state with no active process.
+ */
+WYRM_INLINE void wyrm_state_init_s(wyrm_state* state)
+{
+    state->state_flags = 0;
+    state->machine = WYRM_NULL;
+    state->context = WYRM_NULL;
+    state->fiber = WYRM_NULL;
+    state->state_alloc_ = WYRM_NULL;
+}
+
+/**
+ * Construct New State
+ */
+WYRM_INLINE wyrm_state* wyrm_state_new(wyrm_allocator* alloc)
+{
+    wyrm_state* state = (wyrm_state*) wyrm_allocator_alloc(alloc, sizeof(wyrm_state));
+    if (state == WYRM_NULL) { return WYRM_NULL; }
+    wyrm_state_init_s(state);
+    state->state_flags |= (wyrm_uword) WYRM_STATE_FLAG_OWNS_SELF;
+    state->state_alloc_ = alloc;
+    return state;
+}
+
+WYRM_INLINE wyrm_error wyrm_state_delete(wyrm_state* state)
+{
+    if (state == WYRM_NULL) { return WYRM_ERR_NONE; }
+    wyrm_error last_error = WYRM_ERR_NONE;
+    wyrm_allocator* alloc = state->state_alloc_;
+
+    if (wyrm_state_check_flag_f(state, WYRM_STATE_FLAG_OWNS_SELF)) {
+        WYRM_ASSERT(alloc != WYRM_NULL);
+        wyrm_allocator_free(alloc, state);
+    }
+
+    return last_error;
+}
+
+WYRM_INLINE bool wyrm_state_check_flag_f(wyrm_state* state, wyrm_state_flag flag)
+{
+    WYRM_ASSERT(state != WYRM_NULL);
+    return (state->state_flags & ((wyrm_uword) flag)) != 0;
+}
+
+
+/* ------------------------------------------------------------------------- */
 /* Operations                                                                */
 /* ------------------------------------------------------------------------- */
 
-WYRM_INLINE bool wyrm_op_eq(wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs)
+WYRM_INLINE bool wyrm_op_eq(wyrm_state* state, wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs)
 {
+    WYRM_UNUSED(state);
     if (lhst != rhst) { return false; }
     switch (lhst) {
     case WYRM_TYPE_TAG_NIL:
@@ -45,8 +96,9 @@ WYRM_INLINE bool wyrm_op_eq(wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_ta
     }
 }
 
-WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_type_tag vt, wyrm_primitive v)
+WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_state* state, wyrm_type_tag vt, wyrm_primitive v)
 {
+    WYRM_UNUSED(state);
     switch (vt) {
     case WYRM_TYPE_TAG_NIL:
         return 0;

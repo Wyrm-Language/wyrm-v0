@@ -27,6 +27,7 @@ struct wyrm_main_loop;
 struct wyrm_object_list;
 union wyrm_primitive;
 struct wyrm_stack;
+struct wyrm_state;
 struct wyrm_string;
 struct wyrm_thread;
 struct wyrm_main_loop_vt;
@@ -48,6 +49,7 @@ typedef struct wyrm_main_loop wyrm_main_loop;
 typedef struct wyrm_main_loop_vt wyrm_main_loop_vt;
 typedef union wyrm_primitive wyrm_primitive;
 typedef struct wyrm_stack wyrm_stack;
+typedef struct wyrm_state wyrm_state;
 typedef struct wyrm_string wyrm_string;
 typedef struct wyrm_thread wyrm_thread;
 typedef struct wyrm_value wyrm_value;
@@ -85,6 +87,12 @@ typedef enum wyrm_type_tag
     WYRM_SLOW_PATH_START,
     WYRM_TYPE_TAG_TABLE
 } wyrm_type_tag;
+
+typedef enum wyrm_state_flag_tag
+{
+    WYRM_STATE_FLAG_OWNS_SELF       = 0x0001,
+    WYRM_STATE_FLAG_OWNS_MACHINE    = 0x0002,
+} wyrm_state_flag;
 
 
 // ----------------------------------------------------------------------------
@@ -449,6 +457,32 @@ struct wyrm_machine
 
     struct wyrm_machine_symtab* symtab;
 };
+
+
+// ----------------------------------------------------------------------------
+// Wyrm State
+// ----------------------------------------------------------------------------
+
+
+
+
+/**
+ * @brief State Definition for all Interpreter/Object Calls
+ *
+ * Any call that requires memory allocation or interaction with the virtual
+ * machine shall utilize a wyrm_state* as the first parameter to the function.
+ * This explicitly defines the current machine, context, and fiber.
+ */
+struct wyrm_state
+{
+    wyrm_uword state_flags;
+    wyrm_machine* machine;
+    wyrm_context* context;
+    wyrm_fiber* fiber;
+
+    wyrm_allocator* state_alloc_;
+};
+
 
 #ifdef __cplusplus
 }
