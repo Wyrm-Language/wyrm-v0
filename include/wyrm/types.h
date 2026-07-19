@@ -166,7 +166,7 @@ static inline wyrm_exec_result wyrm_make_exec_result(wyrm_exec_state_tag state, 
  * exec state contained within the return struct.
  *
  */
-typedef wyrm_exec_result (*wyrm_exec_fn)(wyrm_fiber_ref fiber);
+typedef wyrm_exec_result (*wyrm_exec_fn)(wyrm_state* state);
 
 
 // ----------------------------------------------------------------------------
@@ -469,9 +469,14 @@ struct wyrm_machine
 /**
  * @brief State Definition for all Interpreter/Object Calls
  *
+ * This structure is intended to live on the stack or heap. Always initialize
+ * using the wyrm_state_init_* functions - do not bitwise copy. State objects
+ * allow bidirectional communication of complex VM information.
+ *
  * Any call that requires memory allocation or interaction with the virtual
  * machine shall utilize a wyrm_state* as the first parameter to the function.
  * This explicitly defines the current machine, context, and fiber.
+ *
  */
 struct wyrm_state
 {

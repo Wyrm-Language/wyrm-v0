@@ -29,6 +29,17 @@ WYRM_INLINE void wyrm_state_init_s(wyrm_state* state)
 }
 
 /**
+ * Initialize state from a context
+ */
+WYRM_INLINE void wyrm_state_init_context_f(wyrm_state* state, wyrm_context* context)
+{
+    WYRM_ASSERT(state != WYRM_NULL && context != WYRM_NULL);
+    wyrm_state_init_s(state);
+    state->machine = wyrm_context_get_machine(context);
+    state->context = context;
+}
+
+/**
  * Construct New State
  */
 WYRM_INLINE wyrm_state* wyrm_state_new(wyrm_allocator* alloc)
@@ -61,6 +72,23 @@ WYRM_INLINE bool wyrm_state_check_flag_f(wyrm_state* state, wyrm_state_flag flag
     return (state->state_flags & ((wyrm_uword) flag)) != 0;
 }
 
+WYRM_INLINE wyrm_uword wyrm_state_value_count(wyrm_state* state)
+{
+    if (state == WYRM_NULL || state->fiber == WYRM_NULL) { return 0; }
+    return wyrm_fiber_value_count_f(state->fiber);
+}
+
+WYRM_INLINE wyrm_value* wyrm_state_value_n(wyrm_state* state, wyrm_uword index)
+{
+    if (index >= wyrm_state_value_count(state)) { return WYRM_NULL; }
+    return wyrm_fiber_value_n(state->fiber, index);
+}
+
+WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value)
+{
+    if (state == WYRM_NULL || state->fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    return wyrm_fiber_push_value_f(state->fiber, value);
+}
 
 /* ------------------------------------------------------------------------- */
 /* Operations                                                                */

@@ -10,10 +10,15 @@ extern "C" {
 const char* wyrm_lib_implementation(void);
 
 WYRM_INLINE void wyrm_state_init_s(wyrm_state* state);
-
 WYRM_INLINE wyrm_state* wyrm_state_new(wyrm_allocator* mem);
 WYRM_INLINE wyrm_error wyrm_state_delete(wyrm_state* state);
 WYRM_INLINE bool wyrm_state_check_flag_f(wyrm_state* state, wyrm_state_flag flag);
+
+/* Run the active fiber until it hits suspension point */
+wyrm_error wyrm_state_exec(wyrm_state* state);
+WYRM_INLINE wyrm_uword wyrm_state_value_count(wyrm_state* state);
+WYRM_INLINE wyrm_value* wyrm_state_value_n(wyrm_state* state, wyrm_uword idx);
+WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value);
 
 
 WYRM_INLINE bool wyrm_op_eq(wyrm_state* state, wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs);

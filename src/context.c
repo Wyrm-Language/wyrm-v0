@@ -12,15 +12,29 @@
  *       operating correctly. This should wakeup a management thread
  *       and/or flag the status on the context.
  *
+ * TODO: We just hardcode current_fiber in the context, instead -
+ *       we should have some scheduling/extended logic here to
+ *       determine which fiber needs to run. Currently, only
+ *       1 fiber, so not an issue.
+ *
  * @param ud the wyrm_context programmed into the main loop directly
  * @return Always returns true; this trigger is active until context
  *         itself is destroyed.
  */
 static bool context_triggered(wyrm_primitive ud)
 {
+    /* Grab current context */
     wyrm_context* self = WYRM_PRIMITIVE_PTR(wyrm_context, ud);
-    if (self->current_fiber != WYRM_NULL) {
-        wyrm_error last_error = wyrm_fiber_exec_f(self->current_fiber);
+
+    /* State for operations */
+    wyrm_state state;
+    wyrm_state_init_context_f(&state, self);
+
+    /* TODO: determine correct fiber to execute, set state->current_fiber appropriately */
+    state.fiber = self->current_fiber;
+
+    if (state.fiber != WYRM_NULL) {
+        wyrm_error last_error = wyrm_state_exec(&state);
         if (last_error != WYRM_ERR_NONE) {
             /* TODO: flag/update context and fiber */
         }

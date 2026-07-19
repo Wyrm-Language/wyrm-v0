@@ -17,9 +17,9 @@ static wyrm_primitive prim_uword(wyrm_uword v)
     return p;
 }
 
-static wyrm_exec_result test_exec_fn(wyrm_fiber_ref fiber)
+static wyrm_exec_result test_exec_fn(wyrm_state* state)
 {
-    WYRM_UNUSED(fiber);
+    WYRM_UNUSED(state);
     return wyrm_make_exec_result(WYRM_EXEC_DONE, 0);
 }
 
