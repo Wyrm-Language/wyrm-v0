@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <stdexcept>
 
+#include <wyrmxx/allocator.h>
+
 class test_allocator_failure : public std::runtime_error
 {
     using std::runtime_error::runtime_error;
@@ -34,6 +36,8 @@ public:
             std::free(p);
         }
     }
+
+    wyrmxx::allocator get() { return wyrmxx::allocator{ptr()}; }
 
     ext_alloc& allocator() { return allocator_; }
     wyrm_allocator* ptr() { return &allocator_.a; }

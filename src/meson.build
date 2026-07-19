@@ -1,6 +1,6 @@
 cfg = configuration_data()
 
-doctest_dep = dependency('doctest', fallback: ['doctest', 'doctest_dep'])
+doctest_dep = dependency('doctest', fallback: ['doctest', 'doctest_dep'], required: get_option('tests'))
 glib_dep = dependency('glib-2.0', version: '>=2.56', required: get_option('glib'))
 
 
@@ -126,11 +126,24 @@ if not wyrm_opt.disabled()
     subdir('wyrm')
 endif
 
-subdir('test')
+cxx_bindings = get_option('cxx_bindings')
+if not cxx_bindings.disabled()
+    subdir('wyrmxx')
+endif
+
+tests_opt = get_option('tests')
+if not tests_opt.disabled()
+    if cxx_bindings.disabled()
+        error('tests option requires cxx_bindings to be enabled')
+    endif
+    subdir('test')
+endif
 
 summary({
-    'hosted' : get_option('hosted'),
-    'glib'   : glib_dep.found(),
+    'hosted'       : get_option('hosted'),
+    'glib'         : glib_dep.found(),
+    'cxx_bindings' : not cxx_bindings.disabled(),
+    'tests'        : not tests_opt.disabled(),
 #    'wy'     : not wy_opt.disabled(),
 #    'wyrm'   : not wyrm_opt.disabled(),
 }, section: 'Configuration', bool_yn: true)

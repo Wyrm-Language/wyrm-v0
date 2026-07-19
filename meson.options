@@ -4,6 +4,18 @@ option('hosted',
        description: 'Enable hosted platform support (standard C stdlib — malloc/free, file I/O). Disable for bare-metal / freestanding toolchains.',
 )
 
+option('cxx_bindings',
+       type: 'feature',
+       value: 'enabled',
+       description: 'Enable C++ bindings'
+)
+
+option('tests',
+       type: 'feature',
+       value: 'enabled',
+       description: 'Build the test suite (requires cxx_bindings)'
+)
+
 option('glib',
        type: 'feature',
        value: 'auto',
