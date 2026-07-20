@@ -206,7 +206,7 @@ static inline wyrm_error wyrm_stack_push_continuation_f(wyrm_stack* self, wyrm_e
     saved_base->data.value_ptr = self->base;
 
     // base[-1]: continuation
-    cont->type = WYRM_TYPE_TAG_FUNCTION;
+    cont->type = WYRM_TYPE_TAG_FRAME;
     cont->data.cb = cont_fn;
 
     self->top  = cont + 1;
@@ -243,7 +243,7 @@ static inline wyrm_error wyrm_stack_pop_continuation_f(wyrm_stack* self, wyrm_ex
     if (old_base_value->type != WYRM_TYPE_TAG_VALUE_PTR) { return WYRM_ERR_INVAL; }
     wyrm_value* old_base = old_base_value->data.value_ptr;
 
-    if (cont->type != WYRM_TYPE_TAG_FUNCTION) { return WYRM_ERR_INVAL; }
+    if (cont->type != WYRM_TYPE_TAG_FRAME) { return WYRM_ERR_INVAL; }
     *out_continuation = cont->data.cb;
 
     // Grab base to restore and find continuation
@@ -311,13 +311,6 @@ static inline wyrm_error wyrm_fiber_push_continuation(wyrm_fiber_ref self, wyrm_
 
     return WYRM_ERR_NONE;
 }
-
-static inline wyrm_error wyrm_fiber_set_entry_f(wyrm_fiber_ref self, wyrm_exec_fn fn)
-{
-    self->pending_fn = fn;
-    return WYRM_ERR_NONE;
-}
-
 
 // ----------------------------------------------------------------------------
 // Main Loop

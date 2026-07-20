@@ -20,6 +20,8 @@ WYRM_INLINE wyrm_uword wyrm_state_value_count(wyrm_state* state);
 WYRM_INLINE wyrm_value* wyrm_state_value_n(wyrm_state* state, wyrm_uword idx);
 WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value);
 
+WYRM_INLINE wyrm_error wyrm_state_set_pending(wyrm_state* state, wyrm_exec_fn pending);
+
 
 WYRM_INLINE bool wyrm_op_eq(wyrm_state* state, wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs);
 WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_state* state, wyrm_type_tag vt, wyrm_primitive v);

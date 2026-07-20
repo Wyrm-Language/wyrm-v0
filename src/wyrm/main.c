@@ -23,7 +23,7 @@ wyrm_exec_result w_add_int_x2(wyrm_state* state)
 
     wyrm_state_push(state, wyrm_make_int(a->data.word + b->data.word));
     printf("w_add_int: %ld\n", wyrm_state_value_n(state, 2)->data.word);
-    wyrm_fiber_set_entry_f(state->fiber, w_mul_int);
+    wyrm_state_set_pending(state, w_mul_int);
     return wyrm_make_exec_result(WYRM_EXEC_DELEGATE, 2);
 }
 
@@ -55,11 +55,12 @@ int main(void) {
 
     wyrm_fiber_push_value_f(&fiber, wyrm_make_int(1));
     wyrm_fiber_push_value_f(&fiber, wyrm_make_int(2));
-    wyrm_fiber_set_entry_f(&fiber, w_add_int_x2);
 
     wyrm_state state;
     wyrm_state_init_s(&state);
+
     state.fiber = &fiber;
+    wyrm_state_set_pending(&state, w_add_int_x2);
 
     wyrm_state_exec(&state);
 

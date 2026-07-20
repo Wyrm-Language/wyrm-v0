@@ -76,6 +76,7 @@ typedef enum wyrm_type_tag
     WYRM_TYPE_TAG_UWORD,
 
     WYRM_TYPE_TAG_FUNCTION,
+    WYRM_TYPE_TAG_FRAME,
 
     WYRM_TYPE_TAG_SYMBOL,
     WYRM_TYPE_TAG_VALUE_PTR,
@@ -333,8 +334,6 @@ struct wyrm_fiber
 {
     wyrm_context* parent;
     wyrm_stack value_stack;
-    wyrm_exec_fn pending_fn; ///< Non-NULL → fiber is pending; NULL → done or exception.
-    /* wyrm_value exception; -- TODO */
 };
 
 // ----------------------------------------------------------------------------
@@ -484,6 +483,7 @@ struct wyrm_state
     wyrm_machine* machine;
     wyrm_context* context;
     wyrm_fiber* fiber;
+    wyrm_exec_fn pending;
 
     wyrm_allocator* state_alloc_;
 };

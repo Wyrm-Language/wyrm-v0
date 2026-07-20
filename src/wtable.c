@@ -10,6 +10,7 @@ void wyrm_table_init_s(wyrm_table* self,
 {
     wyrm_memset(self, 0, sizeof(wyrm_table));
     self->allocator = allocator;
+    self->obj.gc_type = WYRM_TYPE_TAG_TABLE;
     self->count = count;
     self->dense = dense;
     self->dense_capacity = dense_capacity;
