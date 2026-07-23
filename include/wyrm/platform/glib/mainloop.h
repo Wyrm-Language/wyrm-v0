@@ -17,12 +17,12 @@ wyrm_main_loop *wyrm_glib_mainloop_new(wyrm_allocator *alloc);
 /**
  * Destroy main loop
  */
-wyrm_error wyrm_glib_mainloop_destroy(wyrm_main_loop_ref ref);
+wyrm_error wyrm_glib_mainloop_destroy(wyrm_main_loop* ref);
 
 /**
  * Get total active sources
  */
-wyrm_uword wyrm_glib_mainloop_get_active_sources(wyrm_main_loop_ref ref);
+wyrm_uword wyrm_glib_mainloop_get_active_sources(wyrm_main_loop* ref);
 
 #ifdef __cplusplus
 }

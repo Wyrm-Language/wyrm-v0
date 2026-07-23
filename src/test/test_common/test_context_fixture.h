@@ -3,30 +3,27 @@
 
 #include <doctest/doctest.h>
 #include <wyrm.h>
+#include <wyrmxx/main_loop.h>
+#include <wyrmxx/context.h>
 
 #include <test_common/test_machine_fixture.h>
 #include <test_common/test_main_loop_fixture.h>
 
-class test_context_failure : public std::runtime_error
-{
-    using std::runtime_error::runtime_error;
-};
-
 struct test_context_fixture : test_machine_fixture
 {
-    wyrm_context context;
-    test_main_loop_fixture main_loop;
+    test_main_loop_fixture main_loop_;
+    wyrmxx::context context;
 
     test_context_fixture()
-        : context{}
+        : main_loop_{}
+        , context{main_loop_.get()}
     {
-        wyrm_context_init_s(&context, main_loop);
-        wyrm_machine_attach_context(get_machine_ptr(), &context);
+        wyrm_machine_attach_context(&machine, context);
     }
 
     wyrm_context* get_context_ptr()
     {
-        return &context;
+        return context;
     }
 };
 

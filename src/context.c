@@ -1,7 +1,6 @@
 #include <wyrm.h>
 #include <wyrm/internal_api.h>
 
-
 /**
  * One or more fibers flagged active and ready.
  *
@@ -51,6 +50,7 @@ wyrm_error wyrm_context_init_s(wyrm_context* self, wyrm_main_loop* loop)
     self->current_fiber = WYRM_NULL;
     self->main_loop = loop;
     self->wakeable_source = wyrm_primitive_null();
+    self->wakeable_source_ready = false;
 
     /* SCAFFOLDING */
     self->first = WYRM_NULL;
@@ -72,6 +72,27 @@ cleanup_end:
     self->main_loop = WYRM_NULL;
     self->wakeable_source = wyrm_primitive_null();
     return last_error;
+}
+
+
+void wyrm_context_finalize_f(wyrm_context* self)
+{
+    wyrm_error last_error = WYRM_ERR_NONE;
+    if (self == WYRM_NULL) { return; }
+
+    /* Free the wakeable source */
+    if (self->wakeable_source_ready) {
+        last_error = wyrm_main_loop_remove(self->main_loop, self->wakeable_source);
+        WYRM_ASSERT(last_error == WYRM_ERR_NONE);
+    }
+
+    /* Free all objects */
+    wyrm_gc_object* next = self->first;
+    for (wyrm_gc_object* cur = next; cur; cur = next) {
+        next = cur->next;
+        wyrm_gc_info_finalize_f(self, cur);
+        wyrm_context_gc_free(self, cur);
+    }
 }
 
 

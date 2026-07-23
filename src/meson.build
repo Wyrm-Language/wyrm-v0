@@ -48,17 +48,8 @@ if glib_dep.found()
     modules += platform_glib
 endif
 
-# wy_opt = get_option('wy')
+wy_opt = get_option('wy')
 wyrm_opt = get_option('wyrm')
-
-#if wyrm_opt.enabled() and wy_opt.disabled()
-#    error('wyrm option requires wy to be enabled')
-#endif
-#
-#if not wy_opt.disabled()
-#    subdir('wy')                   # sets wy_module
-#    modules += wy_module
-#endif
 
 # -----------------------------------------------------------------------------
 # Build Optional / Extensions to Core
@@ -122,6 +113,15 @@ pkgconfig.generate(cwyrm_lib,
     description: 'Wyrm C runtime library',
     version:     meson.project_version(),
 )
+
+
+if wyrm_opt.enabled() and wy_opt.disabled()
+    error('wyrm option requires wy to be enabled')
+endif
+
+if not wy_opt.disabled()
+    subdir('wy')                   # sets wy_module
+endif
 
 if not wyrm_opt.disabled()
     subdir('wyrm')

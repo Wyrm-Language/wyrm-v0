@@ -1,4 +1,5 @@
 wyrmxx_sources = files(
+    'context.cpp',
     'state.cpp'
 )
 

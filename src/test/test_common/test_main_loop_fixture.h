@@ -8,6 +8,7 @@
 
 #include <wyrm/internal_api.h>
 #include <wyrmxx/main_loop.h>
+#include <wyrmxx/context.h>
 
 class test_main_loop_fixture_
 {
@@ -85,22 +86,22 @@ private:
 
     using source_list = std::list<std::unique_ptr<source>>;
 
-    static test_main_loop_fixture_& get_self(wyrm_main_loop_ref self)
+    static test_main_loop_fixture_& get_self(wyrm_main_loop* self)
     {
         return *reinterpret_cast<ext_loop*>(self)->self;
     }
 
-    static wyrm_error n_add_fd(wyrm_main_loop_ref, wyrm_primitive*, wyrm_handle, wyrm_io_condition, wyrm_priority, wyrm_source_handle_cb, wyrm_primitive)
+    static wyrm_error n_add_fd(wyrm_main_loop*, wyrm_primitive*, wyrm_handle, wyrm_io_condition, wyrm_priority, wyrm_source_handle_cb, wyrm_primitive)
     {
         return WYRM_ERR_NOSUPPORT;
     }
 
-    static wyrm_error n_add_timer(wyrm_main_loop_ref, wyrm_primitive*, uint32_t, wyrm_priority, wyrm_source_cb, wyrm_primitive)
+    static wyrm_error n_add_timer(wyrm_main_loop*, wyrm_primitive*, uint32_t, wyrm_priority, wyrm_source_cb, wyrm_primitive)
     {
         return WYRM_ERR_NOSUPPORT;
     }
 
-    static wyrm_error n_add_idle(wyrm_main_loop_ref ref, wyrm_primitive* out, wyrm_source_cb cb, wyrm_primitive ud)
+    static wyrm_error n_add_idle(wyrm_main_loop* ref, wyrm_primitive* out, wyrm_source_cb cb, wyrm_primitive ud)
     {
         auto& thiz = get_self(ref);
 
@@ -111,7 +112,7 @@ private:
         return WYRM_ERR_NONE;
     }
 
-    static wyrm_error n_add_wakeable(wyrm_main_loop_ref ref, wyrm_primitive* out, wyrm_priority /*priority*/, wyrm_source_cb cb, wyrm_primitive ud)
+    static wyrm_error n_add_wakeable(wyrm_main_loop* ref, wyrm_primitive* out, wyrm_priority /*priority*/, wyrm_source_cb cb, wyrm_primitive ud)
     {
         auto& thiz = get_self(ref);
 
@@ -122,7 +123,7 @@ private:
         return WYRM_ERR_NONE;
     }
 
-    static wyrm_error n_trigger(wyrm_main_loop_ref /*ref*/, wyrm_primitive src)
+    static wyrm_error n_trigger(wyrm_main_loop* /*ref*/, wyrm_primitive src)
     {
         auto* s = static_cast<source*>(src.ptr);
         if (!s) return WYRM_ERR_INVAL;
@@ -131,7 +132,7 @@ private:
         return WYRM_ERR_NONE;
     }
 
-    static wyrm_error n_remove(wyrm_main_loop_ref ref, wyrm_primitive src)
+    static wyrm_error n_remove(wyrm_main_loop* ref, wyrm_primitive src)
     {
         auto& thiz = get_self(ref);
         auto* s = static_cast<source*>(src.ptr);
@@ -142,19 +143,19 @@ private:
         return WYRM_ERR_NONE;
     }
 
-    static wyrm_error n_iterate(wyrm_main_loop_ref ref, bool /*may_block*/)
+    static wyrm_error n_iterate(wyrm_main_loop* ref, bool /*may_block*/)
     {
         auto& thiz = get_self(ref);
         thiz.run_triggered();
         return WYRM_ERR_NONE;
     }
 
-    static wyrm_error n_run(wyrm_main_loop_ref /*ref*/)
+    static wyrm_error n_run(wyrm_main_loop* /*ref*/)
     {
         return WYRM_ERR_NOSUPPORT;
     }
 
-    static wyrm_error n_quit(wyrm_main_loop_ref ref)
+    static wyrm_error n_quit(wyrm_main_loop* ref)
     {
         get_self(ref).quit_ = true;
         return WYRM_ERR_NONE;
@@ -188,6 +189,8 @@ public:
     {
         self_ = p_.ptr();
     }
+
+    main_loop get() { return main_loop(p_.ptr()); }
 
 private:
     test_main_loop_fixture_ p_;

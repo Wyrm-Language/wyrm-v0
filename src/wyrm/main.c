@@ -1,7 +1,7 @@
 #include <wyrm.h>
 #include <stdio.h>
 
-#include "wyrm/platform/hosted/allocator_cmem.h"
+#include <wy.h>
 
 #define STACK_SIZE 1024
 
@@ -34,35 +34,67 @@ wyrm_exec_result w_print_int(wyrm_state* state)
     return wyrm_make_exec_result(WYRM_EXEC_DONE, 0);
 }
 
-
 wyrm_exec_result w_main(wyrm_state* state)
 {
     printf("Last of the call stack, expect values = 0 actual = %ld\n", wyrm_state_value_count(state));
     return wyrm_make_exec_result(WYRM_EXEC_DONE, 0);
 }
 
+wyrm_exec_result w_push_int(wyrm_state* state)
+{
+    WYRM_UNUSED(state);
+    printf("Push Integer\n");
+    wyrm_value v_int;
+    v_int.type = WYRM_TYPE_TAG_WORD;
+    v_int.data.word = 80085;
+    wyrm_state_push(state, v_int);
+    return wyrm_make_exec_result(WYRM_EXEC_DONE, 1);
+}
+
 int main(void) {
-    wyrm_allocator_cmem allocator;
-    wyrm_allocator_cmem_init(&allocator);
+    wy_options machine_options = {
+        .allocator = WY_ALLOCATOR_CMEM
+    };
 
-    wyrm_value stack[STACK_SIZE];
+    wy_ctx* ctx = wy_init(&machine_options);
+    if (!ctx) {
+        fprintf(stderr, "Failed to initialize context\n");
+        return -1;
+    }
 
-    wyrm_fiber fiber;
-    wyrm_fiber_init(&fiber, stack, STACK_SIZE);
+    int result = wy_run(ctx);
 
-    wyrm_fiber_push_continuation(&fiber, w_main, WYRM_NULL, 0);
-    wyrm_fiber_push_continuation(&fiber, w_print_int, WYRM_NULL, 0);
+    wy_destroy(ctx);
 
-    wyrm_fiber_push_value_f(&fiber, wyrm_make_int(1));
-    wyrm_fiber_push_value_f(&fiber, wyrm_make_int(2));
 
-    wyrm_state state;
-    wyrm_state_init_s(&state);
 
-    state.fiber = &fiber;
-    wyrm_state_set_pending(&state, w_add_int_x2);
 
-    wyrm_state_exec(&state);
+    //
+    //
+    //
+    // wyrm_state_delete(state);
+    //
+    //
+    // wyrm_value stack[STACK_SIZE];
+    //
+    // wyrm_fiber fiber;
+    // wyrm_fiber_init(&fiber, stack, STACK_SIZE);
+    //
+    // wyrm_fiber_push_continuation(&fiber, w_main, WYRM_NULL, 0);
+    // wyrm_fiber_push_continuation(&fiber, w_print_int, WYRM_NULL, 0);
+    //
+    // wyrm_fiber_push_continuation(&fiber, w_push_int, WYRM_NULL, 0);
+    //
+    // //wyrm_fiber_push_value_f(&fiber, wyrm_make_int(1));
+    // //wyrm_fiber_push_value_f(&fiber, wyrm_make_int(2));
+    //
+    // wyrm_state state;
+    // wyrm_state_init_s(&state);
+    //
+    // state.fiber = &fiber;
+    // // wyrm_state_set_pending(&state, w_add_int_x2);
+    //
+    // wyrm_state_exec(&state);
 
-    return 0;
+    return result;
 }

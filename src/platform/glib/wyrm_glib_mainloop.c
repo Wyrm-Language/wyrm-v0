@@ -144,7 +144,7 @@ static int glib_map_priority(wyrm_priority priority) {
 // vtable
 // ----------------------------------------------------------------------------
 
-static wyrm_error glib_add_fd(wyrm_main_loop_ref ref,
+static wyrm_error glib_add_fd(wyrm_main_loop* ref,
                                wyrm_primitive *out,
                                wyrm_handle fd,
                                wyrm_io_condition events,
@@ -183,7 +183,7 @@ static wyrm_error glib_add_fd(wyrm_main_loop_ref ref,
     return WYRM_ERR_NONE;
 }
 
-static wyrm_error glib_add_timer(wyrm_main_loop_ref ref,
+static wyrm_error glib_add_timer(wyrm_main_loop* ref,
                                   wyrm_primitive *out,
                                   uint32_t ms,
                                   wyrm_priority priority,
@@ -215,7 +215,7 @@ static wyrm_error glib_add_timer(wyrm_main_loop_ref ref,
     return WYRM_ERR_NONE;
 }
 
-static wyrm_error glib_add_idle(wyrm_main_loop_ref ref,
+static wyrm_error glib_add_idle(wyrm_main_loop* ref,
                                  wyrm_primitive *out,
                                  wyrm_source_cb cb,
                                  wyrm_primitive ud) {
@@ -245,7 +245,7 @@ static wyrm_error glib_add_idle(wyrm_main_loop_ref ref,
     return WYRM_ERR_NONE;
 }
 
-static wyrm_error glib_add_wakeable(wyrm_main_loop_ref ref,
+static wyrm_error glib_add_wakeable(wyrm_main_loop* ref,
                                      wyrm_primitive *out,
                                      wyrm_priority priority,
                                      wyrm_source_cb cb,
@@ -277,7 +277,7 @@ static wyrm_error glib_add_wakeable(wyrm_main_loop_ref ref,
     return WYRM_ERR_NONE;
 }
 
-static wyrm_error glib_trigger(wyrm_main_loop_ref ref,
+static wyrm_error glib_trigger(wyrm_main_loop* ref,
                                 wyrm_primitive src) {
     glib_mainloop *loop = (glib_mainloop *)ref;
     wyrm_uword idx = src.uword;
@@ -298,7 +298,7 @@ static wyrm_error glib_trigger(wyrm_main_loop_ref ref,
     return WYRM_ERR_NONE;
 }
 
-static wyrm_error glib_remove(wyrm_main_loop_ref ref, wyrm_primitive src) {
+static wyrm_error glib_remove(wyrm_main_loop* ref, wyrm_primitive src) {
     glib_mainloop *loop = (glib_mainloop *)ref;
     wyrm_uword idx = src.uword;
 
@@ -320,19 +320,19 @@ static wyrm_error glib_remove(wyrm_main_loop_ref ref, wyrm_primitive src) {
     return WYRM_ERR_NONE;
 }
 
-static wyrm_error glib_iterate(wyrm_main_loop_ref ref, bool may_block) {
+static wyrm_error glib_iterate(wyrm_main_loop* ref, bool may_block) {
     glib_mainloop *loop = (glib_mainloop *)ref;
     g_main_context_iteration(loop->ctx, (gboolean)may_block);
     return WYRM_ERR_NONE;
 }
 
-static wyrm_error glib_run(wyrm_main_loop_ref ref) {
+static wyrm_error glib_run(wyrm_main_loop* ref) {
     glib_mainloop *loop = (glib_mainloop *)ref;
     g_main_loop_run(loop->gloop);
     return WYRM_ERR_NONE;
 }
 
-static wyrm_error glib_quit(wyrm_main_loop_ref ref) {
+static wyrm_error glib_quit(wyrm_main_loop* ref) {
     glib_mainloop *loop = (glib_mainloop *)ref;
     g_main_loop_quit(loop->gloop);
     return WYRM_ERR_NONE;
@@ -386,7 +386,7 @@ out_err_context_new:
     return NULL;
 }
 
-wyrm_error wyrm_glib_mainloop_destroy(wyrm_main_loop_ref ref) {
+wyrm_error wyrm_glib_mainloop_destroy(wyrm_main_loop* ref) {
     glib_mainloop *loop = (glib_mainloop *)ref;
 
     for (wyrm_uword i = 0; i < loop->capacity; i++) {
@@ -406,7 +406,7 @@ wyrm_error wyrm_glib_mainloop_destroy(wyrm_main_loop_ref ref) {
     return WYRM_ERR_NONE;
 }
 
-wyrm_uword wyrm_glib_mainloop_get_active_sources(wyrm_main_loop_ref ref)
+wyrm_uword wyrm_glib_mainloop_get_active_sources(wyrm_main_loop* ref)
 {
     glib_mainloop *loop = (glib_mainloop *)ref;
     wyrm_uword count = 0;

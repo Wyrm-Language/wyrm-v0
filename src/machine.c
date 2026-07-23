@@ -56,11 +56,10 @@ wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context
     return WYRM_ERR_NONE;
 }
 
-wyrm_error wyrm_machine_finalize_f(wyrm_machine* self)
+void wyrm_machine_finalize_f(wyrm_machine* self)
 {
-    if (self == WYRM_NULL) { return WYRM_ERR_NONE; }
+    if (self == WYRM_NULL) { return; }
     wyrm_allocator_free(self->allocator, self->symtab); self->symtab = WYRM_NULL;
-    return WYRM_ERR_NONE;
 }
 
 wyrm_error wyrm_machine_find_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out)

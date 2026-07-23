@@ -15,12 +15,12 @@ struct wyrm_allocator_cmem
     wyrm_allocator base;
 };
 
-static inline void wyrm_allocator_cmem_init(struct wyrm_allocator_cmem* allocator)
+WYRM_INLINE void wyrm_allocator_cmem_init(struct wyrm_allocator_cmem* allocator)
 {
     allocator->base.clz = &wyrm_allocator_cmem_vt;
 }
 
-static inline wyrm_allocator* wyrm_allocator_from_cmem(struct wyrm_allocator_cmem* allocator)
+WYRM_INLINE wyrm_allocator* wyrm_allocator_from_cmem(struct wyrm_allocator_cmem* allocator)
 {
     return &allocator->base;
 }

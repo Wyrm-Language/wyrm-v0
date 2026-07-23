@@ -15,7 +15,7 @@ static inline bool wyrm_test_main_loop_count_cb(wyrm_primitive ud) {
     return false;
 }
 
-static inline void wyrm_test_main_loop_wakeable_sanity(wyrm_main_loop_ref loop) {
+static inline void wyrm_test_main_loop_wakeable_sanity(wyrm_main_loop* loop) {
     wyrm_test_main_loop_state state = {0};
     wyrm_primitive user_data = {0};
     wyrm_primitive source = {0};
@@ -38,7 +38,7 @@ static inline void wyrm_test_main_loop_wakeable_sanity(wyrm_main_loop_ref loop) 
 }
 
 
-static inline void wyrm_test_main_loop_timer_sanity(wyrm_main_loop_ref loop, uint32_t timer_ms) {
+static inline void wyrm_test_main_loop_timer_sanity(wyrm_main_loop* loop, uint32_t timer_ms) {
     wyrm_test_main_loop_state state = {0};
     wyrm_primitive user_data = {0};
     wyrm_primitive source = {0};

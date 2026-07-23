@@ -282,22 +282,22 @@ static inline wyrm_error wyrm_stack_push_array_f(wyrm_stack* self, wyrm_value* a
 // Fiber Startup
 // ----------------------------------------------------------------------------
 
-static inline wyrm_uword wyrm_fiber_value_count_f(wyrm_fiber_ref self)
+static inline wyrm_uword wyrm_fiber_value_count_f(wyrm_fiber* self)
 {
     return wyrm_stack_arg_count_f(&self->value_stack);
 }
 
-static inline wyrm_value* wyrm_fiber_value_n(wyrm_fiber_ref self, wyrm_uword index)
+static inline wyrm_value* wyrm_fiber_value_n(wyrm_fiber* self, wyrm_uword index)
 {
     return &self->value_stack.base[index];
 }
 
-static inline wyrm_error wyrm_fiber_push_value_f(wyrm_fiber_ref self, wyrm_value value)
+static inline wyrm_error wyrm_fiber_push_value_f(wyrm_fiber* self, wyrm_value value)
 {
     return wyrm_stack_push_f(&self->value_stack, value.type, value.data);
 }
 
-static inline wyrm_error wyrm_fiber_push_continuation(wyrm_fiber_ref self, wyrm_exec_fn fn, wyrm_value* arg, wyrm_uword arg_count)
+static inline wyrm_error wyrm_fiber_push_continuation(wyrm_fiber* self, wyrm_exec_fn fn, wyrm_value* arg, wyrm_uword arg_count)
 {
     wyrm_error last_error = wyrm_stack_push_continuation_f(&self->value_stack, fn);
     if (last_error != WYRM_ERR_NONE) { return last_error; }
@@ -319,7 +319,7 @@ static inline wyrm_error wyrm_fiber_push_continuation(wyrm_fiber_ref self, wyrm_
 /**
  * Add fd watcher to the main loop
  */
-static inline wyrm_error wyrm_main_loop_add_fd(wyrm_main_loop_ref ref, wyrm_primitive *out, wyrm_handle fd, wyrm_io_condition events, wyrm_priority priority, wyrm_source_handle_cb cb, wyrm_primitive ud)
+static inline wyrm_error wyrm_main_loop_add_fd(wyrm_main_loop* ref, wyrm_primitive *out, wyrm_handle fd, wyrm_io_condition events, wyrm_priority priority, wyrm_source_handle_cb cb, wyrm_primitive ud)
 {
     if (ref == WYRM_NULL || ref->vt == WYRM_NULL) { return WYRM_ERR_INVAL; }
     return ref->vt->add_fd(ref, out, fd, events, priority, cb, ud);
@@ -328,7 +328,7 @@ static inline wyrm_error wyrm_main_loop_add_fd(wyrm_main_loop_ref ref, wyrm_prim
 /**
  * Add timer to the main loop
  */
-static inline wyrm_error wyrm_main_loop_add_timer(wyrm_main_loop_ref self, wyrm_primitive *out, uint32_t ms, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud)
+static inline wyrm_error wyrm_main_loop_add_timer(wyrm_main_loop* self, wyrm_primitive *out, uint32_t ms, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud)
 {
     if (self == WYRM_NULL || self->vt == WYRM_NULL) { return WYRM_ERR_INVAL; }
     return self->vt->add_timer(self, out, ms, priority, cb, ud);
@@ -337,7 +337,7 @@ static inline wyrm_error wyrm_main_loop_add_timer(wyrm_main_loop_ref self, wyrm_
 /**
  * Add idle handler to the main loop
  */
-static inline wyrm_error wyrm_main_loop_add_idle(wyrm_main_loop_ref self, wyrm_primitive *out, wyrm_source_cb cb, wyrm_primitive ud)
+static inline wyrm_error wyrm_main_loop_add_idle(wyrm_main_loop* self, wyrm_primitive *out, wyrm_source_cb cb, wyrm_primitive ud)
 {
     if (self == WYRM_NULL || self->vt == WYRM_NULL) { return WYRM_ERR_INVAL; }
     return self->vt->add_idle(self, out, cb, ud);
@@ -346,7 +346,7 @@ static inline wyrm_error wyrm_main_loop_add_idle(wyrm_main_loop_ref self, wyrm_p
 /**
  * Add wakeable handler to the main loop
  */
-static inline wyrm_error wyrm_main_loop_add_wakeable(wyrm_main_loop_ref self, wyrm_primitive *out, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud)
+static inline wyrm_error wyrm_main_loop_add_wakeable(wyrm_main_loop* self, wyrm_primitive *out, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud)
 {
     if (self == WYRM_NULL || self->vt == WYRM_NULL) { return WYRM_ERR_INVAL; }
     return self->vt->add_wakeable(self, out, priority, cb, ud);
@@ -355,7 +355,7 @@ static inline wyrm_error wyrm_main_loop_add_wakeable(wyrm_main_loop_ref self, wy
 /**
  * Add triggerable to the main loop
  */
-static inline wyrm_error wyrm_main_loop_trigger(wyrm_main_loop_ref self, wyrm_primitive src)
+static inline wyrm_error wyrm_main_loop_trigger(wyrm_main_loop* self, wyrm_primitive src)
 {
     if (self == WYRM_NULL || self->vt == WYRM_NULL) { return WYRM_ERR_INVAL; }
     return self->vt->trigger(self, src);
@@ -364,7 +364,7 @@ static inline wyrm_error wyrm_main_loop_trigger(wyrm_main_loop_ref self, wyrm_pr
 /**
  * Remove source from main loop
  */
-static inline wyrm_error wyrm_main_loop_remove(wyrm_main_loop_ref self, wyrm_primitive src)
+static inline wyrm_error wyrm_main_loop_remove(wyrm_main_loop* self, wyrm_primitive src)
 {
     if (self == WYRM_NULL || self->vt == WYRM_NULL) { return WYRM_ERR_INVAL; }
     return self->vt->remove(self, src);
@@ -373,7 +373,7 @@ static inline wyrm_error wyrm_main_loop_remove(wyrm_main_loop_ref self, wyrm_pri
 /**
  * Request iteration of main loop
  */
-static inline wyrm_error wyrm_main_loop_iterate(wyrm_main_loop_ref self, bool may_block)
+static inline wyrm_error wyrm_main_loop_iterate(wyrm_main_loop* self, bool may_block)
 {
     if (self == WYRM_NULL || self->vt == WYRM_NULL) { return WYRM_ERR_INVAL; }
     return self->vt->iterate(self, may_block);
@@ -382,7 +382,7 @@ static inline wyrm_error wyrm_main_loop_iterate(wyrm_main_loop_ref self, bool ma
 /**
  * Run the main loop
  */
-static inline wyrm_error wyrm_main_loop_run(wyrm_main_loop_ref self)
+static inline wyrm_error wyrm_main_loop_run(wyrm_main_loop* self)
 {
     if (self == WYRM_NULL || self->vt == WYRM_NULL) { return WYRM_ERR_INVAL; }
     return self->vt->run(self);
@@ -391,7 +391,7 @@ static inline wyrm_error wyrm_main_loop_run(wyrm_main_loop_ref self)
 /**
  * Quit the main loop
  */
-static inline wyrm_error wyrm_main_loop_quit(wyrm_main_loop_ref self)
+static inline wyrm_error wyrm_main_loop_quit(wyrm_main_loop* self)
 {
     if (self == WYRM_NULL || self->vt == WYRM_NULL) { return WYRM_ERR_INVAL; }
     return self->vt->quit(self);

@@ -29,18 +29,18 @@ WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_state* state, wyrm_type_tag vt, wyrm_pr
 
 wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc);
 wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context);
-wyrm_error wyrm_machine_finalize_f(wyrm_machine* self);
+void wyrm_machine_finalize_f(wyrm_machine* self);
 
 wyrm_error wyrm_machine_find_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out);
 wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out);
 
-
-void wyrm_fiber_init(wyrm_fiber* self, wyrm_value* stack, wyrm_uword stack_size);
+wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len);
 static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self);
+void wyrm_fiber_finalize_f(wyrm_fiber* self);
 
 wyrm_error wyrm_context_init_s(wyrm_context* self, wyrm_main_loop* loop);
-wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber);
-static inline wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
+void wyrm_context_finalize_f(wyrm_context* self);
+WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
 
 
 
@@ -104,7 +104,7 @@ static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)
 }
 
 /* ---------- wyrm_context inlines --------- */
-static inline wyrm_machine* wyrm_context_get_machine(wyrm_context* self)
+WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self)
 {
     if (!self) { return WYRM_NULL; }
     return self->parent;

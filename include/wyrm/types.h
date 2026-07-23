@@ -55,10 +55,6 @@ typedef struct wyrm_thread wyrm_thread;
 typedef struct wyrm_value wyrm_value;
 #endif
 
-typedef wyrm_fiber* wyrm_fiber_ref;
-typedef wyrm_main_loop* wyrm_main_loop_ref;
-typedef wyrm_thread* wyrm_thread_ref;
-
 // ----------------------------------------------------------------------------
 // Standardized Enumerations and Values
 // ----------------------------------------------------------------------------
@@ -84,6 +80,7 @@ typedef enum wyrm_type_tag
     WYRM_GC_PATH_START,
     WYRM_TYPE_TAG_BOX,
     WYRM_TYPE_TAG_STR,
+    WYRM_TYPE_TAG_FIBER,
 
     WYRM_SLOW_PATH_START,
     WYRM_TYPE_TAG_TABLE
@@ -243,6 +240,34 @@ struct wyrm_gc_object
 };
 
 // ----------------------------------------------------------------------------
+// Stack
+// ----------------------------------------------------------------------------
+
+/**
+ * @struct wyrm_stack
+ *
+ * Stack primitive for the Wyrm interpreter. Stack space is defined by a
+ * pointer range (entries_begin, entries_end); Stack grows upward from
+ * begin toward end.
+ *
+ * Stack shape:
+ *      [base - 2] Previous base pointer;
+ *      [base - 1] Continuation meant to expand after base
+ *      [base]
+ *      ...  Current value of the stack
+ *      [top]
+ */
+struct wyrm_stack
+{
+    wyrm_value* entries_begin;
+    wyrm_value* entries_end;
+
+    wyrm_value* base;
+    wyrm_value* top;
+};
+
+
+// ----------------------------------------------------------------------------
 // Wyrm Box
 // ----------------------------------------------------------------------------
 
@@ -296,45 +321,20 @@ struct wyrm_table
     wyrm_uword sparse_capacity;
 };
 
-
 // ----------------------------------------------------------------------------
-// Stack
+// Fiber
 // ----------------------------------------------------------------------------
 
 /**
- * @struct wyrm_stack
- *
- * Stack primitive for the Wyrm interpreter. Stack space is defined by a
- * pointer range (entries_begin, entries_end); Stack grows upward from
- * begin toward end.
- *
- * Stack shape:
- *      [base - 2] Previous base pointer;
- *      [base - 1] Continuation meant to expand after base
- *      [base]
- *      ...  Current value of the stack
- *      [top]
+ * Fiber / stack
  */
-struct wyrm_stack
-{
-    wyrm_value* entries_begin;
-    wyrm_value* entries_end;
-
-    wyrm_value* base;
-    wyrm_value* top;
-};
-
-
-
-// ----------------------------------------------------------------------------
-// Wyrm Fiber
-// ----------------------------------------------------------------------------
-
 struct wyrm_fiber
 {
+    wyrm_gc_object obj;
     wyrm_context* parent;
     wyrm_stack value_stack;
 };
+
 
 // ----------------------------------------------------------------------------
 // Wyrm Main Loop
@@ -397,15 +397,15 @@ typedef bool (*wyrm_source_handle_cb)(wyrm_handle handle, wyrm_io_condition cond
  */
 typedef struct wyrm_main_loop_vt
 {
-    wyrm_error (*add_fd)(wyrm_main_loop_ref ref, wyrm_primitive *out, wyrm_handle fd, wyrm_io_condition events, wyrm_priority priority, wyrm_source_handle_cb cb, wyrm_primitive ud);
-    wyrm_error (*add_timer)(wyrm_main_loop_ref self, wyrm_primitive *out, uint32_t ms, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
-    wyrm_error (*add_idle)(wyrm_main_loop_ref self, wyrm_primitive *out, wyrm_source_cb cb, wyrm_primitive ud);
-    wyrm_error (*add_wakeable)(wyrm_main_loop_ref self, wyrm_primitive *out, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
-    wyrm_error (*trigger)(wyrm_main_loop_ref self, wyrm_primitive src);
-    wyrm_error (*remove)(wyrm_main_loop_ref self, wyrm_primitive src);
-    wyrm_error (*iterate)(wyrm_main_loop_ref self, bool may_block);
-    wyrm_error (*run)(wyrm_main_loop_ref self);
-    wyrm_error (*quit)(wyrm_main_loop_ref self);
+    wyrm_error (*add_fd)(wyrm_main_loop* ref, wyrm_primitive *out, wyrm_handle fd, wyrm_io_condition events, wyrm_priority priority, wyrm_source_handle_cb cb, wyrm_primitive ud);
+    wyrm_error (*add_timer)(wyrm_main_loop* self, wyrm_primitive *out, uint32_t ms, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
+    wyrm_error (*add_idle)(wyrm_main_loop* self, wyrm_primitive *out, wyrm_source_cb cb, wyrm_primitive ud);
+    wyrm_error (*add_wakeable)(wyrm_main_loop* self, wyrm_primitive *out, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
+    wyrm_error (*trigger)(wyrm_main_loop* self, wyrm_primitive src);
+    wyrm_error (*remove)(wyrm_main_loop* self, wyrm_primitive src);
+    wyrm_error (*iterate)(wyrm_main_loop* self, bool may_block);
+    wyrm_error (*run)(wyrm_main_loop* self);
+    wyrm_error (*quit)(wyrm_main_loop* self);
 } wyrm_main_loop_vt;
 
 /**
@@ -437,6 +437,7 @@ struct wyrm_context
     wyrm_main_loop* main_loop;
 
     wyrm_primitive wakeable_source;
+    bool wakeable_source_ready;
 
     wyrm_gc_object* first;
     wyrm_gc_object* last;
@@ -461,8 +462,6 @@ struct wyrm_machine
 // ----------------------------------------------------------------------------
 // Wyrm State
 // ----------------------------------------------------------------------------
-
-
 
 
 /**
