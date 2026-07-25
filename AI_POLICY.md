@@ -35,6 +35,10 @@ AI may assist with explanations, summaries, or drafting, but must not replace un
 
 ## Prohibited content
 
+**AI Majority or Vibe Coded Content.**
+Wholesale AI only oriented features without human in the loop or changes
+where AI was left to "engineer" the solution are not accepted.
+
 **AI-generated media is not permitted.**
 This includes, but is not limited to: art, images, videos, and audio.
 Only text and code are eligible for AI assistance, subject to the rules above.
@@ -53,15 +57,6 @@ Every issue, discussion, and pull request is read and reviewed by maintainers wh
 The primary behavior this policy seeks to prevent is **Vibe Coding**, defined as the uncritical generation and submission of AI-produced code without sufficient understanding, verification, or accountability by the contributor. This policy exists to prevent wasted maintainer time and to ensure high standards of code quality and maintainability.
 
 This policy exists to protect maintainers, preserve code quality, and ensure that collaboration remains productive and sustainable.
-
-## Responsible AI usage is welcome
-
-Wyrm maintainers actively use AI tools as part of their workflow.
-This policy does not represent an anti-AI position.
-
-The restrictions outlined above exist due to repeated misuse of AI by contributors who submit unverified, low-quality, or poorly understood work. The issue is not the tools themselves, but how they are applied.
-
-When used responsibly, transparently, and with proper human oversight, AI can be a valuable productivity aid.
 
 ## Attribution
 
