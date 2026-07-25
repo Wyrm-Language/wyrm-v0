@@ -17,3 +17,6 @@ build
 build.*
 build-*
 
+# Temporary / working files
+doc.tmp
+gen
