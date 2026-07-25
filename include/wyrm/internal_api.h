@@ -182,6 +182,25 @@ static inline wyrm_error wyrm_stack_pop(wyrm_stack* self, wyrm_type_tag* type_re
 }
 
 /**
+ * Pop values from the stack and discard
+ *
+ * @param self Stack to pop value from
+ * @param count Total elements to discard
+ * @return WYRM_ERR_NONE on success
+ */
+static inline wyrm_error wyrm_stack_pop_discard_f(wyrm_stack* self, wyrm_uword count)
+{
+    WYRM_ASSERT(self != WYRM_NULL);
+
+    ptrdiff_t count_available = self->top - self->entries_begin;
+    if (count_available < 0 || (wyrm_uword) count_available < count) {
+        return WYRM_ERR_RANGE;
+    }
+    self->top -= count;
+    return WYRM_ERR_NONE;
+}
+
+/**
  * Push continuation to the stack.
  *
  * Set the next continuation for the next set of results. The base pointer
@@ -216,7 +235,7 @@ static inline wyrm_error wyrm_stack_push_continuation_f(wyrm_stack* self, wyrm_e
 
 
 /**
- * Pop a stack frame, keeping top N values at the stack top.
+ * Pop a stack frame, transfering last N values to the new stack top
  *
  * Restores the base pointer saved by wyrm_stack_push_continuation_f, then
  * moves preserve_count values from the top of the current frame to where the
@@ -297,19 +316,23 @@ static inline wyrm_error wyrm_fiber_push_value_f(wyrm_fiber* self, wyrm_value va
     return wyrm_stack_push_f(&self->value_stack, value.type, value.data);
 }
 
-static inline wyrm_error wyrm_fiber_push_continuation(wyrm_fiber* self, wyrm_exec_fn fn, wyrm_value* arg, wyrm_uword arg_count)
+static inline wyrm_error wyrm_fiber_push_return_f(wyrm_fiber* self, wyrm_value value)
 {
-    wyrm_error last_error = wyrm_stack_push_continuation_f(&self->value_stack, fn);
-    if (last_error != WYRM_ERR_NONE) { return last_error; }
-
-    last_error = wyrm_stack_push_array_f(&self->value_stack, arg, arg_count);
-    if (last_error != WYRM_ERR_NONE) {
-        wyrm_exec_fn garbage;
-        wyrm_stack_pop_continuation_f(&self->value_stack, &garbage, 0);
-        return last_error;
+    wyrm_error last_error = wyrm_fiber_push_value_f(self, value);
+    if (last_error == WYRM_ERR_NONE) {
+        self->tail_preserve_count++;
     }
+    return last_error;
+}
 
-    return WYRM_ERR_NONE;
+
+WYRM_INLINE wyrm_error wyrm_fiber_push_continuation(wyrm_fiber* self, wyrm_exec_fn fn)
+{
+    if (self == WYRM_NULL || fn == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    if (self->pending != WYRM_NULL) { return WYRM_ERR_BUSY; }
+    if (self->tail_preserve_count > 0) { return WYRM_ERR_BUSY; }
+
+    return wyrm_stack_push_continuation_f(&self->value_stack, fn);
 }
 
 

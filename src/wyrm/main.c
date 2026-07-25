@@ -3,29 +3,29 @@
 
 #include <wy.h>
 
-wyrm_exec_result w_main(wyrm_state* state)
+wyrm_exec_state w_main(wyrm_state* state)
 {
     printf("Last of the call stack, expect values = 0 actual = %ld\n", wyrm_state_value_count(state));
-    return wyrm_make_exec_result(WYRM_EXEC_DONE, 0);
+    return WYRM_EXEC_DONE;
 }
 
-wyrm_exec_result w_print_int(wyrm_state* state)
+wyrm_exec_state w_print_int(wyrm_state* state)
 {
     wyrm_value* a = wyrm_state_value_n(state, 0);
     printf("w_print_int: %ld\n", a->data.word);
-    return wyrm_make_exec_result(WYRM_EXEC_DONE, 0);
+    return WYRM_EXEC_DONE;
 }
 
-wyrm_exec_result w_mul_int(wyrm_state* state)
+wyrm_exec_state w_mul_int(wyrm_state* state)
 {
     wyrm_value* a = wyrm_state_value_n(state, 0);
     wyrm_value* b = wyrm_state_value_n(state, 1);
-    wyrm_state_push(state, wyrm_make_int(a->data.word * b->data.word));
+    wyrm_state_push_return(state, wyrm_make_int(a->data.word * b->data.word));
     printf("w_mul_int: %ld x %ld\n", a->data.word, b->data.word);;
-    return wyrm_make_exec_result(WYRM_EXEC_DONE, 1);
+    return WYRM_EXEC_DONE;
 }
 
-wyrm_exec_result w_push_int_pair(wyrm_state* state)
+wyrm_exec_state w_push_int_pair(wyrm_state* state)
 {
     WYRM_UNUSED(state);
     printf("pushing arguments\n");
@@ -33,12 +33,12 @@ wyrm_exec_result w_push_int_pair(wyrm_state* state)
 
     v_int.type = WYRM_TYPE_TAG_WORD;
     v_int.data.word = 8;
-    wyrm_state_push(state, v_int);
+    wyrm_state_push_return(state, v_int);
 
     v_int.data.word = 32;
-    wyrm_state_push(state, v_int);
+    wyrm_state_push_return(state, v_int);
 
-    return wyrm_make_exec_result(WYRM_EXEC_DONE, 2);
+    return WYRM_EXEC_DONE;
 }
 
 int main(void) {
@@ -56,10 +56,10 @@ int main(void) {
 
     // TODO: add wy_eval or something...
     wyrm_fiber* fiber = wy_get_primary_fiber(ctx);
-    wyrm_fiber_push_continuation(fiber, w_main, WYRM_NULL, 0);
-    wyrm_fiber_push_continuation(fiber, w_print_int, WYRM_NULL, 0);
-    wyrm_fiber_push_continuation(fiber, w_mul_int, WYRM_NULL, 0);
-    wyrm_fiber_push_continuation(fiber, w_push_int_pair, WYRM_NULL, 0);
+    wyrm_fiber_push_continuation(fiber, w_main);
+    wyrm_fiber_push_continuation(fiber, w_print_int);
+    wyrm_fiber_push_continuation(fiber, w_mul_int);
+    wyrm_fiber_push_continuation(fiber, w_push_int_pair);
 
     last_error = wyrm_context_activate(
         wy_get_primary_context(ctx),

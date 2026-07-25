@@ -34,9 +34,15 @@ void wyrm_machine_finalize_f(wyrm_machine* self);
 wyrm_error wyrm_machine_find_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out);
 wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out);
 
+/* ------------------------------------------------------------------------- */
+/* Fiber API                                                                 */
+/* ------------------------------------------------------------------------- */
+
 wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len);
 static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self);
 void wyrm_fiber_finalize_f(wyrm_fiber* self);
+wyrm_error wyrm_fiber_exec_f(wyrm_fiber* self, wyrm_state* state);
+
 
 /* ------------------------------------------------------------------------- */
 /* Context API                                                               */

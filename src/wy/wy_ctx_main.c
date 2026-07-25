@@ -78,7 +78,7 @@ wy_ctx* wy_init(const wy_options* options)
     if (ctx->primary_state.fiber == WYRM_NULL) { goto ctx_machine_destroy; }
 
     // Place stop continuation as last task on the thread
-    if (wyrm_fiber_push_continuation(ctx->primary_state.fiber, wyrm_mod_sys_stop, WYRM_NULL, 0) != WYRM_ERR_NONE) {
+    if (wyrm_fiber_push_continuation(ctx->primary_state.fiber, wyrm_mod_sys_stop) != WYRM_ERR_NONE) {
         goto ctx_machine_destroy;
     }
 

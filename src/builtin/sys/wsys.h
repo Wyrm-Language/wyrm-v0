@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-wyrm_exec_result wyrm_mod_sys_stop(wyrm_state* state);
+wyrm_exec_state wyrm_mod_sys_stop(wyrm_state* state);
 
 #ifdef __cplusplus
 }

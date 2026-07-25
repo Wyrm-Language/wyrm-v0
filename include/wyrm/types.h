@@ -113,49 +113,15 @@ struct wyrm_allocator {
 
 
 // ----------------------------------------------------------------------------
-// Execution State
+// The Master Function Type
 // ----------------------------------------------------------------------------
 
-/**
- * Result states for a wyrm callable invoked via wyrm_exec_fn.
- *
- * Each execution state determines interpretation of the fiber's value stack.
- */
-enum wyrm_exec_state_tag
-{
-    WYRM_EXEC_DONE = 0,      ///< Normal return. stack_values indicates the count of values returned.
-    // WYRM_EXEC_EXCEPTION, ///< Unhandled condition raised. fiber->exception holds the value. TODO
-    // WYRM_EXEC_PENDING,   ///< Callee pushed a new frame; fiber->pending_fn is the next call. TODO
-    WYRM_EXEC_DELEGATE,     ///< Tail call; reset stack
-    WYRM_EXEC_CONTINUE,     ///< Continue with the current stack
-};
-typedef wyrm_ushort wyrm_exec_state;
-
-#ifndef __cplusplus
-typedef enum wyrm_exec_state_tag wyrm_exec_state_tag;
-#endif
-
-/**
- * Return type of every wyrm_exec_fn call.
- *
- * Optimized to fit within a single register.
- */
-struct wyrm_exec_result
-{
-    wyrm_exec_state state;
-    wyrm_ushort stack_values;
-};
-
-static inline wyrm_exec_result wyrm_make_exec_result(wyrm_exec_state_tag state, wyrm_ushort count)
-{
-    wyrm_exec_result result = { .state = (wyrm_exec_state)state, .stack_values = count };
-    return result;
-}
+typedef wyrm_word wyrm_exec_state;
 
 
 /**
+ * @brief Uniform Calling Convention for C functions in Wyrm
  *
- * Uniform calling convention for every callable in the system
  *
  * Every call memoizes a frame_start on the fiber's value stack before
  * pushing args; the callee may freely push/pop scratch above frame_start
@@ -164,8 +130,26 @@ static inline wyrm_exec_result wyrm_make_exec_result(wyrm_exec_state_tag state, 
  * exec state contained within the return struct.
  *
  */
-typedef wyrm_exec_result (*wyrm_exec_fn)(wyrm_state* state);
+typedef wyrm_exec_state (*wyrm_exec_fn)(wyrm_state* state);
 
+
+/**
+ * Result states for a wyrm callable invoked via wyrm_exec_fn.
+ *
+ * Each execution state determines interpretation of the fiber's value stack.
+ */
+enum wyrm_exec_state_tag
+{
+    WYRM_EXEC_DONE = 0,     ///< Normal return. stack_values indicates the count of values returned.
+    // WYRM_EXEC_EXCEPTION, ///< Unhandled condition raised. fiber->exception holds the value. TODO
+    // WYRM_EXEC_PENDING,   ///< Callee pushed a new frame; fiber->pending_fn is the next call. TODO
+    WYRM_EXEC_DELEGATE,     ///< Tail call; reset stack
+    WYRM_EXEC_CONTINUE,     ///< Continue with the current stack
+};
+
+#ifndef __cplusplus
+typedef enum wyrm_exec_state_tag wyrm_exec_state_tag;
+#endif
 
 // ----------------------------------------------------------------------------
 // Wyrm Type
@@ -251,10 +235,14 @@ struct wyrm_gc_object
  * begin toward end.
  *
  * Stack shape:
+ *      [previous base] Active argument + context for continuation
+ *      ...
+ *      ...
+ *      ...
  *      [base - 2] Previous base pointer;
- *      [base - 1] Continuation meant to expand after base
+ *      [base - 1] Continuation pointer
  *      [base]
- *      ...  Current value of the stack
+ *      ...  Active countext + arguments
  *      [top]
  */
 struct wyrm_stack
@@ -333,6 +321,10 @@ struct wyrm_fiber
     wyrm_gc_object obj;
     wyrm_context* parent;
     wyrm_stack value_stack;
+    wyrm_exec_fn pending;
+
+    //! The total number of entries to preserve on
+    wyrm_uword tail_preserve_count;
 };
 
 
@@ -482,7 +474,6 @@ struct wyrm_state
     wyrm_machine* machine;
     wyrm_context* context;
     wyrm_fiber* fiber;
-    wyrm_exec_fn pending;
 
     wyrm_allocator* state_alloc_;
 };

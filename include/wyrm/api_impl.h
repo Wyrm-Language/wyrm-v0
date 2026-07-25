@@ -25,7 +25,6 @@ WYRM_INLINE void wyrm_state_init_s(wyrm_state* state)
     state->machine = WYRM_NULL;
     state->context = WYRM_NULL;
     state->fiber = WYRM_NULL;
-    state->pending = WYRM_NULL;
     state->state_alloc_ = WYRM_NULL;
 }
 
@@ -91,13 +90,21 @@ WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value)
     return wyrm_fiber_push_value_f(state->fiber, value);
 }
 
+WYRM_INLINE wyrm_error wyrm_state_push_return(wyrm_state* state, wyrm_value value)
+{
+    if (state == WYRM_NULL || state->fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    return wyrm_fiber_push_return_f(state->fiber, value);
+}
+
 WYRM_INLINE wyrm_error wyrm_state_set_pending(wyrm_state* state, wyrm_exec_fn pending)
 {
     if (state == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (state->pending != WYRM_NULL) { return WYRM_ERR_BUSY; }
-    state->pending = pending;
+    if (state->fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    if (state->fiber->pending != WYRM_NULL) { return WYRM_ERR_BUSY; }
+    state->fiber->pending = pending;
     return WYRM_ERR_NONE;
 }
+
 
 /* ------------------------------------------------------------------------- */
 /* Operations                                                                */
