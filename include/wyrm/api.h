@@ -38,9 +38,33 @@ wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len);
 static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self);
 void wyrm_fiber_finalize_f(wyrm_fiber* self);
 
+/* ------------------------------------------------------------------------- */
+/* Context API                                                               */
+/* ------------------------------------------------------------------------- */
 wyrm_error wyrm_context_init_s(wyrm_context* self, wyrm_main_loop* loop);
 void wyrm_context_finalize_f(wyrm_context* self);
+wyrm_error wyrm_context_activate(wyrm_context* self, wyrm_fiber* fiber);
+wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber);
+
 WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
+
+
+/* ------------------------------------------------------------------------- */
+/* Main Loop API                                                             */
+/* ------------------------------------------------------------------------- */
+
+WYRM_INLINE wyrm_error wyrm_main_loop_add_fd(wyrm_main_loop* ref, wyrm_primitive *out, wyrm_handle fd, wyrm_io_condition events, wyrm_priority priority, wyrm_source_handle_cb cb, wyrm_primitive ud);
+WYRM_INLINE wyrm_error wyrm_main_loop_add_timer(wyrm_main_loop* self, wyrm_primitive *out, uint32_t ms, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
+WYRM_INLINE wyrm_error wyrm_main_loop_add_idle(wyrm_main_loop* self, wyrm_primitive *out, wyrm_source_cb cb, wyrm_primitive ud);
+WYRM_INLINE wyrm_error wyrm_main_loop_add_wakeable(wyrm_main_loop* self, wyrm_primitive *out, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
+WYRM_INLINE wyrm_error wyrm_main_loop_trigger(wyrm_main_loop* self, wyrm_primitive src);
+WYRM_INLINE wyrm_error wyrm_main_loop_remove(wyrm_main_loop* self, wyrm_primitive src);
+WYRM_INLINE wyrm_error wyrm_main_loop_iterate(wyrm_main_loop* self, bool may_block);
+WYRM_INLINE wyrm_error wyrm_main_loop_run(wyrm_main_loop* self);
+WYRM_INLINE wyrm_error wyrm_main_loop_quit(wyrm_main_loop* self);
+
+
+
 
 
 

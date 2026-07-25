@@ -13,6 +13,6 @@ TEST_SUITE("context")
         REQUIRE_EQ(ctx.main_loop, loop.ptr());
         REQUIRE_NE(ctx.wakeable_source.ptr, WYRM_NULL);
 
-        REQUIRE_EQ(wyrm_context_finalize_f(&ctx), WYRM_ERR_NONE);
+        wyrm_context_finalize_f(&ctx);
     }
 }

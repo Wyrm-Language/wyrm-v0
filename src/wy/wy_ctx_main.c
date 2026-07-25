@@ -3,12 +3,13 @@
 
 #include <wyrm/platform/hosted/allocator_cmem.h>
 #include <wyrm/platform/glib/mainloop.h>
+
 #include "priv_wy_ctx.h"
+#include "builtin/sys/wsys.h"
 
 #define DEFAULT_STACK_LEN 1024
 
 #include <stdlib.h>
-#include <stdio.h>
 
 static void destroy_cmem(void* data)
 {
@@ -72,10 +73,18 @@ wy_ctx* wy_init(const wy_options* options)
     last_error = wyrm_machine_attach_context(&ctx->machine, &ctx->primary_context);
     if (last_error != WYRM_ERR_NONE) { goto ctx_machine_destroy; }
 
-    // Create fiber
+    // Create main task fiber
     ctx->primary_state.fiber = wyrm_fiber_create(&ctx->primary_context, DEFAULT_STACK_LEN);
     if (ctx->primary_state.fiber == WYRM_NULL) { goto ctx_machine_destroy; }
 
+    // Place stop continuation as last task on the thread
+    if (wyrm_fiber_push_continuation(ctx->primary_state.fiber, wyrm_mod_sys_stop, WYRM_NULL, 0) != WYRM_ERR_NONE) {
+        goto ctx_machine_destroy;
+    }
+
+    if (wyrm_context_attach_fiber(ctx->primary_state.context, ctx->primary_state.fiber) != WYRM_ERR_NONE) {
+        goto ctx_machine_destroy;
+    }
     return ctx;
 
 ctx_machine_destroy:
@@ -89,9 +98,22 @@ wyrm_state* wy_get_primary_state(wy_ctx* ctx)
     return &ctx->primary_state;
 }
 
+struct wyrm_context* wy_get_primary_context(wy_ctx* ctx)
+{
+    if (ctx == WYRM_NULL) { return WYRM_NULL; }
+    return ctx->primary_state.context;
+}
+
+struct wyrm_fiber* wy_get_primary_fiber(wy_ctx* ctx)
+{
+    if (ctx == WYRM_NULL) { return WYRM_NULL; }
+    return ctx->primary_state.fiber;
+}
+
+
 int wy_run(wy_ctx* ctx)
 {
-    WYRM_UNUSED(ctx);
+    wyrm_main_loop_run(ctx->primary_main_loop);
     return 0;
 }
 

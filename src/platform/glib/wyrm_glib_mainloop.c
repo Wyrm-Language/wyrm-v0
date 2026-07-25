@@ -103,14 +103,17 @@ static void slot_destroy(gpointer ptr)
 static gboolean timer_idle_dispatch(gpointer data) {
     source_slot   *slot = (source_slot *)data;
     WYRM_ASSERT(slot->kind != SOURCE_KIND_EMPTY);
-    if (!slot->src.timer_idle.cb(slot->ud)) {
-        return G_SOURCE_REMOVE;
-    }
 
     if (slot->kind == SOURCE_KIND_WAKEABLE) {
         GSource *gsrc = g_main_context_find_source_by_id(slot->loop->ctx, slot->glib_tag);
-        if (!gsrc) { return G_SOURCE_REMOVE; }
+        if (!gsrc) {
+            return G_SOURCE_REMOVE;
+        }
         g_source_set_ready_time(gsrc, -1);
+    }
+
+    if (!slot->src.timer_idle.cb(slot->ud)) {
+        return G_SOURCE_REMOVE;
     }
 
     return G_SOURCE_CONTINUE;
@@ -282,16 +285,19 @@ static wyrm_error glib_trigger(wyrm_main_loop* ref,
     glib_mainloop *loop = (glib_mainloop *)ref;
     wyrm_uword idx = src.uword;
 
-    if (idx == WYRM_IDX_INVALID || idx >= loop->capacity)
+    if (idx == WYRM_IDX_INVALID || idx >= loop->capacity) {
         return WYRM_ERR_INVAL;
+    }
 
     source_slot *slot = loop->slots[idx];
-    if (slot->kind != SOURCE_KIND_WAKEABLE)
+    if (slot->kind != SOURCE_KIND_WAKEABLE) {
         return WYRM_ERR_INVAL;
+    }
 
     GSource *gsrc = g_main_context_find_source_by_id(loop->ctx, slot->glib_tag);
-    if (!gsrc)
+    if (gsrc == WYRM_NULL) {
         return WYRM_ERR_INVAL;
+    }
 
     g_source_set_ready_time(gsrc, 0);
     g_main_context_wakeup(loop->ctx);

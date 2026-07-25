@@ -12,7 +12,7 @@ wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len)
         return WYRM_NULL;
     }
 
-    fiber->parent = context;
+    fiber->parent = WYRM_NULL;
     wyrm_stack_init_f(&fiber->value_stack, stack, stack_len);
     wyrm_context_gc_init(context, &fiber->obj, WYRM_TYPE_TAG_FIBER);
     return fiber;

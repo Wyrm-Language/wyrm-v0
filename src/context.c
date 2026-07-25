@@ -63,6 +63,7 @@ wyrm_error wyrm_context_init_s(wyrm_context* self, wyrm_main_loop* loop)
         context_triggered,
         wyrm_primitive_ptr(self));
     if (last_error != WYRM_ERR_NONE) { goto cleanup_end; }
+    self->wakeable_source_ready = true;
 
     return WYRM_ERR_NONE;
 
@@ -103,6 +104,22 @@ wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber)
     self->current_fiber = fiber;
     fiber->parent = self;
     return WYRM_ERR_NONE;
+}
+
+wyrm_error wyrm_context_activate(wyrm_context* self, wyrm_fiber* fiber)
+{
+    wyrm_error last_error = WYRM_ERR_NONE;
+    WYRM_UNUSED(fiber);
+
+    if (self != WYRM_NULL &&
+        self->main_loop != WYRM_NULL &&
+        self->wakeable_source_ready)
+    {
+        last_error = wyrm_main_loop_trigger(self->main_loop, self->wakeable_source);
+    } else {
+        last_error = WYRM_ERR_INVAL;
+    }
+    return last_error;
 }
 
 

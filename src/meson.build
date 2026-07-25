@@ -87,6 +87,9 @@ configure_file(
     install_dir: get_option('includedir') / 'wyrm',
 )
 
+# Core Wyrm Extensions
+subdir('builtin')
+
 # -----------------------------------------------------------------------------
 # Construct Library
 # -----------------------------------------------------------------------------

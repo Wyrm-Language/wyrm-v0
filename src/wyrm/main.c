@@ -3,28 +3,10 @@
 
 #include <wy.h>
 
-#define STACK_SIZE 1024
-
-
-wyrm_exec_result w_mul_int(wyrm_state* state)
+wyrm_exec_result w_main(wyrm_state* state)
 {
-    wyrm_value* a = wyrm_state_value_n(state, 0);
-    wyrm_value* b = wyrm_state_value_n(state, 1);
-
-    wyrm_state_push(state, wyrm_make_int(a->data.word * b->data.word));
-    printf("w_mul_int: %ld\n", wyrm_state_value_n(state, 2)->data.word);
-    return wyrm_make_exec_result(WYRM_EXEC_DONE, 1);
-}
-
-wyrm_exec_result w_add_int_x2(wyrm_state* state)
-{
-    wyrm_value* a = wyrm_state_value_n(state, 0);
-    wyrm_value* b = wyrm_state_value_n(state, 1);
-
-    wyrm_state_push(state, wyrm_make_int(a->data.word + b->data.word));
-    printf("w_add_int: %ld\n", wyrm_state_value_n(state, 2)->data.word);
-    wyrm_state_set_pending(state, w_mul_int);
-    return wyrm_make_exec_result(WYRM_EXEC_DELEGATE, 2);
+    printf("Last of the call stack, expect values = 0 actual = %ld\n", wyrm_state_value_count(state));
+    return wyrm_make_exec_result(WYRM_EXEC_DONE, 0);
 }
 
 wyrm_exec_result w_print_int(wyrm_state* state)
@@ -34,24 +16,34 @@ wyrm_exec_result w_print_int(wyrm_state* state)
     return wyrm_make_exec_result(WYRM_EXEC_DONE, 0);
 }
 
-wyrm_exec_result w_main(wyrm_state* state)
+wyrm_exec_result w_mul_int(wyrm_state* state)
 {
-    printf("Last of the call stack, expect values = 0 actual = %ld\n", wyrm_state_value_count(state));
-    return wyrm_make_exec_result(WYRM_EXEC_DONE, 0);
-}
-
-wyrm_exec_result w_push_int(wyrm_state* state)
-{
-    WYRM_UNUSED(state);
-    printf("Push Integer\n");
-    wyrm_value v_int;
-    v_int.type = WYRM_TYPE_TAG_WORD;
-    v_int.data.word = 80085;
-    wyrm_state_push(state, v_int);
+    wyrm_value* a = wyrm_state_value_n(state, 0);
+    wyrm_value* b = wyrm_state_value_n(state, 1);
+    wyrm_state_push(state, wyrm_make_int(a->data.word * b->data.word));
+    printf("w_mul_int: %ld x %ld\n", a->data.word, b->data.word);;
     return wyrm_make_exec_result(WYRM_EXEC_DONE, 1);
 }
 
+wyrm_exec_result w_push_int_pair(wyrm_state* state)
+{
+    WYRM_UNUSED(state);
+    printf("pushing arguments\n");
+    wyrm_value v_int;
+
+    v_int.type = WYRM_TYPE_TAG_WORD;
+    v_int.data.word = 8;
+    wyrm_state_push(state, v_int);
+
+    v_int.data.word = 32;
+    wyrm_state_push(state, v_int);
+
+    return wyrm_make_exec_result(WYRM_EXEC_DONE, 2);
+}
+
 int main(void) {
+    wyrm_error last_error = WYRM_ERR_NONE;
+
     wy_options machine_options = {
         .allocator = WY_ALLOCATOR_CMEM
     };
@@ -62,39 +54,24 @@ int main(void) {
         return -1;
     }
 
+    // TODO: add wy_eval or something...
+    wyrm_fiber* fiber = wy_get_primary_fiber(ctx);
+    wyrm_fiber_push_continuation(fiber, w_main, WYRM_NULL, 0);
+    wyrm_fiber_push_continuation(fiber, w_print_int, WYRM_NULL, 0);
+    wyrm_fiber_push_continuation(fiber, w_mul_int, WYRM_NULL, 0);
+    wyrm_fiber_push_continuation(fiber, w_push_int_pair, WYRM_NULL, 0);
+
+    last_error = wyrm_context_activate(
+        wy_get_primary_context(ctx),
+        fiber);
+
+    if (last_error != WYRM_ERR_NONE) {
+        fprintf(stderr, "Failed to activate primary context: %d\n", (int)(last_error));
+        return -1;
+    }
+
     int result = wy_run(ctx);
-
     wy_destroy(ctx);
-
-
-
-
-    //
-    //
-    //
-    // wyrm_state_delete(state);
-    //
-    //
-    // wyrm_value stack[STACK_SIZE];
-    //
-    // wyrm_fiber fiber;
-    // wyrm_fiber_init(&fiber, stack, STACK_SIZE);
-    //
-    // wyrm_fiber_push_continuation(&fiber, w_main, WYRM_NULL, 0);
-    // wyrm_fiber_push_continuation(&fiber, w_print_int, WYRM_NULL, 0);
-    //
-    // wyrm_fiber_push_continuation(&fiber, w_push_int, WYRM_NULL, 0);
-    //
-    // //wyrm_fiber_push_value_f(&fiber, wyrm_make_int(1));
-    // //wyrm_fiber_push_value_f(&fiber, wyrm_make_int(2));
-    //
-    // wyrm_state state;
-    // wyrm_state_init_s(&state);
-    //
-    // state.fiber = &fiber;
-    // // wyrm_state_set_pending(&state, w_add_int_x2);
-    //
-    // wyrm_state_exec(&state);
 
     return result;
 }
