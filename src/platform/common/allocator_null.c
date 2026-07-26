@@ -23,11 +23,18 @@ static void null_free(wyrm_allocator *allocator, void *buffer)
     WYRM_UNUSED(buffer);
 }
 
+static wyrm_uword null_estimate_heap_size(wyrm_allocator *allocator)
+{
+    WYRM_UNUSED(allocator);
+    return 0;
+}
+
 const wyrm_allocator_vt wyrm_allocator_null_vt =
 {
-    .alloc   = null_alloc,
-    .realloc = null_realloc,
-    .free    = null_free,
+    .alloc              = null_alloc,
+    .realloc            = null_realloc,
+    .free               = null_free,
+    .estimate_heap_size = null_estimate_heap_size,
 };
 
 wyrm_allocator wyrm_allocator_null_global = {

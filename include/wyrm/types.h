@@ -109,6 +109,7 @@ typedef struct wyrm_allocator_vt {
     void* (*alloc)(wyrm_allocator* self, wyrm_uword len);
     void* (*realloc)(wyrm_allocator* self, void* buffer, wyrm_uword new_sz);
     void (*free)(wyrm_allocator* self, void* buffer);
+    wyrm_uword (*estimate_heap_size)(wyrm_allocator* self);
 } wyrm_allocator_vt;
 
 /// @brief Allocator data structure

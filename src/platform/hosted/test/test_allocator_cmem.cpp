@@ -22,7 +22,7 @@ TEST_SUITE("allocator_cmem")
         CHECK((wyrm_allocator_alloc(alloc, 0) == nullptr));
     }
 
-    TEST_CASE("wyrm_allocator_cmem alloc and free") {
+    TEST_CASE("wyrm_allocator_cmem alloc and free with stats") {
         wyrm_allocator_cmem a = {};
         wyrm_allocator_cmem_init(&a);
         wyrm_allocator* alloc = wyrm_allocator_from_cmem(&a);
@@ -30,7 +30,11 @@ TEST_SUITE("allocator_cmem")
         void* p = wyrm_allocator_alloc(alloc, 64);
         REQUIRE((p != nullptr));
         static_cast<unsigned char*>(p)[0] = 0xAB;
+        auto heap_estimate = wyrm_allocator_estimate_heap_size(alloc);
+        REQUIRE_GT(heap_estimate, 64);
+
         wyrm_allocator_free(alloc, p);
+        REQUIRE_LT(wyrm_allocator_estimate_heap_size(alloc), heap_estimate);
     }
 
     TEST_CASE("wyrm_allocator_cmem realloc grows allocation") {

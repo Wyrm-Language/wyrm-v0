@@ -80,9 +80,20 @@ static void static_free(wyrm_allocator *allocator, void *buffer)
     WYRM_ASSERT(!buffer || buffer < (void *)((wyrm_allocator_static *)allocator)->storage_current);
 }
 
+
+static wyrm_uword static_estimate_heap_size(wyrm_allocator *allocator)
+{
+    wyrm_allocator_static *sa = (wyrm_allocator_static *)allocator;
+    if (sa->storage_current > sa->storage) {
+        return sa->storage_current - sa->storage;
+    }
+    return 0;
+}
+
 const wyrm_allocator_vt wyrm_allocator_static_vt =
 {
-    .alloc   = static_alloc,
-    .realloc = static_realloc,
-    .free    = static_free,
+    .alloc              = static_alloc,
+    .realloc            = static_realloc,
+    .free               = static_free,
+    .estimate_heap_size = static_estimate_heap_size,
 };

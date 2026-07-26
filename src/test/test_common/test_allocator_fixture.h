@@ -115,10 +115,17 @@ private:
         }
     }
 
+    static wyrm_uword heap_estimate(wyrm_allocator* self)
+    {
+        auto& thiz = get_self(self);
+        return thiz.allocations_.size() * 32;
+    }
+
     static inline wyrm_allocator_vt vt = {
         .alloc = n_alloc,
         .realloc = n_realloc,
-        .free = n_free
+        .free = n_free,
+        .estimate_heap_size = heap_estimate
     };
 
     std::list<void*> allocations_;

@@ -13,11 +13,13 @@ extern const wyrm_allocator_vt wyrm_allocator_cmem_vt;
 struct wyrm_allocator_cmem
 {
     wyrm_allocator base;
+    wyrm_uword active_size;
 };
 
 WYRM_INLINE void wyrm_allocator_cmem_init(struct wyrm_allocator_cmem* allocator)
 {
     allocator->base.clz = &wyrm_allocator_cmem_vt;
+    allocator->active_size = 0;
 }
 
 WYRM_INLINE wyrm_allocator* wyrm_allocator_from_cmem(struct wyrm_allocator_cmem* allocator)

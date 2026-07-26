@@ -60,6 +60,22 @@ WYRM_INLINE void wyrm_allocator_free(wyrm_allocator* self, void* buffer) {
     }
 }
 
+/**
+ * Estimate total heap size of the allocator
+ *
+ * @param self Pointer to the allocator instance used
+ * @return Estimated heap usage by this allocator
+ */
+WYRM_INLINE wyrm_uword wyrm_allocator_estimate_heap_size(wyrm_allocator* self)
+{
+    if (self == WYRM_NULL ||
+        self->clz == WYRM_NULL ||
+        self->clz->estimate_heap_size == WYRM_NULL) {
+        return 0;
+    }
+    return self->clz->estimate_heap_size(self);
+}
+
 
 WYRM_END_DECLS
 

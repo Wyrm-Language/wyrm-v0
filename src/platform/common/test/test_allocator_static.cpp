@@ -20,7 +20,7 @@ TEST_SUITE("allocator_static")
         CHECK((wyrm_allocator_alloc(alloc, 0) == nullptr));
     }
 
-    TEST_CASE("wyrm_allocator_static alloc and free") {
+    TEST_CASE("wyrm_allocator_static alloc and free with stats") {
         wyrm_allocator_static a = {};
         char buffer[512];
         wyrm_allocator_static_init(&a, buffer, sizeof(buffer));
@@ -29,6 +29,9 @@ TEST_SUITE("allocator_static")
         void* p = wyrm_allocator_alloc(alloc, 64);
         REQUIRE((p != nullptr));
         static_cast<unsigned char*>(p)[0] = 0xAB;
+        auto heap_estimate = wyrm_allocator_estimate_heap_size(alloc);
+        REQUIRE_GT(heap_estimate, 64);
+
         wyrm_allocator_free(alloc, p);
     }
 
