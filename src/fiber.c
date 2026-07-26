@@ -1,6 +1,16 @@
 #include <wyrm.h>
 #include <wyrm/internal_api.h>
 
+static void finalize_f(wyrm_context* context, wyrm_object* object);
+
+const wyrm_object_type wyrm_type_fiber = {
+    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
+    .gc_type = WYRM_TYPE_TAG_FIBER,
+    .super = &wyrm_type_object,
+
+    .finalize = finalize_f
+};
+
 static wyrm_error fiber_continue_with_return(wyrm_fiber* self)
 {
     /* Not completed executing current task */
@@ -40,13 +50,16 @@ wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len)
     fiber->tail_preserve_count = 0;
 
     wyrm_stack_init_f(&fiber->value_stack, stack, stack_len);
-    wyrm_context_gc_init(context, &fiber->obj, WYRM_TYPE_TAG_FIBER);
+    wyrm_context_object_init_header_f(context, &fiber->object, &wyrm_type_fiber);
     return fiber;
 }
 
-void wyrm_fiber_finalize_f(wyrm_fiber* self)
+
+static void finalize_f(wyrm_context* context, wyrm_object* object)
 {
-    wyrm_context_gc_free(self->parent, self->value_stack.entries_begin);
+    wyrm_fiber* self = (wyrm_fiber*) object;
+
+    wyrm_context_gc_free(context, self->value_stack.entries_begin);
     self->value_stack.entries_begin = WYRM_NULL;
     self->value_stack.entries_end = WYRM_NULL;
     self->value_stack.base = WYRM_NULL;

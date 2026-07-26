@@ -16,9 +16,11 @@ cwyrm_sources = files(
     'fiber.c',
     'machine.c',
     'wbox.c',
+    'wobject.c',
     'wstate.c',
     'wstring.c',
-    'wtable.c'
+    'wtable.c',
+    'wtype.c',
 )
 
 # Each modules module sets a dict named with keys:

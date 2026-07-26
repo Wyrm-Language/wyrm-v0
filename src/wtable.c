@@ -1,5 +1,11 @@
 #include <wyrm.h>
 
+const wyrm_object_type wyrm_type_table = {
+    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
+    .gc_type = WYRM_TYPE_TAG_TABLE,
+    .super = &wyrm_type_object
+};
+
 void wyrm_table_init_s(wyrm_table* self,
     wyrm_allocator* allocator,
     wyrm_uword count,
@@ -9,8 +15,8 @@ void wyrm_table_init_s(wyrm_table* self,
     wyrm_uword sparse_capacity)
 {
     wyrm_memset(self, 0, sizeof(wyrm_table));
+    wyrm_object_init_header_s(&self->obj, &wyrm_type_table);
     self->allocator = allocator;
-    self->obj.gc_type = WYRM_TYPE_TAG_TABLE;
     self->count = count;
     self->dense = dense;
     self->dense_capacity = dense_capacity;
@@ -44,7 +50,7 @@ wyrm_value* wyrm_table_get(wyrm_state* state, wyrm_table* self, wyrm_type_tag ta
     return WYRM_NULL;
 }
 
-WYRM_INLINE wyrm_error _expand_dict(wyrm_table* self, wyrm_uword count)
+WYRM_INLINE wyrm_error expand_dict(wyrm_table* self, wyrm_uword count)
 {
     if (count > self->dense_capacity) {
         wyrm_uword new_cap = wyrm_next_array_capacity(self->dense_capacity, 4);
@@ -76,7 +82,7 @@ wyrm_error wyrm_table_set(wyrm_state* state, wyrm_table* self, wyrm_type_tag key
 
     if (!slot) {
         wyrm_uword new_count = self->count + 1;
-        last_error = _expand_dict(self, new_count);
+        last_error = expand_dict(self, new_count);
         if (last_error != WYRM_ERR_NONE) { return last_error; }
         slot = &self->dense[self->count].value;
         self->dense[self->count].key.type = key_type;

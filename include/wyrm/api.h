@@ -9,23 +9,7 @@ extern "C" {
 
 const char* wyrm_lib_implementation(void);
 
-WYRM_INLINE void wyrm_state_init_s(wyrm_state* state);
-WYRM_INLINE wyrm_state* wyrm_state_new(wyrm_allocator* mem);
-WYRM_INLINE wyrm_error wyrm_state_delete(wyrm_state* state);
-WYRM_INLINE bool wyrm_state_check_flag_f(wyrm_state* state, wyrm_state_flag flag);
 
-/* Run the active fiber until it hits suspension point */
-wyrm_error wyrm_state_exec(wyrm_state* state);
-WYRM_INLINE wyrm_uword wyrm_state_value_count(wyrm_state* state);
-WYRM_INLINE wyrm_value* wyrm_state_value_n(wyrm_state* state, wyrm_uword idx);
-WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value);
-
-WYRM_INLINE wyrm_error wyrm_state_set_pending(wyrm_state* state, wyrm_exec_fn pending);
-WYRM_INLINE wyrm_error wyrm_state_call_continue(wyrm_state* state, wyrm_exec_fn result_cb, wyrm_exec_fn fn, const wyrm_value* args, wyrm_uword arg_count);
-
-
-WYRM_INLINE bool wyrm_op_eq(wyrm_state* state, wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs);
-WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_state* state, wyrm_type_tag vt, wyrm_primitive v);
 
 
 wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc);
@@ -34,6 +18,39 @@ void wyrm_machine_finalize_f(wyrm_machine* self);
 
 wyrm_error wyrm_machine_find_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out);
 wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out);
+
+
+/* ------------------------------------------------------------------------- */
+/* Primitive Operations                                                      */
+/* ------------------------------------------------------------------------- */
+
+WYRM_INLINE bool wyrm_op_eq(wyrm_state* state, wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs);
+WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_state* state, wyrm_type_tag vt, wyrm_primitive v);
+
+/* ------------------------------------------------------------------------- */
+/* Object API                                                                */
+/* ------------------------------------------------------------------------- */
+
+WYRM_INLINE void wyrm_object_init_header_s(wyrm_object* self, const wyrm_object_type* dtype);
+WYRM_INLINE void wyrm_object_finalize_f(wyrm_context* context, wyrm_object* self);
+
+/* ------------------------------------------------------------------------- */
+/* State API                                                                 */
+/* ------------------------------------------------------------------------- */
+
+WYRM_INLINE void wyrm_state_init_s(wyrm_state* state);
+WYRM_INLINE wyrm_state* wyrm_state_new(wyrm_allocator* mem);
+WYRM_INLINE void wyrm_state_delete(wyrm_state* state);
+WYRM_INLINE bool wyrm_state_check_flag_f(wyrm_state* state, wyrm_state_flag flag);
+
+wyrm_error wyrm_state_exec(wyrm_state* state);
+WYRM_INLINE wyrm_uword wyrm_state_value_count(wyrm_state* state);
+WYRM_INLINE wyrm_value* wyrm_state_value_n(wyrm_state* state, wyrm_uword idx);
+WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value);
+
+WYRM_INLINE wyrm_error wyrm_state_set_pending(wyrm_state* state, wyrm_exec_fn pending);
+WYRM_INLINE wyrm_error wyrm_state_call_continue(wyrm_state* state, wyrm_exec_fn result_cb, wyrm_exec_fn fn, const wyrm_value* args, wyrm_uword arg_count);
+
 
 /* ------------------------------------------------------------------------- */
 /* Fiber API                                                                 */
@@ -55,6 +72,7 @@ wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber);
 
 WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
 
+void wyrm_context_object_init_header_f(wyrm_context* context, wyrm_object* object, const wyrm_object_type* dtype);
 
 /* ------------------------------------------------------------------------- */
 /* Main Loop API                                                             */
@@ -71,6 +89,15 @@ WYRM_INLINE wyrm_error wyrm_main_loop_run(wyrm_main_loop* self);
 WYRM_INLINE wyrm_error wyrm_main_loop_quit(wyrm_main_loop* self);
 
 
+/* ------------------------------------------------------------------------- */
+/* Primitives                                                                */
+/* ------------------------------------------------------------------------- */
+
+#define WYRM_PRIMITIVE_PTR(dtype, v) ((dtype*) (v).ptr)
+
+WYRM_INLINE wyrm_primitive wyrm_primitive_null(void) { const wyrm_primitive v = {.ptr = WYRM_NULL}; return v; }
+WYRM_INLINE wyrm_primitive wyrm_primitive_int(wyrm_word value) { const wyrm_primitive v = {.word = value}; return v; }
+WYRM_INLINE wyrm_primitive wyrm_primitive_ptr(void* value) { const wyrm_primitive v = {.ptr = value}; return v; }
 
 
 
@@ -89,8 +116,7 @@ WYRM_INLINE void wyrm_string_finalize_f(wyrm_context* context, wyrm_string* self
 // SCAFFOLDING - TO BE REMOVED
 void* wyrm_context_gc_alloc(wyrm_context* context, wyrm_uword dsize);
 void wyrm_context_gc_free(wyrm_context* context, void* ptr);
-wyrm_error wyrm_context_gc_init(wyrm_context* context, wyrm_gc_object* gc_info, wyrm_type_tag gc_type);
-void wyrm_context_push_gc(wyrm_context* context, wyrm_gc_object* gc_info);
+void wyrm_context_push_gc(wyrm_context* context, wyrm_object* gc_info);
 void wyrm_context_gc_start_mark(wyrm_context* machine);
 void wyrm_context_gc_sweep_f(wyrm_context* machine);
 
@@ -123,10 +149,6 @@ WYRM_INLINE wyrm_uword wyrm_hash_buffer(const char* start, const char* end)
 }
 
 
-/* ---- GC Objects ----- */
-WYRM_INLINE void wyrm_gc_info_init_s(wyrm_gc_object* self, wyrm_type_tag gc_type);
-WYRM_INLINE void wyrm_gc_info_finalize_f(wyrm_context* context, wyrm_gc_object* self);
-
 /* ---------- wyrm_fiber inlines --------- */
 static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)
 {
@@ -147,10 +169,13 @@ WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self)
 #endif
 
 #include "internal_api.h"
+#include "api_impl.h"
+
 #include <wyrm/inl/stack_inl.h>
 #include <wyrm/inl/fiber_inl.h>
-
-#include "api_impl.h"
+#include <wyrm/inl/state_inl.h>
+#include <wyrm/inl/object_inl.h>
+#include <wyrm/inl/op_inl.h>
 
 
 #endif

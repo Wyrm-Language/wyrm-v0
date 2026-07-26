@@ -8,15 +8,6 @@
 extern "C" {
 #endif
 
-// ----------------------------------------------------------------------------
-// Primitive
-// ----------------------------------------------------------------------------
-
-#define WYRM_PRIMITIVE_PTR(dtype, v) ((dtype*) (v).ptr)
-
-static inline wyrm_primitive wyrm_primitive_null(void) { const wyrm_primitive v = {.ptr = WYRM_NULL}; return v; }
-static inline wyrm_primitive wyrm_primitive_int(wyrm_word value) { const wyrm_primitive v = {.word = value}; return v; }
-static inline wyrm_primitive wyrm_primitive_ptr(void* value) { const wyrm_primitive v = {.ptr = value}; return v; }
 
 
 // ----------------------------------------------------------------------------
@@ -105,9 +96,6 @@ static inline void wyrm_allocator_free(wyrm_allocator* self, void* buffer) {
     }
 }
 
-// ----------------------------------------------------------------------------
-// Stack API
-// ----------------------------------------------------------------------------
 
 #ifdef __cplusplus
 }

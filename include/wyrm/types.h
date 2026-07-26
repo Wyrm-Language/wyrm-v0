@@ -18,13 +18,15 @@ struct wyrm_allocator;
 struct wyrm_allocator_vt;
 struct wyrm_box;
 struct wyrm_context;
+struct wyrm_dstruct;
 struct wyrm_table;
 struct wyrm_exec_result;
 struct wyrm_fiber;
-struct wyrm_gc_object;
 struct wyrm_machine;
 struct wyrm_main_loop;
+struct wyrm_object;
 struct wyrm_object_list;
+struct wyrm_object_type;
 union wyrm_primitive;
 struct wyrm_stack;
 struct wyrm_state;
@@ -38,10 +40,10 @@ typedef struct wyrm_allocator wyrm_allocator;
 typedef struct wyrm_allocator_vt wyrm_allocator_vt;
 typedef struct wyrm_box wyrm_box;
 typedef struct wyrm_context wyrm_context;
+typedef struct wyrm_dstruct wyrm_dstruct;
 typedef struct wyrm_table wyrm_table;
 typedef struct wyrm_exec_result wyrm_exec_result;
 typedef struct wyrm_fiber wyrm_fiber;
-typedef struct wyrm_gc_object wyrm_gc_object;
 typedef struct wyrm_machine wyrm_machine;
 typedef struct wyrm_object_type wyrm_object_type;
 typedef struct wyrm_object wyrm_object;
@@ -78,9 +80,14 @@ typedef enum wyrm_type_tag
     WYRM_TYPE_TAG_VALUE_PTR,
 
     WYRM_GC_PATH_START,
+
     WYRM_TYPE_TAG_BOX,
+    WYRM_TYPE_TAG_CLOSURE,
+    WYRM_TYPE_TAG_OBJECT,
     WYRM_TYPE_TAG_STR,
     WYRM_TYPE_TAG_FIBER,
+    WYRM_TYPE_TAG_DSTRUCT,
+    WYRM_TYPE_TAG_DTYPE,
 
     WYRM_SLOW_PATH_START,
     WYRM_TYPE_TAG_TABLE
@@ -194,7 +201,7 @@ union wyrm_primitive {
     const char* symtab_entry;
     void* ptr;
 
-    wyrm_gc_object* gc_object;
+    wyrm_object* gc_object;
     wyrm_string* str;
 };
 
@@ -224,14 +231,30 @@ enum
     WYRM_GC_STATIC          = 0x001,
     WYRM_GC_FLAG_MARKED     = 0x004,
     WYRM_GC_FLAG_FINALIZED  = 0x008,
+    WYRM_GC_FLAG_RO         = 0x010,
 };
 
-struct wyrm_gc_object
+struct wyrm_object
 {
-    wyrm_gc_object* next;
+    const wyrm_object_type* dtype;
+    wyrm_object* next;
     wyrm_uword flags;
-    wyrm_type_tag gc_type;
 };
+
+struct wyrm_object_type
+{
+    wyrm_object object;
+    wyrm_type_tag gc_type;
+    const wyrm_object_type* super;
+
+    void (*finalize)(wyrm_context* context, wyrm_object* self);
+};
+
+extern const wyrm_object_type wyrm_type_type;
+extern const wyrm_object_type wyrm_type_object;
+
+#define WYRM_OBJECT_STATIC_INITIALIZER(DTYPE)   { .dtype = DTYPE, .next = WYRM_NULL, .flags = (WYRM_GC_STATIC | WYRM_GC_FLAG_RO)  }
+#define WYRM_OBJECT_TYPE_OBJECT_INIT WYRM_OBJECT_STATIC_INITIALIZER(&wyrm_type_type)
 
 // ----------------------------------------------------------------------------
 // Stack
@@ -271,9 +294,25 @@ struct wyrm_stack
 
 struct wyrm_box
 {
-    wyrm_gc_object head;
+    wyrm_object object;
     wyrm_value value;
 };
+
+
+// ----------------------------------------------------------------------------
+// Wyrm Closure
+// ----------------------------------------------------------------------------
+
+struct wyrm_closure
+{
+    wyrm_object head;
+
+    const wyrm_value* arg_list;
+    wyrm_uword arg_count;
+
+    wyrm_exec_fn fn;
+};
+
 
 // ----------------------------------------------------------------------------
 // Wyrm String
@@ -281,7 +320,7 @@ struct wyrm_box
 
 struct wyrm_string
 {
-    wyrm_gc_object head;
+    wyrm_object object;
     const char* str;
     wyrm_uword len;
     wyrm_uword hash;
@@ -306,7 +345,7 @@ typedef struct wyrm_key_hash_value
  */
 struct wyrm_table
 {
-    wyrm_gc_object obj;
+    wyrm_object obj;
 
     wyrm_allocator* allocator;
 
@@ -328,7 +367,7 @@ struct wyrm_table
  */
 struct wyrm_fiber
 {
-    wyrm_gc_object obj;
+    wyrm_object object;
     wyrm_context* parent;
     wyrm_stack value_stack;
     wyrm_exec_fn pending;
@@ -337,6 +376,33 @@ struct wyrm_fiber
     wyrm_uword tail_preserve_count;
 };
 
+
+// ----------------------------------------------------------------------------
+// DStruct
+// ----------------------------------------------------------------------------
+
+/**
+ * DStruct
+ */
+typedef struct wyrm_dstruct_type
+{
+    const char* name;
+} wyrm_dstruct_type;
+
+typedef void (*wyrm_dstruct_finalizer)(wyrm_context* state, wyrm_dstruct* dstruct);
+
+/**
+ * Datastruct
+ */
+struct wyrm_dstruct
+{
+    wyrm_object obj;
+    const wyrm_dstruct_type* dtype;
+
+    wyrm_dstruct_finalizer finalizer;
+
+    void* data;
+};
 
 // ----------------------------------------------------------------------------
 // Wyrm Main Loop
@@ -441,8 +507,8 @@ struct wyrm_context
     wyrm_primitive wakeable_source;
     bool wakeable_source_ready;
 
-    wyrm_gc_object* first;
-    wyrm_gc_object* last;
+    wyrm_object* first;
+    wyrm_object* last;
 };
 
 

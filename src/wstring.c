@@ -1,5 +1,12 @@
 #include <wyrm.h>
 
+const wyrm_object_type wyrm_type_string = {
+   .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
+   .gc_type = WYRM_TYPE_TAG_STR,
+   .super = &wyrm_type_object,
+};
+
+
 /**
  * Duplicate String into the VM
  */
@@ -14,8 +21,7 @@ wyrm_error wyrm_string_strdup(wyrm_context* context, const char* src, wyrm_strin
    if (buffer == WYRM_NULL || new_str == WYRM_NULL) { last_error = WYRM_ERR_NOMEM; goto err_out; }
 
    wyrm_memcpy(buffer, src, src_len + 1);
-   last_error = wyrm_context_gc_init(context, &new_str->head, WYRM_TYPE_TAG_STR);
-   if (last_error != WYRM_ERR_NONE) { goto err_out; }
+   wyrm_context_object_init_header_f(context, &new_str->object, &wyrm_type_string);
 
    new_str->str = buffer;
    new_str->hash = wyrm_hash_buffer(buffer, buffer + src_len);

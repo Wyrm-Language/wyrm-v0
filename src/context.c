@@ -88,10 +88,10 @@ void wyrm_context_finalize_f(wyrm_context* self)
     }
 
     /* Free all objects */
-    wyrm_gc_object* next = self->first;
-    for (wyrm_gc_object* cur = next; cur; cur = next) {
+    wyrm_object* next = self->first;
+    for (wyrm_object* cur = next; cur; cur = next) {
         next = cur->next;
-        wyrm_gc_info_finalize_f(self, cur);
+        wyrm_object_finalize_f(self, cur);
         wyrm_context_gc_free(self, cur);
     }
 }
@@ -143,7 +143,7 @@ void wyrm_context_gc_free(wyrm_context* context, void* ptr)
 }
 
 
-void wyrm_context_push_gc(wyrm_context* context, wyrm_gc_object* gc_info)
+void wyrm_context_push_gc(wyrm_context* context, wyrm_object* gc_info)
 {
     if (!context || !gc_info) { return; }
     if (!context->first) {
@@ -158,22 +158,18 @@ void wyrm_context_push_gc(wyrm_context* context, wyrm_gc_object* gc_info)
 
 
 
-wyrm_error wyrm_context_gc_init(wyrm_context* context, wyrm_gc_object* gc_info, wyrm_type_tag gc_type)
+void wyrm_context_object_init_header_f(wyrm_context* context, wyrm_object* object, const wyrm_object_type* dtype)
 {
-    if (gc_info == WYRM_NULL) { return WYRM_ERR_INVAL; }
-
-    gc_info->flags = 0;
-    gc_info->gc_type = gc_type;
-    gc_info->next = WYRM_NULL;
-    wyrm_context_push_gc(context, gc_info);
-    return WYRM_ERR_NONE;
+    WYRM_ASSERT(context != WYRM_NULL && object != WYRM_NULL && dtype != WYRM_NULL);
+    wyrm_object_init_header_s(object, dtype);
+    wyrm_context_push_gc(context, object);
 }
 
 
 void wyrm_context_gc_start_mark(wyrm_context* context)
 {
     if (context == WYRM_NULL) { return; }
-    wyrm_gc_object* gc_cur = context->first;
+    wyrm_object* gc_cur = context->first;
     while (gc_cur) {
         gc_cur->flags &= ~( (wyrm_uword) WYRM_GC_FLAG_MARKED );
         gc_cur = gc_cur->next;
@@ -184,18 +180,18 @@ void wyrm_context_gc_sweep_f(wyrm_context* context)
 {
     WYRM_ASSERT(context != WYRM_NULL && context->parent != WYRM_NULL);
     wyrm_machine* machine = wyrm_context_get_machine(context);
-    wyrm_gc_object* first = WYRM_NULL;
-    wyrm_gc_object* last = WYRM_NULL;
-    wyrm_gc_object* gc_cur = context->first;
+    wyrm_object* first = WYRM_NULL;
+    wyrm_object* last = WYRM_NULL;
+    wyrm_object* gc_cur = context->first;
 
     while (gc_cur) {
-        wyrm_gc_object* next_gc = gc_cur->next;
+        wyrm_object* next_gc = gc_cur->next;
         if ((gc_cur->flags & WYRM_GC_FLAG_MARKED) != 0) {
             last = gc_cur;
             if (first == WYRM_NULL) { first = gc_cur; }
         } else {
             if ((gc_cur->flags & WYRM_GC_STATIC) == 0) {
-                wyrm_gc_info_finalize_f(context, gc_cur);
+                wyrm_object_finalize_f(context, gc_cur);
                 wyrm_allocator_free(machine->allocator, gc_cur);
             }
         }
