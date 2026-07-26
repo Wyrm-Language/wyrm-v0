@@ -23,6 +23,21 @@ WYRM_INLINE void wyrm_object_finalize_f(wyrm_context* context, wyrm_object* self
 }
 
 
+WYRM_INLINE wyrm_error wyrm_object_children_iter_start(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa)
+{
+    if (self == WYRM_NULL || self->dtype == WYRM_NULL || wa == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    if (self->dtype->children_iter_start == WYRM_NULL ||
+        self->dtype->children_iter_next == WYRM_NULL) { return WYRM_ERR_NOSUPPORT; }
+    return self->dtype->children_iter_start(state, self, wa);
+}
+
+
+WYRM_INLINE wyrm_error wyrm_object_children_iter_next_f(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa, const wyrm_object** object_ptr)
+{
+    return self->dtype->children_iter_next(state, self, wa, object_ptr);
+}
+
+
 WYRM_END_DECLS
 
 #endif

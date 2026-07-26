@@ -33,6 +33,7 @@ struct wyrm_state;
 struct wyrm_string;
 struct wyrm_thread;
 struct wyrm_main_loop_vt;
+struct wyrm_work_area;
 struct wyrm_value;
 
 #ifndef __cplusplus
@@ -55,6 +56,7 @@ typedef struct wyrm_state wyrm_state;
 typedef struct wyrm_string wyrm_string;
 typedef struct wyrm_thread wyrm_thread;
 typedef struct wyrm_value wyrm_value;
+typedef struct wyrm_work_area wyrm_work_area;
 #endif
 
 // ----------------------------------------------------------------------------
@@ -79,7 +81,7 @@ typedef enum wyrm_type_tag
     WYRM_TYPE_TAG_SYMBOL,
     WYRM_TYPE_TAG_VALUE_PTR,
 
-    WYRM_GC_PATH_START,
+    WYRM_TYPE_TAG_GC_PATH_START,
 
     WYRM_TYPE_TAG_BOX,
     WYRM_TYPE_TAG_CLOSURE,
@@ -222,6 +224,25 @@ struct wyrm_value
     wyrm_primitive data;
 };
 
+// ----------------------------------------------------------------------------
+// Work Area
+// ----------------------------------------------------------------------------
+
+#define WYRM_WORK_AREA_LEN 8
+
+/**
+ * Generic 'User Data' Friendly Field
+ *
+ * A small working space intended for temporary stack parameters and type
+ * erased operations. Work areas should be tightly coupled to a single known
+ * API usage.
+ */
+struct wyrm_work_area
+{
+    wyrm_primitive data[WYRM_WORK_AREA_LEN];
+};
+
+
 
 // ----------------------------------------------------------------------------
 // Wyrm GC Info
@@ -249,6 +270,9 @@ struct wyrm_object_type
     const wyrm_object_type* super;
 
     void (*finalize)(wyrm_context* context, wyrm_object* self);
+
+    wyrm_error (*children_iter_start)(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa);
+    wyrm_error (*children_iter_next)(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa, const wyrm_object** child);
 };
 
 extern const wyrm_object_type wyrm_type_type;
@@ -292,6 +316,8 @@ struct wyrm_stack
 // ----------------------------------------------------------------------------
 // Wyrm Box
 // ----------------------------------------------------------------------------
+
+extern const wyrm_object_type wyrm_type_box;
 
 struct wyrm_box
 {
@@ -346,7 +372,7 @@ typedef struct wyrm_key_hash_value
  */
 struct wyrm_table
 {
-    wyrm_object obj;
+    wyrm_object object;
 
     wyrm_allocator* allocator;
 
@@ -362,6 +388,8 @@ struct wyrm_table
 // ----------------------------------------------------------------------------
 // Fiber
 // ----------------------------------------------------------------------------
+
+extern const wyrm_object_type wyrm_type_fiber;
 
 /**
  * Fiber / stack
@@ -504,6 +532,8 @@ struct wyrm_context
     wyrm_machine* parent;
     wyrm_fiber* current_fiber;
     wyrm_main_loop* main_loop;
+
+    wyrm_table* root;
 
     wyrm_primitive wakeable_source;
     bool wakeable_source_ready;

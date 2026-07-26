@@ -1,14 +1,8 @@
 #include <wyrm.h>
 
 static void finalize_f(wyrm_context* context, wyrm_object* object);
-
-const wyrm_object_type wyrm_type_fiber = {
-    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
-    .gc_type = WYRM_TYPE_TAG_FIBER,
-    .super = &wyrm_type_object,
-
-    .finalize = finalize_f
-};
+static wyrm_error start_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa);
+static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa, const wyrm_object** child);
 
 static wyrm_error fiber_continue_with_return(wyrm_fiber* self)
 {
@@ -118,3 +112,43 @@ wyrm_error wyrm_fiber_exec_f(wyrm_fiber* self, wyrm_state* state)
     }
     return last_error;
 }
+
+
+static wyrm_error start_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa)
+{
+    WYRM_UNUSED(state); WYRM_UNUSED(object);
+    wyrm_memset(wa, 0, sizeof(wyrm_work_area));
+    wa->data[0].word = 0;
+    return WYRM_ERR_NONE;
+}
+
+static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa, const wyrm_object** child)
+{
+    WYRM_UNUSED(state);
+    wyrm_fiber* self = (wyrm_fiber*) object;
+    wyrm_word idx = wa->data[0].word;
+    while ((self->value_stack.entries_begin + idx) < self->value_stack.top) {
+        wyrm_value* cur = self->value_stack.entries_begin + idx;
+        idx++;
+
+        if (cur->type >= WYRM_TYPE_TAG_GC_PATH_START) {
+            *child = cur->data.gc_object;
+            wa->data[0].word = idx;
+            return WYRM_ERR_NONE;
+        }
+    }
+
+    wa->data[0].word = idx;
+    return WYRM_ERR_STOP_ITERATION;
+}
+
+
+const wyrm_object_type wyrm_type_fiber = {
+    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
+    .gc_type = WYRM_TYPE_TAG_FIBER,
+    .super = &wyrm_type_object,
+
+    .finalize = finalize_f,
+    .children_iter_start = start_children_iter,
+    .children_iter_next = next_children_iter,
+};

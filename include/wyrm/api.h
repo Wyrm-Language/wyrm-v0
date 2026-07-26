@@ -33,6 +33,8 @@ WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_state* state, wyrm_type_tag vt, wyrm_pr
 
 WYRM_INLINE void wyrm_object_init_header_s(wyrm_object* self, const wyrm_object_type* dtype);
 WYRM_INLINE void wyrm_object_finalize_f(wyrm_context* context, wyrm_object* self);
+WYRM_INLINE wyrm_error wyrm_object_children_iter_start(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa);
+WYRM_INLINE wyrm_error wyrm_object_children_iter_next_f(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa, const wyrm_object** object_ptr);
 
 /* ------------------------------------------------------------------------- */
 /* State API                                                                 */
@@ -70,6 +72,8 @@ void wyrm_context_finalize_f(wyrm_context* self);
 wyrm_error wyrm_context_activate(wyrm_context* self, wyrm_fiber* fiber);
 wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber);
 
+WYRM_INLINE wyrm_table* wyrm_context_get_root_f(wyrm_context* context);
+WYRM_INLINE wyrm_error wyrm_context_set_root_f(wyrm_context* context, wyrm_table* root);
 WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
 
 void wyrm_context_object_init_header_f(wyrm_context* context, wyrm_object* object, const wyrm_object_type* dtype);
@@ -112,29 +116,26 @@ WYRM_INLINE bool wyrm_string_eq_f(wyrm_string* lhs, wyrm_string* rhs);
 WYRM_INLINE wyrm_uword wyrm_string_hash_f(wyrm_string* str);
 wyrm_error wyrm_string_strdup(wyrm_context* machine, const char* src, wyrm_string** out_str);
 
+/* ------------------------------------------------------------------------- */
+/* Table                                                                     */
+/* ------------------------------------------------------------------------- */
+
+extern const wyrm_object_type wyrm_type_table;
+
+wyrm_error wyrm_table_new(wyrm_context* self, wyrm_table** out);
+wyrm_value* wyrm_table_get(wyrm_state* state, wyrm_table* self, wyrm_type_tag tag, wyrm_primitive value);
+wyrm_error wyrm_table_set(wyrm_state* state, wyrm_table* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value);
 
 
 
 // SCAFFOLDING - TO BE REMOVED
 void* wyrm_context_gc_alloc(wyrm_context* context, wyrm_uword dsize);
+void* wyrm_context_gc_realloc(wyrm_context* context, void* ptr, wyrm_uword new_size);
 void wyrm_context_gc_free(wyrm_context* context, void* ptr);
 void wyrm_context_push_gc(wyrm_context* context, wyrm_object* gc_info);
-void wyrm_context_gc_start_mark(wyrm_context* machine);
-void wyrm_context_gc_sweep_f(wyrm_context* machine);
 
+void wyrm_context_gc_full_run(wyrm_state* state, wyrm_context* context);
 
-
-void wyrm_table_init_s(wyrm_table* self,
-    wyrm_allocator* allocator,
-    wyrm_uword count,
-    wyrm_key_hash_value* dense,
-    wyrm_uword dense_capacity,
-    wyrm_uword* sparse,
-    wyrm_uword sparse_capacity);
-void wyrm_table_init_f(wyrm_table* self, wyrm_allocator* allocator);
-void wyrm_table_finalize_f(wyrm_table* self);
-wyrm_value* wyrm_table_get(wyrm_state* state, wyrm_table* self, wyrm_type_tag tag, wyrm_primitive value);
-wyrm_error wyrm_table_set(wyrm_state* state, wyrm_table* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value);
 
 
 
@@ -158,13 +159,6 @@ static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)
     return self->parent;
 }
 
-/* ---------- wyrm_context inlines --------- */
-WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self)
-{
-    if (!self) { return WYRM_NULL; }
-    return self->parent;
-}
-
 
 #ifdef __cplusplus
 }
@@ -172,6 +166,7 @@ WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self)
 
 #include <wyrm/inl/util.h>
 #include <wyrm/inl/allocator.h>
+#include <wyrm/inl/context.h>
 #include <wyrm/inl/stack.h>
 #include <wyrm/inl/fiber.h>
 #include <wyrm/inl/state.h>

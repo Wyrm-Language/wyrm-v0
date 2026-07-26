@@ -28,6 +28,7 @@ enum wyrm_error {
     WYRM_ERR_CYCLE,             ///< Cycle detected
     WYRM_ERR_KEY,               ///< Key not found
     WYRM_ERR_STACK_OVERFLOW,    ///< Insufficient memory in stack
+    WYRM_ERR_STOP_ITERATION,    ///< Iterator is completed
 
     WYRM_ERR_EXISTS,
     WYRM_ERR_NOMEM,

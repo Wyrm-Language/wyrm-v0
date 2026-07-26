@@ -28,8 +28,9 @@ struct test_context_fixture : test_machine_fixture
 
     void run_gc()
     {
-        wyrm_context_gc_start_mark(context);
-        wyrm_context_gc_sweep_f(context);
+        wyrm_state state{};
+        wyrm_state_init_from_context_f(&state, context);
+        wyrm_context_gc_full_run(&state, context);
     }
 
 };

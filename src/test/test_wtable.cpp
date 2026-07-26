@@ -11,9 +11,12 @@ TEST_SUITE("table") {
     TEST_CASE("string get/set")
     {
         test_state_fixture state;
-        wyrm_table dict{};
 
-        wyrm_table_init_f(&dict, state.get_allocator_ptr());
+        wyrm_table* new_dict = nullptr;
+        REQUIRE_EQ(wyrm_table_new(state.context, &new_dict), WYRM_ERR_NONE);
+        REQUIRE_NE(new_dict, nullptr);
+
+        wyrm_table& dict = *new_dict;;
 
         wyrm_primitive s1{};
         wyrm_primitive s2{};
@@ -40,9 +43,12 @@ TEST_SUITE("table") {
 
     TEST_CASE("simple uword get/set") {
         test_state_fixture state;
-        wyrm_table dict{};
 
-        wyrm_table_init_f(&dict, state.get_allocator_ptr());
+        wyrm_table* new_dict = nullptr;
+        REQUIRE_EQ(wyrm_table_new(state.context, &new_dict), WYRM_ERR_NONE);
+        REQUIRE_NE(new_dict, nullptr);
+
+        wyrm_table& dict = *new_dict;;
 
         REQUIRE_EQ(wyrm_table_get(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5}), WYRM_NULL);
         REQUIRE_EQ(wyrm_table_set(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5}, WYRM_TYPE_TAG_UWORD, {.uword=0xfeed}), WYRM_ERR_NONE);
@@ -50,7 +56,5 @@ TEST_SUITE("table") {
         auto res = wyrm_table_get(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5});
         REQUIRE_NE(res, WYRM_NULL);
         REQUIRE_EQ(res->data.uword, 0xfeed);
-
-        wyrm_table_finalize_f(&dict);
     }
 }

@@ -133,6 +133,14 @@ void* wyrm_context_gc_alloc(wyrm_context* context, wyrm_uword dsize)
     return wyrm_allocator_alloc(machine->allocator, dsize);
 }
 
+void* wyrm_context_gc_realloc(wyrm_context* context, void* ptr, wyrm_uword new_size)
+{
+    wyrm_machine* machine = wyrm_context_get_machine(context);
+    if (machine == WYRM_NULL) { return WYRM_NULL; }
+
+    return wyrm_allocator_realloc(machine->allocator, ptr, new_size);
+}
+
 void wyrm_context_gc_free(wyrm_context* context, void* ptr)
 {
     wyrm_machine* machine = wyrm_context_get_machine(context);
@@ -164,8 +172,11 @@ void wyrm_context_object_init_header_f(wyrm_context* context, wyrm_object* objec
     wyrm_context_push_gc(context, object);
 }
 
+// ----------------------------------------------------------------------------
+// Temporary, Minimally Functional GC
+// ----------------------------------------------------------------------------
 
-void wyrm_context_gc_start_mark(wyrm_context* context)
+static void gc_start_mark(wyrm_context* context)
 {
     if (context == WYRM_NULL) { return; }
     wyrm_object* gc_cur = context->first;
@@ -175,7 +186,7 @@ void wyrm_context_gc_start_mark(wyrm_context* context)
     }
 }
 
-void wyrm_context_gc_sweep_f(wyrm_context* context)
+static void gc_sweep_f(wyrm_context* context)
 {
     WYRM_ASSERT(context != WYRM_NULL && context->parent != WYRM_NULL);
     wyrm_machine* machine = wyrm_context_get_machine(context);
@@ -199,4 +210,37 @@ void wyrm_context_gc_sweep_f(wyrm_context* context)
 
     context->first = first;
     context->last = last;
+}
+
+static void gc_mark_object(wyrm_state* state, wyrm_object* parent)
+{
+    wyrm_work_area wa;
+
+    parent->flags |= WYRM_GC_FLAG_MARKED;
+
+    if (wyrm_object_children_iter_start(state, parent, &wa) != WYRM_ERR_NONE) { return; }
+    const wyrm_object* child = WYRM_NULL;
+
+    while (wyrm_object_children_iter_next_f(state, parent, &wa, &child) == WYRM_ERR_NONE) {
+        WYRM_ASSERT(child != WYRM_NULL);
+        if ((child->flags & WYRM_GC_FLAG_MARKED) == 0 &&
+            (child->flags & WYRM_GC_STATIC) == 0) {
+            gc_mark_object(state, (wyrm_object*) child);
+        }
+    }
+}
+
+void wyrm_context_gc_full_run(wyrm_state* state, wyrm_context* context)
+{
+    gc_start_mark(context);
+
+    if (context->current_fiber != WYRM_NULL) {
+        gc_mark_object(state, (wyrm_object*) context->current_fiber);
+    }
+
+    if (context->root != WYRM_NULL) {
+        gc_mark_object(state, (wyrm_object*) context->root);
+    }
+
+    gc_sweep_f(context);
 }

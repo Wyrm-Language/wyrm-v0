@@ -20,6 +20,20 @@ WYRM_INLINE void wyrm_state_init_s(wyrm_state* state)
     state->state_alloc_ = WYRM_NULL;
 }
 
+
+/**
+ * Initialize temporary state from a context
+ *
+ * @param state State object
+ * @param context Context data
+ */
+WYRM_INLINE void wyrm_state_init_from_context_f(wyrm_state* state, wyrm_context* context)
+{
+    wyrm_state_init_s(state);
+    state->machine = wyrm_context_get_machine(context);
+    state->context = context;
+}
+
 /**
  * Initialize state from a context
  */
