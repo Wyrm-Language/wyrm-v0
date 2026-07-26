@@ -108,7 +108,6 @@ wyrm_error wyrm_box_new(wyrm_context* self, wyrm_box** out);
 WYRM_INLINE bool wyrm_string_eq_f(wyrm_string* lhs, wyrm_string* rhs);
 WYRM_INLINE wyrm_uword wyrm_string_hash_f(wyrm_string* str);
 wyrm_error wyrm_string_strdup(wyrm_context* machine, const char* src, wyrm_string** out_str);
-WYRM_INLINE void wyrm_string_finalize_f(wyrm_context* context, wyrm_string* self);
 
 
 

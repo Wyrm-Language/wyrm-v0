@@ -11,8 +11,8 @@ TEST_SUITE("wstring") {
         REQUIRE_EQ(wyrm_string_strdup(fix.get_context_ptr(), "Hello World", &str_ptr), WYRM_ERR_NONE);
         REQUIRE_NE(str_ptr, WYRM_NULL);
 
-        fix.allocator.watch(str_ptr->str);
-        wyrm_string_finalize_f(fix.get_context_ptr(), str_ptr);
+        fix.allocator.watch(str_ptr->str); str_ptr = WYRM_NULL;
+        fix.run_gc();
         fix.allocator.check_watched_free();
     }
 

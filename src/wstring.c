@@ -1,9 +1,22 @@
 #include <wyrm.h>
 
+static void finalize_f(wyrm_context* context, wyrm_object* object)
+{
+   wyrm_string* self = (wyrm_string*) object;
+
+   wyrm_context_gc_free(context, (void*) self->str);
+   self->str = WYRM_NULL;
+   self->len = 0;
+   self->hash = 0;
+}
+
+
 const wyrm_object_type wyrm_type_string = {
    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
    .gc_type = WYRM_TYPE_TAG_STR,
    .super = &wyrm_type_object,
+
+   .finalize = finalize_f,
 };
 
 

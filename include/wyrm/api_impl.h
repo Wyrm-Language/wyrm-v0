@@ -35,13 +35,7 @@ WYRM_INLINE wyrm_uword wyrm_string_hash_f(wyrm_string* str)
 }
 
 
-WYRM_INLINE void wyrm_string_finalize_f(wyrm_context* context, wyrm_string* self)
-{
-    wyrm_context_gc_free(context, (void*) self->str);
-    self->str = WYRM_NULL;
-    self->len = 0;
-    self->hash = 0;
-}
+
 
 /* ------------------------------------------------------------------------- */
 /* Main Loop API                                                             */
