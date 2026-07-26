@@ -141,10 +141,20 @@ typedef wyrm_exec_state (*wyrm_exec_fn)(wyrm_state* state);
 enum wyrm_exec_state_tag
 {
     WYRM_EXEC_DONE = 0,     ///< Normal return. stack_values indicates the count of values returned.
-    // WYRM_EXEC_EXCEPTION, ///< Unhandled condition raised. fiber->exception holds the value. TODO
-    // WYRM_EXEC_PENDING,   ///< Callee pushed a new frame; fiber->pending_fn is the next call. TODO
-    WYRM_EXEC_DELEGATE,     ///< Tail call; reset stack
-    WYRM_EXEC_CONTINUE,     ///< Continue with the current stack
+
+    /// Continue execution with the next function
+    ///
+    /// This result indicates that the pending_fn is set to a function
+    /// intended to continue the current execution thread. Fiber variables
+    /// are left unmodified.
+    WYRM_EXEC_CONTINUE,
+
+    /// Tail call with new arguments
+    ///
+    /// pending function is a tail call function; stack is expected to
+    /// be based on only the call of this function. preserve count must
+    /// be set to the desired count of pushed arguments for the call.
+    WYRM_EXEC_TAIL_CALL,
 };
 
 #ifndef __cplusplus

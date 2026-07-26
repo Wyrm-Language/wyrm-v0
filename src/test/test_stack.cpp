@@ -1,5 +1,5 @@
 #include <doctest/doctest.h>
-#include <wyrm/internal_api.h>
+#include <wyrm.h>
 
 static const int STACK_CAP = 16;
 
@@ -67,7 +67,7 @@ TEST_SUITE("stack") {
         for (int i = 0; i < STACK_CAP; i++) {
             REQUIRE_EQ(wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword((wyrm_uword)i)), WYRM_ERR_NONE);
         }
-        CHECK_EQ(wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(0)), WYRM_ERR_NOMEM);
+        CHECK_EQ(wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(0)), WYRM_ERR_STACK_OVERFLOW);
     }
 
     TEST_CASE("null self returns WYRM_ERR_INVAL") {

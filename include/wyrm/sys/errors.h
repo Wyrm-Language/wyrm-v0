@@ -16,17 +16,18 @@ enum wyrm_error {
     WYRM_ERR_CONTINUE = 1,              ///< Operation paused and return result set to continuation
     WYRM_ERR_INCONSISTENT_STATE = 2,    ///< Operation detected inconsistent state within VM, fatal error
 
-    WYRM_ERR_UNKNOWN,   ///< General / unknown failure
-    WYRM_ERR_INVAL,     ///< Invalid parameter (such as nullptr)
-    WYRM_ERR_BAD_TYPE,  ///< Unable to convert to given type
-    WYRM_ERR_BUSY,      ///< Object is busy
-    WYRM_ERR_UNBOUND,   ///< Unbound or unknown variable
-    WYRM_ERR_PERM,      ///< Bad permissions
-    WYRM_ERR_EMPTY,     ///< Container is empty
-    WYRM_ERR_CHILDREN,  ///< Container has children
-    WYRM_ERR_RANGE,     ///< Out of range
-    WYRM_ERR_CYCLE,     ///< Cycle detected
-    WYRM_ERR_KEY,       ///< Key not found
+    WYRM_ERR_UNKNOWN,           ///< General / unknown failure
+    WYRM_ERR_INVAL,             ///< Invalid parameter (such as nullptr)
+    WYRM_ERR_BAD_TYPE,          ///< Unable to convert to given type
+    WYRM_ERR_BUSY,              ///< Object is busy
+    WYRM_ERR_UNBOUND,           ///< Unbound or unknown variable
+    WYRM_ERR_PERM,              ///< Bad permissions
+    WYRM_ERR_EMPTY,             ///< Container is empty
+    WYRM_ERR_CHILDREN,          ///< Container has children
+    WYRM_ERR_RANGE,             ///< Out of range
+    WYRM_ERR_CYCLE,             ///< Cycle detected
+    WYRM_ERR_KEY,               ///< Key not found
+    WYRM_ERR_STACK_OVERFLOW,    ///< Insufficient memory in stack
 
     WYRM_ERR_EXISTS,
     WYRM_ERR_NOMEM,

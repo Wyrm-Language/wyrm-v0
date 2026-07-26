@@ -21,6 +21,7 @@ WYRM_INLINE wyrm_value* wyrm_state_value_n(wyrm_state* state, wyrm_uword idx);
 WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value);
 
 WYRM_INLINE wyrm_error wyrm_state_set_pending(wyrm_state* state, wyrm_exec_fn pending);
+WYRM_INLINE wyrm_error wyrm_state_call_continue(wyrm_state* state, wyrm_exec_fn result_cb, wyrm_exec_fn fn, const wyrm_value* args, wyrm_uword arg_count);
 
 
 WYRM_INLINE bool wyrm_op_eq(wyrm_state* state, wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs);
@@ -145,6 +146,11 @@ WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self)
 }
 #endif
 
+#include "internal_api.h"
+#include <wyrm/inl/stack_inl.h>
+#include <wyrm/inl/fiber_inl.h>
+
 #include "api_impl.h"
+
 
 #endif

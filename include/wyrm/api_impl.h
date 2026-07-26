@@ -105,6 +105,12 @@ WYRM_INLINE wyrm_error wyrm_state_set_pending(wyrm_state* state, wyrm_exec_fn pe
     return WYRM_ERR_NONE;
 }
 
+WYRM_INLINE wyrm_error wyrm_state_call_continue(wyrm_state* state, wyrm_exec_fn result_cb, wyrm_exec_fn fn, const wyrm_value* args, wyrm_uword arg_count)
+{
+    if (state == WYRM_NULL || state->fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    if (arg_count > 0 && args == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    return wyrm_fiber_exec_continue_f(state->fiber, result_cb, fn, args, arg_count);
+}
 
 /* ------------------------------------------------------------------------- */
 /* Operations                                                                */

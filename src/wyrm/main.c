@@ -25,20 +25,17 @@ wyrm_exec_state w_mul_int(wyrm_state* state)
     return WYRM_EXEC_DONE;
 }
 
-wyrm_exec_state w_push_int_pair(wyrm_state* state)
+wyrm_exec_state w_do_a_mul(wyrm_state* state)
 {
     WYRM_UNUSED(state);
     printf("pushing arguments\n");
-    wyrm_value v_int;
+    wyrm_value v_ints[2] = {
+        { .type = WYRM_TYPE_TAG_WORD, .data.word = 8 },
+        {.type = WYRM_TYPE_TAG_WORD, .data.word = 32 },
+    };
 
-    v_int.type = WYRM_TYPE_TAG_WORD;
-    v_int.data.word = 8;
-    wyrm_state_push_return(state, v_int);
-
-    v_int.data.word = 32;
-    wyrm_state_push_return(state, v_int);
-
-    return WYRM_EXEC_DONE;
+    wyrm_state_call_continue(state, w_print_int, w_mul_int, v_ints, 2);
+    return WYRM_EXEC_CONTINUE;
 }
 
 int main(void) {
@@ -57,9 +54,7 @@ int main(void) {
     // TODO: add wy_eval or something...
     wyrm_fiber* fiber = wy_get_primary_fiber(ctx);
     wyrm_fiber_push_continuation(fiber, w_main);
-    wyrm_fiber_push_continuation(fiber, w_print_int);
-    wyrm_fiber_push_continuation(fiber, w_mul_int);
-    wyrm_fiber_push_continuation(fiber, w_push_int_pair);
+    wyrm_fiber_push_continuation(fiber, w_do_a_mul);
 
     last_error = wyrm_context_activate(
         wy_get_primary_context(ctx),

@@ -76,7 +76,7 @@ wyrm_error wyrm_fiber_exec_f(wyrm_fiber* self, wyrm_state* state)
         wyrm_exec_state result = pending(state);
 
         switch (result) {
-        case WYRM_EXEC_DELEGATE:
+        case WYRM_EXEC_TAIL_CALL:
             last_error = wyrm_stack_replace_frame_f(&self->value_stack, self->tail_preserve_count);
             if (self->pending == WYRM_NULL) {
                 last_error = WYRM_ERR_INVAL;
