@@ -2,7 +2,7 @@
 #define WYRM_PLATFORM_COMMON_ALLOCATOR_STATIC_H_
 
 #include <wyrm/types.h>
-#include <wyrm/internal_api.h>
+#include <wyrm.h>
 
 #ifdef __cplusplus
 extern "C" {

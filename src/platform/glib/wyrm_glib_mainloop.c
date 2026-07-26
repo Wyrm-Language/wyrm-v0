@@ -1,5 +1,5 @@
 #include <wyrm/platform/glib/mainloop.h>
-#include <wyrm/internal_api.h>
+#include <wyrm.h>
 
 #include <string.h>
 #include <glib.h>

@@ -1,5 +1,4 @@
 #include <wyrm.h>
-#include <wyrm/internal_api.h>
 
 static void finalize_f(wyrm_context* context, wyrm_object* object);
 

@@ -1,4 +1,4 @@
-#include <wyrm/internal_api.h>
+#include <wyrm.h>
 #include <wyrm/platform/common/allocator_null.h>
 
 

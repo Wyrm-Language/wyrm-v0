@@ -99,8 +99,11 @@ WYRM_INLINE wyrm_primitive wyrm_primitive_null(void) { const wyrm_primitive v = 
 WYRM_INLINE wyrm_primitive wyrm_primitive_int(wyrm_word value) { const wyrm_primitive v = {.word = value}; return v; }
 WYRM_INLINE wyrm_primitive wyrm_primitive_ptr(void* value) { const wyrm_primitive v = {.ptr = value}; return v; }
 
-
-
+WYRM_INLINE wyrm_value wyrm_value_word(wyrm_word value)
+{
+    wyrm_value v = { .type = WYRM_TYPE_TAG_WORD, .data = wyrm_primitive_int(value) };
+    return v;
+}
 
 
 wyrm_error wyrm_box_new(wyrm_context* self, wyrm_box** out);
@@ -167,14 +170,15 @@ WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self)
 }
 #endif
 
-#include "internal_api.h"
-#include "api_impl.h"
-
-#include <wyrm/inl/stack_inl.h>
-#include <wyrm/inl/fiber_inl.h>
-#include <wyrm/inl/state_inl.h>
-#include <wyrm/inl/object_inl.h>
-#include <wyrm/inl/op_inl.h>
+#include <wyrm/inl/util.h>
+#include <wyrm/inl/allocator.h>
+#include <wyrm/inl/stack.h>
+#include <wyrm/inl/fiber.h>
+#include <wyrm/inl/state.h>
+#include <wyrm/inl/object.h>
+#include <wyrm/inl/string.h>
+#include <wyrm/inl/op.h>
+#include <wyrm/inl/main_loop.h>
 
 
 #endif

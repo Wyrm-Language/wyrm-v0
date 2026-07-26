@@ -1,7 +1,7 @@
 #ifndef WYRM_INL_OBJECT_INL_H_
 #define WYRM_INL_OBJECT_INL_H_
 
-#include <wyrm/inl/stack_inl.h>
+#include <wyrm/inl/stack.h>
 #include <wyrm/types.h>
 
 #ifdef __cplusplus

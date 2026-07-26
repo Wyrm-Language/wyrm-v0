@@ -1,6 +1,5 @@
 #include <wyrm/platform/common/allocator_static.h>
 #include <wyrm/sys/string.h>
-#include <wyrm/internal_api.h>
 
 #define MAX_ALLOC_SZ (WYRM_WORD_MAX - sizeof(wyrm_uword))
 

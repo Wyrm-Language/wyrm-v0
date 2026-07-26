@@ -20,7 +20,8 @@ wyrm_exec_state w_mul_int(wyrm_state* state)
 {
     wyrm_value* a = wyrm_state_value_n(state, 0);
     wyrm_value* b = wyrm_state_value_n(state, 1);
-    wyrm_state_push_return(state, wyrm_make_int(a->data.word * b->data.word));
+
+    wyrm_state_push_return(state, wyrm_value_word(a->data.word * b->data.word));
     printf("w_mul_int: %ld x %ld\n", a->data.word, b->data.word);;
     return WYRM_EXEC_DONE;
 }

@@ -1,5 +1,4 @@
 #include <wyrm.h>
-#include <wyrm/internal_api.h>
 
 /**
  * One or more fibers flagged active and ready.

@@ -2,6 +2,7 @@
 #define WYRM_INL_STACK_INL_H_
 
 #include <wyrm/types.h>
+#include <wyrm/sys/string.h>
 
 #ifdef __cplusplus
 extern "C" {

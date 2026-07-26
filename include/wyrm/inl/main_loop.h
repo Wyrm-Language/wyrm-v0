@@ -1,45 +1,12 @@
-#ifndef WYRM_API_IMPL_H_
-#define WYRM_API_IMPL_H_
+#ifndef WYRM_INL_MAIN_LOOP_INL_H_
+#define WYRM_INL_MAIN_LOOP_INL_H_
 
+#include <wyrm/inl/stack.h>
 #include <wyrm/types.h>
-#include <wyrm/internal_api.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#ifndef WYRM_OBJECT_LIST_INITIAL_SZ
-#define WYRM_OBJECT_LIST_INITIAL_SZ 4
-#endif
-
-
-
-/* ------------------------------------------------------------------------- */
-/* Operations                                                                */
-/* ------------------------------------------------------------------------- */
-
-WYRM_INLINE bool wyrm_string_eq_f(wyrm_string* lhs, wyrm_string* rhs)
-{
-    WYRM_ASSERT(lhs != WYRM_NULL && rhs != WYRM_NULL);
-    if (lhs == rhs) { return true; }
-    if (lhs->hash != rhs->hash) { return false; }
-    if (lhs->len != rhs->len) { return false; }
-    if (lhs->len == 0) { return true; }
-    return wyrm_strncmp_f(lhs->str, rhs->str, lhs->len) == 0;
-}
-
-WYRM_INLINE wyrm_uword wyrm_string_hash_f(wyrm_string* str)
-{
-    if (!str) { return 0; }
-    return str->hash;
-}
-
-
-
-
-/* ------------------------------------------------------------------------- */
-/* Main Loop API                                                             */
-/* ------------------------------------------------------------------------- */
 
 /**
  * Add fd watcher to the main loop
@@ -121,8 +88,6 @@ WYRM_INLINE wyrm_error wyrm_main_loop_quit(wyrm_main_loop* self)
     if (self == WYRM_NULL || self->vt == WYRM_NULL) { return WYRM_ERR_INVAL; }
     return self->vt->quit(self);
 }
-
-
 
 #ifdef __cplusplus
 }
