@@ -1,13 +1,9 @@
 #ifndef WYRM_INL_OBJECT_INL_H_
 #define WYRM_INL_OBJECT_INL_H_
 
-#include <wyrm/inl/stack.h>
 #include <wyrm/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+WYRM_BEGIN_DECLS
 
 WYRM_INLINE void wyrm_object_init_header_s(wyrm_object* self, const wyrm_object_type* dtype)
 {
@@ -27,8 +23,6 @@ WYRM_INLINE void wyrm_object_finalize_f(wyrm_context* context, wyrm_object* self
 }
 
 
-#ifdef __cplusplus
-}
-#endif
+WYRM_END_DECLS
 
 #endif

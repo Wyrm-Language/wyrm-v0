@@ -185,4 +185,12 @@ static inline wyrm_uword wyrm_pointer_decode_bits(wyrm_uword data) {
 
 #define WYRM_IDX_INVALID WYRM_UWORD_MAX
 
+#ifdef __cplusplus
+#define WYRM_BEGIN_DECLS extern "C" {
+#define WYRM_END_DECLS }
+#else
+#define WYRM_BEGIN_DECLS
+#define WYRM_END_DECLS
+#endif
+
 #endif

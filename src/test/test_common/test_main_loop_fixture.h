@@ -6,7 +6,6 @@
 #include <memory>
 #include <variant>
 
-#include <wyrm/internal_api.h>
 #include <wyrmxx/main_loop.h>
 #include <wyrmxx/context.h>
 

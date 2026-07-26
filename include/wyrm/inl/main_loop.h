@@ -1,12 +1,9 @@
 #ifndef WYRM_INL_MAIN_LOOP_INL_H_
 #define WYRM_INL_MAIN_LOOP_INL_H_
 
-#include <wyrm/inl/stack.h>
 #include <wyrm/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+WYRM_BEGIN_DECLS
 
 /**
  * Add fd watcher to the main loop
@@ -89,8 +86,6 @@ WYRM_INLINE wyrm_error wyrm_main_loop_quit(wyrm_main_loop* self)
     return self->vt->quit(self);
 }
 
-#ifdef __cplusplus
-}
-#endif
+WYRM_END_DECLS
 
 #endif

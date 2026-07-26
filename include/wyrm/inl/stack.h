@@ -4,9 +4,7 @@
 #include <wyrm/types.h>
 #include <wyrm/sys/string.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+WYRM_BEGIN_DECLS
 
 /**
  * Initialize stack
@@ -42,7 +40,7 @@ WYRM_INLINE wyrm_uword wyrm_stack_capacity_remaining_f(wyrm_stack* self)
 WYRM_INLINE wyrm_uword wyrm_stack_arg_count_f(wyrm_stack* self)
 {
     WYRM_ASSERT(self != WYRM_NULL);
-    return (wyrm_uword)(self->top - self->base);
+    return (wyrm_uword) (self->top - self->base);
 }
 
 
@@ -206,8 +204,6 @@ WYRM_INLINE wyrm_error wyrm_stack_push_array_f(wyrm_stack* self, const wyrm_valu
     return WYRM_ERR_NONE;
 }
 
-#ifdef __cplusplus
-}
-#endif
+WYRM_END_DECLS
 
 #endif

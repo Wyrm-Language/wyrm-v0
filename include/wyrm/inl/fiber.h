@@ -4,9 +4,7 @@
 #include <wyrm/inl/stack.h>
 #include <wyrm/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+WYRM_BEGIN_DECLS
 
 WYRM_INLINE wyrm_uword wyrm_fiber_value_count_f(wyrm_fiber* self)
 {
@@ -82,8 +80,6 @@ WYRM_INLINE wyrm_error wyrm_fiber_exec_continue_f(wyrm_fiber* self, wyrm_exec_fn
     return last_error;
 }
 
-#ifdef __cplusplus
-}
-#endif
+WYRM_END_DECLS
 
 #endif

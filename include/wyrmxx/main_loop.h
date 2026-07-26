@@ -2,11 +2,7 @@
 #define WYRMXX_MAIN_LOOP_H_
 
 #include <wyrm.h>
-#include <wyrm/internal_api.h>
-
 #include <wyrmxx/except.h>
-
-
 
 namespace wyrmxx
 {

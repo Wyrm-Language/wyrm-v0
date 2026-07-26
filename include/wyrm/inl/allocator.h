@@ -3,9 +3,7 @@
 
 #include <wyrm/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+WYRM_BEGIN_DECLS
 
 /**
  * Allocates memory of the specified length using the provided allocator.
@@ -15,7 +13,7 @@ extern "C" {
  * @return A pointer to the allocated memory on success. Returns `WYRM_NULL` if
  *         allocation fails or if the provided allocator is invalid.
  */
-static inline void* wyrm_allocator_alloc(wyrm_allocator* self, wyrm_uword len) {
+WYRM_INLINE void* wyrm_allocator_alloc(wyrm_allocator* self, wyrm_uword len) {
     if (self == WYRM_NULL || self->clz == WYRM_NULL) { return WYRM_NULL; }
     return self->clz->alloc(self, len);
 }
@@ -30,7 +28,7 @@ static inline void* wyrm_allocator_alloc(wyrm_allocator* self, wyrm_uword len) {
  * @return A pointer to the allocated memory on success. Returns `WYRM_NULL` if
  *         allocation fails or if the provided allocator is invalid.
  */
-static inline void* wyrm_allocator_alloc_array(wyrm_allocator* self, size_t header_sz, wyrm_uword element_sz, wyrm_uword count)
+WYRM_INLINE void* wyrm_allocator_alloc_array(wyrm_allocator* self, size_t header_sz, wyrm_uword element_sz, wyrm_uword count)
 {
     if (self == WYRM_NULL) { return WYRM_NULL; }
     return wyrm_allocator_alloc(self, header_sz + (element_sz * count));
@@ -45,7 +43,7 @@ static inline void* wyrm_allocator_alloc_array(wyrm_allocator* self, size_t head
  * @return A pointer to the reallocated memory buffer on success. Returns `NULL` if the
  *         reallocation fails or if the provided allocator is invalid.
  */
-static inline void* wyrm_allocator_realloc(wyrm_allocator* self, void* buffer, wyrm_uword len) {
+WYRM_INLINE void* wyrm_allocator_realloc(wyrm_allocator* self, void* buffer, wyrm_uword len) {
     if (self == WYRM_NULL || self->clz == WYRM_NULL) { return WYRM_NULL; }
     return self->clz->realloc(self, buffer, len);
 }
@@ -56,15 +54,13 @@ static inline void* wyrm_allocator_realloc(wyrm_allocator* self, void* buffer, w
  * @param self   Pointer to the allocator instance used for memory deallocation.
  * @param buffer Pointer to the memory to be freed. If `NULL`, no action is taken.
  */
-static inline void wyrm_allocator_free(wyrm_allocator* self, void* buffer) {
+WYRM_INLINE void wyrm_allocator_free(wyrm_allocator* self, void* buffer) {
     if (self != WYRM_NULL && self->clz != WYRM_NULL) {
         self->clz->free(self, buffer);
     }
 }
 
 
-#ifdef __cplusplus
-}
-#endif
+WYRM_END_DECLS
 
 #endif

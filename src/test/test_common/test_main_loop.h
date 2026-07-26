@@ -2,8 +2,7 @@
 #define WYRM_TEST_MAIN_LOOP_RIG_H_
 
 #include <doctest/doctest.h>
-
-#include <wyrm/internal_api.h>
+#include <wyrm.h>
 
 typedef struct wyrm_test_main_loop_state {
     wyrm_uword fired_count;

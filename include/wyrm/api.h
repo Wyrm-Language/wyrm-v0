@@ -180,5 +180,4 @@ WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self)
 #include <wyrm/inl/op.h>
 #include <wyrm/inl/main_loop.h>
 
-
 #endif

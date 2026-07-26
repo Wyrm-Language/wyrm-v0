@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 #include <wyrm/platform/common/allocator_static.h>
-#include <wyrm/internal_api.h>
+#include <wyrm.h>
 
 TEST_SUITE("allocator_static")
 {
