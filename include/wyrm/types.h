@@ -17,6 +17,7 @@ extern "C" {
 struct wyrm_allocator;
 struct wyrm_allocator_vt;
 struct wyrm_box;
+struct wyrm_class;
 struct wyrm_context;
 struct wyrm_dstruct;
 struct wyrm_dict;
@@ -38,6 +39,7 @@ struct wyrm_value;
 typedef struct wyrm_allocator wyrm_allocator;
 typedef struct wyrm_allocator_vt wyrm_allocator_vt;
 typedef struct wyrm_box wyrm_box;
+typedef struct wyrm_class wyrm_class;
 typedef struct wyrm_context wyrm_context;
 typedef struct wyrm_dstruct wyrm_dstruct;
 typedef struct wyrm_dict wyrm_dict;
@@ -84,6 +86,7 @@ typedef enum wyrm_type_tag
     WYRM_TYPE_TAG_STR,
     WYRM_TYPE_TAG_FIBER,
     WYRM_TYPE_TAG_DTYPE,
+    WYRM_TYPE_TAG_CLASS,
 
     WYRM_TYPE_TAG_TABLE
 } wyrm_type_tag;
@@ -195,9 +198,11 @@ union wyrm_primitive {
     wyrm_value* value_ptr;
     const char* symtab_entry;
     void* ptr;
+    bool flag;
 
     wyrm_object* gc_object;
     wyrm_string* str;
+    wyrm_class* cls;
 };
 
 enum {
@@ -317,7 +322,6 @@ struct wyrm_box
     wyrm_value value;
 };
 
-
 // ----------------------------------------------------------------------------
 // Wyrm String
 // ----------------------------------------------------------------------------
@@ -330,8 +334,9 @@ struct wyrm_string
     wyrm_uword hash;
 };
 
+
 // ----------------------------------------------------------------------------
-// Wyrm Table
+// Wyrm Dict
 // ----------------------------------------------------------------------------
 
 /**
@@ -408,6 +413,28 @@ struct wyrm_dstruct
     wyrm_dstruct_finalizer finalizer;
 
     void* data;
+};
+
+
+// ----------------------------------------------------------------------------
+// Class
+// ----------------------------------------------------------------------------
+
+typedef struct wyrm_class_slot
+{
+    wyrm_primitive sym_name;
+    wyrm_type_tag type_tag;
+} wyrm_class_slot;
+
+
+struct wyrm_class
+{
+    wyrm_object object;
+    wyrm_class* super;
+    wyrm_primitive sym_name;
+
+    wyrm_uword slot_count;
+    wyrm_class_slot* slots;
 };
 
 // ----------------------------------------------------------------------------

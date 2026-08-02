@@ -117,7 +117,19 @@ WYRM_INLINE wyrm_uword wyrm_string_hash_f(wyrm_string* str);
 wyrm_error wyrm_string_strdup(wyrm_context* machine, const char* src, wyrm_string** out_str);
 
 /* ------------------------------------------------------------------------- */
-/* Table                                                                     */
+/* Class                                                                     */
+/* ------------------------------------------------------------------------- */
+
+extern const wyrm_object_type wyrm_type_class;
+
+wyrm_error wyrm_class_new(wyrm_context* context, wyrm_class** out);
+WYRM_INLINE void wyrm_class_set_name_f(wyrm_class* self, wyrm_primitive name);
+WYRM_INLINE wyrm_error wyrm_class_add_slot_f(wyrm_class* self, wyrm_primitive slot_name, wyrm_type_tag slot_type);
+WYRM_INLINE wyrm_uword wyrm_class_get_slot_selector_f(wyrm_class* self, wyrm_primitive sym_name);
+
+
+/* ------------------------------------------------------------------------- */
+/* Dict                                                                      */
 /* ------------------------------------------------------------------------- */
 
 extern const wyrm_object_type wyrm_type_table;
@@ -166,6 +178,7 @@ static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)
 
 #include <wyrm/inl/util.h>
 #include <wyrm/inl/allocator.h>
+#include <wyrm/inl/class.h>
 #include <wyrm/inl/context.h>
 #include <wyrm/inl/stack.h>
 #include <wyrm/inl/fiber.h>

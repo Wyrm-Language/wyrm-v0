@@ -16,6 +16,7 @@ cwyrm_sources = files(
     'fiber.c',
     'machine.c',
     'wbox.c',
+    'wclass.c',
     'wdict.c',
     'wobject.c',
     'wstate.c',
