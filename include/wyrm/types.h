@@ -20,7 +20,6 @@ struct wyrm_box;
 struct wyrm_context;
 struct wyrm_dstruct;
 struct wyrm_dict;
-struct wyrm_exec_result;
 struct wyrm_fiber;
 struct wyrm_machine;
 struct wyrm_main_loop;
@@ -31,7 +30,6 @@ union wyrm_primitive;
 struct wyrm_stack;
 struct wyrm_state;
 struct wyrm_string;
-struct wyrm_thread;
 struct wyrm_main_loop_vt;
 struct wyrm_work_area;
 struct wyrm_value;
@@ -43,7 +41,6 @@ typedef struct wyrm_box wyrm_box;
 typedef struct wyrm_context wyrm_context;
 typedef struct wyrm_dstruct wyrm_dstruct;
 typedef struct wyrm_dict wyrm_dict;
-typedef struct wyrm_exec_result wyrm_exec_result;
 typedef struct wyrm_fiber wyrm_fiber;
 typedef struct wyrm_machine wyrm_machine;
 typedef struct wyrm_object_type wyrm_object_type;
@@ -54,7 +51,6 @@ typedef union wyrm_primitive wyrm_primitive;
 typedef struct wyrm_stack wyrm_stack;
 typedef struct wyrm_state wyrm_state;
 typedef struct wyrm_string wyrm_string;
-typedef struct wyrm_thread wyrm_thread;
 typedef struct wyrm_value wyrm_value;
 typedef struct wyrm_work_area wyrm_work_area;
 #endif
@@ -84,21 +80,17 @@ typedef enum wyrm_type_tag
     WYRM_TYPE_TAG_GC_PATH_START,
 
     WYRM_TYPE_TAG_BOX,
-    WYRM_TYPE_TAG_CLOSURE,
     WYRM_TYPE_TAG_OBJECT,
     WYRM_TYPE_TAG_STR,
     WYRM_TYPE_TAG_FIBER,
-    WYRM_TYPE_TAG_DSTRUCT,
     WYRM_TYPE_TAG_DTYPE,
 
-    WYRM_SLOW_PATH_START,
     WYRM_TYPE_TAG_TABLE
 } wyrm_type_tag;
 
 typedef enum wyrm_state_flag_tag
 {
     WYRM_STATE_FLAG_OWNS_SELF       = 0x0001,
-    WYRM_STATE_FLAG_OWNS_MACHINE    = 0x0002,
 } wyrm_state_flag;
 
 
@@ -327,21 +319,6 @@ struct wyrm_box
 
 
 // ----------------------------------------------------------------------------
-// Wyrm Closure
-// ----------------------------------------------------------------------------
-
-struct wyrm_closure
-{
-    wyrm_object head;
-
-    const wyrm_value* arg_list;
-    wyrm_uword arg_count;
-
-    wyrm_exec_fn fn;
-};
-
-
-// ----------------------------------------------------------------------------
 // Wyrm String
 // ----------------------------------------------------------------------------
 
@@ -513,15 +490,6 @@ typedef struct wyrm_main_loop
     const wyrm_main_loop_vt *vt;
 } wyrm_main_loop;
 
-
-// ----------------------------------------------------------------------------
-// Wyrm Thread (OS)
-// ----------------------------------------------------------------------------
-
-struct wyrm_thread
-{
-    int placeholder_;
-};
 
 // ----------------------------------------------------------------------------
 // Wyrm Context
