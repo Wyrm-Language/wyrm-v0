@@ -72,8 +72,8 @@ void wyrm_context_finalize_f(wyrm_context* self);
 wyrm_error wyrm_context_activate(wyrm_context* self, wyrm_fiber* fiber);
 wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber);
 
-WYRM_INLINE wyrm_table* wyrm_context_get_root_f(wyrm_context* context);
-WYRM_INLINE wyrm_error wyrm_context_set_root_f(wyrm_context* context, wyrm_table* root);
+WYRM_INLINE wyrm_dict* wyrm_context_get_root_f(wyrm_context* context);
+WYRM_INLINE wyrm_error wyrm_context_set_root_f(wyrm_context* context, wyrm_dict* root);
 WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
 
 void wyrm_context_object_init_header_f(wyrm_context* context, wyrm_object* object, const wyrm_object_type* dtype);
@@ -122,9 +122,9 @@ wyrm_error wyrm_string_strdup(wyrm_context* machine, const char* src, wyrm_strin
 
 extern const wyrm_object_type wyrm_type_table;
 
-wyrm_error wyrm_table_new(wyrm_context* self, wyrm_table** out);
-wyrm_value* wyrm_table_get(wyrm_state* state, wyrm_table* self, wyrm_type_tag tag, wyrm_primitive value);
-wyrm_error wyrm_table_set(wyrm_state* state, wyrm_table* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value);
+wyrm_error wyrm_dict_new(wyrm_context* self, wyrm_dict** out);
+wyrm_value* wyrm_dict_get(wyrm_state* state, wyrm_dict* self, wyrm_type_tag tag, wyrm_primitive value);
+wyrm_error wyrm_dict_set(wyrm_state* state, wyrm_dict* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value);
 
 
 

@@ -12,11 +12,11 @@ TEST_SUITE("table") {
     {
         test_state_fixture state;
 
-        wyrm_table* new_dict = nullptr;
-        REQUIRE_EQ(wyrm_table_new(state.context, &new_dict), WYRM_ERR_NONE);
+        wyrm_dict* new_dict = nullptr;
+        REQUIRE_EQ(wyrm_dict_new(state.context, &new_dict), WYRM_ERR_NONE);
         REQUIRE_NE(new_dict, nullptr);
 
-        wyrm_table& dict = *new_dict;;
+        wyrm_dict& dict = *new_dict;;
 
         wyrm_primitive s1{};
         wyrm_primitive s2{};
@@ -24,11 +24,11 @@ TEST_SUITE("table") {
         REQUIRE_EQ(wyrm_string_strdup(state.get_context_ptr(), "dog", &s1.str), WYRM_ERR_NONE);
         REQUIRE_EQ(wyrm_string_strdup(state.get_context_ptr(), "cat", &s2.str), WYRM_ERR_NONE);
 
-        wyrm_table_set(&state, &dict, WYRM_TYPE_TAG_STR, s1, WYRM_TYPE_TAG_WORD, wyrm_primitive_int(0xfeed));
-        wyrm_table_set(&state, &dict, WYRM_TYPE_TAG_STR, s2, WYRM_TYPE_TAG_NIL, wyrm_primitive_null());
+        wyrm_dict_set(&state, &dict, WYRM_TYPE_TAG_STR, s1, WYRM_TYPE_TAG_WORD, wyrm_primitive_int(0xfeed));
+        wyrm_dict_set(&state, &dict, WYRM_TYPE_TAG_STR, s2, WYRM_TYPE_TAG_NIL, wyrm_primitive_null());
 
-        wyrm_value* v1 = wyrm_table_get(&state, &dict, WYRM_TYPE_TAG_STR, s1);
-        wyrm_value* v2 = wyrm_table_get(&state, &dict, WYRM_TYPE_TAG_STR, s2);
+        wyrm_value* v1 = wyrm_dict_get(&state, &dict, WYRM_TYPE_TAG_STR, s1);
+        wyrm_value* v2 = wyrm_dict_get(&state, &dict, WYRM_TYPE_TAG_STR, s2);
 
         REQUIRE((v1 != nullptr));
         REQUIRE((v2 != nullptr));
@@ -44,16 +44,16 @@ TEST_SUITE("table") {
     TEST_CASE("simple uword get/set") {
         test_state_fixture state;
 
-        wyrm_table* new_dict = nullptr;
-        REQUIRE_EQ(wyrm_table_new(state.context, &new_dict), WYRM_ERR_NONE);
+        wyrm_dict* new_dict = nullptr;
+        REQUIRE_EQ(wyrm_dict_new(state.context, &new_dict), WYRM_ERR_NONE);
         REQUIRE_NE(new_dict, nullptr);
 
-        wyrm_table& dict = *new_dict;;
+        wyrm_dict& dict = *new_dict;;
 
-        REQUIRE_EQ(wyrm_table_get(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5}), WYRM_NULL);
-        REQUIRE_EQ(wyrm_table_set(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5}, WYRM_TYPE_TAG_UWORD, {.uword=0xfeed}), WYRM_ERR_NONE);
+        REQUIRE_EQ(wyrm_dict_get(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5}), WYRM_NULL);
+        REQUIRE_EQ(wyrm_dict_set(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5}, WYRM_TYPE_TAG_UWORD, {.uword=0xfeed}), WYRM_ERR_NONE);
 
-        auto res = wyrm_table_get(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5});
+        auto res = wyrm_dict_get(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5});
         REQUIRE_NE(res, WYRM_NULL);
         REQUIRE_EQ(res->data.uword, 0xfeed);
     }

@@ -81,6 +81,12 @@ WYRM_INLINE wyrm_uword wyrm_state_value_count(wyrm_state* state)
     return wyrm_fiber_value_count_f(state->fiber);
 }
 
+WYRM_INLINE wyrm_error wyrm_state_pop_to_value_count(wyrm_state* state, wyrm_uword count)
+{
+    if (state == WYRM_NULL || state->fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    return wyrm_fiber_pop_to_value_count_f(state->fiber, count);
+}
+
 WYRM_INLINE wyrm_value* wyrm_state_value_n(wyrm_state* state, wyrm_uword index)
 {
     if (index >= wyrm_state_value_count(state)) { return WYRM_NULL; }

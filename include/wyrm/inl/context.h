@@ -11,7 +11,7 @@ WYRM_BEGIN_DECLS
  * @param context Context to access
  * @return Table associated with the root scope
  */
-WYRM_INLINE wyrm_table* wyrm_context_get_root_f(wyrm_context* context)
+WYRM_INLINE wyrm_dict* wyrm_context_get_root_f(wyrm_context* context)
 {
     WYRM_ASSERT(context != WYRM_NULL);
     return context->root;
@@ -24,7 +24,7 @@ WYRM_INLINE wyrm_table* wyrm_context_get_root_f(wyrm_context* context)
  * @param root Table to use as root scope
  * @return WYRM_ERR_BUSY if already set, WYRM_ERR_NONE on success
  */
-WYRM_INLINE wyrm_error wyrm_context_set_root_f(wyrm_context* context, wyrm_table* root)
+WYRM_INLINE wyrm_error wyrm_context_set_root_f(wyrm_context* context, wyrm_dict* root)
 {
     WYRM_ASSERT(context != WYRM_NULL);
     if (context->root != WYRM_NULL) { return WYRM_ERR_BUSY; }

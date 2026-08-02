@@ -11,6 +11,11 @@ WYRM_INLINE wyrm_uword wyrm_fiber_value_count_f(wyrm_fiber* self)
     return wyrm_stack_arg_count_f(&self->value_stack);
 }
 
+WYRM_INLINE wyrm_error wyrm_fiber_pop_to_value_count_f(wyrm_fiber* self, wyrm_uword count)
+{
+    return wyrm_stack_pop_to_value_count_f(&self->value_stack, count);
+}
+
 WYRM_INLINE wyrm_value* wyrm_fiber_value_n(wyrm_fiber* self, wyrm_uword index)
 {
     return &self->value_stack.base[index];

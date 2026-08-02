@@ -16,10 +16,10 @@ cwyrm_sources = files(
     'fiber.c',
     'machine.c',
     'wbox.c',
+    'wdict.c',
     'wobject.c',
     'wstate.c',
     'wstring.c',
-    'wtable.c',
     'wtype.c',
 )
 

@@ -6,6 +6,8 @@
 
 WYRM_BEGIN_DECLS
 
+WYRM_INLINE wyrm_error wyrm_stack_pop_discard_f(wyrm_stack* self, wyrm_uword count);
+
 /**
  * Initialize stack
  *
@@ -43,6 +45,17 @@ WYRM_INLINE wyrm_uword wyrm_stack_arg_count_f(wyrm_stack* self)
     return (wyrm_uword) (self->top - self->base);
 }
 
+
+WYRM_INLINE wyrm_error wyrm_stack_pop_to_value_count_f(wyrm_stack* self, wyrm_uword count)
+{
+    WYRM_ASSERT(self != WYRM_NULL);
+
+    wyrm_uword current_count = wyrm_stack_arg_count_f(self);
+    if (current_count < count) { return WYRM_ERR_RANGE; }
+
+    wyrm_uword reduce_by = current_count - count;
+    return wyrm_stack_pop_discard_f(self, reduce_by);
+}
 
 /**
  * Push value to the stack

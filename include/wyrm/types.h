@@ -19,7 +19,7 @@ struct wyrm_allocator_vt;
 struct wyrm_box;
 struct wyrm_context;
 struct wyrm_dstruct;
-struct wyrm_table;
+struct wyrm_dict;
 struct wyrm_exec_result;
 struct wyrm_fiber;
 struct wyrm_machine;
@@ -42,7 +42,7 @@ typedef struct wyrm_allocator_vt wyrm_allocator_vt;
 typedef struct wyrm_box wyrm_box;
 typedef struct wyrm_context wyrm_context;
 typedef struct wyrm_dstruct wyrm_dstruct;
-typedef struct wyrm_table wyrm_table;
+typedef struct wyrm_dict wyrm_dict;
 typedef struct wyrm_exec_result wyrm_exec_result;
 typedef struct wyrm_fiber wyrm_fiber;
 typedef struct wyrm_machine wyrm_machine;
@@ -370,7 +370,7 @@ typedef struct wyrm_key_hash_value
 /**
  * Dictionary type
  */
-struct wyrm_table
+struct wyrm_dict
 {
     wyrm_object object;
 
@@ -533,7 +533,7 @@ struct wyrm_context
     wyrm_fiber* current_fiber;
     wyrm_main_loop* main_loop;
 
-    wyrm_table* root;
+    wyrm_dict* root;
 
     wyrm_primitive wakeable_source;
     bool wakeable_source_ready;
