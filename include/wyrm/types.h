@@ -264,7 +264,6 @@ struct wyrm_object_type
 {
     wyrm_object object;
     wyrm_type_tag gc_type;
-    const wyrm_object_type* super;
 
     void (*finalize)(wyrm_context* context, wyrm_object* self);
 

@@ -14,7 +14,6 @@ static void finalize_f(wyrm_context* context, wyrm_object* object)
 const wyrm_object_type wyrm_type_string = {
    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
    .gc_type = WYRM_TYPE_TAG_STR,
-   .super = &wyrm_type_object,
 
    .finalize = finalize_f,
 };

@@ -146,7 +146,6 @@ static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyr
 const wyrm_object_type wyrm_type_fiber = {
     .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
     .gc_type = WYRM_TYPE_TAG_FIBER,
-    .super = &wyrm_type_object,
 
     .finalize = finalize_f,
     .children_iter_start = start_children_iter,

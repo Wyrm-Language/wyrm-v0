@@ -150,7 +150,6 @@ static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyr
 const wyrm_object_type wyrm_type_table = {
     .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
     .gc_type = WYRM_TYPE_TAG_TABLE,
-    .super = &wyrm_type_object,
 
     .finalize = table_finalize_f,
     .children_iter_start =  start_children_iter,

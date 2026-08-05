@@ -52,7 +52,6 @@ static wyrm_error children_iter_next(wyrm_state* state, wyrm_object* self, wyrm_
 const wyrm_object_type wyrm_type_class = {
     .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
     .gc_type = WYRM_TYPE_TAG_CLASS,
-    .super = &wyrm_type_object,
 
     .finalize = finalize,
     .children_iter_start = children_iter_start,
