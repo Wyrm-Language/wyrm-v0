@@ -34,7 +34,7 @@ static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyr
 
     if (wa->data[0].word == 0) {
         wa->data[0].word = 1;
-        if (box->value.type >= WYRM_TYPE_TAG_GC_PATH_START) {
+        if (wyrm_type_tag_is_gc(box->value.type)) {
             *child = box->value.data.gc_object;
             return WYRM_ERR_NONE;
         }

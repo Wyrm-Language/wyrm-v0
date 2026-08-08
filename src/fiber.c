@@ -131,7 +131,7 @@ static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyr
         wyrm_value* cur = self->value_stack.entries_begin + idx;
         idx++;
 
-        if (cur->type >= WYRM_TYPE_TAG_GC_PATH_START) {
+        if (wyrm_type_tag_is_gc(cur->type)) {
             *child = cur->data.gc_object;
             wa->data[0].word = idx;
             return WYRM_ERR_NONE;

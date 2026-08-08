@@ -33,13 +33,13 @@ TEST_SUITE("machine") {
     {
         test_machine_fixture machine;
 
-        wyrm_primitive p = wyrm_primitive_null();
+        wyrm_symtab_entry p{};
         REQUIRE_EQ(wyrm_machine_find_symbol(machine.get_machine_ptr(), "symbol", &p), WYRM_ERR_KEY);
 
-        wyrm_primitive inserted = wyrm_primitive_null();
+        wyrm_symtab_entry inserted{};
         REQUIRE_EQ(wyrm_machine_insert_symbol(machine.get_machine_ptr(), "symbol", &inserted), WYRM_ERR_NONE);
 
-        wyrm_primitive found = wyrm_primitive_null();
+        wyrm_symtab_entry found{};
         REQUIRE_EQ(wyrm_machine_find_symbol(machine.get_machine_ptr(), "symbol", &found), WYRM_ERR_NONE);
     }
 
@@ -51,7 +51,7 @@ TEST_SUITE("machine") {
         for (int i = 0; i < 8192; ++i) {
             char buffer[10];
             sprintf(buffer, "b%d", i);
-            wyrm_primitive p{};
+            wyrm_symtab_entry p{};
             auto err = wyrm_machine_insert_symbol(machine.get_machine_ptr(), buffer, &p);
             if (err != WYRM_ERR_NONE) {
                 REQUIRE_EQ(err, WYRM_ERR_NOMEM);

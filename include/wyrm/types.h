@@ -28,6 +28,7 @@ struct wyrm_object;
 struct wyrm_object_list;
 struct wyrm_object_type;
 union wyrm_primitive;
+struct wyrm_prototype;
 struct wyrm_stack;
 struct wyrm_state;
 struct wyrm_string;
@@ -50,6 +51,7 @@ typedef struct wyrm_object wyrm_object;
 typedef struct wyrm_main_loop wyrm_main_loop;
 typedef struct wyrm_main_loop_vt wyrm_main_loop_vt;
 typedef union wyrm_primitive wyrm_primitive;
+typedef struct wyrm_prototype wyrm_prototype;
 typedef struct wyrm_stack wyrm_stack;
 typedef struct wyrm_state wyrm_state;
 typedef struct wyrm_string wyrm_string;
@@ -81,6 +83,7 @@ typedef enum wyrm_type_tag
 
     WYRM_TYPE_TAG_GC_PATH_START,
 
+    WYRM_TYPE_TAG_ERROR,
     WYRM_TYPE_TAG_BOX,
     WYRM_TYPE_TAG_OBJECT,
     WYRM_TYPE_TAG_STR,
@@ -96,6 +99,10 @@ typedef enum wyrm_state_flag_tag
     WYRM_STATE_FLAG_OWNS_SELF       = 0x0001,
 } wyrm_state_flag;
 
+WYRM_INLINE bool wyrm_type_tag_is_gc(wyrm_type_tag tag)
+{
+    return tag >= WYRM_TYPE_TAG_GC_PATH_START;
+}
 
 // ----------------------------------------------------------------------------
 // Allocator
@@ -196,6 +203,7 @@ union wyrm_primitive {
     wyrm_atomic_word ref_count;
     wyrm_sys_thread_id thread_id;
     wyrm_value* value_ptr;
+    wyrm_box* box_ptr;
     const char* symtab_entry;
     void* ptr;
     bool flag;
@@ -276,6 +284,43 @@ extern const wyrm_object_type wyrm_type_object;
 
 #define WYRM_OBJECT_STATIC_INITIALIZER(DTYPE)   { .dtype = DTYPE, .next = WYRM_NULL, .flags = (WYRM_GC_STATIC | WYRM_GC_FLAG_RO)  }
 #define WYRM_OBJECT_TYPE_OBJECT_INIT WYRM_OBJECT_STATIC_INITIALIZER(&wyrm_type_type)
+
+
+// ----------------------------------------------------------------------------
+// Prototype & Scope
+// ----------------------------------------------------------------------------
+#define WYRM_BAD_SLOT WYRM_UWORD_MAX
+typedef const char* wyrm_symtab_entry;
+
+enum
+{
+    WYRM_PROTOTYPE_SLOT_FLAG_BOXED  = 0x0001,  ///< Slot is boxed, may escape
+    WYRM_PROTOTYPE_SLOT_FLAG_STATIC = 0x0002,  ///< Slot is statically allocated
+};
+
+#define WYRM_SLOT_DEFAULTS 0
+
+typedef struct wyrm_prototype_slot
+{
+    wyrm_uword flags;
+    wyrm_symtab_entry symtab_entry;
+    wyrm_value default_value;
+} wyrm_prototype_slot;
+
+struct wyrm_prototype
+{
+    wyrm_object object;
+    wyrm_prototype_slot* slots;
+    wyrm_uword slot_capacity;
+    wyrm_uword slot_count;
+};
+
+struct wyrm_scope
+{
+    wyrm_object object;
+    wyrm_prototype* prototype;
+    wyrm_value* slots;
+};
 
 // ----------------------------------------------------------------------------
 // Stack
@@ -419,21 +464,11 @@ struct wyrm_dstruct
 // Class
 // ----------------------------------------------------------------------------
 
-typedef struct wyrm_class_slot
-{
-    wyrm_primitive sym_name;
-    wyrm_type_tag type_tag;
-} wyrm_class_slot;
-
-
 struct wyrm_class
 {
-    wyrm_object object;
+    wyrm_prototype prototype;
     wyrm_class* super;
     wyrm_primitive sym_name;
-
-    wyrm_uword slot_count;
-    wyrm_class_slot* slots;
 };
 
 // ----------------------------------------------------------------------------

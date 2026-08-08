@@ -124,7 +124,7 @@ static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyr
     while (idx < self->count) {
         if (subidx == 0) {
             subidx++;
-            if (self->dense[idx].key.type >= WYRM_TYPE_TAG_GC_PATH_START) {
+            if (wyrm_type_tag_is_gc(self->dense[idx].key.type)) {
                 wa->data[0].uword = idx;
                 wa->data[1].uword = subidx;
                 *child = self->dense[idx].key.data.gc_object;
@@ -133,7 +133,7 @@ static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyr
         } else {
             wyrm_word cur_idx = idx;
             subidx = 0; idx++;
-            if (self->dense[cur_idx].value.type >= WYRM_TYPE_TAG_GC_PATH_START) {
+            if (wyrm_type_tag_is_gc(self->dense[cur_idx].value.type)) {
                 wa->data[0].uword = idx;
                 wa->data[1].uword = subidx;
                 *child = self->dense[cur_idx].value.data.gc_object;

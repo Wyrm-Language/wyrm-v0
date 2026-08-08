@@ -1,5 +1,7 @@
 #include <wyrm.h>
 
+#define SLOT_COUNT 256
+
 wyrm_error wyrm_class_new(wyrm_context* context, wyrm_class** out)
 {
     wyrm_class* cls = wyrm_context_gc_alloc(context, sizeof(wyrm_class));
@@ -8,14 +10,14 @@ wyrm_error wyrm_class_new(wyrm_context* context, wyrm_class** out)
     cls->super = WYRM_NULL;
     cls->sym_name.symtab_entry = WYRM_NULL;
 
-    cls->slot_count = 0;
-    cls->slots = wyrm_context_gc_alloc(context, sizeof(wyrm_class_slot) * WYRM_SLOT_COUNT);
-    if (!cls->slots) {
+    wyrm_prototype_init_f(&cls->prototype);
+    wyrm_error last_error = wyrm_prototype_reserve_f(context, &cls->prototype, SLOT_COUNT);
+    if (last_error != WYRM_ERR_NONE) {
         wyrm_context_gc_free(context, cls);
         return WYRM_ERR_NOMEM;
     }
 
-    wyrm_context_object_init_header_f(context, &cls->object, &wyrm_type_class);
+    wyrm_context_object_init_header_f(context, &cls->prototype.object, &wyrm_type_class);
     *out = cls;
     return WYRM_ERR_NONE;
 }
@@ -24,7 +26,7 @@ wyrm_error wyrm_class_new(wyrm_context* context, wyrm_class** out)
 static void finalize(wyrm_context* context, wyrm_object* self)
 {
     wyrm_class* cls = (wyrm_class*) self;
-    wyrm_context_gc_free(context, cls->slots);
+    wyrm_prototype_finalize_f(context, &cls->prototype);
 }
 
 

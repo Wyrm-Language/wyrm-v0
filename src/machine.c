@@ -62,20 +62,20 @@ void wyrm_machine_finalize_f(wyrm_machine* self)
     wyrm_allocator_free(self->allocator, self->symtab); self->symtab = WYRM_NULL;
 }
 
-wyrm_error wyrm_machine_find_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out)
+wyrm_error wyrm_machine_find_symbol(wyrm_machine* self, const char* cstr, wyrm_symtab_entry* out)
 {
     if (self == WYRM_NULL || out == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (self->symtab == WYRM_NULL) { out->symtab_entry = WYRM_NULL; return WYRM_ERR_KEY; }
+    if (self->symtab == WYRM_NULL) { *out = WYRM_NULL; return WYRM_ERR_KEY; }
     wyrm_uword offset = symtab_find_str(self->symtab->data, cstr);
 
     if (self->symtab->data[offset] == 0) {
-        out->symtab_entry = WYRM_NULL; return WYRM_ERR_KEY;
+        *out = WYRM_NULL; return WYRM_ERR_KEY;
     }
-    out->symtab_entry = &self->symtab->data[offset];
+    *out = &self->symtab->data[offset];
     return WYRM_ERR_NONE;
 }
 
-wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out)
+wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm_symtab_entry* out)
 {
     if (self == WYRM_NULL || cstr == WYRM_NULL || self->symtab == WYRM_NULL) { return WYRM_ERR_INVAL; }
     wyrm_uword length = wyrm_strlen_f(cstr);
@@ -86,7 +86,7 @@ wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm
     wyrm_uword offset = symtab_find_str(self->symtab->data, cstr);
     char* symtab_buffer = &self->symtab->data[offset];
 
-    if (*symtab_buffer != 0) { out->symtab_entry = symtab_buffer; return WYRM_ERR_EXISTS; }
+    if (*symtab_buffer != 0) { *out = symtab_buffer; return WYRM_ERR_EXISTS; }
 
     wyrm_uword end = offset + length + 2;
     if (end >= self->symtab->alloc_size) { return WYRM_ERR_NOMEM; }
@@ -95,6 +95,6 @@ wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm
     self->symtab->data[offset + 1 + length] = '\0';
     self->symtab->data[end] = 0;
     self->symtab->data[offset] = (char) length;
-    out->symtab_entry = &self->symtab->data[offset];
+    *out = &self->symtab->data[offset];
     return WYRM_ERR_NONE;
 }

@@ -16,8 +16,8 @@ wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc);
 wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context);
 void wyrm_machine_finalize_f(wyrm_machine* self);
 
-wyrm_error wyrm_machine_find_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out);
-wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm_primitive* out);
+wyrm_error wyrm_machine_find_symbol(wyrm_machine* self, const char* cstr, wyrm_symtab_entry* out);
+wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm_symtab_entry* out);
 
 
 /* ------------------------------------------------------------------------- */
@@ -124,8 +124,8 @@ extern const wyrm_object_type wyrm_type_class;
 
 wyrm_error wyrm_class_new(wyrm_context* context, wyrm_class** out);
 WYRM_INLINE void wyrm_class_set_name_f(wyrm_class* self, wyrm_primitive name);
-WYRM_INLINE wyrm_error wyrm_class_add_slot_f(wyrm_class* self, wyrm_primitive slot_name, wyrm_type_tag slot_type);
-WYRM_INLINE wyrm_uword wyrm_class_get_slot_selector_f(wyrm_class* self, wyrm_primitive sym_name);
+WYRM_INLINE wyrm_error wyrm_class_add_slot_f(wyrm_class* self, wyrm_symtab_entry slot_name, wyrm_uword flags);
+WYRM_INLINE wyrm_uword wyrm_class_get_slot_selector_f(wyrm_class* self, wyrm_symtab_entry sym_name);
 
 
 /* ------------------------------------------------------------------------- */
