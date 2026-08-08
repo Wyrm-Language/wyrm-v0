@@ -1,5 +1,5 @@
 
-## Semantic Explanation of Syntax
+## Language Syntax And Parsing
 
 ### Top-Level
 
@@ -7,7 +7,7 @@ A wyrm module is a list of statements. Every statement produces
 a result. Any standalone expression is the value of the expression.
 
 The statement rule is valid for all special statements: `fn`,
-`class`, `do`, `with`, `import`, `using`.
+`class`, `do`, `with`, `import`
 
 ### Literals / Atoms
 
@@ -364,51 +364,48 @@ initializers happen at that time, not per instance construction**.
 Import is simple:
 
     import mod
-
-Imports with nested submodules:
-
     import mod::baz::bar
+
+When importing a qualified path, both the name and the qualified
+path are placed into the current lexical scope. After the statement
+`import mod::baz::bar` the following names are valid: `bar`, `mod`,
+`mod::baz`.
+
+The 'as' keyword allows aliasing an import name:
+
+    import mod::baz as bt
+
+In this example, `mod`, `mod::baz`, and `bt` are valid symbols. Aliases
+are honored in all statements _within the namespace they are defined_.
+An alias may be utilized for an import:
+
+    import std as _std         # std not created, _std valid
+    import _std::io as _stdio  # _std::io valid and _stdio valid
+    import _stdio::File        # File is valid, _stdio remains valid
 
 Once a module is imported, the name scope operator can pull in elements:
 
     import mod
     mod::function()
 
-The import statement creates the namespace for each module part. It is
-valid to alias the import if desired:
+Multiple elements may be imported using parens:
 
-    import mod::baz::bleet as bar
+    import std::io::(File, StreamReader, StreamWriter)
 
-The alias results in only 'bar' being added to the module namespace.
+Aliases may be applied to each element:
 
-The 'using' statement allows further manipulation and aliasing of names.
+    import std::io::(File as IOFile, StreamReader as Sr, StreamWriter)
 
-Using an imported module name results in a wild card import of all exported names
-within the module:
+The wildcard operator allows importing a full namespace. The wildcard operator
+is not compatible with 'as' keyword:
 
-    import math
-    using math
+    import std::io::*
 
-This works with aliased modules as well:
+The wildcard operator may be utilized with 'except' to exclude specific names
+from an import, and multiple items may be excluded:
 
-    import math as bar
-    using bar
-
-Using may also import individual symbols:
-
-    using sin from math;
-
-Or to create aliases with as keyword:
-
-    using long_math_name_lots_of_typing as corefn from math;
-
-And a list is valid:
-
-    using sin, cos, long_math_name as lfn from math;
-
-Parens are allowed:
-
-    using (sin, cos) from math
+    import std::io::* except File  # File must be referenced via std::io::File, all other symbols in namespace
+    import std::io::* except (File, StreamReader)
 
 ### Special Blocks
 
@@ -479,13 +476,13 @@ Arguments may have default values:
     fn message(name: str, greeting: str = "Hello") -> str:
         return greeting + name
 
-Variable length arguments may be collected by the '*' operator:
-
-    fn message(*arguments) -> str:
+Variable length arguments may be collected by the '\*' operator:
+    
+    fn message(\*arguments) -> str:
         greeting, name := arguments
         return greeting + name
 
-And '**' may be used to collect keyword argument into a dict:
+And '\*\*' may be used to collect keyword argument into a dict:
 
     fn message(**kwargs) -> str:
         return kwargs["greeting"] + kwargs["name"]
@@ -926,6 +923,22 @@ Inherited / Extended predefined class types:
   - **RuntimeError: error** - generic runtime error
   - **OSError: error** - OS error with errno
 
+## Language Limits
+
+
+Identifiers:
+
+  - Leading 31 unicode characters of an identifier SHALL be significant. Additional character behavior is implementation defined.
+  - Identifiers SHALL be binary equivalent UTF-8 encoded strings
+  - A lexical scope MAY be limited to 65535 identifiers.
+
+Messages:
+
+  - An implementation SHALL support a minimum of 4 types for multiple dispatch.
+
+## Semantics
+
+
 ## Core Features
 
 ### Classes
@@ -951,7 +964,83 @@ operators may be overloaded:
     __message__ - find closure for this message
     __hash__ - return integer hash representation of this object
 
-### Native Code
+
+## Idiomatic Recommendations
+
+### Import classes instead of module
+
+Wyrm core library prefers leveraging objects. Prefer importing single classes directly:
+
+    import std::io::File
+
+    f = File("path")
+
+The module import path may still be used:
+
+    import std::io
+    f = std::io::File("path")
+
+While legal, using wildcard module is not recommended:
+
+    import std::io::*
+    f = File("path")
+
+### Error Handling
+
+Annotate functions that may return error using union error:
+
+    fn may_fail() -> int | error:
+        ...
+
+Leverage defer on error to handle cleanup:
+
+    resource := resource()
+    defer on error:
+        resource ! cleanup()
+
+    try setup(resource)
+    return resource
+
+Consider cleaning up and terminating the error if it makes sense:
+
+    resource := resource()
+    defer on error | nil:
+        resource ! cleanup()
+
+    try setup(resource)
+    check_if_should_return(resource) catch return nil
+    return resource
+
+Use the ?= operator to catch and default values. This can be leveraged
+and eventually used with a try statement for a series of attempts:
+
+    f := open('try_location_1.txt')
+    f ?= open('try_location_2.txt')
+    f ?= try open('try_final_location.txt')
+
+Leverage catch to detect actual errors if truthy false is a valid result:
+
+    f := lookup['value'] catch 0
+
+Error may be inherited to create new error types. Using error as a method
+(basic constructor) will result in a new error of the base type.
+
+    fn make_error(bad: bool) -> int | error:
+        if bad:
+            return error("this is an error")
+        return 0
+
+You may also create new error types by subclassing error:
+
+    class DetectedHardwareFailure(error) {}
+
+    fn hardware_failed() -> int | error:
+        return DetectedHardwareFailure()
+
+
+## Language Extensions
+
+### Native Code (specific to Wyrm Implementation and C modules)
 
 **This is an internal feature.**
 
@@ -1031,57 +1120,3 @@ Type Mapping:
  - bool -> bool
  - str (input only) -> wyrm_string*
  - object -> wyrm_value
-
-## Idiomatic Recommendations
-
-### Error Handling
-
-Annotate functions that may return error using union error:
-
-    fn may_fail() -> int | error:
-        ...
-
-Leverage defer on error to handle cleanup:
-
-    resource := resource()
-    defer on error:
-        resource ! cleanup()
-
-    try setup(resource)
-    return resource
-
-Consider cleaning up and terminating the error if it makes sense:
-
-    resource := resource()
-    defer on error | nil:
-        resource ! cleanup()
-
-    try setup(resource)
-    check_if_should_return(resource) catch return nil
-    return resource
-
-Use the ?= operator to catch and default values. This can be leveraged
-and eventually used with a try statement for a series of attempts:
-
-    f := open('try_location_1.txt')
-    f ?= open('try_location_2.txt')
-    f ?= try open('try_final_location.txt')
-
-Leverage catch to detect actual errors if truthy false is a valid result:
-
-    f := lookup['value'] catch 0
-
-Error may be inherited to create new error types. Using error as a method
-(basic constructor) will result in a new error of the base type.
-
-    fn make_error(bad: bool) -> int | error:
-        if bad:
-            return error("this is an error")
-        return 0
-
-You may also create new error types by subclassing error:
-
-    class DetectedHardwareFailure(error) {}
-
-    fn hardware_failed() -> int | error:
-        return DetectedHardwareFailure()
