@@ -9,7 +9,7 @@ a result. Any standalone expression is the value of the expression.
 The statement rule is valid for all special statements: `fn`,
 `class`, `do`, `with`, `import`, `using`.
 
-### Literals
+### Literals / Atoms
 
     literal_expr:
       | signed_number
@@ -21,19 +21,52 @@ The statement rule is valid for all special statements: `fn`,
 
 The value of any literal as a statement is the literal.
 
-#### Signed Numbers
 
-Integers leverage standard C semantics: -?\d+ or 0x[a-fA-F0-9]+
+#### Identifiers
 
-    0xdead
-    12345
-    -10
+Identifiers are used for variable names, functions, classes, modules. A
+standalone identifier will evaluate.
 
-Floating point numbers follow standard C semantics:
+_Grammar_
+ 
+    (* Note: xid_start and xid_continue require Unicode support, ASCII
+       simplification is letters with underscore and added digits *)
 
-    3e1
-    3.14159
-    -18.24
+    identifier      ::= xid_start , { xid_continue } ;
+
+_Example_
+
+    Pi  # Evaluate to Pi constant after import
+    i   # evaluate to value of i
+
+#### Numbers
+
+_Grammar_
+
+    (* The +/- is handled as a unary operator preceeding the literal.
+        literal_float ::= [ ("-" | "+") ] literal_float
+        literal_int   ::= [ ("-" | "+") ] literal_int  *)
+
+    literal_float ::= digits , ( "." , digits , [ exponent ] | exponent ) ;
+    literal_int   ::= digits | ("0x" | "0X") , hexdigits | ("0b" | "0B"), bindigits;
+
+    bindigit      ::= "0" | "1" ;
+    digit         ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+    hexdigit      ::= digit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F" ;
+
+    digits        ::= digit , { digit | "_" } ;
+    bindigits     ::= bindigit , { bindigit | "_" } ;
+    hexdigits     ::= hexdigit , { hexdigit | "_" } ;
+
+    exponent      ::= ( "e" | "E" ) , [ "+" | "-" ] , digits ;
+
+_Examples_
+   
+    12345        # Boring luggage combination
+    12_345       # _ allowed to separate in integer
+    0b1010_0000  # Bitmake written in binary wtih separate character
+    123e45       # Floating point
+
 
 #### Booleans
 
