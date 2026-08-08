@@ -1,17 +1,16 @@
 #include <wyrm.h>
 
 /**
- * Allocate a new box.
+ * @brief Allocate a new box.
  */
-wyrm_error wyrm_box_new(wyrm_context* self, wyrm_box** out)
+wyrm_error wyrm_box_new_f(wyrm_context* context, wyrm_box** out)
 {
-    wyrm_box* box = wyrm_context_gc_alloc(self, sizeof(wyrm_box));
+    wyrm_box* box = wyrm_context_gc_alloc(context, sizeof(wyrm_box));
     if (box == WYRM_NULL) { return WYRM_ERR_NOMEM; }
 
-    wyrm_object_init_header_s(&box->object, &wyrm_type_box);
+    box->value = wyrm_value_Unset();
+    wyrm_context_object_init_header_f(context, &box->object, &wyrm_box_type);
 
-    box->value.type = WYRM_TYPE_TAG_NIL;
-    box->value.data.uword = 0;
     *out = box;
     return WYRM_ERR_NONE;
 }
@@ -34,7 +33,7 @@ static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyr
 
     if (wa->data[0].word == 0) {
         wa->data[0].word = 1;
-        if (wyrm_type_tag_is_gc(box->value.type)) {
+        if (wyrm_type_tag_is_gc(box->value.type) && box->value.data.gc_object != WYRM_NULL) {
             *child = box->value.data.gc_object;
             return WYRM_ERR_NONE;
         }
@@ -43,7 +42,7 @@ static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyr
 }
 
 
-const wyrm_object_type wyrm_type_box = {
+const wyrm_object_type wyrm_box_type = {
     .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
     .gc_type = WYRM_TYPE_TAG_BOX,
 

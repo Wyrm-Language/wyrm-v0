@@ -2,6 +2,8 @@
 #define WYRM_API_H_
 
 #include <wyrm/types.h>
+#include <wyrm/wbox.h>
+#include <wyrm/wstring.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -109,11 +111,8 @@ WYRM_INLINE wyrm_value wyrm_value_word(wyrm_word value)
 }
 
 
-wyrm_error wyrm_box_new(wyrm_context* self, wyrm_box** out);
 
-WYRM_INLINE bool wyrm_string_eq_f(wyrm_string* lhs, wyrm_string* rhs);
-WYRM_INLINE wyrm_uword wyrm_string_hash_f(wyrm_string* str);
-wyrm_error wyrm_string_strdup(wyrm_context* machine, const char* src, wyrm_string** out_str);
+
 
 /* ------------------------------------------------------------------------- */
 /* Class                                                                     */
@@ -153,15 +152,6 @@ void wyrm_context_gc_full_run(wyrm_state* state, wyrm_context* context);
 
 /* ---- Utility Functions ----- */
 
-WYRM_INLINE wyrm_uword wyrm_hash_buffer(const char* start, const char* end)
-{
-    wyrm_uword hash = 0;
-    for (const char* cur = start; cur != end; ++cur) {
-        hash = hash + (wyrm_uword)(*cur);
-    }
-    return hash;
-}
-
 
 /* ---------- wyrm_fiber inlines --------- */
 static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)
@@ -183,7 +173,6 @@ static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)
 #include <wyrm/inl/fiber.h>
 #include <wyrm/inl/state.h>
 #include <wyrm/inl/object.h>
-#include <wyrm/inl/string.h>
 #include <wyrm/inl/op.h>
 #include <wyrm/inl/main_loop.h>
 

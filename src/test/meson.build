@@ -7,6 +7,7 @@ test_cwyrm_sources = files(
     'test_machine.cpp',
     'test_stack.cpp',
     'test_state.cpp',
+    'test_wbox.cpp',
     'test_wpair.cpp',
     'test_wstring.cpp',
     'test_wtable.cpp',

@@ -30,6 +30,20 @@ TEST_SUITE("wstring") {
         REQUIRE_NE(str1->hash, str2->hash);
     }
 
+    TEST_CASE("prefix match not equal") {
+        test_context_fixture fix;
+
+        wyrm_string* str1 = WYRM_NULL;
+        REQUIRE_EQ(wyrm_string_new(fix.get_context_ptr(), "if2", 2, &str1), WYRM_ERR_NONE);
+        REQUIRE_NE(str1, WYRM_NULL);
+
+        wyrm_string* str2 = WYRM_NULL;
+        REQUIRE_EQ(wyrm_string_new(fix.get_context_ptr(), "if2", 3, &str2), WYRM_ERR_NONE);
+        REQUIRE_NE(str2, WYRM_NULL);
+
+        REQUIRE_NE(str1->hash, str2->hash);
+    }
+
     TEST_CASE("oom handled") {
         test_context_fixture fix;
 
