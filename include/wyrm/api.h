@@ -99,7 +99,6 @@ WYRM_INLINE wyrm_error wyrm_main_loop_quit(wyrm_main_loop* self);
 
 #define WYRM_PRIMITIVE_PTR(dtype, v) ((dtype*) (v).ptr)
 
-WYRM_INLINE wyrm_primitive wyrm_primitive_null(void) { const wyrm_primitive v = {.ptr = WYRM_NULL}; return v; }
 WYRM_INLINE wyrm_primitive wyrm_primitive_int(wyrm_word value) { const wyrm_primitive v = {.word = value}; return v; }
 WYRM_INLINE wyrm_primitive wyrm_primitive_ptr(void* value) { const wyrm_primitive v = {.ptr = value}; return v; }
 

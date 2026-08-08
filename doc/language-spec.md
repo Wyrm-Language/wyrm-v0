@@ -15,9 +15,9 @@ The statement rule is valid for all special statements: `fn`,
       | signed_number
       | strings
       | character
-      | 'true'
-      | 'false'
-      | 'nil'
+      | literal_symbol
+      | literal_bool
+      | literal_nil
 
 The value of any literal as a statement is the literal.
 
@@ -37,23 +37,40 @@ Floating point numbers follow standard C semantics:
 
 #### Booleans
 
-Specify true or false
+Literal for boolean.
 
-    true # True
-    false # False
+_Grammar_
+
+    literal_bool ::= "true" | "false";
+
+_Example_
+
+    true # True value
+    false # False value
 
 #### Nil
 
-`nil` is a keyword for an unset variable.
+`nil` is the literal for a null object reference.
+
+_Grammar_
+
+    literal_nil ::= "nil" ;
+
+_Example_
 
     nil
 
 #### Symbol
 
-A symbol is an identifier / name in Wyrm code. It may be specified
-by a single quote preceding a valid wyrm name:
+A symbol is an identifier / name in Wyrm code expressed as a literal.
 
-    'name
+_Grammar_
+
+    literal_symbol ::= "'" , identifier
+
+_Example_
+
+    'name # symbol name
 
 An implementation may limit significant characters in a symbol. An
 implementation must support at least 31 characters of significance.
@@ -1035,4 +1052,3 @@ You may also create new error types by subclassing error:
 
     fn hardware_failed() -> int | error:
         return DetectedHardwareFailure()
-
