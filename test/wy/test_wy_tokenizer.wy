@@ -1,0 +1,89 @@
+import wyrm::parser::tokenizer as tok
+
+fn test_single_token(name: str, buffer: str, expected: sym, match: str):
+    defer on error:
+        println("FAIL on error")
+    
+    print("Test:", name, "- ")
+
+    parser := tok::Tokenizer(buffer)
+    token := try parser ! scan()
+
+    if token.kind != expected:
+        println("FAIL unexpected kind check:", expected, "!=", token.kind)
+        return
+
+    found_match := token ! get_text(buffer)
+    if found_match != match:
+        println("FAIL bad match check:", found_match, "!=", match)
+        return
+
+    println(" PASS")
+
+fn test_token_stream(name: str, buffer: str, *symbols):
+    defer on error:
+        println("FAIL no result: ", name)
+    
+    print("Test:", name, "- ")
+    parser := tok::Tokenizer(buffer)
+    count := 0
+
+    for expected in symbols:
+        token := try parser ! scan()
+        if token.kind != expected:
+            println("FAIL bad match, check: ", expected, "!=", token.kind, "elem:", count)
+            return
+        count = count + 1
+    
+    println("PASS")
+
+println("Token Tests")
+test_single_token("Empty String", "", 'TOK_END, "")
+test_single_token("Basic Integer", "12345", 'TOK_LITERAL_INT, "12345")
+test_single_token("Binary", "0b1010", 'TOK_LITERAL_INT_BIN, "0b1010")
+test_single_token("Hex Integer", "0x1111_2222", 'TOK_LITERAL_INT_HEX, "0x1111_2222")
+test_single_token("Hex Malformed", "0xZF", 'TOK_LITERAL_INT, "0")
+test_single_token("Basic Float", "1.1", 'TOK_LITERAL_FLOAT, "1.1")
+test_single_token("Float exponent", "1e5", 'TOK_LITERAL_FLOAT, "1e5")
+test_single_token("Int from Float Bad Decimal", "1.A", 'TOK_LITERAL_INT, "1")
+test_single_token("Int from Float Bad Decimal Exponent", "1.e", 'TOK_LITERAL_INT, "1")
+test_single_token("Int from Float Bad Exponent", "1.eA", 'TOK_LITERAL_INT, "1")
+
+test_single_token("Simple string", "\"Very\"123", 'TOK_STR, "\"Very\"")
+test_single_token("Simple string with escape", "\"a\\\"b\"", 'TOK_STR, "\"a\\\"b\"")
+test_single_token("Simple string with escape at end", "\"Very\\\"\"1", 'TOK_STR, "\"Very\\\"\"")
+
+test_single_token("Simple 2char token", "::", 'TOK_SCOPE, "::")
+test_single_token("Simple 1char token", ":", 'TOK_COLON, ":")
+test_single_token("Simple literal", "'abc123", 'TOK_LITERAL_SYM, "'abc123")
+
+test_token_stream("Simple Comment", "# Comment Is Here", 'TOK_COMMENT)
+test_token_stream("Simple Comment With Line Extension", "# Comment\\\nNext line", 'TOK_COMMENT, 'TOK_END)
+test_token_stream("Number comment", "1234#abcde", 'TOK_LITERAL_INT, 'TOK_COMMENT)
+
+test_token_stream("Fetch multiple end", "", 'TOK_END, 'TOK_END)
+test_token_stream("Integer End", "12345", 'TOK_LITERAL_INT, 'TOK_END)
+test_token_stream("Hax Malformed", "0xZF", 'TOK_LITERAL_INT, 'TOK_XID, 'TOK_END)
+
+test_token_stream("Identifier", "a", 'TOK_XID, 'TOK_END)
+test_token_stream("Identifier with number", "a1", 'TOK_XID, 'TOK_END)
+test_token_stream("Number then identifier", "1a2", 'TOK_LITERAL_INT, 'TOK_XID, 'TOK_END)
+test_token_stream("Keyword is xid", "fn", 'TOK_XID, 'TOK_END)
+
+test_token_stream("Function definition", "fn foo(count: int) -> int:",
+    'TOK_XID, # fn
+    'TOK_WS, 
+    'TOK_XID, # foo
+    'TOK_LPAREN,
+    'TOK_XID, # count
+    'TOK_COLON,
+    'TOK_WS,
+    'TOK_XID, # int
+    'TOK_RPAREN,
+    'TOK_WS,
+    'TOK_RARROW,
+    'TOK_WS,
+    'TOK_XID,
+    'TOK_COLON)
+
+println("...Done")

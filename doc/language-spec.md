@@ -9,6 +9,15 @@ a result. Any standalone expression is the value of the expression.
 The statement rule is valid for all special statements: `fn`,
 `class`, `do`, `with`, `import`
 
+### File Encoding and Newlines
+
+Wyrm files shall be encoded in UTF-8. 
+
+### Comments
+
+A comment begins with '#' and goes to the end of a line. A '\' character
+immediately preceeding a newline extends the comment to the next line.
+
 ### Literals / Atoms
 
     literal_expr:
@@ -127,21 +136,38 @@ Raw strings may be defined using the R prefix with specific token:
     R"(Arbitrary Text)"
     R"extra(We can now have (" )extra"
 
+Normal strings and multiline strings allow escaping as follows:
+
+    \\ - escaped '\'
+    \" - escaped double quote
+    \n - escaped LF
+    \r - escaped CR
+    \t - escaped TAB
+    \b - escaped backspace
+    \f - escaped formfeed
+    \v - vertical tab
+    \ooo - octal number specified character
+    \xxx - hex specified character
+
 #### Characters
 
 A character literal is Clojure-style: a backslash followed by either a
 single character, or one of a handful of named characters. It evaluates to
 that character's numeric (u32) value - the same value string indexing
-already produces, e.g. `\a == "asdf"[0]`.
+already produces, e.g. `\a == "asdf"[0]`. More than one character
+indicates a named special character.
 
     \a
     \newline
-    \space
-    \tab
-    \return
-    \backspace
-    \formfeed
-    \null
+
+Special characters and C++ escapes:
+    space       ' '
+    tab         '\t'
+    return      '\r'
+    newline     '\n'
+    backspace   '\b'
+    formfeed    '\f'
+    null        '\0'
 
 ### Built-in Collections
 
@@ -623,8 +649,8 @@ dynamic scope forces a return with either 'return' or 'try' statements.
 
 ### Messages
 
-A message is a method on a class. Messages may be dispatched utilizing the
-message operator `!`.
+A message is a dynamically bound method on one or more objects. Messages may be
+dispatched utilizing the message operator `!`.
 
 In simple cases, a message may be utilized just as a method call:
 
@@ -633,6 +659,8 @@ In simple cases, a message may be utilized just as a method call:
 A message may be executed on a tuple for multiple dispatch:
 
     (canvas, shape) ! draw();
+
+A message may be bound to a primitive object.
 
 ### Basic Classes
 
@@ -918,6 +946,7 @@ Class types inherit from object. These may be further subclassed as desired.
 Inherited / Extended predefined class types:
 
   - **Unset: error** - the value of a declared but unassigned variable
+  - **NotFound: error** - the value was not found
   - **OutOfMemory: error** - out of memory error
   - **StopIteration: error** - stop iteration error
   - **RuntimeError: error** - generic runtime error

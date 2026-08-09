@@ -1,0 +1,34 @@
+# Character Type Support for Wyrm
+#
+# NOTE: This is temporarily US ASCII only...
+
+fn is_bindigit(c: int) -> bool:
+    return c == \0 or c == \1
+
+fn is_digit(c: int) -> bool:
+    return c >= \0 and c <= \9
+
+fn is_cntrl(c: int) -> bool:
+    # TODO: implement
+    return c == \0 or c == \backspace
+
+fn is_hexdigit(c: int) -> bool:
+    return is_digit(c) or (c >= \a and c <= \f) or (c >= \A and c <= \F)
+
+fn is_alpha_lower(c: int) -> bool:
+    return c >= \a and c <= \z
+
+fn is_alpha_upper(c: int) -> bool:
+    return c >= \A and c <= \Z
+
+fn is_alpha(c: int) -> bool:
+    return is_alpha_lower(c) or is_alpha_upper(c)
+
+fn is_space(c: int) -> bool:
+    return c in (\space, \newline, \tab, \return, \formfeed)
+
+fn is_xid_start(c: int) -> bool:
+    return is_alpha(c) or c == \_
+
+fn is_xid_continue(c: int) -> bool:
+    return is_xid_start(c) or is_digit(c)

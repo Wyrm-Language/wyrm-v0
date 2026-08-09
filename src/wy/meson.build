@@ -15,4 +15,4 @@ wy_lib_dep = declare_dependency(
     dependencies: cwyrm_lib_dep,
 )
 
-install_subdir('../../include/wy', install_dir: get_option('includedir'))
+install_headers('../../include/wy.h')

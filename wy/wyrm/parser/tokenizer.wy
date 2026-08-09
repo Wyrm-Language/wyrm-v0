@@ -1,0 +1,436 @@
+# Tokenizer - Wyrm Implementation
+
+import std::ctype::*
+
+
+# Scanned Token from the Tokenizer
+#
+# Types:
+#   error                   error token
+#   'TOK_END                end of stream marker
+#   'TOK_LITERAL_CHAR       grammar literal_char
+#   'TOK_LITERAL_INT        grammar literal_int
+#   'TOK_LITERAL_INT_HEX    grammar literal_int (hex variant)
+#   'TOK_LITERAL_INT_BIN    grammar literal int (binary digits variant)
+#   'TOK_LITERAL_FLOAT      grammar literal_float
+#   'TOK_LITERAL_SYM        grammar literal_sym
+#
+#   'TOK_EXPONENT '**'
+#   'TOK_LBRACE_S '${'
+#   'TOK_RARROW   '->'
+#   'TOK_LARROW   '<-'
+#   'TOK_LE       '<='
+#   'TOK_GE       '>='
+#   'TOK_DEQUAL   '=='
+#   'TOK_NE       '!='
+#   'TOK_BIND     ':='
+#   'TOK_QEQ      '?='
+#   'TOK_SCOPE    '::'
+
+#   'TOK_MUL       '*'
+#   'TOK_BANG      '!'
+#   'TOK_MOD       '%'
+#   'TOK_XOR       '^'
+#
+#   'TOK_LPAREN    '('
+#   'TOK_RPAREN    ')'
+#   'TOK_COLON     ':'
+#   'TOK_SEMICOLON ';'
+#   'TOK_OR        '|'
+#   'TOK_AND       '&'
+# 
+# Types to be handled by parser:
+#   'TOK_XID                word/name/identifier
+#   'TOK_WS                 whitespace
+#   'TOK_INDENT             space after NEWLINE before other tokens
+#   'TOK_COMMENT            a comment
+
+_DUAL_CHARS := [
+ ('TOK_EXPONENT, \*, \*),
+ ('TOK_LBRACE_S, \$, \{),
+ ('TOK_LBRACKET_S, \$, \[),
+ ('TOK_RARROW, \-, \>),
+ ('TOK_LARROW, \<, \-),
+
+ ('TOK_LE, \<, \=),
+ ('TOK_GE, \>, \=),
+ ('TOK_NE, \!, \=),
+ ('TOK_DEQUAL, \=, \=),
+ ('TOK_BIND, \:, \=),
+ ('TOK_SCOPE, \:, \:),
+ ('TOK_QEQ, \?, \=),
+]
+
+_S_CHARS := [
+    ('TOK_PLUS, \+),
+    ('TOK_MINUS, \-),
+    ('TOK_MUL, \*),
+    ('TOK_DIV, \/),
+    ('TOK_MOD, \%),
+    ('TOK_EQUAL, \=),
+    ('TOK_LT, \<),
+    ('TOK_GT, \>),
+    ('TOK_DOT, \.),
+
+
+    ('TOK_XOR, \^),
+    ('TOK_OR, \|),
+    ('TOK_AND, \&),
+
+    ('TOK_COMMA, \, ),
+    ('TOK_COLON, \: ),
+    ('TOK_SEMICOLON, \; ),
+    ('TOK_BANG, \! ),
+
+    ('TOK_TILDE, \~ ),
+    ('TOK_LPAREN, \( ),
+    ('TOK_RPAREN, \) ),
+    ('TOK_LBRACE, \{ ),
+    ('TOK_RBRACE, \} ),
+    ('TOK_LBRACKET, \[ ),
+    ('TOK_RBRACKET, \] ),
+]
+
+class Token:
+    slot kind: sym | error  #< Identified type of token
+    slot start: int         #< Initial byte of the token in stream
+    slot end: int           #< Byte after the ending token of the stream
+
+    fn init(kind: sym | error, start: int, end: int):
+        this.kind = kind
+        this.start = start
+        this.end = end
+
+    fn get_text(buffer: str) -> str:
+        return buffer ! substr(this.start, this.end)
+
+fn _get_char(buffer: str, cur_pos: int) -> int | sym:
+    return buffer[cur_pos] catch 'EOF
+
+# Newlines
+fn _is_newline(ch: int) -> bool:
+    return ch == \return or ch == \newline
+
+fn _scan_escape_nl_break(buffer: str, cur_pos: int) -> int | nil:
+    next_c := _get_char(buffer, cur_pos)
+    if next_c != \\:
+        return nil
+    c1 := _get_char(buffer, cur_pos + 1)
+    c2 := _get_char(buffer, cur_pos + 2)
+    if c1 == \return and c2 == \newline:
+        return cur_pos + 3
+    if c1 == \return or c1 == \newline:
+        return cur_pos + 2
+    return nil
+
+# Scan whitespace
+fn _find_end_whitespace(buffer: str, cur_pos: int) -> int:
+    idx := cur_pos
+    next_c := _get_char(buffer, idx)
+    while (next_c != 'EOF):
+        if _is_newline(next_c):
+            return idx        
+        if is_space(next_c):
+            idx = idx + 1
+        elif next_c != \\:
+            return idx
+        else:
+            break_idx := _scan_escape_nl_break(buffer, idx)
+            if break_idx == nil:
+                return idx
+            idx = break_idx
+        next_c = _get_char(buffer, idx)
+    return idx
+
+# Scan to EOL (including line joining) or EOF
+fn _scan_to_eol(buffer: str, cur_pos: int) -> int:
+    idx := cur_pos
+    next_c := _get_char(buffer, idx)
+    while (next_c != 'EOF) and not _is_newline(next_c):
+        idx = idx + 1
+        next_c = _get_char(buffer, idx)
+        if next_c == \\:
+            break_idx := _scan_escape_nl_break(buffer, idx)
+            if break_idx != nil:
+                idx = break_idx
+                next_c = _get_char(buffer, idx)
+    return idx
+
+# Digits
+#
+# **Grammar**:
+#    digits        ::= digit , { digit | "_" } ;
+fn _scan_digits(buffer: str, cur_pos: int) -> int | nil:
+    idx := cur_pos
+    next_c := _get_char(buffer, idx)
+    if next_c == 'EOF or not is_digit(next_c):
+        return nil
+    while (next_c != 'EOF) and (is_digit(next_c) or next_c == \_):
+        idx = idx + 1
+        next_c = _get_char(buffer, idx)
+    return idx
+
+# Hexadecimal Digits
+#
+# **Grammar**:
+#   hexdigits     ::= hexdigit , { hexdigit | "_" } ;
+fn _scan_hexdigits(buffer: str, cur_pos: int) -> int | nil:
+    idx := cur_pos
+    next_c := _get_char(buffer, idx)
+    if next_c == 'EOF or not is_hexdigit(next_c):
+        return nil
+    while (not next_c == 'EOF) and (is_hexdigit(next_c) or next_c == \_):
+        idx = idx + 1
+        next_c = _get_char(buffer, idx)
+    return idx
+
+# Binary Digits
+#
+# **Grammar**:
+#    bindigits     ::= bindigit , { bindigit | "_" } ;
+fn _scan_bindigits(buffer: str, cur_pos: int) -> int | nil:
+    idx := cur_pos
+    next_c := _get_char(buffer, idx)
+    if next_c == 'EOF or not is_bindigit(next_c):
+        return nil
+    while (next_c != 'EOF) and (is_bindigit(next_c) or next_c == \_):
+        idx = idx + 1
+        next_c = _get_char(buffer, idx)
+    return idx
+
+# Exponent portion of an integer.
+#
+# **Grammar**
+#    exponent      ::= ( "e" | "E" ) , [ "+" | "-" ] , digits ;
+fn _scan_exponent(buffer: str, cur_pos: int) -> int | nil:
+    idx := cur_pos
+    next_c := _get_char(buffer, idx)
+    if next_c != \e and next_c != \E:
+        return nil
+    idx = idx + 1
+    next_c = _get_char(buffer, idx)
+    if next_c == \+ or next_c == \-:
+        idx = idx + 1
+    return _scan_digits(buffer, idx)
+
+# Scan an xid character
+fn _scan_xid(buffer: str, cur_pos: int) -> int | nil:
+    idx := cur_pos
+    next_c := _get_char(buffer, idx)
+    if next_c == 'EOF or not is_xid_start(next_c):
+        return nil
+    idx = idx + 1
+    next_c = _get_char(buffer, idx)
+    while next_c != 'EOF and is_xid_continue(next_c):
+        idx = idx + 1
+        next_c = _get_char(buffer, idx)
+    return idx
+
+# Check if token matches
+fn _check_match(buffer: str, cur_pos: int, required: bool, match_chars) -> bool | error:
+    idx := cur_pos
+    for ch in match_chars:
+        found_ch := _get_char(buffer, idx)
+        idx = idx + 1
+        if found_ch == 'EOF and required:
+            return error("unexpected stream end")
+        if found_ch != ch:
+            return false
+    return true
+
+
+# @brief Token analysis of source
+#
+# This class provides a basic token analysis of a source file. Tokens
+# are scanned from a given position. Tokens are scanned one layer
+# deeper than the built lexical analysis of the source.
+class Tokenizer:
+    slot buffer: str
+    slot cur_pos: int
+
+    fn init(buffer: str):
+        this.buffer = buffer
+        this.cur_pos = 0
+
+    fn set_pos(pos: int):
+        this.cur_pos = pos
+
+    fn _advance_with_token(kind: sym | error, end_pos: int) -> Token | error:
+        start_pos := this.cur_pos
+        this.cur_pos = end_pos
+        return Token(kind, start_pos, this.cur_pos)
+
+    fn scan() -> Token | error:
+        var token: Token | nil
+
+        next_c := _get_char(this.buffer, this.cur_pos)
+        next_next_c := _get_char(this.buffer, this.cur_pos + 1)
+        next_next_next_c := _get_char(this.buffer, this.cur_pos + 2)
+        
+        # End Stream
+        if next_c == 'EOF:
+            return Token('TOK_END, this.cur_pos, this.cur_pos)
+        
+        # Comment, newlines, spaces
+        if next_c == \#:
+            return this ! _scan_comment()
+        if next_c == \return and next_next_c == \newline:
+            return this ! _advance_with_token('TOK_NEWLINE, this.cur_pos + 2)
+        if _is_newline(next_c):
+            return this ! _advance_with_token('TOK_NEWLINE, this.cur_pos + 1)
+        if (next_c == \\ and _is_newline(next_next_c)) or is_space(next_c):
+            return this ! _advance_with_token('TOK_WS, _find_end_whitespace(this.buffer, this.cur_pos))
+
+        # Literal symbol
+        if next_c == \':
+            lit_end := _scan_xid(this.buffer, this.cur_pos + 1)
+            if lit_end == nil:
+                return this ! _advance_with_token(error("bad symbol literal"), this.cur_pos + 1)
+            return this ! _advance_with_token('TOK_LITERAL_SYM, lit_end)
+
+        # Strings
+        if next_c == \" and next_next_c == \" and next_next_next_c == \":
+            return this ! _scan_finish_str(this.cur_pos + 3, false, (\", \", \"))
+        if next_c == \":
+            return this ! _scan_finish_str(this.cur_pos + 1, true, (\",))
+
+        # Duo characters
+        if next_next_c != 'EOF:
+            for element in _DUAL_CHARS:
+                if next_c == element[1] and next_next_c == element[2]:
+                    return this ! _advance_with_token(element[0], this.cur_pos + 2)
+
+        # Single characters
+        for element in _S_CHARS:
+            if next_c == element[1]:
+                return this ! _advance_with_token(element[0], this.cur_pos + 1)
+
+        # Character literals
+        # **Grammar**:
+        #    literal_char ::= "\", (printable non-whitespace | xid)
+        if next_c == \\:
+            if next_next_c == 'EOF:
+                return this ! _advance_with_token(error("eof in character literal"), len(this.buffer))
+            end_literal_min := this.cur_pos + 2
+            if is_cntrl(next_next_c) or is_space(next_next_c):
+                return this ! _advance_with_token(error("unexpected character in character literal"), end_literal_min)
+            end_literal_max := _scan_xid(this.buffer, this.cur_pos + 1)
+            if end_literal_max != nil and end_literal_max > end_literal_min:
+                return this ! _advance_with_token('TOK_LITERAL_CHAR, end_literal_max)
+            return this ! _advance_with_token('TOK_LITERAL_CHAR, end_literal_min)
+
+        # Numeric Literal
+        token = this ! _scan_number()
+        if token != nil:
+            return token
+
+        # General identifier
+        token = this ! _scan_xid_token()
+        if token != nil:
+            return token
+
+        return this ! _advance_with_token(error("unexpected token"), this.cur_pos + 1)
+
+    # Scan xid
+    #   An xid is a separated word (delimated by spaces or error tokens)
+    #   This must be disambiguated by the parser - into keyword, identifier, etc...
+    fn _scan_xid_token() -> Token | nil:
+        idx := this.cur_pos
+        next_c := _get_char(this.buffer, idx)
+        if next_c == 'EOF or not is_xid_start(next_c):
+            return nil
+        idx = idx + 1
+        next_c = _get_char(this.buffer, idx)
+        while next_c != 'EOF and is_xid_continue(next_c):
+            idx = idx + 1
+            next_c = _get_char(this.buffer, idx)
+        return this ! _advance_with_token('TOK_XID, idx)
+
+    # Scan comment
+    #   Tokenizer reports back the comment tokens; they must be ignored above
+    fn _scan_comment() -> Token | nil:
+        return this ! _advance_with_token('TOK_COMMENT, _scan_to_eol(this.buffer, this.cur_pos))
+
+    # Scan string
+    #
+    # Find the ending of the string; only minimally process escapes to skip
+    # escaped quotes.
+    fn _scan_finish_str(start_pos: int, single_line: bool, end_seq) -> Token | nil:
+        idx := start_pos
+        tok_match := _check_match(this.buffer, idx, true, end_seq)
+        while (not (tok_match is error)) and not tok_match:
+            var nl_escape_idx: int | nil = nil
+            next_c := _get_char(this.buffer, idx)
+            if single_line and _is_newline(next_c):
+                return this ! _advance_with_token(error("unexpected end-of-line within string"), idx)
+            if next_c == \\:
+                nl_escape_idx = _scan_escape_nl_break(this.buffer, idx)
+                if nl_escape_idx != nil:
+                    idx = nl_escape_idx
+                else:
+                    idx = idx + 2
+            else:
+                idx = idx + 1
+            tok_match = _check_match(this.buffer, idx, true, end_seq)
+        if tok_match is error:
+            return this ! _advance_with_token(tok_match, idx)
+        return this ! _advance_with_token('TOK_STR, idx + len(end_seq))
+
+    # Generate numeric tokens
+    #
+    # Token Types: TOK_LITERAL_INT_BIN, TOK_LITERAL_INT_HEX, TOK_LITERAL_FLOAT
+    #
+    # **Grammar**:
+    #   literal_float ::= digits , ( "." , digits , [ exponent ] | exponent ) ;
+    #   literal_int   ::= digits | ("0x" | "0X") , hexdigits | ("0b" | "0B"), bindigits;
+    #
+    # **Grammar Examples**:
+    #   0xde_ad
+    #   0XDEAD
+    #   0b0001
+    #   0b0
+    #   1.2e34
+    #   1E40
+    #   0124
+    #   00.0_0
+    fn _scan_number() -> Token | nil:
+        ch0 := _get_char(this.buffer, this.cur_pos)
+        ch1 := _get_char(this.buffer, this.cur_pos + 1)
+
+        if ch0 == \0 and (ch1 == \b or ch1 == \B):
+            bin_end := _scan_bindigits(this.buffer, this.cur_pos + 2)
+            if bin_end != nil:
+                return this ! _advance_with_token('TOK_LITERAL_INT_BIN, bin_end)
+        if ch0 == \0 and (ch1 == \x or ch1 == \X):
+            hex_end := _scan_hexdigits(this.buffer, this.cur_pos + 2)
+            if hex_end != nil:
+                return this ! _advance_with_token('TOK_LITERAL_INT_HEX, hex_end)
+
+        # require digits or not numeric
+        accept_end := _scan_digits(this.buffer, this.cur_pos)
+        if accept_end == nil { return nil }
+        
+        # check for float
+        var float_end: int | nil = nil
+        next_char := _get_char(this.buffer, accept_end)
+        
+        # accept "." digits if present
+        if next_char == \.:
+            float_end = _scan_digits(this.buffer, accept_end + 1)
+            if float_end != nil:
+                accept_end = float_end
+                next_char = _get_char(this.buffer, accept_end)
+    
+        if (next_char == \e or next_char == \E):
+            exp_end := _scan_exponent(this.buffer, accept_end)
+            if exp_end != nil:
+                float_end = exp_end
+                accept_end = exp_end
+
+        if float_end == nil:
+            return this ! _advance_with_token('TOK_LITERAL_INT, accept_end)
+        else:
+            return this ! _advance_with_token('TOK_LITERAL_FLOAT, accept_end)
+
+
+

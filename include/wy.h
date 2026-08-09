@@ -28,5 +28,4 @@ struct wyrm_fiber* wy_get_primary_fiber(wy_ctx* ctx);
 int wy_run(wy_ctx* ctx);
 void wy_destroy(wy_ctx* ctx);
 
-
 #endif
