@@ -333,24 +333,7 @@ typedef struct wyrm_main_loop
 } wyrm_main_loop;
 
 
-// ----------------------------------------------------------------------------
-// Wyrm Context
-// ----------------------------------------------------------------------------
 
-struct wyrm_context
-{
-    wyrm_machine* parent;
-    wyrm_fiber* current_fiber;
-    wyrm_main_loop* main_loop;
-
-    wyrm_dict* root;
-
-    wyrm_primitive wakeable_source;
-    bool wakeable_source_ready;
-
-    wyrm_object* first;
-    wyrm_object* last;
-};
 
 
 // ----------------------------------------------------------------------------

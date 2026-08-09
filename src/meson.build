@@ -18,6 +18,7 @@ cwyrm_sources = files(
     'wbox.c',
     'wclass.c',
     'wdict.c',
+    'wgc.c',
     'wpair.c',
     'wobject.c',
     'wstate.c',

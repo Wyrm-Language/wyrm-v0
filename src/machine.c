@@ -53,6 +53,10 @@ wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context
     if (self == WYRM_NULL || context == WYRM_NULL) { return WYRM_ERR_INVAL; }
     self->context = context;
     context->parent = self;
+
+    /* TODO: should be setup with context */
+    context->arena.allocator = self->allocator;
+
     return WYRM_ERR_NONE;
 }
 

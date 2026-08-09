@@ -2,11 +2,9 @@
 #define WYRM_WPAIR_H_
 
 #include <wyrm/wcore.h>
-#include <wyrm/context.h>
+#include <wyrm/wcontext.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+WYRM_BEGIN_DECLS
 
 extern const wyrm_object_type wyrm_pair_type;
 
@@ -68,8 +66,6 @@ WYRM_INLINE wyrm_value wyrm_pair_cdr_f(wyrm_pair* pair)
     return pair->cdr;
 }
 
-#ifdef __cplusplus
-}
-#endif
+WYRM_END_DECLS
 
 #endif

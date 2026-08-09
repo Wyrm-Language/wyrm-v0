@@ -51,9 +51,7 @@ wyrm_error wyrm_context_init_s(wyrm_context* self, wyrm_main_loop* loop)
     self->wakeable_source = wyrm_primitive_null();
     self->wakeable_source_ready = false;
 
-    /* SCAFFOLDING */
-    self->first = WYRM_NULL;
-    self->last = WYRM_NULL;
+    wyrm_gc_init_f(&self->arena, WYRM_NULL);
 
     last_error = wyrm_main_loop_add_wakeable(
         loop,
@@ -87,12 +85,7 @@ void wyrm_context_finalize_f(wyrm_context* self)
     }
 
     /* Free all objects */
-    wyrm_object* next = self->first;
-    for (wyrm_object* cur = next; cur; cur = next) {
-        next = cur->next;
-        wyrm_object_finalize_f(self, cur);
-        wyrm_context_gc_free(self, cur);
-    }
+    wyrm_gc_finalize_f(self, &self->arena);
 }
 
 
@@ -152,15 +145,7 @@ void wyrm_context_gc_free(wyrm_context* context, void* ptr)
 
 void wyrm_context_push_gc(wyrm_context* context, wyrm_object* gc_info)
 {
-    if (!context || !gc_info) { return; }
-    if (!context->first) {
-        context->first = gc_info;
-        context->last = gc_info;
-    } else {
-        WYRM_ASSERT(context->last != WYRM_NULL);
-        context->last->next = gc_info;
-        context->last = gc_info;
-    }
+    wyrm_gc_track(&context->arena, gc_info);
 }
 
 
@@ -172,75 +157,18 @@ void wyrm_context_object_init_header_f(wyrm_context* context, wyrm_object* objec
     wyrm_context_push_gc(context, object);
 }
 
-// ----------------------------------------------------------------------------
-// Temporary, Minimally Functional GC
-// ----------------------------------------------------------------------------
-
-static void gc_start_mark(wyrm_context* context)
-{
-    if (context == WYRM_NULL) { return; }
-    wyrm_object* gc_cur = context->first;
-    while (gc_cur) {
-        gc_cur->flags &= ~( (wyrm_uword) WYRM_GC_FLAG_MARKED );
-        gc_cur = gc_cur->next;
-    }
-}
-
-static void gc_sweep_f(wyrm_context* context)
-{
-    WYRM_ASSERT(context != WYRM_NULL && context->parent != WYRM_NULL);
-    wyrm_machine* machine = wyrm_context_get_machine(context);
-    wyrm_object* first = WYRM_NULL;
-    wyrm_object* last = WYRM_NULL;
-    wyrm_object* gc_cur = context->first;
-
-    while (gc_cur) {
-        wyrm_object* next_gc = gc_cur->next;
-        if ((gc_cur->flags & WYRM_GC_FLAG_MARKED) != 0) {
-            last = gc_cur;
-            if (first == WYRM_NULL) { first = gc_cur; }
-        } else {
-            if ((gc_cur->flags & WYRM_GC_STATIC) == 0) {
-                wyrm_object_finalize_f(context, gc_cur);
-                wyrm_allocator_free(machine->allocator, gc_cur);
-            }
-        }
-        gc_cur = next_gc;
-    }
-
-    context->first = first;
-    context->last = last;
-}
-
-static void gc_mark_object(wyrm_state* state, wyrm_object* parent)
-{
-    wyrm_work_area wa;
-
-    parent->flags |= WYRM_GC_FLAG_MARKED;
-
-    if (wyrm_object_children_iter_start(state, parent, &wa) != WYRM_ERR_NONE) { return; }
-    const wyrm_object* child = WYRM_NULL;
-
-    while (wyrm_object_children_iter_next_f(state, parent, &wa, &child) == WYRM_ERR_NONE) {
-        WYRM_ASSERT(child != WYRM_NULL);
-        if ((child->flags & WYRM_GC_FLAG_MARKED) == 0 &&
-            (child->flags & WYRM_GC_STATIC) == 0) {
-            gc_mark_object(state, (wyrm_object*) child);
-        }
-    }
-}
 
 void wyrm_context_gc_full_run(wyrm_state* state, wyrm_context* context)
 {
-    gc_start_mark(context);
+    wyrm_gc_collect_start_f(context, &context->arena);
 
     if (context->current_fiber != WYRM_NULL) {
-        gc_mark_object(state, (wyrm_object*) context->current_fiber);
+        wyrm_gc_object_visit(state, (wyrm_object*) context->current_fiber);
     }
 
     if (context->root != WYRM_NULL) {
-        gc_mark_object(state, (wyrm_object*) context->root);
+        wyrm_gc_object_visit(state, (wyrm_object*) context->root);
     }
 
-    gc_sweep_f(context);
+    wyrm_gc_collect_finish_f(context, &context->arena);
 }

@@ -4,6 +4,7 @@
 #include <wyrm/types.h>
 #include <wyrm/wbox.h>
 #include <wyrm/wstring.h>
+#include <wyrm/wcontext.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -168,7 +169,6 @@ static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)
 #include <wyrm/inl/util.h>
 #include <wyrm/inl/allocator.h>
 #include <wyrm/inl/class.h>
-#include <wyrm/inl/context.h>
 #include <wyrm/inl/stack.h>
 #include <wyrm/inl/fiber.h>
 #include <wyrm/inl/state.h>
