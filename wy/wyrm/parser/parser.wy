@@ -1,0 +1,95 @@
+import wyrm::parser::tokenizer as tokenizer
+import wyrm::ast
+
+class TokenState:
+    slot line_start: bool
+
+
+class Parser:
+    slot _buffer: str
+    slot _tok: tokenizer::Tokenizer
+    slot _index: int
+    slot _tokens: list
+
+    fn init(buffer: str):
+        this._buffer = buffer
+        this._tok = tokenizer::Tokenizer(buffer)
+        this._index = 0
+        this._tokens = []
+
+    fn parse() -> ast::Program:
+        cur := this!_peek()
+        flist := []
+        while cur.kind != 'TOK_END:
+            nxt := try this!accept_factor()
+            flist!append(nxt)
+            cur = this!_peek()
+        return ast::Program(flist)
+
+    fn mark() -> int:
+        return this._index
+
+    fn restore(mark: int):
+        this._index = mark
+
+    fn restore_with(mark: int, value: ast::TreeItem) -> ast::TreeItem:
+        this!restore(mark)
+        return value
+
+    fn _require(kind: sym) -> tokenizer::Token | nil:
+        nxt := this!_peek()
+        if nxt.kind != kind:
+            return error("missing token")
+        this!_advance()
+        return nxt
+
+    # factor ::= ("+" | "-" | "~" factor) | power
+    fn accept_factor() -> ast::TreeItem | error:
+        # alt 1 ("+" | "-" | "~" factor)
+        mark := this!mark()
+        op_token := this!_peek()
+        if op_token.kind == 'TOK_PLUS or op_token.kind == 'TOK_MINUS:
+            this!_advance()
+            target := this!accept_factor()
+            if target != nil:
+                return ast::UnaryOp(op_token.kind, target)
+        this!restore(mark)
+
+        # alt 2 power
+        return this!accept_power()
+
+    # power ::= primary, "**", factor | primary;
+    fn accept_power() -> ast::TreeItem | error:
+        primary := try this!accept_primary()
+        mark := this!mark()
+        this!_require('TOK_EXPONENT) catch return this!restore_with(mark, primary)
+        secondary := this!accept_primary() catch return this!restore_with(mark, primary)
+        return ast::BinOp('TOK_EXPONENT, primary, secondary)
+    
+    # primary ::= ...
+    fn accept_primary() -> ast::TreeItem | error:
+        return this!accept_literal()
+    
+    # NUMBER
+    fn accept_literal() -> ast::TreeItem | nil:
+        nxt := try this!_peek()
+        if nxt.kind == 'TOK_LITERAL_NUMBER:
+            this!_advance()
+            text := nxt!get_text(this._buffer)
+            return ast::Number(try __str_to_u32(text))
+        return nil
+
+fn [Parser] _advance() -> ast::Token:
+    token := this!_peek()
+    this._index = this._index + 1
+    return token
+
+fn [Parser] _peek() -> ast::Token:
+    while this._index >= len(this._tokens):
+        token := this._tok!scan()
+        # Skip WS
+        if token.kind == 'TOK_WS:
+            continue
+        this._tokens ! append(token)
+    return this._tokens[this._index]
+

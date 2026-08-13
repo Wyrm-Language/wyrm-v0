@@ -1,4 +1,5 @@
 import wyrm::parser::tokenizer as tok
+import std::io::*;
 
 fn test_single_token(name: str, buffer: str, expected: sym, match: str):
     defer on error:

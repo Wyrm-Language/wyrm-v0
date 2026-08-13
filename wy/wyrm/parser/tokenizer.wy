@@ -9,10 +9,7 @@ import std::ctype::*
 #   error                   error token
 #   'TOK_END                end of stream marker
 #   'TOK_LITERAL_CHAR       grammar literal_char
-#   'TOK_LITERAL_INT        grammar literal_int
-#   'TOK_LITERAL_INT_HEX    grammar literal_int (hex variant)
-#   'TOK_LITERAL_INT_BIN    grammar literal int (binary digits variant)
-#   'TOK_LITERAL_FLOAT      grammar literal_float
+#   'TOK_LITERAL_NUMBER     grammar literal_int
 #   'TOK_LITERAL_SYM        grammar literal_sym
 #
 #   'TOK_EXPONENT '**'
@@ -58,7 +55,7 @@ _DUAL_CHARS := [
  ('TOK_DEQUAL, \=, \=),
  ('TOK_BIND, \:, \=),
  ('TOK_SCOPE, \:, \:),
- ('TOK_QEQ, \?, \=),
+ ('TOK_QEQ, \?, \=)
 ]
 
 _S_CHARS := [
@@ -88,7 +85,7 @@ _S_CHARS := [
     ('TOK_LBRACE, \{ ),
     ('TOK_RBRACE, \} ),
     ('TOK_LBRACKET, \[ ),
-    ('TOK_RBRACKET, \] ),
+    ('TOK_RBRACKET, \] )
 ]
 
 class Token:
@@ -378,11 +375,12 @@ class Tokenizer:
 
     # Generate numeric tokens
     #
-    # Token Types: TOK_LITERAL_INT_BIN, TOK_LITERAL_INT_HEX, TOK_LITERAL_FLOAT
+    # Token Types: TOK_LITERAL_NUMBER
     #
     # **Grammar**:
-    #   literal_float ::= digits , ( "." , digits , [ exponent ] | exponent ) ;
-    #   literal_int   ::= digits | ("0x" | "0X") , hexdigits | ("0b" | "0B"), bindigits;
+    #
+    #    literal_float ::= digits , ( "." , digits , [ exponent ] | exponent ) ;
+    #    literal_int   ::= digits | ("0x" | "0X") , hexdigits | ("0b" | "0B"), bindigits;
     #
     # **Grammar Examples**:
     #   0xde_ad
@@ -400,11 +398,11 @@ class Tokenizer:
         if ch0 == \0 and (ch1 == \b or ch1 == \B):
             bin_end := _scan_bindigits(this.buffer, this.cur_pos + 2)
             if bin_end != nil:
-                return this ! _advance_with_token('TOK_LITERAL_INT_BIN, bin_end)
+                return this ! _advance_with_token('TOK_LITERAL_NUMBER, bin_end)
         if ch0 == \0 and (ch1 == \x or ch1 == \X):
             hex_end := _scan_hexdigits(this.buffer, this.cur_pos + 2)
             if hex_end != nil:
-                return this ! _advance_with_token('TOK_LITERAL_INT_HEX, hex_end)
+                return this ! _advance_with_token('TOK_LITERAL_NUMBER, hex_end)
 
         # require digits or not numeric
         accept_end := _scan_digits(this.buffer, this.cur_pos)
@@ -428,9 +426,16 @@ class Tokenizer:
                 accept_end = exp_end
 
         if float_end == nil:
-            return this ! _advance_with_token('TOK_LITERAL_INT, accept_end)
+            return this ! _advance_with_token('TOK_LITERAL_NUMBER, accept_end)
         else:
-            return this ! _advance_with_token('TOK_LITERAL_FLOAT, accept_end)
+            return this ! _advance_with_token('TOK_LITERAL_NUMBER, accept_end)
 
 
+class OffsideRuleTokenizer:
+    slot tok: Tokenizer
+
+    fn init(buffer: str):
+        this.tok = Tokenizer(buffer)
+    
+    
 

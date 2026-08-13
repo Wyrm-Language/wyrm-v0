@@ -1,0 +1,41 @@
+# AST Types
+import wyrm::parser::tokenizer::Token
+
+class TreeItem:
+    slot kind: sym
+
+class UnaryOp(TreeItem):
+    slot target: TreeItem
+    
+    fn init(kind: sym, target: TreeItem):
+        this.kind = kind
+        this.target = target
+
+class BinOp(TreeItem):
+    slot lhs: TreeItem
+    slot rhs: TreeItem
+
+    fn init(kind: sym, lhs: TreeItem, rhs: TreeItem):
+        this.kind = kind
+        this.lhs = lhs
+        this.rhs = rhs
+
+
+
+# Full Program
+#   expr_list: list of tokens, each one to eval
+class Program(TreeItem):
+    slot expr_list: list
+
+    fn init(expr_list: list):
+        this.expr_list = expr_list
+
+
+# Literal
+#     value - the underlying token
+class Number(TreeItem):
+    slot value: int
+
+    fn init(number: int):
+        this.value = number
+

@@ -1,0 +1,42 @@
+import wyrm::parser::parser::*
+import wyrm::ast::*
+import std::io::*
+
+fn indent(lvl: int):
+    for i in range(0, lvl):
+        print("  ")
+
+fn pindent(lvl, *args):
+    indent(lvl);
+    for i in range(0, len(args)):
+        if i > 0:
+            print(" ")
+        print(args[i])
+    println()
+
+fn [UnaryOp] print_tree(lvl: int):
+    pindent(lvl, "Unary Operation:", this.kind)
+    this.target!print_tree(lvl+1)
+
+fn [BinOp] print_tree(lvl: int):
+    pindent(lvl, "Binary Operation:", this.kind)
+    this.lhs!print_tree(lvl+1)
+    this.rhs!print_tree(lvl+1)
+
+fn [Number] print_tree(lvl: int):
+    indent(lvl); println("Number:", this.value)
+
+fn [Program] print_tree(lvl: int):
+    indent(lvl); println("Program:")
+    for item in this.expr_list:
+        item!print_tree(lvl+1)
+
+
+fn test_parse(buffer: str):
+    parse := Parser(buffer)
+    return parse ! parse()
+
+# println("?", test_parse("12345").expr_list)
+
+test_parse("+3 ** 2") ! print_tree(0)
+
