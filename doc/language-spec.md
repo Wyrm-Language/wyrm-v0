@@ -9,14 +9,46 @@ a result. Any standalone expression is the value of the expression.
 The statement rule is valid for all special statements: `fn`,
 `class`, `do`, `with`, `import`
 
-### File Encoding and Newlines
+### File Encoding
 
-Wyrm files shall be encoded in UTF-8. 
+Wyrm files shall be encoded in UTF-8.
+
+### Statements and Blocks
+
+Newlines are substantial. Supported line termination is CR, CRLF, LF.
+Whitespace and comments may appear between any two tokens and are
+ignored with the exception of leading whitespace for the offside
+rule. Newlines are emitted as BREAK tokens. Alternatively, a SEMICOLON
+is also a BREAK token.
+
+A line ending with a \ outside of a is a continuation. A continuation
+allows the string to span multiple lines, and is treated as an escape
+that is deleted from the string. .
+
+Wyrm follows Python's general offside rules with an additional allowance
+for brace style code. The prefferred style is that of Python, braces are
+intended to allow one-liners and compressed scripts. 
+
+Whitespace preceeding non-comment characters outside a block formed by 
+grouping operators or strings form an indent. An INDENT mark is emitted
+when a line is indented further and pushed onto the the stack. When
+the indentation is shorter, a DEDENT mark is emitted for each closing
+element. Grouping characters include {} [] (). INDENT, DEDENT, and
+NEWLINE operations are ignored within. This means and offside rule
+block can not nest under a brace block.
+
+    block  ::= "{" , expression_list , "}"
+                | ":" BREAK INDENT , expression_list , DEDENT ;
+    expression_list  ::= expression , { BREAK , expression } , [ BREAK ] ;
+
+Example:
+    if name:
+    ->->->->print("Hello")  # Single tab indent
+    ........print("Bar")    # Invalid - whitespace mismatch
 
 ### Comments
 
-A comment begins with '#' and goes to the end of a line. A '\' character
-immediately preceeding a newline extends the comment to the next line.
+A comment begins with '#' and goes to the end of a line.
 
 ### Literals / Atoms
 
@@ -41,7 +73,7 @@ _Grammar_
     (* Note: xid_start and xid_continue require Unicode support, ASCII
        simplification is letters with underscore and added digits *)
 
-    identifier      ::= xid_start , { xid_continue } ;
+    identifier      ::= xid_start | $, { xid_continue } ;
 
 _Example_
 
@@ -104,15 +136,22 @@ _Example_
 
 #### Symbol
 
-A symbol is an identifier / name in Wyrm code expressed as a literal.
+A symbol is a name or symbol in Wyrm code expressed as a literal.
+Symbols allow an expanded set of characters:
+
 
 _Grammar_
 
-    literal_symbol ::= "'" , identifier
+    literal_symbol ::= "'" , 
+                       printable_character,
+                       printable_character excluding grouping_charactes, quotes, semicolon
 
-_Example_
+_Examples_
 
     'name # symbol name
+    '+
+    '**
+    'cond?
 
 An implementation may limit significant characters in a symbol. An
 implementation must support at least 31 characters of significance.
@@ -146,8 +185,8 @@ Normal strings and multiline strings allow escaping as follows:
     \b - escaped backspace
     \f - escaped formfeed
     \v - vertical tab
-    \ooo - octal number specified character
-    \xxx - hex specified character
+    \x<<HexLiteral>> - hex specified character
+    \u<<Literal>> - unicode code point
 
 #### Characters
 
@@ -175,6 +214,10 @@ The value of any collection as a statement is the collection.
 
 #### Tuples
 
+_Grammar_
+
+    expr_tuple ::= expression, ',', {expression, ','}, [expression] ;
+
 Tuples denoted by the comma operator (least precedence):
 
     1, 2, 3, 4
@@ -188,12 +231,21 @@ are constant.
 
 #### List / Array
 
+_Grammar_
+
+    expr_coma_list ::= {expression, ','}, [expression] ;
+    expr_list ::= '[', expr_coma_list, ']'
+
 A list is a sequence of wyrm objects with constant time indexing. A
 list is mutable - individual elements may be assigned.
 
     [1, 2, 3, 4]
 
 #### Pair List
+
+_Grammar_
+
+    expr_pair_list ::= '$[', expr_coma_list, ']'
 
 A pair list is a sequence of pairs. Wyrm provides the same general
 shorthand syntax as Scheme for defining lists, but substitutes
@@ -211,17 +263,20 @@ To create an improper list, the 'pair' constructor can be used:
 
 #### Tables or Dictionaries
 
-Dictionary definitions use a `${` sigil rather than bare braces.
+A dictionary definition uses {}.
 
-    ${ "Name": 15 }
+    { "Name": 15 }
 
 Empty dictionary:
 
-    ${}
+    {}
 
-### Type Constraints
+Note: braces also define a block start token.
 
-A type constraint is a specific syntax for requiring types in function
+
+### Type Expression
+
+A type expression is a specific syntax for specifying types in function
 definitions, generics, or type checks.
 
 A type identifier alone may be used as a constraint:
@@ -247,9 +302,14 @@ is at compilation time.
 
 Numerical operators follow same rules as C/C++/Python:
 
+    # signed_number ::= NUMBER | -NUMBER
+
+    power ::= primary, "**", primary | primary;
+
+
     a ** 2     # Exponents
-    a + b + c  # Addition, LTR
     a * b * c  # Multiplication, LTR
+    a + b + c  # Addition, LTR
     a - b - c  # Subtraction, LTR
     a % b % c  # Modulus, LTR
     a / b / c  # Division, LTR
@@ -287,19 +347,6 @@ Lookup Operator:
     arr[0]
     dictionary[key]
 
-### Blocks
-
-Wyrm follows Haskell's Layout-Rule. Preferred style is that of Python, braces
-are intended to allow one-liners and compressed scripts. Statements may be
-terminated by newline, semicolon, or a brace matching the block.
-
-    # If statement
-    if foo:
-        action()
-    another_action()
-
-    # If statement, braces
-    if foo { action(); } another_action();
 
 ### Variables
 
@@ -341,7 +388,7 @@ Multivalue assignment is also legal with the var form:
 
     var a: int, b: str = f()
 
-Wyrm offers a 'set if unset' operator. Evaluation is short-circuited
+Wyrm offers a 'set if error' operator. Evaluation is short-circuited
 if the variable's current value is not an error; otherwise the right
 side is evaluated and assigned:
 
@@ -433,6 +480,11 @@ from an import, and multiple items may be excluded:
     import std::io::* except File  # File must be referenced via std::io::File, all other symbols in namespace
     import std::io::* except (File, StreamReader)
 
+Constants and statics may be imported using the 'static' keyword. Static
+imports disallow closures, class construction, and runtime message invocations.
+
+    import static std::io
+
 ### Special Blocks
 
 The with keywords allows binding a series of immutable variables to expression
@@ -456,6 +508,11 @@ do statement is the last executed line:
     # complex_answer == 10
 
 ### Basic Functions
+
+_Grammar_
+
+    parameter ::= xid, [ ':', type_expr ]
+    expr_function ::= 'fn', [ '[', route, ']' ], [ xid ], '(', { parameter }, ')', [ '->', type_expr ], block
 
 Basic functions should look exceedingly familiar to Python users. Most all
 the same rules apply – including no function overloading in parameters.
@@ -901,6 +958,21 @@ active coroutine will return an error when accessing:
     c := next(cofun) # c = StopIteration error
     d := cofun.value # d = 5
 
+### Decorators
+
+A decorator leverages the homoiconic nature of the language for a light-weight
+macro system.
+
+Syntax:
+    decorator ::= '@', qualified-name, '(', call-args, ')', [ BREAK ], expression;
+
+Example:
+
+    @memoize()
+    fn do_operation() { ... }
+
+    @memoize() var i := $TEMPLATE;
+
 ## Types and Type System
 
 ### Fundamental Types
@@ -966,6 +1038,31 @@ Messages:
   - An implementation SHALL support a minimum of 4 types for multiple dispatch.
 
 ## Semantics
+
+### Decorators
+
+Decorators allow reprocessing of a statement during compilation. Given
+a decorator statement, the compiler calls the defined decorator function
+and replaces the expression with the return result of the function. The
+decorator function is a normal wyrm message defined on an AST element.
+
+Example:
+
+    fn [ast::BaseTree] identity() -> BaseTree:
+        return this
+
+    @identity() println("Hello")  # Evaluates to println("Hello")
+
+    fn [ast::BaseTree] add_value(v: int) -> BaseTree:
+        return ast::BinOp(\+, this, v)
+    
+    @add_value(5) 3 # line replaced with: 3 + 5
+
+The primary use case would be rewriting functions:
+
+    @change_body()
+    fn modify_func():
+        ...
 
 
 ## Core Features
