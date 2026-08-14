@@ -1,0 +1,355 @@
+# DSL for Wyrm Implementing Parser
+#
+# ----------------------------------------------------------------------------
+# Construction Handling
+# ----------------------------------------------------------------------------
+#
+# @accept and @expect implement a DSL for a single BNF rule
+#
+# @accept expression            # test expression and accept tokens, returning
+#                                 tuple of items matched for expression
+# @expect(message) expression   # the same as accept, but return an error with
+#                                 given description on failure
+#
+# Expression must be a term or a pair list of terms. A list of term is called
+# a sequence. `$[term, term, ...]` matches each term in order. If any term
+# answers `'NO_MATCH`, the sequence does too; if any term forces an
+# `error(...)`, the sequence answers that error instead. On a full match,
+# the tokens are consumed, and the sequence answers:
+#
+#   - the single term's value, if the sequence has exactly one term that
+#     is captured
+#   - otherwise a tuple of the each term value, in order.
+#
+# A bare term (no `$[...]`) is the same as a one-term sequence.
+#
+# Term types:
+#     xid                   another rule: `(this ! xid()) catch 'NO_MATCH`
+#     'TOK_KIND             a token of that kind, consumed if `peek(0).kind` matches
+#     "text"                a soft keyword: a 'TOK_XID token whose text matches
+#     ~(subseq)             match `subseq`, but leave it out of the sequence's result
+#     bool(subseq)          if sequence matched, return 
+#     oneplus(subseq)       one or more `subseq`; `'NO_MATCH` (not `[]`) if none matched
+#     many(subseq)          zero or more `term`, collected into a list
+#     opt(subseq)           one or zero `term`; `nil` if not matched
+#     expect(note, subseq)  expect a token 
+#     flatten(subseq)       match the subseq and perform a single flattening pass -
+#                           appending pair lists to result in a list.
+#     first | subseeq       attempt match first, if not matched, continue match on term
+#
+# Note: the decorator currently is a unary operator, which means that multi
+# element expressions must be represented as a list:
+#
+# @accept $['TOK_A | 'TOK_B]  # correct
+# @accept 'TOK_A | 'TOK_B     # incorrect, is (@accept 'TOK_A) | 'TOK_B
+#
+# ### Result
+#
+# The decorated statement expands to the required logic to return a
+# pair list matching the given sequence.
+#
+#     $[]          a successfully captured empty list. Note that the
+#                  empty pairlist is an alias for `nil`; to check
+#                  for a non-match leverage 'NO_MATCH.
+#
+#     'NO_MATCH    this did not match at the current position
+#
+#     error(...)   a match was forced (`@expect`, or an explicit
+#                  `error(...)` inside a rule body) and didn't happen.
+#                  In an error case, no backtracking is performed.
+#
+# ### Backtracking and External Calls
+#
+# A match moves the token cursor to past all accepted tokens. On error,
+# the cursor is left where the error happened. On a non-match, the cursor
+# is left at the last accepted portion.
+#
+# Optional, Variable Count, and Or matches will backtrack to clear partial
+# results. Backtracking is done via a reset() message to the underlying
+# contract. Errors preempt any backtracking.
+#
+# ### Contract
+#
+# The class the decorated expression's enclosing message is defined on must
+# provide:
+#
+#     peek(n: int) -> Token      # token at offset n; peek(0) is current
+#     advance() -> Token         # consume peek(0) and answer it
+#     buffer: str                # source text, for a token's `get_text`
+#     mark() -> [impl]           # get implementation defined token (no type available)
+#     reset(mark: impl)          # reset to previous returned mark
+#
+# The 'Token' type must have `.kind` returning the token kind symbol
+# and accept `get_text(buffer: str)` message.
+
+import wyrm::ast::*
+import std::pairs::(replace, chain)
+
+# The sexpr for the `'NO_MATCH` symbol literal - the failure sentinel every
+# generated matcher answers on a miss
+NO_MATCH_EXPR := $['sym, 'NO_MATCH]
+
+
+# --- decoding a term into an expression -------------------------------
+
+# another rule: 'NO_MATCH if it forces an error rather than matching (a
+# rule call used as an ordinary term doesn't propagate the callee's own
+# forced failures - only a top-level `@expect` in *this* rule forces one
+# of its own). Hand-built - the selector `name` is a bare symbol, not an
+# expression a hole could stand in for.
+fn _decode_rule_call(name) -> pair:
+    return $['do, [_expr_stmt_catch($['msg, $['name, 'this], name, []], NO_MATCH_EXPR)]]
+
+fn _expr_stmt_catch(value, handler) -> pair:
+    return $['expr_stmt, $['catch, value, handler]]
+
+# --- 'sym match a token kind == symbol
+fn $token_kind(kind):
+    if (this ! peek(0)).kind == kind:
+        this ! advance()
+    else:
+        'NO_MATCH
+
+fn _decode_token_kind(kind) -> pair:
+    return mk_expand($token_kind::$ast, 'kind, mk_sym(kind))
+
+
+# --- "string" match a token string == text
+fn $soft_keyword(text):
+    tok := this ! peek(0)
+    if tok.kind == 'TOK_XID and tok ! get_text(this.buffer) == text:
+        this ! advance()
+    else:
+        'NO_MATCH
+
+fn _decode_soft_keyword(text) -> pair:
+    return mk_expand($soft_keyword::$ast, 'text, mk_str(text))
+
+# --- expect(name, subseq) a subsequence is expected
+fn $_expect_tmpl(expect_text, match_expr):
+    v := match_expr
+    if v == 'NO_MATCH:
+        error(expect_text)
+    else:
+        v
+
+fn _decode_expect(arg_text, arg_subseq) -> pair:
+    return mk_expand_n($_expect_tmpl::$ast, 
+        pair('expect_text, arg_text),
+        pair('match_expr, _decode_term(arg_subseq)))
+
+# --- many(subseq) repeated match of a token
+fn $_many(match_expr):
+    items := []
+    while true:
+        _mark := this ! mark()
+        m := match_expr
+        if m == 'NO_MATCH:
+            this ! reset(_mark)
+            break
+        if m is error:
+            this ! reset(_mark)
+            items = m
+            break
+        items ! append(m)
+    items
+
+fn _decode_many(arg) -> pair:
+    return mk_expand($_many::$ast, 'match_expr, _decode_term(arg))
+
+# --- onplus(subseq) match at least one of a sequence
+fn $_oneplus(match_expr):
+    items := []
+    while true:
+        _mark := this ! mark()
+        m := match_expr
+        if m == 'NO_MATCH:
+            this ! reset(_mark)
+            break
+        if m is error:
+            this ! reset(_mark)
+            return m
+        items ! append(m)
+    if len(items) != 0:
+        items
+    else:
+        'NO_MATCH
+
+fn _decode_oneplus(arg) -> pair:
+    return mk_expand($_oneplus::$ast, 'match_expr, _decode_term(arg))
+
+# --- bool(subseq) an optional node that becomes true or false
+fn _tmpl_bool(match_expr):
+    _mark := this ! mark()
+    v := match_expr
+    if v == 'NO_MATCH:
+        this ! reset(_mark)
+        false
+    else:
+        true
+
+fn _decode_bool(arg) -> pair:
+    return mk_expand(_tmpl_bool::$ast, 'match_expr, _decode_term(arg))
+
+# --- opt(subseq) optional subsequence
+fn _tmpl_opt(match_expr):
+    _mark := this ! mark()
+    v := match_expr
+    if v == 'NO_MATCH:
+        this ! reset(_mark)
+        nil
+    else:
+        v
+
+fn _decode_opt(arg) -> pair:
+    return mk_expand(_tmpl_opt::$ast, 'match_expr, _decode_term(arg))
+
+# ENTRY: func(subseq) -- handle the various subsequences from functions
+fn _decode_call(node) -> pair:
+    callee := s_call_target(node)
+    args := s_call_args(node)
+
+    cname := s_get_name(callee)
+    if cname == 'oneplus:
+        return _decode_oneplus(args[0])
+    if cname == 'many:
+        return _decode_many(args[0])
+    if cname == 'opt:
+        return _decode_opt(args[0])
+    if cname == 'expect:
+        return _decode_expect(args[0], args[1])
+    if cname == 'bool:
+        return _decode_bool(args[0])
+    return error("@accept: unknown term form '" + str(cname) + "'")
+
+# --- `first | subseq` - try to match first and fallback to subseq
+fn $_binop_or(first_expr, second_expr):
+    _mark := this ! mark()
+    v := first_expr
+    if v != 'NO_MATCH:
+        v
+    else:
+        this ! reset(_mark)
+        second_expr
+
+# ENTRY: lhs OP rhs -- handle binary operands
+fn _decode_binop(node) -> pair:
+    op := s_op_name(node)
+    if op == '|:
+        return mk_expand_n($_binop_or::$ast,
+                pair('first_expr, _decode_term(s_binop_lhs(node))),
+                pair('second_expr, _decode_term(s_binop_rhs(node)))
+            )
+    return error("@accept: unsupported operator '" + str(op) + "'")
+
+# -----------------------------------------------------------------------------
+# SEQUENCES
+# -----------------------------------------------------------------------------
+#
+# For each element in a pair list match the element per the given rules. By
+# default, each element in the sequence yields a matching element in the
+# result, but the ~ operator may be used to test match-only.
+
+# Handle a single element in a pair list match sequence
+fn _decode_term(node) -> pair:
+    kind := car(node)
+    if kind == 'name:
+        return _decode_rule_call(cadr(node))
+    if kind == 'sym:
+        return _decode_token_kind(cadr(node))
+    if kind == 'str:
+        return _decode_soft_keyword(cadr(node))
+    if kind == 'call:
+        return _decode_call(node)
+    if kind == 'binop:
+        return _decode_binop(node)
+    if kind == 'pairlist:
+        return _build_sequence_expr(cadr(node))
+    return error("@accept: this is not something the notation can match yet")
+
+fn _is_drop(node) -> bool:
+    if car(node) == 'unop and s_op_name(node) == '~:
+        return true
+    return false
+
+# Each step is:
+#
+#    do:
+#        _t = <term's expr>;
+#        if _t != 'NO_MATCH and not (_t is error):
+#            _acc = cons(_t, _acc) # if captured
+#            <rest>
+#        else:
+#           _t
+fn _build_sequence_steps(remaining, n_capture_count) -> pair:
+    if remaining == nil:
+        if n_capture_count == 0:
+            return error("$[...]: a sequence must capture at least one term")
+        if n_capture_count == 1:
+            return $['index, $['name, '_acc], $['int, 0]]
+        else:
+            return mk_call('reverse, [mk_name('_acc)])
+
+    term := car(remaining)
+    capture_inc := 1
+    then_stmts := []
+
+    if _is_drop(term):
+        term = s_unary_target(term)
+        capture_inc = 0
+    else:
+        then_stmts!append(mk_set('_acc, mk_call('cons, [mk_name('_t), mk_name('_acc)])))
+
+    rest := _build_sequence_steps(cdr(remaining), n_capture_count + capture_inc)
+    then_stmts!append(mk_expr_stmt(rest))
+    matched := mk_binop(mk_name('_t), '!=, NO_MATCH_EXPR)
+    is_err := $['is, mk_name('_t), [mk_type('error)]]
+
+    return mk_do([
+        mk_set('_t, _decode_term(term)),
+        mk_expr_stmt(mk_if(
+                is_err,
+                [mk_expr_stmt(mk_name('_t))],
+                [mk_expr_stmt(mk_if(
+                        matched,
+                        then_stmts,
+                        [mk_expr_stmt(NO_MATCH_EXPR)
+                    ]))]))
+    ])
+
+
+# Preamble: declare the target list once, then descend through the steps.
+fn _build_sequence_expr(elements) -> pair:
+    return $['do, [
+        $['decl, '_acc, NIL_EXPR],
+        $['decl, '_t, NIL_EXPR],
+        $['expr_stmt, _build_sequence_steps(chain(elements), 0)]
+    ]]
+
+# a bare term is a one-term sequence
+fn _sequence_elements(node) -> list:
+    if car(node) == 'pairlist:
+        return cadr(node)
+    return [node]
+
+# -----------------------------------------------------------------------------
+# Decorators
+# -----------------------------------------------------------------------------
+
+fn [TreeBase] accept():
+    s := sexpr(this)
+    elements := _sequence_elements(s)
+    return _build_sequence_expr(elements)
+
+
+fn $_expect(match_expr, desc):
+    r := match_expr
+    if r == 'NO_MATCH:
+        return error(desc)
+    r
+
+fn [TreeBase] expect(desc):
+    s := sexpr(this)
+    elements := _sequence_elements(s)
+    seq := _build_sequence_expr(elements)
+    return mk_expand_n($_expect::$ast, pair('match_expr, seq), pair('desc, $['str, desc]))

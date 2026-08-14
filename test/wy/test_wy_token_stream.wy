@@ -1,0 +1,58 @@
+import wyrm::parser::tokenizer as tok
+import std::io::*;
+
+# Render a token list as a compact space separated string of kinds.
+# INDENT / DEDENT / NEWLINE are abbreviated to keep expectations readable.
+fn render(tokens: list) -> str:
+    out := ""
+    for token in tokens:
+        name := ""
+        if token.kind is error:
+            name = "ERR"
+        elif token.kind == 'TOK_INDENT:
+            name = ">"
+        elif token.kind == 'TOK_DEDENT:
+            name = "<"
+        elif token.kind == 'TOK_NEWLINE:
+            name = "."
+        elif token.kind == 'TOK_END:
+            name = "$"
+        elif token.kind == 'TOK_XID:
+            name = "x"
+        else:
+            name = "?"
+        out = out + name
+    return out
+
+fn check(name: str, buffer: str, expected: str):
+    defer on error:
+        println("FAIL on error:", name)
+
+    stream := tok::TokenStream(buffer)
+    tokens := try stream ! scan()
+    found := render(tokens)
+    if found != expected:
+        println("FAIL", name, "- expected", expected, "got", found)
+        return
+    println("PASS", name)
+
+
+println("Token Stream Tests")
+
+check("empty", "", "$")
+check("single line", "a\n", "x.$")
+check("no trailing newline", "a", "x.$")
+check("blank lines collapse", "a\n\n\n b\n", "x.>x.<$")
+check("simple indent", "a\n b\n", "x.>x.<$")
+check("indent and dedent", "a\n b\nc\n", "x.>x.<x.$")
+check("nested indent", "a\n b\n  c\nd\n", "x.>x.>x.<<x.$")
+check("multi dedent to middle", "a\n b\n  c\n d\n", "x.>x.>x.<x.<$")
+check("comment only line no indent", "a\n    # note\nb\n", "x.x.$")
+check("dedent at eof", "a\n b\n  c\n", "x.>x.>x.<<$")
+check("group suppresses newline", "f(\na\n)\n", "x?x?.$")
+check("group suppresses indent", "f(\n        a\n)\n", "x?x?.$")
+check("line starting with close paren", "f(\na\n)\nb\n", "x?x?.x.$")
+check("tab vs space mismatch", "a\n\tb\n        c\n", "x.>x.ERRx.<$")
+check("bad unindent", "a\n    b\n  c\n", "x.>x.<ERRx.$")
+
+println("...Done")

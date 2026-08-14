@@ -9,8 +9,9 @@ fn is_digit(c: int) -> bool:
     return c >= \0 and c <= \9
 
 fn is_cntrl(c: int) -> bool:
-    # TODO: implement
-    return c == \0 or c == \backspace
+    # NOTE: \0 is the digit '0', not NUL; control characters are the
+    # ASCII range below space plus DEL.
+    return c < 32 or c == 127
 
 fn is_hexdigit(c: int) -> bool:
     return is_digit(c) or (c >= \a and c <= \f) or (c >= \A and c <= \F)
@@ -32,3 +33,9 @@ fn is_xid_start(c: int) -> bool:
 
 fn is_xid_continue(c: int) -> bool:
     return is_xid_start(c) or is_digit(c)
+
+fn is_wy_xid_start(c: int) -> bool:
+    return is_xid_start(c) or c == \$
+
+fn is_wy_xid_continue(c: int) -> bool:
+    return is_xid_continue(c) or c == \$

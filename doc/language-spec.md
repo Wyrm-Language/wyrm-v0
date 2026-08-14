@@ -137,14 +137,26 @@ _Example_
 #### Symbol
 
 A symbol is a name or symbol in Wyrm code expressed as a literal.
-Symbols allow an expanded set of characters:
-
+Symbols allow an expanded set of characters relative to identifiers,
+including common operator characters, so long as the result stays
+unambiguous with surrounding tokens.
 
 _Grammar_
 
-    literal_symbol ::= "'" , 
-                       printable_character,
-                       printable_character excluding grouping_charactes, quotes, semicolon
+    (* Note: printable_character requires Unicode support, excluding
+       control (Cc), format (Cf), and separator (Z*) categories.
+       ASCII simplification is 0x21-0x7E. *)
+
+    literal_symbol      ::= "'" , symbol_char , { symbol_char } ;
+    symbol_char         ::= printable_character - excluded_char ;
+    excluded_char        ::= grouping_character | quote_character
+                              | "#" | ";" | "," ;
+    grouping_character   ::= "{" | "}" | "[" | "]" | "(" | ")" ;
+    quote_character       ::= "'" | '"' ;
+
+Whitespace (including newlines) is excluded via `printable_character`,
+since it is a separator and never a symbol constituent; a whitespace
+or BREAK token always terminates a symbol.
 
 _Examples_
 
@@ -153,8 +165,17 @@ _Examples_
     '**
     'cond?
 
+_Invalid_
+
+    '(foo)   # grouping characters not permitted
+    'a, b    # comma not permitted; terminates the symbol
+    'foo bar # whitespace terminates the symbol after 'foo
+
 An implementation may limit significant characters in a symbol. An
-implementation must support at least 31 characters of significance.
+implementation must support at least 31 codepoints of significance;
+input beyond that length is accepted but excess codepoints are not
+guaranteed to distinguish the symbol from another with the same
+significant prefix.
 
 #### Strings
 

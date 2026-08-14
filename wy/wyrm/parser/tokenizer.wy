@@ -3,7 +3,7 @@
 import std::ctype::*
 
 
-# Scanned Token from the Tokenizer
+# Scanned Token from the Scanner
 #
 # Types:
 #   error                   error token
@@ -39,8 +39,12 @@ import std::ctype::*
 # Types to be handled by parser:
 #   'TOK_XID                word/name/identifier
 #   'TOK_WS                 whitespace
-#   'TOK_INDENT             space after NEWLINE before other tokens
+#   'TOK_NEWLINE            end of a line
 #   'TOK_COMMENT            a comment
+#
+# Emitted by TokenStream only, never by the Scanner:
+#   'TOK_INDENT             a line opened a deeper indent level
+#   'TOK_DEDENT             a line closed one indent level
 
 _DUAL_CHARS := [
  ('TOK_EXPONENT, \*, \*),
@@ -99,7 +103,7 @@ class Token:
         this.end = end
 
     fn get_text(buffer: str) -> str:
-        return buffer ! substr(this.start, this.end)
+        return buffer ! substr(this.start, this.end - this.start)
 
 fn _get_char(buffer: str, cur_pos: int) -> int | sym:
     return buffer[cur_pos] catch 'EOF
@@ -151,6 +155,15 @@ fn _scan_to_eol(buffer: str, cur_pos: int) -> int:
             if break_idx != nil:
                 idx = break_idx
                 next_c = _get_char(buffer, idx)
+    return idx
+
+# Scan to EOL or EOF (no line joining) or EOF
+fn _scan_to_eol_raw(buffer: str, cur_pos: int) -> int:
+    idx := cur_pos
+    next_c := _get_char(buffer, idx)
+    while (next_c != 'EOF) and not _is_newline(next_c):
+        idx = idx + 1
+        next_c = _get_char(buffer, idx)
     return idx
 
 # Digits
@@ -238,10 +251,8 @@ fn _check_match(buffer: str, cur_pos: int, required: bool, match_chars) -> bool 
 
 # @brief Token analysis of source
 #
-# This class provides a basic token analysis of a source file. Tokens
-# are scanned from a given position. Tokens are scanned one layer
-# deeper than the built lexical analysis of the source.
-class Tokenizer:
+# Scan for simple tokens through the source code.
+class Scanner:
     slot buffer: str
     slot cur_pos: int
 
@@ -334,19 +345,19 @@ class Tokenizer:
     fn _scan_xid_token() -> Token | nil:
         idx := this.cur_pos
         next_c := _get_char(this.buffer, idx)
-        if next_c == 'EOF or not is_xid_start(next_c):
+        if next_c == 'EOF or not is_wy_xid_start(next_c):
             return nil
         idx = idx + 1
         next_c = _get_char(this.buffer, idx)
-        while next_c != 'EOF and is_xid_continue(next_c):
+        while next_c != 'EOF and is_wy_xid_continue(next_c):
             idx = idx + 1
             next_c = _get_char(this.buffer, idx)
         return this ! _advance_with_token('TOK_XID, idx)
 
     # Scan comment
-    #   Tokenizer reports back the comment tokens; they must be ignored above
+    #   Scanner reports back the comment tokens; they must be ignored above
     fn _scan_comment() -> Token | nil:
-        return this ! _advance_with_token('TOK_COMMENT, _scan_to_eol(this.buffer, this.cur_pos))
+        return this ! _advance_with_token('TOK_COMMENT, _scan_to_eol_raw(this.buffer, this.cur_pos))
 
     # Scan string
     #
@@ -431,11 +442,134 @@ class Tokenizer:
             return this ! _advance_with_token('TOK_LITERAL_NUMBER, accept_end)
 
 
-class OffsideRuleTokenizer:
-    slot tok: Tokenizer
+_GROUP_START := ('TOK_LBRACE, 'TOK_LBRACE_S, 'TOK_LBRACKET_S, 'TOK_LPAREN, 'TOK_LBRACKET)
+_GROUP_END := ('TOK_RBRACE, 'TOK_RBRACKET, 'TOK_RPAREN)
+
+# True when prefix is a leading substring of text
+fn _is_prefix(prefix: str, text: str) -> bool:
+    if len(prefix) > len(text):
+        return false
+    return (text ! substr(0, len(prefix))) == prefix
+
+
+# @brief Offside rule token stream
+#
+# Wraps a Scanner and applies the offside rule. Leading whitespace on a
+# line produces INDENT / DEDENT marks against a stack of indent strings.
+# Blank and comment-only lines carry no indentation of their own, and
+# INDENT, DEDENT and NEWLINE are all suppressed within a group formed by
+# () [] or {} (including $ varieties).
+#
+# Indent levels are compared as strings rather than widths: a deeper line
+# must extend its enclosing indent as a prefix, so four tabs and eight
+# spaces are a mismatch rather than a match.
+class TokenStream:
+    slot buffer: str
+    slot tokens: list
+    slot group_depth: int     #< nesting depth of () [] {}
+    slot at_line_start: bool  #< no significant token seen on this line yet
+    slot line_ws: str         #< leading whitespace of the current line
+    slot indents: pair        #< indent strings, innermost first
 
     fn init(buffer: str):
-        this.tok = Tokenizer(buffer)
-    
-    
+        this.buffer = buffer
+        this.tokens = []
+        this.group_depth = 0
+        this.at_line_start = true
+        this.line_ws = ""
+        this.indents = $[""]
 
+    # Append a zero width mark at pos
+    fn _emit(kind: sym | error, pos: int):
+        this.tokens ! append(Token(kind, pos, pos))
+
+    # Emit the INDENT / DEDENT marks for the current line
+    #
+    # pos is the offset of the first significant token on the line. The
+    # stack always retains its base "" entry, so the dedent walk below
+    # terminates without running the stack empty.
+    fn _apply_indent(pos: int):
+        cur := car(this.indents)
+
+        # Deeper - a single INDENT opens one level
+        if len(this.line_ws) > len(cur):
+            if not _is_prefix(cur, this.line_ws):
+                this ! _emit(error("inconsistent indent"), pos)
+                return
+            this.indents = pair(this.line_ws, this.indents)
+            this ! _emit('TOK_INDENT, pos)
+            return
+
+        # Shallower - one DEDENT per level closed
+        while len(car(this.indents)) > len(this.line_ws):
+            this.indents = cdr(this.indents)
+            this ! _emit('TOK_DEDENT, pos)
+
+        # The line must land exactly on an enclosing level
+        if car(this.indents) != this.line_ws:
+            this ! _emit(error("unindent does not match an enclosing level"), pos)
+
+    # Feed one scanner token into the stream
+    fn _push(token: Token):
+        # Whitespace is only significant at the head of a line
+        if token.kind == 'TOK_WS:
+            if this.at_line_start:
+                this.line_ws = token ! get_text(this.buffer)
+            return
+
+        # Comments never carry indentation
+        if token.kind == 'TOK_COMMENT:
+            return
+
+        if token.kind == 'TOK_NEWLINE:
+            if this.group_depth > 0:
+                return
+            # Still at line start means the line was blank; collapse it
+            if not this.at_line_start:
+                this.tokens ! append(token)
+            this.at_line_start = true
+            this.line_ws = ""
+            return
+
+        # The first significant token fixes the indentation of its line.
+        # Whitespace prior to a group start still counts so run this
+        # prior to handling the token as a group token.
+        if this.at_line_start:
+            this.at_line_start = false
+            if this.group_depth == 0:
+                this ! _apply_indent(token.start)
+
+        if token.kind in _GROUP_START:
+            this.group_depth = this.group_depth + 1
+        elif token.kind in _GROUP_END:
+            if this.group_depth > 0:
+                this.group_depth = this.group_depth - 1
+
+        this.tokens ! append(token)
+
+    # Terminate a final unterminated line and unwind open indentation
+    fn _finish(end_token: Token):
+        if not this.at_line_start:
+            this.tokens ! append(Token('TOK_NEWLINE, end_token.start, end_token.start))
+            this.at_line_start = true
+        this.line_ws = ""
+        this ! _apply_indent(end_token.start)
+        this.tokens ! append(end_token)
+
+    # Scan the whole buffer into the token list
+    #
+    # Scanning stops at the end of the stream or at the first error token,
+    # which is retained so the caller can report it.
+    fn scan() -> list:
+        scanner := Scanner(this.buffer)
+        var cur: Token | error = scanner ! scan()
+        while not (cur is error):
+            if cur.kind is error:
+                this.tokens ! append(cur)
+                return this.tokens
+            if cur.kind == 'TOK_END:
+                this ! _finish(cur)
+                return this.tokens
+            this ! _push(cur)
+            cur = scanner ! scan()
+        return this.tokens

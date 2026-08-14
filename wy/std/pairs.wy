@@ -1,0 +1,83 @@
+# std::pairs Utilities for handling pair operations
+
+# CAR(CDR(X)) Second item in a pair list
+fn cadr(x: pair):
+    return car(cdr(x))
+
+# CDDR(x) Third item starting list
+fn cddr(x: pair):
+    return cdr(cdr(x))
+
+# CDDDR(x) Fourth item starting list
+fn cdddr(x: pair):
+    return cdr(cdr(cdr(x)))
+
+# CAR(CDR(CDR(X)) Third item in a pair list
+fn caddr(x: pair):
+    return car(cdr(cdr(x)))
+
+# Convert an indexable object into a pair list
+fn chain(items) -> pair:
+    out := nil
+    i := len(items) - 1
+    while i >= 0:
+        out = cons(items[i], out)
+        i = i - 1
+    return out
+
+# Pair to list
+fn to_list(node: pair) -> list:
+    out := []
+    p := node
+    while p is pair:
+        out ! append(car(p))
+        p = cdr(p)
+    return out
+
+# Append an element to the end of a pair list
+#
+# Named `pair_append`\ due to bug in wypoc
+fn pair_append(node: pair | nil, item) -> pair:
+    if node is nil:
+        return cons(item, nil)
+    return cons(car(node), pair_append(cdr(node), item))
+
+# Replace every element that tests true on pred with replacement, walking
+# both pair chains and native lists - an s-expression node's fields cross as
+# a `[...]` list, not a pair list (see doc/sexpr-spec.md's "child list"), so
+# a statement body / if-branch / call argument list needs the list case to
+# be reached at all.
+fn replace(pred, replacement, node):
+    if pred(node):
+        return replacement
+    if node is pair:
+        return cons(replace(pred, replacement, car(node)), replace(pred, replacement, cdr(node)))
+    if node is list:
+        out := []
+        for x in node:
+            out ! append(replace(pred, replacement, x))
+        return out
+    return node
+
+# Get a copy of the list cut after the first n elements
+fn list_head(ls, n):
+    if (n == 0):
+        return $[]
+    else:
+        ls_p := cdr(ls)
+        if not (ls_p is pair):
+            return error("index out of range")
+        return cons(car(ls), list_head(ls_p, n-1))
+
+# Get the nth tail of a pair list (0 unmodified)
+fn list_tail(ll, n: int):
+    cur := ll
+    for i in range(0, n):
+        if not (cur is pair):
+            return error("index out of range")
+        cur = cdr(cur)
+    return cur
+
+# Get the nth field of a pair list
+fn field(ls: pair, n: int):
+    return car(list_tail(ls, n))

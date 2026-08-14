@@ -1,95 +1,119 @@
-import wyrm::parser::tokenizer as tokenizer
+import wyrm::parser::tokenizer::*
 import wyrm::ast
 
-class TokenState:
-    slot line_start: bool
+import static wyrm::parser::_dsl::*
+
 
 
 class Parser:
-    slot _buffer: str
-    slot _tok: tokenizer::Tokenizer
-    slot _index: int
-    slot _tokens: list
+    slot buffer: str
+    slot tokens: list
+    slot pos: int
 
     fn init(buffer: str):
-        this._buffer = buffer
-        this._tok = tokenizer::Tokenizer(buffer)
-        this._index = 0
-        this._tokens = []
+        this.buffer = buffer
+        this.tokens = TokenStream(buffer) ! scan()
+        this.pos = 0
 
-    fn parse() -> ast::Program:
-        cur := this!_peek()
-        flist := []
-        while cur.kind != 'TOK_END:
-            nxt := try this!accept_factor()
-            flist!append(nxt)
-            cur = this!_peek()
-        return ast::Program(flist)
+    fn peek(n: int) -> Token:
+        idx := this.pos + n
+        last := len(this.tokens) - 1
+        if idx > last:
+            idx = last
+        return this.tokens[idx]
+
+    fn advance() -> Token:
+        t := this ! peek(0)
+        this.pos = this.pos + 1
+        return t
 
     fn mark() -> int:
-        return this._index
+        return this.pos
 
-    fn restore(mark: int):
-        this._index = mark
+    fn reset(mark: int):
+        this.pos = mark
 
-    fn restore_with(mark: int, value: ast::TreeItem) -> ast::TreeItem:
-        this!restore(mark)
-        return value
+    # -------------------------------------------------------------------------
+    # Low Level / Near Lexical Tokens
+    # -------------------------------------------------------------------------
 
-    fn _require(kind: sym) -> tokenizer::Token | nil:
-        nxt := this!_peek()
-        if nxt.kind != kind:
-            return error("missing token")
-        this!_advance()
-        return nxt
 
-    # factor ::= ("+" | "-" | "~" factor) | power
-    fn accept_factor() -> ast::TreeItem | error:
-        # alt 1 ("+" | "-" | "~" factor)
-        mark := this!mark()
-        op_token := this!_peek()
-        if op_token.kind == 'TOK_PLUS or op_token.kind == 'TOK_MINUS:
-            this!_advance()
-            target := this!accept_factor()
-            if target != nil:
-                return ast::UnaryOp(op_token.kind, target)
-        this!restore(mark)
 
-        # alt 2 power
-        return this!accept_power()
 
-    # power ::= primary, "**", factor | primary;
-    fn accept_power() -> ast::TreeItem | error:
-        primary := try this!accept_primary()
-        mark := this!mark()
-        this!_require('TOK_EXPONENT) catch return this!restore_with(mark, primary)
-        secondary := this!accept_primary() catch return this!restore_with(mark, primary)
-        return ast::BinOp('TOK_EXPONENT, primary, secondary)
+
+
+    fn program():
+        # GRAMMAR: program ::= { top_level_stmt }
+        @accept
+        many(top_level_stmt)
+
+    fn top_level_stmt():
+        # GRAMMAR: top_level_stmt ::= import_stmt | stmt_line
+        @accept
+        $[import_stmt | stmt_line]
+
+
+
+    # import_stmt     ::= "import" , [ "static" ] , import_body ;
+
+    # import_body     ::= module_path , [ "as" , identifier ]
+    #                    | module_path , "::" , "(" , import_item_list , ")"
+    #                    | module_path , "::" , "*" , [ "except" , except_names ] ;
+
+    # import_item_list
+    #                 ::= import_item , { "," , import_item } ;
+
+    # import_item     ::= identifier , [ "as" , identifier ] ;
+
+    # except_names    ::= identifier
+    #                    | "(" , name_list , ")" ;
+
+    # module_path     ::= identifier , { "::" , identifier } ;
+
+    # name_list       ::= identifier , { "," , identifier } ;
+
+    fn import_stmt():
+        # GRAMMAR: import_stmt     ::= "import" , [ "static" ] , import_body ;
+        @accept
+        $["import", bool("static"), import_body, expect("statement end", stmt_end)]
+
+    fn import_body():
+        # GRAMMAR:
+        #   import_body     ::= qual_id , [ "as" , identifier ]
+        #           | qual_id , "::" , "(" , import_item_list , ")"
+        #           | qual_id , "::" , "*" , [ "except" , except_names ] ;
+        @accept
+        $[module_path]
     
-    # primary ::= ...
-    fn accept_primary() -> ast::TreeItem | error:
-        return this!accept_literal()
-    
-    # NUMBER
-    fn accept_literal() -> ast::TreeItem | nil:
-        nxt := try this!_peek()
-        if nxt.kind == 'TOK_LITERAL_NUMBER:
-            this!_advance()
-            text := nxt!get_text(this._buffer)
-            return ast::Number(try __str_to_u32(text))
-        return nil
+    fn module_path():
+        @accept
+        $[qual_id]
 
-fn [Parser] _advance() -> ast::Token:
-    token := this!_peek()
-    this._index = this._index + 1
-    return token
+    # -------------------------------------------------------------------------
+    # Primitive Tokens
+    # -------------------------------------------------------------------------
 
-fn [Parser] _peek() -> ast::Token:
-    while this._index >= len(this._tokens):
-        token := this._tok!scan()
-        # Skip WS
-        if token.kind == 'TOK_WS:
-            continue
-        this._tokens ! append(token)
-    return this._tokens[this._index]
+    fn qual_id():
+        # GRAMMAR: qual_id ::= xid, { "::", xid } ;
+        @accept
+        $[xid, many($[~'TOK_SCOPE, xid])]
+
+    # -------------------------------------------------------------------------
+    # Lexical Token to Primitive Type
+    # -------------------------------------------------------------------------
+
+    fn stmt_end():
+        # GRAMMAR: stmt_end ::= NEWLINE | ";"
+        @accept
+        $['TOK_NEWLINE | 'TOK_SEMICOLON | 'TOK_END]
+
+    fn expect_stmt_end() -> bool:
+        @accept $[expect("statement end", stmt_end)]
+
+    fn xid() -> str:
+        tok := @accept 'TOK_XID
+        return tok ! get_text(this.buffer)
+
+
+
 

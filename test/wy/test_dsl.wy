@@ -1,0 +1,239 @@
+# Minimal fixture for wyrm::parser::_dsl's @accept / @expect decorators.
+
+import static wyrm::parser::_dsl
+import wyrm::parser::tokenizer::*
+import std::io::*
+
+class DslTest:
+    slot buffer: str
+    slot tokens: list
+    slot pos: int
+
+    fn init(buffer: str):
+        this.buffer = buffer
+        this.tokens = TokenStream(buffer) ! scan()
+        this.pos = 0
+
+    fn peek(n: int) -> Token:
+        idx := this.pos + n
+        last := len(this.tokens) - 1
+        if idx > last:
+            idx = last
+        return this.tokens[idx]
+
+    fn advance() -> Token:
+        t := this ! peek(0)
+        this.pos = this.pos + 1
+        return t
+
+    fn mark() -> int:
+        return this.pos
+
+    fn reset(mark: int):
+        this.pos = mark
+
+fn [DslTest] number():
+    return @accept 'TOK_LITERAL_NUMBER
+
+fn [DslTest] expect_number():
+    return @accept expect("Number", $['TOK_LITERAL_NUMBER])
+
+fn [DslTest] bool_number():
+    return @accept bool(number)
+
+fn [DslTest] soft_hello():
+    return @accept "hello"
+
+fn [DslTest] numbers():
+    return @accept many(number)
+
+fn [DslTest] one_or_more_numbers():
+    return @accept oneplus(number)
+
+fn [DslTest] number_list():
+    return @accept $[number, many($[~'TOK_COMMA, number]), ~opt('TOK_COMMA)]
+
+fn [DslTest] required_number():
+    return @expect("a number") number
+
+fn [DslTest] opt_number():
+    return @accept opt(number)
+
+fn [DslTest] opt_paren_number():
+    return @accept opt($[~'TOK_LPAREN, number, ~'TOK_RPAREN])
+
+# opt() as a *non-final* sequence element: its own "nothing matched" nil
+# must not be mistaken for the whole step failing - the sequence should
+# still go on to match the number that follows.
+fn [DslTest] opt_prefix_then_number():
+    return @accept $[opt('TOK_LPAREN), number]
+
+fn [DslTest] paren_numbers():
+    return @accept many($[~'TOK_LPAREN, number, ~'TOK_RPAREN])
+
+# `@accept EXPR` only swallows a `unary_expr` - `|` binds looser than that,
+# so a bare top-level `a | b` would parse as `(@accept a) | b` instead of
+# what's wanted. Wrapping in `$[...]` (even as the sole element) puts `|`
+# back inside expression grammar the decorator does reach.
+fn [DslTest] number_or_hello():
+    return @accept $[number | soft_hello]
+
+fn [DslTest] paren_number_or_hello():
+    return @accept $[$[~'TOK_LPAREN, number, ~'TOK_RPAREN] | $[~'TOK_LPAREN, soft_hello, ~'TOK_RPAREN]]
+
+# A plain (non-`opt`) rule that legitimately answers `nil` as a captured
+# value, not `'NO_MATCH` - proving the sequence gate's "nil is just a
+# value" treatment isn't special-cased to `opt(...)` specifically.
+fn [DslTest] maybe_nil():
+    if (this ! peek(0)).kind == 'TOK_TILDE:
+        this ! advance()
+        return nil
+    return 'NO_MATCH
+
+fn [DslTest] nil_then_number():
+    return @accept $[maybe_nil, number]
+
+fn check(what: str, got, want):
+    if got == want:
+        println("PASS " + what)
+    else:
+        println("FAIL " + what + " got " + str(got))
+
+# a token kind: match and no-match
+p := DslTest("42")
+check("number matches", (p ! number()).kind == 'TOK_LITERAL_NUMBER, true)
+check("number consumed", p.pos == 1, true)
+
+p2 := DslTest("hello")
+check("number rejects non-number", p2 ! number() == 'NO_MATCH, true)
+check("number does not consume on miss", p2.pos == 0, true)
+
+# a soft keyword
+p3 := DslTest("hello")
+check("soft_hello matches", (p3 ! soft_hello()) ! get_text(p3.buffer) == "hello", true)
+
+p4 := DslTest("world")
+check("soft_hello rejects other text", p4 ! soft_hello() == 'NO_MATCH, true)
+
+# many(term) bare: zero or more, no separator, never fails
+p5 := DslTest("1 2 3")
+r5 := p5 ! numbers()
+check("many(term) collects three", len(r5) == 3, true)
+
+p6 := DslTest("hello")
+r6 := p6 ! numbers()
+check("many(term) collects zero", len(r6) == 0, true)
+
+# oneplus(): 'NO_MATCH (a genuine miss) rather than [] when none matched
+p7 := DslTest("hello")
+check("oneplus NO_MATCH on zero matches", p7 ! one_or_more_numbers() == 'NO_MATCH, true)
+
+p8 := DslTest("1 2")
+r8 := p8 ! one_or_more_numbers()
+check("oneplus collects two", len(r8) == 2, true)
+
+# a $[...] sequence with drop() and many(): "1, 2, 3" -> (first, [rest...])
+p9 := DslTest("1, 2, 3")
+r9 := p9 ! number_list()
+check("sequence captures first", (r9[0]).kind == 'TOK_LITERAL_NUMBER, true)
+check("sequence captures rest via many", len(r9[1]) == 2, true)
+
+# verify expect is error
+p10 := DslTest("zz")
+r10 := p10 ! expect_number()
+check("expected match return error", r10 is error, true)
+
+# expect(): required match raises through the enclosing rule
+p11 := DslTest("9")
+check("expect answers the match", (p11 ! required_number()).kind == 'TOK_LITERAL_NUMBER, true)
+
+p12 := DslTest("hello")
+got12 := p12 ! required_number() catch 'caught_error
+check("expect errors on miss", got12 == 'caught_error, true)
+
+# opt(term): matches like the term, nil (not error) on miss, never consumes
+# on miss
+p13 := DslTest("42")
+check("opt matches", (p13 ! opt_number()).kind == 'TOK_LITERAL_NUMBER, true)
+check("opt consumed", p13.pos == 1, true)
+
+p14 := DslTest("hello")
+check("opt nil on miss", p14 ! opt_number() == nil, true)
+check("opt does not consume on miss", p14.pos == 0, true)
+
+# opt($[...]): backtracking - "(x" matches the '(' before failing on the
+# number, so opt must reset all the way back to before the '(' was consumed
+p15 := DslTest("(x)")
+check("opt group nil on partial match", p15 ! opt_paren_number() == nil, true)
+check("opt group resets fully on partial match", p15.pos == 0, true)
+
+p16 := DslTest("(42)")
+check("opt group matches", (p16 ! opt_paren_number()).kind == 'TOK_LITERAL_NUMBER, true)
+check("opt group consumes all three tokens", p16.pos == 3, true)
+
+# many($[...]): grouped/parenthesized repetition, not just the elem-~sep
+# separator shape
+p17 := DslTest("(1)(2)(3)")
+r17 := p17 ! paren_numbers()
+check("grouped many collects three", len(r17) == 3, true)
+check("grouped many first element", (r17[0]).kind == 'TOK_LITERAL_NUMBER, true)
+
+p18 := DslTest("hello")
+r18 := p18 ! paren_numbers()
+check("grouped many collects zero", len(r18) == 0, true)
+
+# grouped many backtracking: a dangling, incomplete trailing group must not
+# be partially consumed - the loop should stop with the '(' still unread
+p19 := DslTest("(1)(2)(")
+r19 := p19 ! paren_numbers()
+check("grouped many stops before incomplete group", len(r19) == 2, true)
+check("grouped many resets the incomplete group's tokens", (p19 ! peek(0)).kind == 'TOK_LPAREN, true)
+
+# first | term: try first, then term, no backtracking needed since neither
+# alternative here partially consumes
+p20 := DslTest("42")
+check("or matches first alt", (p20 ! number_or_hello()).kind == 'TOK_LITERAL_NUMBER, true)
+
+p21 := DslTest("hello")
+check("or falls through to second alt", (p21 ! number_or_hello()) ! get_text(p21.buffer) == "hello", true)
+
+# first | term backtracking: the first alt's '(' consumes before failing on
+# the number, so the second alt must retry from the '(' rather than from
+# wherever the first alt gave up
+p22 := DslTest("(hello)")
+r22 := p22 ! paren_number_or_hello()
+check("or group backtracks into second alt", r22 ! get_text(p22.buffer) == "hello", true)
+check("or group consumed all three tokens", p22.pos == 3, true)
+
+p23 := DslTest("(42)")
+check("or group matches first alt when it fits", (p23 ! paren_number_or_hello()).kind == 'TOK_LITERAL_NUMBER, true)
+
+# opt() as a non-final sequence element must not abort the sequence when
+# it captures nothing - the rest of the sequence still has to run.
+p24 := DslTest("42")
+r24 := p24 ! opt_prefix_then_number()
+check("opt-then-term: opt absent still lets term match", r24[0] == nil, true)
+check("opt-then-term: term captured", (r24[1]).kind == 'TOK_LITERAL_NUMBER, true)
+
+p25 := DslTest("(42")
+r25 := p25 ! opt_prefix_then_number()
+check("opt-then-term: opt present is captured too", (r25[0]).kind == 'TOK_LPAREN, true)
+check("opt-then-term: term after opt still matches", (r25[1]).kind == 'TOK_LITERAL_NUMBER, true)
+
+# A rule that answers a genuine `nil` (not via opt()) as a non-final
+# sequence element must not be mistaken for `'NO_MATCH` either - the gate
+# is general, not `opt`-specific.
+p26 := DslTest("~42")
+r26 := p26 ! nil_then_number()
+check("plain nil-valued term: captured as nil, not a failure", r26[0] == nil, true)
+check("plain nil-valued term: rest of sequence still matches", (r26[1]).kind == 'TOK_LITERAL_NUMBER, true)
+
+# Bool Number
+p27 := DslTest("42")
+r27 := p27 ! bool_number()
+check("bool number is true for number", r27, true)
+
+# Bool Number
+p28 := DslTest("a")
+r28 := p28 ! bool_number()
+check("bool number is false for letter", r28, false)

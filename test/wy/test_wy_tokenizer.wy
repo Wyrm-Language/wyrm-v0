@@ -7,7 +7,7 @@ fn test_single_token(name: str, buffer: str, expected: sym, match: str):
     
     print("Test:", name, "- ")
 
-    parser := tok::Tokenizer(buffer)
+    parser := tok::Scanner(buffer)
     token := try parser ! scan()
 
     if token.kind != expected:
@@ -26,7 +26,7 @@ fn test_token_stream(name: str, buffer: str, *symbols):
         println("FAIL no result: ", name)
     
     print("Test:", name, "- ")
-    parser := tok::Tokenizer(buffer)
+    parser := tok::Scanner(buffer)
     count := 0
 
     for expected in symbols:
@@ -59,7 +59,8 @@ test_single_token("Simple 1char token", ":", 'TOK_COLON, ":")
 test_single_token("Simple literal", "'abc123", 'TOK_LITERAL_SYM, "'abc123")
 
 test_token_stream("Simple Comment", "# Comment Is Here", 'TOK_COMMENT)
-test_token_stream("Simple Comment With Line Extension", "# Comment\\\nNext line", 'TOK_COMMENT, 'TOK_END)
+# A trailing backslash does not extend a comment; it ends at the line
+test_token_stream("Comment Ignores Line Extension", "# Comment\\\nNext line", 'TOK_COMMENT, 'TOK_NEWLINE, 'TOK_XID, 'TOK_WS, 'TOK_XID, 'TOK_END)
 test_token_stream("Number comment", "1234#abcde", 'TOK_LITERAL_INT, 'TOK_COMMENT)
 
 test_token_stream("Fetch multiple end", "", 'TOK_END, 'TOK_END)

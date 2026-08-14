@@ -2,41 +2,30 @@ import wyrm::parser::parser::*
 import wyrm::ast::*
 import std::io::*
 
-fn indent(lvl: int):
-    for i in range(0, lvl):
-        print("  ")
-
-fn pindent(lvl, *args):
-    indent(lvl);
-    for i in range(0, len(args)):
-        if i > 0:
-            print(" ")
-        print(args[i])
-    println()
-
-fn [UnaryOp] print_tree(lvl: int):
-    pindent(lvl, "Unary Operation:", this.kind)
-    this.target!print_tree(lvl+1)
-
-fn [BinOp] print_tree(lvl: int):
-    pindent(lvl, "Binary Operation:", this.kind)
-    this.lhs!print_tree(lvl+1)
-    this.rhs!print_tree(lvl+1)
-
-fn [Number] print_tree(lvl: int):
-    indent(lvl); println("Number:", this.value)
-
-fn [Program] print_tree(lvl: int):
-    indent(lvl); println("Program:")
-    for item in this.expr_list:
-        item!print_tree(lvl+1)
+fn check(what: str, got, want):
+    if got == want:
+        println("PASS " + what)
+    else:
+        println("FAIL " + what + " got " + str(got))
 
 
-fn test_parse(buffer: str):
-    parse := Parser(buffer)
-    return parse ! parse()
+p_xid_1 := Parser("std")
+r_xid_1 := p_xid_1!xid()
+check("basic xid", r_xid_1, "std")
 
-# println("?", test_parse("12345").expr_list)
+p_xid_2 := Parser("std.asdf")
+r_xid_2 := p_xid_2!xid()
+check("basic xid split on operator", r_xid_2, "std")
 
-test_parse("+3 ** 2") ! print_tree(0)
+p_xid_3 := Parser("$_ope1n$.asdf")
+r_xid_3 := p_xid_3!xid()
+check("xid includes $", r_xid_3, "$_ope1n$")
+
+p_import_1 := Parser("import std::io")
+r_import_1 := p_import_1!import_stmt()
+check("import matches", r_import_1 != 'NO_MATCH, true)
+
+p_import_2 := Parser("import std::io 12345")
+r_import_2 := p_import_2!import_stmt()
+check("import with garbage", r_import_2 is error, true)
 

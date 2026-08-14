@@ -1,12 +1,13 @@
 # AST Types
 import wyrm::parser::tokenizer::Token
+import std::pairs::*
 
 class TreeItem:
     slot kind: sym
 
 class UnaryOp(TreeItem):
     slot target: TreeItem
-    
+
     fn init(kind: sym, target: TreeItem):
         this.kind = kind
         this.target = target
@@ -39,3 +40,125 @@ class Number(TreeItem):
     fn init(number: int):
         this.value = number
 
+
+##### SEXPR Manipulation
+
+# Valid for:
+#     'unop unary ops
+#     'binop binary ops
+#     'call
+fn s_op_name(e):
+    return cadr(e)
+
+# Unary Target
+fn s_unary_target(e):
+    # Current form: ('unop [OP] target)
+    return caddr(e)
+
+# Binary op lhs
+fn s_binop_lhs(e):
+    # Current form ('binop [OP] LHS RHS)
+    return caddr(e)
+
+# Binary op rhs
+fn s_binop_rhs(e):
+    # Current form ('binop [OP] LHS RHS)
+    return car(cdddr(e))
+
+# Return true if literal is type name and name matches
+fn s_is_name_match(literal, name) -> bool:
+    return ((car(literal) == 'name) and (cadr(literal) == name)) catch false
+
+fn s_get_name(literal) -> sym:
+    if car(literal) != 'name:
+        return error("name expected")
+    return cadr(literal)
+
+fn s_call_target(call) -> pair:
+    return s_op_name(call)
+
+fn s_call_args(call) -> pair:
+    return caddr(call)
+
+_FN_NAME := 1
+_FN_RESULTS := 2
+_FN_REST := 3
+_FN_KWARGS := 4
+_FN_PARAMS := 5
+_FN_DISPATCH := 6
+_FN_BODY := 7
+# Get body from function
+fn s_fn_body(e):
+    return car(list_tail(sexpr(e), _FN_BODY))
+
+# Given function node, return new sexpr with replaced body
+fn s_fn_with_body(node, body) -> pair:
+    return $['fn, field(node, _FN_NAME), field(node, _FN_RESULTS), field(node, _FN_REST),
+             field(node, _FN_KWARGS), field(node, _FN_PARAMS), field(node, _FN_DISPATCH), body]
+
+fn test_parse(s: str) -> pair:
+    return cadr(sexpr(parse(s)))
+
+# ---------------------------
+# Creators
+# NOTE: These are generally _ALL_ faulty; this is all based
+# on the wyrm poc code, and that's really broken.
+# ---------------------------
+NIL_EXPR := $['nil]
+
+fn mk_set(s: sym, initial: pair) -> pair:
+    return $['assign, mk_name(s), initial]
+
+fn mk_sym(s: sym) -> pair:
+    return $['sym, s]
+
+fn mk_str(s: str) -> pair:
+    return $['str, s]
+
+fn mk_type(s: sym) -> pair:
+    return $['type, s, [], [] ]
+
+fn mk_binop(lhs: pair, op: sym, rhs: pair):
+    return $['binop, op, lhs, rhs]
+
+fn mk_name(name: sym) -> pair:
+    return $['name, name]
+
+fn mk_call(func: sym, args: list) -> pair:
+    return $['call, mk_name(func), args]
+
+fn mk_expr_stmt(stmt: pair) -> pair:
+    return $['expr_stmt, stmt]
+
+fn mk_do(block):
+    return $['do, block]
+
+fn mk_if(cond, then_block, else_block):
+    return $['if, cond, then_block, else_block]
+
+fn mk_or(lhs, rhs):
+    return $['or, lhs, rhs]
+
+fn mk_is(lhs, rhs):
+    return $['is, lhs, rhs]
+
+# @brief Build expansion of template function AST
+#
+# Given a template function, substitute the given arguments
+# and return a newly created pair list suitable for
+# s_fn_with_body or a general block.
+fn mk_expand_n(tmpl_ast, *subs) -> pair:
+    body := s_fn_body(sexpr(tmpl_ast))
+    out := []
+    for stmt in body:
+        expanded := stmt
+        for sub in subs:
+            hole := try (car(sub) catch sub[0])
+            repl := try (cdr(sub) catch sub[1])
+            expanded = replace(fn(node) { s_is_name_match(node, hole) }, repl, expanded)
+        out ! append(expanded)
+    return $['do, out]
+
+# @brief Build expansion of template function AST (1 type)
+fn mk_expand(tmpl_ast, name, replace) -> pair:
+    return mk_expand_n(tmpl_ast, pair(name, replace))
