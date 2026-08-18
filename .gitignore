@@ -5,6 +5,9 @@
 .cache
 .wyrm
 
+# Generate python
+py/
+
 
 *~
 *.swp

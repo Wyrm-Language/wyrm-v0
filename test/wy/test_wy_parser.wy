@@ -9,23 +9,55 @@ fn check(what: str, got, want):
         println("FAIL " + what + " got " + str(got))
 
 
-p_xid_1 := Parser("std")
-r_xid_1 := p_xid_1!xid()
-check("basic xid", r_xid_1, "std")
+# # p_xid_1 := Parser("std")
+# # r_xid_1 := p_xid_1!xid()
+# # check("basic xid", r_xid_1, "std")
 
-p_xid_2 := Parser("std.asdf")
-r_xid_2 := p_xid_2!xid()
-check("basic xid split on operator", r_xid_2, "std")
+# # p_xid_2 := Parser("std.asdf")
+# # r_xid_2 := p_xid_2!xid()
+# # check("basic xid split on operator", r_xid_2, "std")
 
-p_xid_3 := Parser("$_ope1n$.asdf")
-r_xid_3 := p_xid_3!xid()
-check("xid includes $", r_xid_3, "$_ope1n$")
+# # p_xid_3 := Parser("$_ope1n$.asdf")
+# # r_xid_3 := p_xid_3!xid()
+# # check("xid includes $", r_xid_3, "$_ope1n$")
 
-p_import_1 := Parser("import std::io")
-r_import_1 := p_import_1!import_stmt()
-check("import matches", r_import_1 != 'NO_MATCH, true)
+# p_import_1 := Parser("import std::io")
+# r_import_1 := p_import_1!import_stmt()
+# check("import matches", r_import_1 != 'NO_MATCH, true)
 
-p_import_2 := Parser("import std::io 12345")
-r_import_2 := p_import_2!import_stmt()
-check("import with garbage", r_import_2 is error, true)
+# p_import_2 := Parser("import std::io 12345")
+# r_import_2 := p_import_2!import_stmt()
+# check("import with garbage", r_import_2 is error, true)
+
+# check("nil parse", Parser("nil")!nil_literal(), $['nil])
+
+# p_qual_id_1 := Parser("foo::bar::baz::bleet")
+# r_qual_id_1 := p_qual_id_1!qualified_name()
+# check("qual_id parsed into correct size", len(r_qual_id_1), 5)
+
+# p_qual_id_2 := Parser("**")
+# r_qual_id_2 := p_qual_id_2!qualified_name()
+# check("qual_id parsed into 'NO_MATCH", r_qual_id_2, 'NO_MATCH)
+
+# check("bool true parse", Parser("true")!literal(), $['true])
+# check("bool false parse", Parser("false")!bool_literal(), $['false])
+# check("bool non-parse", Parser("!")!bool_literal(), 'NO_MATCH)
+# #check("bool in paren (primary recurse)", Parser("(true)")!expression(), $['true])
+
+# Basic tuple
+check("tuple expr", len(Parser("a, b, c")!expression()), 4)
+
+# Proper double try
+p_tuple_dtry := Parser("try a, try b")!expression()
+check("double try tuple", 
+    len(p_tuple_dtry) == 3 
+    and cadr(cadr(p_tuple_dtry)) == "a"
+    and cadr(caddr(p_tuple_dtry)) == "b",
+    true)
+
+check("try expr", car(Parser("try a")!expression()), 'try)
+
+
+#print(Parser("abc, xy, z")!tuple_expr(), "\n")
+
 

@@ -46,12 +46,20 @@ import std::ctype::*
 #   'TOK_INDENT             a line opened a deeper indent level
 #   'TOK_DEDENT             a line closed one indent level
 
+_TRIPLE_CHARS := [
+ ('TOK_SPACESHIP, \<, \=, \>),
+ ('TOK_ELLIPSIS, \., \., \.)
+]
+
 _DUAL_CHARS := [
  ('TOK_EXPONENT, \*, \*),
  ('TOK_LBRACE_S, \$, \{),
  ('TOK_LBRACKET_S, \$, \[),
  ('TOK_RARROW, \-, \>),
  ('TOK_LARROW, \<, \-),
+
+ ('TOK_LSHIFT, \<, \<),
+ ('TOK_RSHIFT, \>, \>),
 
  ('TOK_LE, \<, \=),
  ('TOK_GE, \>, \=),
@@ -84,6 +92,7 @@ _S_CHARS := [
     ('TOK_BANG, \! ),
 
     ('TOK_TILDE, \~ ),
+    ('TOK_AT, \@ ),
     ('TOK_LPAREN, \( ),
     ('TOK_RPAREN, \) ),
     ('TOK_LBRACE, \{ ),
@@ -236,6 +245,27 @@ fn _scan_xid(buffer: str, cur_pos: int) -> int | nil:
         next_c = _get_char(buffer, idx)
     return idx
 
+# Operator spellings valid after a symbol literal's quote - longest first, so
+# "**" isn't cut short as "*" and "<=>" isn't cut short as "<=".
+_OPERATOR_SYMBOLS := [
+    "...", "<=>", "**", "<<", ">>", "==", "!=", "<=", ">=",
+    "+", "-", "*", "/", "%", "&", "|", "^", "~", "<", ">"
+]
+
+fn _scan_operator_symbol(buffer: str, cur_pos: int) -> int | nil:
+    for spelling in _OPERATOR_SYMBOLS:
+        n := len(spelling)
+        i := 0
+        ok := true
+        while i < n:
+            if _get_char(buffer, cur_pos + i) != spelling[i]:
+                ok = false
+                break
+            i = i + 1
+        if ok:
+            return cur_pos + n
+    return nil
+
 # Check if token matches
 fn _check_match(buffer: str, cur_pos: int, required: bool, match_chars) -> bool | error:
     idx := cur_pos
@@ -248,6 +278,49 @@ fn _check_match(buffer: str, cur_pos: int, required: bool, match_chars) -> bool 
             return false
     return true
 
+
+# Raw string: 'R"(' content ')"' or 'R"' tag '(' content ')' tag '"'.
+# `tag` (grammar's delim_tag) is letters/digits, read back out of the
+# source so the closing needle can be built to match it exactly.
+#
+# **Grammar**:
+#    raw_string ::= 'R"(' , { any_char } , ')"'
+#                 | 'R"' , delim_tag , "(" , { any_char } , ")" , delim_tag , '"' ;
+fn _scan_raw_string_tag(buffer: str, cur_pos: int) -> int | nil:
+    idx := cur_pos
+    c := _get_char(buffer, idx)
+    while c != \(:
+        if c == 'EOF or not (is_alpha(c) or is_digit(c)):
+            return nil
+        idx = idx + 1
+        c = _get_char(buffer, idx)
+    return idx
+
+fn _find_needle(buffer: str, cur_pos: int, needle: str) -> int | nil:
+    idx := cur_pos
+    nlen := len(needle)
+    blen := len(buffer)
+    while idx + nlen <= blen:
+        i := 0
+        ok := true
+        while i < nlen:
+            if buffer[idx + i] != needle[i]:
+                ok = false
+                break
+            i = i + 1
+        if ok:
+            return idx + nlen
+        idx = idx + 1
+    return nil
+
+# `cur_pos` points just past the opening 'R"'.
+fn _scan_raw_string(buffer: str, cur_pos: int) -> int | nil:
+    tag_end := _scan_raw_string_tag(buffer, cur_pos)
+    if tag_end == nil:
+        return nil
+    tag := buffer ! substr(cur_pos, tag_end - cur_pos)
+    needle := ")" + tag + "\""
+    return _find_needle(buffer, tag_end + 1, needle)
 
 # @brief Token analysis of source
 #
@@ -289,18 +362,33 @@ class Scanner:
         if (next_c == \\ and _is_newline(next_next_c)) or is_space(next_c):
             return this ! _advance_with_token('TOK_WS, _find_end_whitespace(this.buffer, this.cur_pos))
 
-        # Literal symbol
+        # Literal symbol - name form ('foo) or operator form ('+, '<=>, ...)
         if next_c == \':
             lit_end := _scan_xid(this.buffer, this.cur_pos + 1)
-            if lit_end == nil:
-                return this ! _advance_with_token(error("bad symbol literal"), this.cur_pos + 1)
-            return this ! _advance_with_token('TOK_LITERAL_SYM, lit_end)
+            if lit_end != nil:
+                return this ! _advance_with_token('TOK_LITERAL_SYM, lit_end)
+            op_end := _scan_operator_symbol(this.buffer, this.cur_pos + 1)
+            if op_end != nil:
+                return this ! _advance_with_token('TOK_LITERAL_SYM, op_end)
+            return this ! _advance_with_token(error("bad symbol literal"), this.cur_pos + 1)
+
+        # Raw strings: R"(...)" or R"tag(...)tag"
+        if next_c == \R and next_next_c == \":
+            raw_end := _scan_raw_string(this.buffer, this.cur_pos + 2)
+            if raw_end != nil:
+                return this ! _advance_with_token('TOK_STR, raw_end)
 
         # Strings
         if next_c == \" and next_next_c == \" and next_next_next_c == \":
             return this ! _scan_finish_str(this.cur_pos + 3, false, (\", \", \"))
         if next_c == \":
             return this ! _scan_finish_str(this.cur_pos + 1, true, (\",))
+
+        # Triple characters
+        if next_next_c != 'EOF and next_next_next_c != 'EOF:
+            for element in _TRIPLE_CHARS:
+                if next_c == element[1] and next_next_c == element[2] and next_next_next_c == element[3]:
+                    return this ! _advance_with_token(element[0], this.cur_pos + 3)
 
         # Duo characters
         if next_next_c != 'EOF:

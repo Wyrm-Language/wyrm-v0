@@ -3,6 +3,16 @@ import wyrm::ast
 
 import static wyrm::parser::_dsl::*
 
+fn mk_mk_pair(s):
+    return fn(t) { cons(s, t) }
+
+_HARD_KEYWORDS := [
+    "and", "break", "catch", "class", "co", "continue", "defer", "do",
+    "elif", "else", "emit", "fn", "for", "from", "getter", "if", "import",
+    "in", "is", "not", "or", "pass", "return", "signal", "slot",
+    "static", "try", "var", "while", "with", "yield"
+]
+
 
 
 class Parser:
@@ -33,87 +43,451 @@ class Parser:
     fn reset(mark: int):
         this.pos = mark
 
-    # -------------------------------------------------------------------------
-    # Low Level / Near Lexical Tokens
-    # -------------------------------------------------------------------------
 
+    # (* ---------------------------------------------------------------------
+    #    0. Lexical tokens
+    #    --------------------------------------------------------------------- *)
 
+    # digit           ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+    # hex_digit       ::= digit | "a" | "b" | "c" | "d" | "e" | "f"
+    #                           | "A" | "B" | "C" | "D" | "E" | "F" ;
+    # letter          ::= "a" | "..." | "z" | "A" | "..." | "Z" | "_" ;
 
+    # comment         ::= "#" , { any_char - newline } , newline ;
 
+    # int_literal     ::= [ "-" ] , digit , { digit | "_" }
+    #                    | "0x" , hex_digit , { hex_digit | "_" } ;
 
+    # float_literal   ::= [ "-" ] , digit , { digit | "_" } , "." , digit , { digit | "_" } ,
+    #                      [ ( "e" | "E" ) , [ "+" | "-" ] , digit , { digit } ]
+    #                    | [ "-" ] , digit , { digit | "_" } ,
+    #                      ( "e" | "E" ) , [ "+" | "-" ] , digit , { digit } ;
 
+    # bool_literal    ::= "true" | "false" ;
+    fn bool_literal():
+        @accept $[value('true, "true") | value('false, "false")]
+
+    # nil_literal     ::= "nil" ;
+    fn nil_literal():
+        @accept value('nil, "nil")
+
+    # (* `$` is an ordinary identifier character, in any position: `$ast`, `a$b`,
+    #    `reg$0` are all names. The `$` of the pair-list sigil `$[` is still the
+    #    operator it always was - a `$` only begins a name when a letter follows
+    #    it. `$ast` (see scope_op) is reserved language-wide; the rest of the
+    #    `$`-family (`$name`, `$line`, `$doc`) is not built yet. *)
+    # identifier      ::= ( letter | "$" , letter ) , { letter | digit | "$" } ;
+
+    # symbol_literal  ::= "'" , ( identifier | operator_symbol ) ;
+    #                   (* At least 31 significant characters recognized.
+    #                      A symbol's name may be a reserved word ('fn, 'return,
+    #                      'if): they are node kinds in the canonical s-expression
+    #                      format, so the literal is lexed whole rather than as
+    #                      "'" followed by a name. *)
+
+    # (* An operator, written as a symbol. The s-expression format spells a
+    #    binop's operator as one, so a tree cannot be built from scratch without
+    #    these; nothing else in the grammar puts an operator after a quote, so
+    #    there is no ambiguity to trade for it. *)
+    # operator_symbol ::= "+" | "-" | "*" | "/" | "%" | "**"
+    #                    | "&" | "|" | "^" | "~" | "<<" | ">>"
+    #                    | "==" | "!=" | "<" | ">" | "<=" | ">=" | "<=>" ;
+
+    # ellipsis_literal
+    #                 ::= "..." ;                (* the placeholder / template hole *)
+
+    # string_literal  ::= normal_string | multiline_string | raw_string ;
+
+    # normal_string   ::= '"' , { string_char } , '"' ;
+    # string_char     ::= any_char - ( '"' | "\" | newline ) | escape_sequence ;
+    # escape_sequence ::= "\" , any_char ;
+
+    # multiline_string
+    #                 ::= '"""' , { any_char } , '"""' ;
+
+    # raw_string      ::= 'R"(' , { any_char } , ')"'
+    #                    | 'R"' , delim_tag , "(" , { any_char } , ")" , delim_tag , '"' ;
+    # delim_tag       ::= { letter | digit } ;
+
+    # newline         ::= "\n" ;
+    # NEWLINE         ::= (* virtual statement-separator token, emitted by lexer *) ;
+    # INDENT          ::= (* virtual token: rise in layout column *) ;
+    # DEDENT          ::= (* virtual token: fall in layout column *) ;
+
+    # identifier, excluding hard keywords
+    fn xid() -> str:
+        v := @accept 'TOK_XID
+        if v != 'NO_MATCH and v is not error:
+            text := v!get_text(this.buffer)
+            if text in _HARD_KEYWORDS:
+                return 'NO_MATCH
+            return text
+        else:
+            v
+
+    fn qualified_name():
+        # GRAMMAR: qualified_name ::= xid, { "::", xid } ;
+        compose_if_parse(mk_mk_pair('qualified_name), 
+            @accept flatten($[xid, many($[~'TOK_SCOPE, xid])])
+        )
+
+    # symbol_literal
+    fn symbol_literal():
+        @accept 'TOK_LITERAL_SYM
+
+    # string literal
+    fn string_literal():
+        @accept 'TOK_STR
+
+    # (* ---------------------------------------------------------------------
+    #    1. Program structure
+    #    --------------------------------------------------------------------- *)
+
+    # program         ::= { top_level_stmt } ;
     fn program():
-        # GRAMMAR: program ::= { top_level_stmt }
-        @accept
-        many(top_level_stmt)
+        @accept many(top_level_stmt)
 
+
+    # top_level_stmt  ::= import_stmt
+    #                    | stmt_line ;
     fn top_level_stmt():
-        # GRAMMAR: top_level_stmt ::= import_stmt | stmt_line
+        @accept $[import_stmt | stmt_line]
+
+
+    # (* ---------------------------------------------------------------------
+    #    2. Blocks and statements
+    #    --------------------------------------------------------------------- *)
+
+    # block           ::= ":" , NEWLINE , INDENT , stmt_list , DEDENT
+    #                    | ":" , stmt_line                          (* one-liner *)
+    #                    | "{" , stmt_list , "}" ;                  (* "{}" is dict_literal's, not this *)
+    fn block():
         @accept
-        $[import_stmt | stmt_line]
+        $[ ('TOK_NEWLINE, 'TOK_INDENT, stmt_list, 'TOK_DEDENT )
+         # | (":", stmt_line)
+         # | ('TOK_LBRACE, stmt_list, 'TOK_RBRACE)
+         ]
+
+    # stmt_list       ::= stmt_line , { stmt_sep , stmt_line } , [ stmt_sep ] ;
+    # stmt_sep        ::= NEWLINE | ";" ;
 
 
+    # stmt_line       ::= { decorator } ,
+    #                      ( expression
+    #                      | var_stmt
+    #                      | assignment_stmt
+    #                      | static_stmt
+    #                      | "with" , with_binding
+    #                      | import_stmt
+    #                      | with_block
+    #                      | defer_stmt
+    #                      | fn_def
+    #                      | co_def
+    #                      | class_def
+    #                      | slot_def ) ;
+
+    #! stmt_list ::= stmt_line , { stmt_sep , stmt_line } , [ stmt_sep ] ;
+    fn stmt_list():
+        @accept $[ stmt_line, many($[stmt_sep, stmt_line]), opt(stmt_end) ]
+
+    #! stmt_sep ::= NEWLINE | ";" ;
+    fn stmt_sep():
+        @accept $['TOK_NEWLINE | 'TOK_SEMICOLON | 'TOK_END]
+
+    fn expect_stmt_sep() -> bool:
+        @accept $[expect("statement end", stmt_sep)]
+
+    fn stmt_line():
+        @accept
+        $[ expr_stmt
+         # | var_stmt
+         # | assignment_stmt
+         # | static_stmt
+         # | with_stmt_simple
+         # | import_stmt
+         # | with_block
+         # | defer_stmt
+         # | fn_def
+         # | co_def
+         # | class_def
+         # | slot_def
+        ]
+
+    # decorator       ::= "@" , identifier , [ "(" , [ arg_list ] , ")" ] , [ NEWLINE ] ;
+
+    # defer_stmt      ::= "defer" , [ "on" , type_constraint ] , block ;
+
+    # if_stmt         ::= "if" , expression , block ,
+    #                      { "elif" , expression , block } ,
+    #                      [ "else" , block ] ;
+
+    # while_stmt      ::= "while" , expression , block ;
+
+    # for_stmt        ::= "for" , identifier , "in" , expression , block ,
+    #                      [ "else" , block ] ;
+
+    # var_stmt        ::= "var" , var_target , { "," , var_target } , [ "=" , expression ] ;
+    # var_target      ::= identifier , [ ":" , type_constraint ] ;
+
+    # assignment_stmt ::= target , { "," , target } , assign_op , expression ;
+    # target          ::= ( identifier | postfix_expr , "." , identifier ) , { "[" , expression , "]" } ;
+    # assign_op       ::= "=" | "?=" | ":=" ;
+
+    # static_stmt     ::= "static" , identifier , [ ":" , type_constraint ] , [ "=" , expression ] ;
+
+    # with_block      ::= "with" , ":" , NEWLINE , INDENT ,
+    #                      { with_binding , stmt_sep } ,
+    #                      DEDENT ;
+    # with_binding    ::= identifier , [ ":" , type_constraint ] , "=" , expression ;
+
+
+    # (* ---------------------------------------------------------------------
+    #    3. Modules and imports
+    #    --------------------------------------------------------------------- *)
 
     # import_stmt     ::= "import" , [ "static" ] , import_body ;
+    fn import_stmt():
+        @accept $["import", bool("static"), import_body, expect("statement end", stmt_sep)]
 
-    # import_body     ::= module_path , [ "as" , identifier ]
-    #                    | module_path , "::" , "(" , import_item_list , ")"
-    #                    | module_path , "::" , "*" , [ "except" , except_names ] ;
 
-    # import_item_list
-    #                 ::= import_item , { "," , import_item } ;
+    # import_body     ::= qualified_name , [ "as" , identifier ]
+    #                    | qualified_name , "::" , "(" , import_item , { "," , import_item } , ")"
+    #                    | qualified_name , "::" , "*" , [ "except" , except_names ] ;
+    fn import_body():
+        @accept $[qualified_name]
+
 
     # import_item     ::= identifier , [ "as" , identifier ] ;
 
     # except_names    ::= identifier
-    #                    | "(" , name_list , ")" ;
-
-    # module_path     ::= identifier , { "::" , identifier } ;
-
-    # name_list       ::= identifier , { "," , identifier } ;
-
-    fn import_stmt():
-        # GRAMMAR: import_stmt     ::= "import" , [ "static" ] , import_body ;
-        @accept
-        $["import", bool("static"), import_body, expect("statement end", stmt_end)]
-
-    fn import_body():
-        # GRAMMAR:
-        #   import_body     ::= qual_id , [ "as" , identifier ]
-        #           | qual_id , "::" , "(" , import_item_list , ")"
-        #           | qual_id , "::" , "*" , [ "except" , except_names ] ;
-        @accept
-        $[module_path]
-    
-    fn module_path():
-        @accept
-        $[qual_id]
-
-    # -------------------------------------------------------------------------
-    # Primitive Tokens
-    # -------------------------------------------------------------------------
-
-    fn qual_id():
-        # GRAMMAR: qual_id ::= xid, { "::", xid } ;
-        @accept
-        $[xid, many($[~'TOK_SCOPE, xid])]
-
-    # -------------------------------------------------------------------------
-    # Lexical Token to Primitive Type
-    # -------------------------------------------------------------------------
-
-    fn stmt_end():
-        # GRAMMAR: stmt_end ::= NEWLINE | ";"
-        @accept
-        $['TOK_NEWLINE | 'TOK_SEMICOLON | 'TOK_END]
-
-    fn expect_stmt_end() -> bool:
-        @accept $[expect("statement end", stmt_end)]
-
-    fn xid() -> str:
-        tok := @accept 'TOK_XID
-        return tok ! get_text(this.buffer)
+    #                    | "(" , identifier , { "," , identifier } , ")" ;
 
 
+    # (* ---------------------------------------------------------------------
+    #    4. Functions
+    #    --------------------------------------------------------------------- *)
+
+    # fn_def          ::= "fn" , [ class_target ] , identifier , "(" , [ param_list ] , ")" ,
+    #                      [ "->" , type_constraint ] , block ;
+
+    # class_target    ::= "[" , identifier , { "," , identifier } , "]" ;   (* multi-dispatch receivers *)
+
+    # param_list      ::= param , { "," , param } ;
+    # param           ::= var_positional | var_keyword | plain_param ;
+    # plain_param     ::= identifier , [ ":" , type_constraint ] , [ "=" , expression ] ;
+    # var_positional  ::= "*" , identifier ;
+    # var_keyword     ::= "**" , identifier ;
+
+    # (* ---------------------------------------------------------------------
+    #    5. Coroutines
+    #    --------------------------------------------------------------------- *)
+
+    # co_def          ::= "co" , [ class_target ] , identifier , "(" , [ co_param_list ] , ")" ,
+    #                      [ "->" , type_constraint ] , block ;
+
+    # co_param_list   ::= "<-" , type_constraint , [ "," , param_list ]   (* send-type, not a param *)
+    #                    | param_list ;
 
 
+    # (* ---------------------------------------------------------------------
+    #    6. Classes
+    #    --------------------------------------------------------------------- *)
+
+    # class_def       ::= "class" , identifier , [ "(" , [ arg_list ] , ")" ] , block ;
+
+    # slot_def        ::= "slot" , identifier , [ ":" , type_constraint ] ,
+    #                      [ "=" , expression ] , [ "with" , slot_options ] ;
+
+    # slot_options    ::= ":" , NEWLINE , INDENT , { slot_option , stmt_sep } , DEDENT
+    #                    | "{" , { slot_option , [ ";" ] } , "}" ;
+
+    # slot_option     ::= ( "setter" | "getter" ) , "=" , ( expression | "undefined" ) ;
+
+
+    # (* ---------------------------------------------------------------------
+    #    7. Expressions
+    #    --------------------------------------------------------------------- *)
+
+    # expression      ::= try_expr , { "," , try_expr } ;        (* comma = tuple *)
+    fn expression():
+        @accept apply_if($_mk_values, $[cons(try_expr, many($[~'TOK_COMMA, try_expr])), ~opt('TOK_COMMA)])
+
+    # try_expr ::= ( "try", catch_expr ) | catch_expr;
+    fn try_expr():
+        @accept $[apply_if($_mk_try, $[~"try", catch_expr]) | catch_expr]
+
+    # catch_expr ::= logical_expr , [ "catch" , expression ] ;
+    fn catch_expr():
+        @accept apply_if($_catch_fn, logical_expr, opt($[~"catch", expression]))
+
+    # logical_expr    ::= not_expr , { logical_op , not_expr } ;
+    fn logical_expr():
+        @accept primary
+        # @accept flatten(not_expr, many($[logical_op, not_expr]))
+
+    # logical_op      ::= "or" | "and" ;
+    fn logical_op():
+        @accept $["or" | "and"]
+
+    # not_expr        ::= "not" , not_expr
+    #                    | comparison ;
+    fn not_expr():
+        @accept $[$["not", not_expr] | comparison]
+
+
+    # comparison      ::= binary_expr , "is" , [ "not" ] , type_constraint
+    #                    | binary_expr , [ comp_op , binary_expr ] ;
+    # comp_op         ::= "<=" | ">=" | "<=>" | "<" | ">" | "==" | "!=" | "in" ;
+
+    # type_constraint ::= qualified_name , { "|" , qualified_name } ;
+
+    # binary_expr     ::= unary_expr , { binary_op , unary_expr } ;
+    # binary_op       ::= "|" | "^" | "&" | "<<" | ">>" | "+" | "-" | "*" | "/" | "%" ;
+
+    # unary_expr      ::= decorator , unary_expr
+    #                    | ( "-" | "+" | "~" | "not" ) , unary_expr
+    #                    | power_expr ;
+
+    # power_expr      ::= postfix_expr , [ "**" , unary_expr ] ;       (* right-assoc *)
+
+    # postfix_expr    ::= primary , { postfix_op } ;
+    # postfix_op      ::= call_op | index_op | attr_op | message_op | scope_op ;
+
+    # call_op         ::= "(" , [ arg_list ] , ")" ;
+    # index_op        ::= "[" , expression , "]" ;
+    # attr_op         ::= "." , identifier ;
+    # message_op      ::= "!" , identifier , [ "(" , [ arg_list ] , ")" ] ;
+    # scope_op        ::= "::" , identifier
+    #                    | "::" , "$ast" ;
+
+    # arg_list        ::= argument , { "," , argument } ;
+    # argument        ::= expression
+    #                    | identifier , "=" , expression          (* keyword argument *)
+    #                    | "*" , expression                       (* spread positional *)
+    #                    | "**" , expression ;                    (* spread keyword *)
+
+    # primary         ::= literal
+    #                    | identifier
+    #                    | "(" , expression , ")"
+    #                    | tuple_literal
+    #                    | array_literal
+    #                    | pair_literal
+    #                    | dict_literal
+    #                    | message_tuple_expr
+    #                    | "this"
+    #                    | "super" , "(" , [ arg_list ] , ")"
+    #                    | "return" , [ expression ]
+    #                    | "yield" , "from" , expression
+    #                    | "yield" , [ expression ]
+    #                    | "break"
+    #                    | "continue"
+    #                    | "pass"
+    #                    | if_stmt
+    #                    | while_stmt
+    #                    | for_stmt
+    #                    | lambda_expr
+    #                    | co_lambda_expr
+    #                    | class_expr
+    #                    | do_expr ;
+    fn primary():
+        @accept xid
+        # @accept $[ xid
+        #     # literal
+        #       #   | qualified_name
+        #       #   | $[ ~'TOK_LPAREN, expression, ~'TOK_RPAREN ]
+        # ]
+
+    # char_literal    ::= "\" , ( ( any_char - ( control_char | " " ) ) | identifier ) ;
+
+    # literal         ::= nil_literal
+    #                    | int_literal
+    #                    | float_literal
+    #                    | bool_literal
+    #                    | string_literal
+    #                    | symbol_literal
+    #                    | char_literal
+    #                    | ellipsis_literal ;
+    fn literal():
+        @accept $[ nil_literal
+                 # | int_literal
+                 # | float_literal
+                   | bool_literal
+                 # | string_literal
+                 # | symbol_literal
+                 # | ellipsis_literal
+                 ]
+
+    # array_literal   ::= "[" , [ expression ] , "]" ;
+
+    # pair_literal    ::= "$[" , [ pair_body ] , "]" ;             (* cons-list primitive *)
+    # pair_body       ::= pair_element , { "," , pair_element } ;
+    # pair_element    ::= expression ;
+
+    # tuple_literal   ::= "(" , ")"                                (* empty tuple *)
+    #                    | "(" , expression , "," , ")" ;           (* single-element tuple *)
+
+    # dict_literal    ::= "{" , [ dict_pair , { "," , dict_pair } ] , "}" ;
+    # dict_pair       ::= expression , ":" , expression ;
+
+    # message_tuple_expr
+    #                 ::= "(" , expression , ")" , "!" , identifier , [ "(" , [ arg_list ] , ")" ] ;
+
+    # lambda_expr     ::= "fn" , "(" , [ param_list ] , ")" , [ "->" , type_constraint ] , block ;
+    # co_lambda_expr  ::= "co" , "(" , [ co_param_list ] , ")" , [ "->" , type_constraint ] , block ;
+    # class_expr      ::= "class" , [ "(" , [ arg_list ] , ")" ] , block ;
+
+    # do_expr         ::= "do" , block ;
+
+    # (* ---------------------------------------------------------------------
+    #    8. Keyword summary (reserved words)
+    #    --------------------------------------------------------------------- *)
+
+    # (* and, break, catch, class, co, continue, defer, do, elif, else,
+    #    fn, for, from, getter, if, import, in, is, not, or,
+    #    pass, return, setter, slot, static, this, try,
+    #    var, while, with, yield
+
+    # (* ---------------------------------------------------------------------
+    #    9. Operator precedence
+    #    --------------------------------------------------------------------- *)
+
+    # (*   tuple_expr        ,               (loosest: builds a tuple)
+    #      assign_expr       ?=  try/catch
+    #      logical_expr      or
+    #                         and             (tighter than or)
+    #      not_expr          not              (prefix; own tier)
+    #      comparison        is  <=  >=  <=>  <  >  ==  !=  in   (non-associative - no chaining)
+    #      binary_expr       |
+    #                         ^
+    #                         &
+    #                         <<  >>
+    #                         +   -
+    #                         *   /   %
+    #      unary_expr        -  +  ~  not     (prefix; "not" here is a second,
+    #                                           tighter tier from the one above -
+    #                                           see the note at unary_expr)
+    #      power_expr        **               (right-associative)
+    #      postfix_expr       .  ()  []  !  ::   (tightest)
+
+    #    All binary_expr and logical_expr levels are left-associative. *)
+
+fn $_mk_values(expr):
+    if cdr(expr) != nil:
+        return cons('tuple, expr)
+    return car(expr)
+
+
+fn $_mk_try(expr):
+    return $['try, expr]
+
+fn $_try_fn(expr):
+    if car(expr):
+        return $['try, cdr(expr)]
+    return cdr(expr)
+
+fn $_catch_fn(expr):
+    base := car(expr)
+    handler := cadr(expr)
+    if handler == nil:
+        return base
+    return $['catch, base, handler]

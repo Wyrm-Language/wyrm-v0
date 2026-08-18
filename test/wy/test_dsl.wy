@@ -4,6 +4,10 @@ import static wyrm::parser::_dsl
 import wyrm::parser::tokenizer::*
 import std::io::*
 
+
+fn dumb_fn(*r):
+    return 12345
+
 class DslTest:
     slot buffer: str
     slot tokens: list
@@ -32,8 +36,20 @@ class DslTest:
     fn reset(mark: int):
         this.pos = mark
 
+fn [DslTest] apply_dumb_fn():
+    @accept apply_if(dumb_fn, "callme")
+
+fn [DslTest] apply_dumb_fn_error():
+    @accept apply_if(dumb_fn, error_rule)
+
 fn [DslTest] number():
     return @accept 'TOK_LITERAL_NUMBER
+
+fn [DslTest] error_rule():
+    return error("Bad News")
+
+fn [DslTest] error_match():
+    return @accept error_rule
 
 fn [DslTest] expect_number():
     return @accept expect("Number", $['TOK_LITERAL_NUMBER])
@@ -52,6 +68,9 @@ fn [DslTest] one_or_more_numbers():
 
 fn [DslTest] number_list():
     return @accept $[number, many($[~'TOK_COMMA, number]), ~opt('TOK_COMMA)]
+
+fn [DslTest] flat_numbers():
+    return @accept $[cons(number, many(~'TOK_COMMA, number)), ~opt('TOK_COMMA)]
 
 fn [DslTest] required_number():
     return @expect("a number") number
@@ -237,3 +256,25 @@ check("bool number is true for number", r27, true)
 p28 := DslTest("a")
 r28 := p28 ! bool_number()
 check("bool number is false for letter", r28, false)
+
+# flatten($[number, many(number)]): the outer sequence captures a lone
+# number plus a many()-collected list; check we have 1 list
+p29 := DslTest("1, 2, 3,")
+r29 := p29 ! flat_numbers()
+check("flatten splices nested many() into one flat list", len(r29), 3)
+check("flatten preserves order", (r29[0]).kind == 'TOK_LITERAL_NUMBER and (r29[2]).kind == 'TOK_LITERAL_NUMBER, true)
+
+# flatten with only one number, no trailing repeats: many() collects an
+# empty list, should have 1 item
+p30 := DslTest("1")
+r30 := p30 ! flat_numbers()
+check("flatten with empty nested many() collapses to one element", len(r30), 1)
+
+# verify that an error reported by a subrule perculates through
+p31 := DslTest("1")
+r31 := p31 ! error_match()
+check("error propagates", r31 is error, true)
+
+check("apply_if with a match", DslTest("callme")!apply_dumb_fn(), 12345)
+check("apply_if without a match", DslTest("12345")!apply_dumb_fn(), 'NO_MATCH)
+check("apply_if with error", DslTest("make_error")!apply_dumb_fn_error() is error, true)
