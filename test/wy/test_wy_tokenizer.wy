@@ -71,11 +71,11 @@ test_token_stream("Hax Malformed", "0xZF", 'TOK_LITERAL_NUMBER, 'TOK_XID, 'TOK_E
 test_token_stream("Identifier", "a", 'TOK_XID, 'TOK_END)
 test_token_stream("Identifier with number", "a1", 'TOK_XID, 'TOK_END)
 test_token_stream("Number then identifier", "1a2", 'TOK_LITERAL_NUMBER, 'TOK_XID, 'TOK_END)
-test_token_stream("Keyword is xid", "fn", 'TOK_XID, 'TOK_END)
+test_token_stream("Hard keyword gets its own kind", "fn", 'TOK_KW_FN, 'TOK_END)
 
 test_token_stream("Function definition", "fn foo(count: int) -> int:",
-    'TOK_XID, # fn
-    'TOK_WS, 
+    'TOK_KW_FN,
+    'TOK_WS,
     'TOK_XID, # foo
     'TOK_LPAREN,
     'TOK_XID, # count
@@ -88,5 +88,13 @@ test_token_stream("Function definition", "fn foo(count: int) -> int:",
     'TOK_WS,
     'TOK_XID,
     'TOK_COLON)
+
+# A hard keyword is matched on its exact text - a longer identifier that
+# merely starts with one (e.g. "for" inside "forever") must still lex as
+# a plain identifier, not the keyword's kind.
+test_token_stream("Keyword-prefixed identifier stays an identifier", "forever classroom", 'TOK_XID, 'TOK_WS, 'TOK_XID, 'TOK_END)
+
+test_token_stream("Various hard keywords get their own kind", "var while class",
+    'TOK_KW_VAR, 'TOK_WS, 'TOK_KW_WHILE, 'TOK_WS, 'TOK_KW_CLASS, 'TOK_END)
 
 println("...Done")

@@ -29,15 +29,13 @@
 #     "text"                a soft keyword: a 'TOK_XID token whose text matches
 #     ~(subseq)             match `subseq`, but leave it out of the sequence's result
 #     bool(subseq)          if sequence matched, return true, false, return false
-#     oneplus(subseq)       one or more `subseq`; `'NO_MATCH` (not `[]`) if none matched
-#     onelist(subseq)       one item as a list
 #     many(subseq)          zero or more `term`, collected into a list
+#     manyflat(subseq)      flattened version of many(subseq)
 #     opt(subseq)           one or zero `term`; `nil` if not matched
-#     expect(note, subseq)  expect a token 
+#     expect(note, subseq)  expect a token
 #     value(sym, subseq)    if sequence matched, replace with the literal $[sym]
-#     call(value, subseq)   call if sequence replace with value
-#     flatten(subseq)       take subseq and flatten
-#     text(subseq)          if matched, replace with the matched token's source text
+#     push(sym)             unconditionally match, answering the literal $[sym],
+#                            without consuming any tokens
 #     cons(a, b)            match a, then b (exactly 2 terms), answer cons(a, b)
 #                            directly rather than the usual $[a, b] tuple
 #     first | subseq        attempt match first, if not matched, continue match on term
@@ -86,6 +84,25 @@
 #
 # The 'Token' type must have `.kind` returning the token kind symbol
 # and accept `get_text(buffer: str)` message.
+#
+# `@accept` additionally packrat-memoizes each site it expands at, keyed by
+# that site's own id (assigned once, at expansion time - see
+# `_next_accept_site_id`) combined with the token position the attempt
+# started from (positions are assumed unique within one parse). This needs:
+#
+#     get_cache(id: int, pos: int)         # see below
+#     put_hit(id: int, pos: int, end_pos: int, result)  # record a match
+#     put_miss(id: int, pos: int)          # record a failed match
+#     clear()                              # drop every memoized entry
+#
+# `get_cache` answers one of three things: `'NO_CACHE` if id/pos has never
+# been recorded (the caller must actually attempt the match); the memoized
+# `result` if it was a hit, after repositioning the cursor to `end_pos` (the
+# span a fresh match would have consumed); or `'NO_MATCH` if it was a
+# recorded miss, with no repositioning (a failed match never consumes
+# tokens). `clear()` is safe to call once nothing left uncommitted could
+# backtrack across the entries it drops - e.g. once a statement is fully
+# parsed.
 
 import wyrm::ast::*
 import std::pairs::(replace, chain)
@@ -171,21 +188,9 @@ fn $_many(match_expr):
 fn _decode_many(arg) -> pair:
     return mk_expand($_many::$ast, 'match_expr, _build_sequence_expr(arg))
 
-# --- onelist(subseq) match at least one of a sequence
-fn $_onelist(match_expr):
-    m := match_expr
-    if m == 'NO_MATCH or m is error:
-        m
-    else:
-        $[m]
-
-fn _decode_onelist(arg) -> pair:
-    return mk_expand($_onelist::$ast, 'match_expr, _decode_term(arg))
-
-
-# --- onplus(subseq) match at least one of a sequence
-fn $_oneplus(match_expr):
-    items := []
+# --- manyflat(subseq) flattened version of many
+fn $_manyflat(match_expr):
+    items := nil
     while true:
         _mark := this ! mark()
         m := match_expr
@@ -194,36 +199,17 @@ fn $_oneplus(match_expr):
             break
         if m is error:
             this ! reset(_mark)
-            return m
-        items ! append(m)
-    if len(items) != 0:
-        items
-    else:
-        'NO_MATCH
+            items = m
+            break
+        if m is pair or m is list or m is nil:
+            for x in m:
+                items = cons(x, items)
+        else:
+            items = cons(m, items)
+    reverse(items)
 
-fn _decode_oneplus(arg) -> pair:
-    return mk_expand($_oneplus::$ast, 'match_expr, _build_sequence_expr(arg))
-
-# --- flatten(subseq) match a sequence and splice one level of nested
-# pair lists/lists into a single flat list.
-fn $_flatten_tmpl(match_expr):
-    v := match_expr
-    if v == 'NO_MATCH:
-        v
-    elif v is error:
-        v
-    else:
-        out := nil
-        for x in v:
-            if x is pair or x is list or x is nil:
-                for y in x:
-                    out = cons(y, out)
-            else:
-                out = cons(x, out)
-        reverse(out)
-
-fn _decode_flatten(arg) -> pair:
-    return mk_expand($_flatten_tmpl::$ast, 'match_expr, _build_sequence_expr(arg))
+fn _decode_manyflat(arg) -> pair:
+    return mk_expand($_manyflat::$ast, 'match_expr, _build_sequence_expr(arg))
 
 # --- bool(subseq) an optional node that becomes true or false
 fn _tmpl_bool(match_expr):
@@ -256,22 +242,22 @@ fn _decode_value(repl, arg) -> pair:
         pair('match_expr, _build_sequence_expr(arg))
     )
 
-# --- text(subseq) replace a matched token with its source text
-fn $_tmpl_text(match_expr):
-    v := match_expr
-    if v == 'NO_MATCH or v is error:
-        v
-    else:
-        v ! get_text(this.buffer)
+# --- push(sym) unconditionally match the literal node $[sym], consuming
+# no tokens - useful for injecting a fixed marker into a sequence, e.g.
+# distinguishing which alternative of an `|` matched.
+fn $_tmpl_push(repl):
+    repl
 
-fn _decode_text(arg) -> pair:
-    return mk_expand($_tmpl_text::$ast, 'match_expr, _build_sequence_expr(arg))
+fn _decode_push(repl) -> pair:
+    if car(repl) != 'sym:
+        return error("push(): argument must be a bare symbol, e.g. push('foo)")
+    return mk_expand($_tmpl_push::$ast, 'repl, repl)
 
 # --- cons(a, b) match exactly two terms and answer their cons cell,
 # rather than the usual $[a, b] two-tuple. b is often itself a list-shaped
 # term (many(...), opt(recursive-rule), ...), so cons(a, b) prepends a onto
 # it directly - the go-to way to build a "one, then zero-or-more more"
-# list without flatten/onelist's list-vs-node ambiguity, e.g.:
+# list without a separate splice/flatten step, e.g.:
 #
 #     fn item_list():
 #         @accept cons(item, opt($[~'TOK_COMMA, item_list]))
@@ -321,12 +307,10 @@ fn _decode_call(node) -> pair:
     cname := s_get_name(callee)
     if cname == 'apply_if:
         return _decode_apply_if(car(args), cdr(args))
-    if cname == 'onelist:
-        return _decode_onelist(args[0])
-    if cname == 'oneplus:
-        return _decode_oneplus(args)
     if cname == 'many:
         return _decode_many(args)
+    if cname == 'manyflat:
+        return _decode_manyflat(args)
     if cname == 'opt:
         return _decode_opt(args)
     if cname == 'expect:
@@ -335,10 +319,8 @@ fn _decode_call(node) -> pair:
         return _decode_bool(args)
     if cname == 'value:
         return _decode_value(car(args), cdr(args))
-    if cname == 'flatten:
-        return _decode_flatten(args)
-    if cname == 'text:
-        return _decode_text(args)
+    if cname == 'push:
+        return _decode_push(args[0])
     if cname == 'cons:
         return _decode_cons(args)
     return error("@accept: unknown term form '" + str(cname) + "'")
@@ -405,7 +387,7 @@ fn _is_drop(node) -> bool:
 fn _build_sequence_steps(remaining, n_capture_count) -> pair:
     if remaining == nil:
         if n_capture_count == 0:
-            return $[]
+            return NIL_EXPR
         if n_capture_count == 1:
             return $['index, $['name, '_acc], $['int, 0]]
         else:
@@ -465,10 +447,37 @@ fn _sequence_elements(node) -> list:
 # Decorators
 # -----------------------------------------------------------------------------
 
+# @brief packrat memoization
+#
+# See contract for requirements
+fn $_accept_cache(_site_id, seq_expr):
+    _accept_start := this ! mark()
+    _accept_cached := this ! get_cache(_site_id, _accept_start)
+    if _accept_cached != 'NO_CACHE:
+        _accept_cached
+    else:
+        _accept_result := seq_expr
+        if _accept_result == 'NO_MATCH:
+            this ! put_miss(_site_id, _accept_start)
+        elif _accept_result is not error:
+            this ! put_hit(_site_id, _accept_start, this ! mark(), _accept_result)
+        _accept_result
+
+# static id associated with number of times decorator has expanded
+# NOTE: this is unsafe - need to document semantics for decorator mutations!
+fn _next_accept_site_id() -> int:
+    static id: int = 0
+    id = id + 1
+    return id
+
 fn [TreeBase] accept():
     s := sexpr(this)
     elements := _sequence_elements(s)
-    return _build_sequence_expr(elements)
+    seq := _build_sequence_expr(elements)
+    site_id := _next_accept_site_id()
+    return mk_expand_n($_accept_cache::$ast,
+        pair('_site_id, $['int, site_id]),
+        pair('seq_expr, seq))
 
 
 fn $_expect(match_expr, desc):
@@ -483,14 +492,5 @@ fn [TreeBase] expect(desc):
     seq := _build_sequence_expr(elements)
     return mk_expand_n($_expect::$ast, pair('match_expr, seq), pair('desc, $['str, desc]))
 
-fn result_if_parse(value, parse):
-    if parse == 'NO_MATCH or parse is error:
-        parse
-    else:
-        value
-
-fn compose_if_parse(functor, parse):
-    if parse == 'NO_MATCH or parse is error:
-        parse
-    else:
-        functor(parse)
+fn is_match(result):
+    result is not error and result != 'NO_MATCH

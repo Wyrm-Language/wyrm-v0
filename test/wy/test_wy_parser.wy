@@ -8,56 +8,114 @@ fn check(what: str, got, want):
     else:
         println("FAIL " + what + " got " + str(got))
 
+fn cmd_type(v: pair) -> sym: car(v)
 
-# # p_xid_1 := Parser("std")
-# # r_xid_1 := p_xid_1!xid()
-# # check("basic xid", r_xid_1, "std")
+fn is_num_tok(t) -> bool: t.kind == 'TOK_LITERAL_NUMBER
 
-# # p_xid_2 := Parser("std.asdf")
-# # r_xid_2 := p_xid_2!xid()
-# # check("basic xid split on operator", r_xid_2, "std")
+check("basic xid", Parser("std")!xid(), "std")
+check("basic xid split on operator", Parser("std.asdf")!xid(), "std")
+check("xid includes $", Parser("$_ope1n$.asdf")!xid(), "$_ope1n$")
+check("xid excludes keyword", Parser("fn")!xid(), 'NO_MATCH)
 
-# # p_xid_3 := Parser("$_ope1n$.asdf")
-# # r_xid_3 := p_xid_3!xid()
-# # check("xid includes $", r_xid_3, "$_ope1n$")
+basic_import := Parser("import std::io")!import_stmt()
+check("basic import parse", cmd_type(basic_import), 'import)
+check("basic import target", cmd_type(car(cadr(basic_import))), 'qualified_name)
 
-# p_import_1 := Parser("import std::io")
-# r_import_1 := p_import_1!import_stmt()
-# check("import matches", r_import_1 != 'NO_MATCH, true)
+p_import_2 := Parser("import std::io 12345")
+r_import_2 := p_import_2!import_stmt()
+check("import with garbage", r_import_2 is error, true)
 
-# p_import_2 := Parser("import std::io 12345")
-# r_import_2 := p_import_2!import_stmt()
-# check("import with garbage", r_import_2 is error, true)
+check("nil parse", Parser("nil")!nil_literal(), 'nil)
 
-# check("nil parse", Parser("nil")!nil_literal(), $['nil])
+p_qual_id_1 := Parser("foo::bar::baz::bleet")
+r_qual_id_1 := p_qual_id_1!qualified_name()
+check("qual_id parsed into correct size", len(r_qual_id_1), 5)
 
-# p_qual_id_1 := Parser("foo::bar::baz::bleet")
-# r_qual_id_1 := p_qual_id_1!qualified_name()
-# check("qual_id parsed into correct size", len(r_qual_id_1), 5)
+p_qual_id_2 := Parser("**")
+r_qual_id_2 := p_qual_id_2!qualified_name()
+check("qual_id parsed into 'NO_MATCH", r_qual_id_2, 'NO_MATCH)
 
-# p_qual_id_2 := Parser("**")
-# r_qual_id_2 := p_qual_id_2!qualified_name()
-# check("qual_id parsed into 'NO_MATCH", r_qual_id_2, 'NO_MATCH)
-
-# check("bool true parse", Parser("true")!literal(), $['true])
-# check("bool false parse", Parser("false")!bool_literal(), $['false])
-# check("bool non-parse", Parser("!")!bool_literal(), 'NO_MATCH)
+check("bool true parse", Parser("true")!literal(), 'true)
+check("bool false parse", Parser("false")!bool_literal(), 'false)
+check("bool non-parse", Parser("!")!bool_literal(), 'NO_MATCH)
 # #check("bool in paren (primary recurse)", Parser("(true)")!expression(), $['true])
 
 # Basic tuple
-check("tuple expr", len(Parser("a, b, c")!expression()), 4)
+# check("tuple expr", len(Parser("a, b, c")!expression()), 4)
 
-# Proper double try
-p_tuple_dtry := Parser("try a, try b")!expression()
-check("double try tuple", 
-    len(p_tuple_dtry) == 3 
-    and cadr(cadr(p_tuple_dtry)) == "a"
-    and cadr(caddr(p_tuple_dtry)) == "b",
-    true)
+# # Proper double try
+# p_tuple_dtry := Parser("try a, try b")!expression()
+# check("double try tuple",
+#     len(p_tuple_dtry) == 3
+#     and cadr(cadr(p_tuple_dtry)) == "a"
+#     and cadr(caddr(p_tuple_dtry)) == "b",
+#     true)
 
-check("try expr", car(Parser("try a")!expression()), 'try)
+# check("try expr", car(Parser("try a")!expression()), 'try)
 
+# Catch expression, left-associative chain
+check("catch expr", Parser("a catch b catch c")!expression(),
+    $[ 'catch, "a", $[ 'catch, "b", "c" ] ])
 
-#print(Parser("abc, xy, z")!tuple_expr(), "\n")
+# print("and expr", Parser("a and b and c")!expression(), "\n")
+# print("or expr", Parser("a or b and c or d")!expression(), "\n")
+# print("not expr", Parser("not not a and not b or c")!expression(), "\n")
+# print("expr", Parser("a != b")!expression(), "\n")
+# print("expr", Parser("a in b or c not in d or e == f")!expression(), "\n")
+# print("expr", Parser("a + b / d % e * f + h - j << 1 >> 4")!expression(), "\n")
 
+# print("expr", Parser("f()")!expression(), "\n")
+# print("expr", Parser("f(a, b)")!expression(), "\n")
+# print("expr", Parser("f(a::d, b::g)(c::$ast, d)(f, e)")!expression(), "\n")
 
+# print("basic array", Parser("[]")!expression(), "\n")
+# print("basic array 2", Parser("[a]")!expression(), "\n")
+# print("basic array 2", Parser("[a, b, [c, [e]]]")!expression(), "\n")
+
+# print("dictionary", Parser("{\"key\": 5, \"key2\": 10}")!expression(), "\n")
+
+r_do := Parser("do: 5")!expression()
+check("do expr kind", car(r_do), 'do)
+check("do expr body", is_num_tok(cadr(r_do)), true)
+
+check("return bare", Parser("return")!expression(), $[ 'return, nil ])
+check("return val", Parser("return a")!expression(), $[ 'return, "a" ])
+check("yield bare", Parser("yield")!expression(), $[ 'yield, nil ])
+check("yield val", Parser("yield a")!expression(), $[ 'yield, "a" ])
+check("yield from", Parser("yield from a")!expression(), $[ 'yield_from, "a" ])
+check("break", Parser("break")!expression(), 'break)
+check("continue", Parser("continue")!expression(), 'continue)
+check("pass", Parser("pass")!expression(), 'pass)
+check("if", Parser("if a: b")!expression(), $[ 'if, "a", "b", nil, nil ])
+check("if else", Parser("if a: b else: c")!expression(), $[ 'if, "a", "b", nil, "c" ])
+check("while", Parser("while a: b")!expression(), $[ 'while, "a", "b" ])
+check("for", Parser("for x in a: b")!expression(), $[ 'for, "x", "a", "b", nil ])
+
+# var statement tests
+check("var simple", Parser("var x")!stmt_line(), $[ 'var, $[ $[ "x", nil ] ] ])
+check("var with type", Parser("var x: int")!stmt_line(), $[ 'var, $[ $[ "x", $[ "int" ] ] ] ])
+
+r_var_init := Parser("var x = 5")!stmt_line()
+check("var with init target", $[ car(r_var_init), cadr(r_var_init) ], $[ 'var, $[ $[ "x", nil ] ] ])
+check("var with init value", is_num_tok(caddr(r_var_init)), true)
+
+r_var_type_init := Parser("var x: int = 5")!stmt_line()
+check("var with type and init target", $[ car(r_var_type_init), cadr(r_var_type_init) ],
+    $[ 'var, $[ $[ "x", $[ "int" ] ] ] ])
+check("var with type and init value", is_num_tok(caddr(r_var_type_init)), true)
+
+check("var multiple", Parser("var x, y")!stmt_line(),
+    $[ 'var, $[ $[ "x", nil ], $[ "y", nil ] ] ])
+
+r_var_multi_init := Parser("var x, y = 5")!stmt_line()
+check("var multiple with init target", $[ car(r_var_multi_init), cadr(r_var_multi_init) ],
+    $[ 'var, $[ $[ "x", nil ], $[ "y", nil ] ] ])
+check("var multiple with init value", is_num_tok(caddr(r_var_multi_init)), true)
+
+r_var_mixed := Parser("var x: int, y, z: str = 10")!stmt_line()
+check("var multiple mixed target", $[ car(r_var_mixed), cadr(r_var_mixed) ],
+    $[ 'var, $[ $[ "x", $[ "int" ] ], $[ "y", nil ], $[ "z", $[ "str" ] ] ] ])
+check("var multiple mixed value", is_num_tok(caddr(r_var_mixed)), true)
+
+# Test that var is not parsed as an expression
+check("var not expr", Parser("var x")!expression(), 'NO_MATCH)

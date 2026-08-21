@@ -5,6 +5,10 @@
 .cache
 .wyrm
 
+# Caches
+*.wyc
+__wycache__
+
 # Generate python
 py/
 

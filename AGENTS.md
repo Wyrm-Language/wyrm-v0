@@ -30,7 +30,29 @@ Run a single doctest test case by name:
 ./buildDir/src/test/test_cwyrm --test-case="test name"
 ```
 
-## Coding Standards
+## Wyrm Logic
+
+Wyrm logic all follows the syntax defined in [language-spec.md](doc/language-spec.md)
+and grammar specified in [grammar.md](doc/grammar.md).
+
+This repository is intended to support bootstrapping .wy sources using a pre-existing
+installation or staged build. Prefer the default 'wyrm' in user `$PATH` if it is
+present -- this installation is the stable variant of the language and will avoid
+confusion caused by incomplete/experimental implementations provided here.
+
+Scripts do expect the `wy` folder to be operative in path. To run a script:
+
+```sh
+wyrm -Iwy script_path.wy
+```
+
+To test a script for syntax:
+
+```sh
+wyrm -Iwy --check script_path.wy
+```
+
+## C/C++ Coding Standards
 
 - Core code is highly portable C11 with platform code segregated into platform subdirs
 - C++ portions require C++23 and should follow MISRA C++ 2023

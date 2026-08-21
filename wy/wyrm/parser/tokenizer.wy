@@ -2,6 +2,11 @@
 
 import std::ctype::*
 
+#>  ## Lexical Conventions
+#>
+#>  ## Basics
+#>
+#>  Wyrm files shall be encoded in UTF-8.
 
 # Scanned Token from the Scanner
 #
@@ -11,30 +16,6 @@ import std::ctype::*
 #   'TOK_LITERAL_CHAR       grammar literal_char
 #   'TOK_LITERAL_NUMBER     grammar literal_int
 #   'TOK_LITERAL_SYM        grammar literal_sym
-#
-#   'TOK_EXPONENT '**'
-#   'TOK_LBRACE_S '${'
-#   'TOK_RARROW   '->'
-#   'TOK_LARROW   '<-'
-#   'TOK_LE       '<='
-#   'TOK_GE       '>='
-#   'TOK_DEQUAL   '=='
-#   'TOK_NE       '!='
-#   'TOK_BIND     ':='
-#   'TOK_QEQ      '?='
-#   'TOK_SCOPE    '::'
-
-#   'TOK_MUL       '*'
-#   'TOK_BANG      '!'
-#   'TOK_MOD       '%'
-#   'TOK_XOR       '^'
-#
-#   'TOK_LPAREN    '('
-#   'TOK_RPAREN    ')'
-#   'TOK_COLON     ':'
-#   'TOK_SEMICOLON ';'
-#   'TOK_OR        '|'
-#   'TOK_AND       '&'
 # 
 # Types to be handled by parser:
 #   'TOK_XID                word/name/identifier
@@ -42,64 +23,122 @@ import std::ctype::*
 #   'TOK_NEWLINE            end of a line
 #   'TOK_COMMENT            a comment
 #
-# Emitted by TokenStream only, never by the Scanner:
-#   'TOK_INDENT             a line opened a deeper indent level
-#   'TOK_DEDENT             a line closed one indent level
+#   'TOK_KW_*               a hard keyword (see _HARD_KEYWORDS below) -
+#                           an xid-shaped word never lexes as 'TOK_XID
+#                           when its text is one of these, so the parser
+#                           can match it directly by token kind instead of
+#                           comparing text
+#
 
+# Triple Character Operators
 _TRIPLE_CHARS := [
- ('TOK_SPACESHIP, \<, \=, \>),
- ('TOK_ELLIPSIS, \., \., \.)
+ ('TOK_SPACESHIP, \<, \=, \>),  # 'TOK_SPACESHIP    <=>     Reserved
+ ('TOK_ELLIPSIS, \., \., \.)    # 'TOK_ELLIPSIS     ...     Ellipsis
 ]
 
+# Dual Character Operators
 _DUAL_CHARS := [
- ('TOK_EXPONENT, \*, \*),
- ('TOK_LBRACE_S, \$, \{),
- ('TOK_LBRACKET_S, \$, \[),
- ('TOK_RARROW, \-, \>),
- ('TOK_LARROW, \<, \-),
+ ('TOK_EXPONENT, \*, \*),       # 'TOK_EXPONTENT    **      Exponent
+ ('TOK_LBRACE_S, \$, \{),       # 'TOK_LBRACE_S     ${      Reserved
+ ('TOK_LBRACKET_S, \$, \[),     # 'TOK_LBRACKET_S   $[      Scheme Pair 
+ ('TOK_RARROW, \-, \>),         # 'TOK_RARROW       ->      Return decorator
+ ('TOK_LARROW, \<, \-),         # 'TOK_LARROW       <-      Cooroutine Inparem
 
- ('TOK_LSHIFT, \<, \<),
- ('TOK_RSHIFT, \>, \>),
+ ('TOK_LSHIFT, \<, \<),         # 'TOK_LSHIFT       <<      Left shift   
+ ('TOK_RSHIFT, \>, \>),         # 'TOK_RSHIFT       >>      Right shift
 
- ('TOK_LE, \<, \=),
- ('TOK_GE, \>, \=),
- ('TOK_NE, \!, \=),
- ('TOK_DEQUAL, \=, \=),
- ('TOK_BIND, \:, \=),
- ('TOK_SCOPE, \:, \:),
- ('TOK_QEQ, \?, \=)
+ ('TOK_LE, \<, \=),             # 'TOK_LE           <=      Less than equal
+ ('TOK_GE, \>, \=),             # 'TOK_GE           >=      Greater than equal
+ ('TOK_NE, \!, \=),             # 'TOK_NE           !=      Not equal
+ ('TOK_DEQUAL, \=, \=),         # 'TOK_DEQUAL       ==      Equality check
+ ('TOK_BIND, \:, \=),           # 'TOK_BIND         :=      Define name as value
+ ('TOK_SCOPE, \:, \:),          # 'TOK_SCOPE        ::      Scope resolution
+ ('TOK_QEQ, \?, \=)             # 'TOK_QEQ          ?=      Assign if error
 ]
 
 _S_CHARS := [
-    ('TOK_PLUS, \+),
-    ('TOK_MINUS, \-),
-    ('TOK_MUL, \*),
-    ('TOK_DIV, \/),
-    ('TOK_MOD, \%),
-    ('TOK_EQUAL, \=),
-    ('TOK_LT, \<),
-    ('TOK_GT, \>),
-    ('TOK_DOT, \.),
+    ('TOK_SEMICOLON, \; ),      # 'TOK_SEMICOLON    ;       End of statement
+    ('TOK_COMMA, \, ),          # 'TOK_COMMA        ,       Field separator
+    ('TOK_COLON, \: ),          # 'TOK_COLON        :       Block start
+    ('TOK_AT, \@ ),             # 'TOK_AT           @       Decorator start
 
+    ('TOK_LPAREN, \( ),         # 'TOK_LPAREN       (       Grouping, tuple
+    ('TOK_RPAREN, \) ),         # 'TOK_RPAREN       )       Grouping, tuple
+    ('TOK_LBRACE, \{ ),         # 'TOK_LBRACE       {       Block/dict start
+    ('TOK_RBRACE, \} ),         # 'TOK_RBRACE       }       Block/dict end
+    ('TOK_LBRACKET, \[ ),       # 'TOK_LBRACKET     [       Start index, list
+    ('TOK_RBRACKET, \] ),       # 'TOK_RBRACKET     ]       End index, list
 
-    ('TOK_XOR, \^),
-    ('TOK_OR, \|),
-    ('TOK_AND, \&),
+    ('TOK_EQUAL, \=),           # 'TOK_EQUAL        =       Setter
+    ('TOK_BANG, \! ),           # 'TOK_BANG         !       Message operator
+    ('TOK_DOT, \.),             # 'TOK_DOT          .       Attribute access
 
-    ('TOK_COMMA, \, ),
-    ('TOK_COLON, \: ),
-    ('TOK_SEMICOLON, \; ),
-    ('TOK_BANG, \! ),
+    ('TOK_PLUS, \+),            # 'TOK_PLUS         +       Addition
+    ('TOK_MINUS, \-),           # 'TOK_MINUS        -       Subtraction
+    ('TOK_MUL, \*),             # 'TOK_MUL          *       Multiplication
+    ('TOK_DIV, \/),             # 'TOK_DIV          /       Divison
+    ('TOK_MOD, \%),             # 'TOK_MOD          %       Modulo
+    ('TOK_LT, \<),              # 'TOK_LT           <       Less than
+    ('TOK_GT, \>),              # 'TOK_GT           >       Greater than
+    ('TOK_XOR, \^),             # 'TOK_XOR          ^       Exclusive or
+    ('TOK_OR, \|),              # 'TOK_OR           |       Or, Disjunction
+    ('TOK_AND, \&),             # 'TOK_AND          &       And, Conjunction
 
-    ('TOK_TILDE, \~ ),
-    ('TOK_AT, \@ ),
-    ('TOK_LPAREN, \( ),
-    ('TOK_RPAREN, \) ),
-    ('TOK_LBRACE, \{ ),
-    ('TOK_RBRACE, \} ),
-    ('TOK_LBRACKET, \[ ),
-    ('TOK_RBRACKET, \] )
+    ('TOK_TILDE, \~ )           # 'TOK_TILDE        ~       Bit invert unary
 ]
+
+#>  ### Keywords
+#>
+#>  Keywords are considered own tokens:
+#>      **and, break, catch, class, co, continue, defer, do, elif,
+#>      else, emit, false, fn, for, from, if, import, in, is,
+#>      nil, not, or, pass, return, signal, slot
+#>      static, task, thread, true, try, var, while, with, yield**
+#>
+
+_HARD_KEYWORDS := [
+    ("and", 'TOK_KW_AND),
+    ("break", 'TOK_KW_BREAK),
+    ("catch", 'TOK_KW_CATCH),
+    ("class", 'TOK_KW_CLASS),
+    ("co", 'TOK_KW_CO),
+    ("continue", 'TOK_KW_CONTINUE),
+    ("defer", 'TOK_KW_DEFER),
+    ("do", 'TOK_KW_DO),
+    ("elif", 'TOK_KW_ELIF),
+    ("else", 'TOK_KW_ELSE),
+    ("emit", 'TOK_KW_EMIT),
+    ("false", 'TOK_KW_FALSE),
+    ("fn", 'TOK_KW_FN),
+    ("for", 'TOK_KW_FOR),
+    ("from", 'TOK_KW_FROM),
+    ("if", 'TOK_KW_IF),
+    ("import", 'TOK_KW_IMPORT),
+    ("in", 'TOK_KW_IN),
+    ("is", 'TOK_KW_IS),
+    ("nil", 'TOK_KW_NIL),
+    ("not", 'TOK_KW_NOT),
+    ("or", 'TOK_KW_OR),
+    ("pass", 'TOK_KW_PASS),
+    ("return", 'TOK_KW_RETURN),
+    ("signal", 'TOK_KW_SIGNAL),
+    ("slot", 'TOK_KW_SLOT),
+    ("static", 'TOK_KW_STATIC),
+    ("task", 'TOK_TASK),
+    ("thread", 'TOK_THREAD),
+    ("true", 'TOK_KW_TRUE),
+    ("try", 'TOK_KW_TRY),
+    ("var", 'TOK_KW_VAR),
+    ("while", 'TOK_KW_WHILE),
+    ("with", 'TOK_KW_WITH),
+    ("yield", 'TOK_KW_YIELD)
+]
+
+fn _lookup_keyword(text: str) -> sym | nil:
+    for entry in _HARD_KEYWORDS:
+        if entry[0] == text:
+            return entry[1]
+    return nil
 
 class Token:
     slot kind: sym | error  #< Identified type of token
@@ -117,9 +156,34 @@ class Token:
 fn _get_char(buffer: str, cur_pos: int) -> int | sym:
     return buffer[cur_pos] catch 'EOF
 
-# Newlines
+#>  ### Newlines
+#>
+#>  Newlines are substantial. Supported line termination is CR, CRLF, LF.
+#>  Whitespace and comments may appear between any two tokens and are
+#>  ignored with the exception of leading whitespace for the offside
+#>  rule.
+#>
+
+# Parse newline
 fn _is_newline(ch: int) -> bool:
     return ch == \return or ch == \newline
+
+#>  ### Comments
+#>
+#>  _Example_: `# This is a comment`
+#>
+#>  ```ebnf
+#>  comment ::= "#" , { any_char - newline } , newline ;
+#>  ```
+#>
+
+
+#>  ### Line Continuations
+#>
+#>  A line ending with a \ outside of a is a continuation. A continuation
+#>  allows the string to span multiple lines, and is treated as an escape
+#>  that is deleted from the string.
+#>
 
 fn _scan_escape_nl_break(buffer: str, cur_pos: int) -> int | nil:
     next_c := _get_char(buffer, cur_pos)
@@ -132,25 +196,6 @@ fn _scan_escape_nl_break(buffer: str, cur_pos: int) -> int | nil:
     if c1 == \return or c1 == \newline:
         return cur_pos + 2
     return nil
-
-# Scan whitespace
-fn _find_end_whitespace(buffer: str, cur_pos: int) -> int:
-    idx := cur_pos
-    next_c := _get_char(buffer, idx)
-    while (next_c != 'EOF):
-        if _is_newline(next_c):
-            return idx        
-        if is_space(next_c):
-            idx = idx + 1
-        elif next_c != \\:
-            return idx
-        else:
-            break_idx := _scan_escape_nl_break(buffer, idx)
-            if break_idx == nil:
-                return idx
-            idx = break_idx
-        next_c = _get_char(buffer, idx)
-    return idx
 
 # Scan to EOL (including line joining) or EOF
 fn _scan_to_eol(buffer: str, cur_pos: int) -> int:
@@ -175,10 +220,76 @@ fn _scan_to_eol_raw(buffer: str, cur_pos: int) -> int:
         next_c = _get_char(buffer, idx)
     return idx
 
-# Digits
-#
-# **Grammar**:
-#    digits        ::= digit , { digit | "_" } ;
+
+#>  ### Offside rule tokens
+#>  The offside rule is applied whenver no open grouping or
+#>  string operator is active at the beginning of a line.
+#>  Whitespace at the beginning of a line **must match**.
+#>
+#>  An 'indent' is determined by a line including extra
+#>  whitespace prior to active code. An indent level is
+#>  defined by the the whitespace added.
+#>
+#>  A 'dedent' is determined by return to a previous
+#>  indentation level. A DEDENT token is emitted for each
+#>  INDENT until the whitespace matches.
+#>
+#>  ```ebnf
+#>  NEWLINE         ::= (* virtual statement-separator token, emitted by lexer *) ;
+#>  INDENT          ::= (* virtual token: rise in layout column *) ;
+#>  DEDENT          ::= (* virtual token: fall in layout column *) ;
+#>  ```
+
+# Scan whitespace
+fn _find_end_whitespace(buffer: str, cur_pos: int) -> int:
+    idx := cur_pos
+    next_c := _get_char(buffer, idx)
+    while (next_c != 'EOF):
+        if _is_newline(next_c):
+            return idx        
+        if is_space(next_c):
+            idx = idx + 1
+        elif next_c != \\:
+            return idx
+        else:
+            break_idx := _scan_escape_nl_break(buffer, idx)
+            if break_idx == nil:
+                return idx
+            idx = break_idx
+        next_c = _get_char(buffer, idx)
+    return idx
+
+#>  ### Numbers
+#>
+#>  _Example_:
+#>
+#>    * `0xfeed`
+#>    * `1_234_567`
+#>    * `1e-9`
+#>    * `0xfeed_beef`
+#>    * `1.2345_687e-9`
+#> 
+#>  (* Numbers are unsigned at the lexical level; a leading "-" or "+" is
+#>     unary_expr's job, not the lexer's. *)
+#> ```ebnf
+#>   int_literal ::= digit , { digit | "_" }
+#>                   | "0x" , hex_digit , { hex_digit | "_" }
+#>                   | "0b" , bin_digit , { bin_digit | "_" } ;
+#>   float_literal ::= digit , { digit | "_" } , "." , digit , { digit | "_" } ,
+#>                     [ ( "e" | "E" ) , [ "+" | "-" ] , digit , { digit } ]
+#>                     | digit , { digit | "_" } ,
+#>                     ( "e" | "E" ) , [ "+" | "-" ] , digit , { digit } ;
+#>  ```
+#>
+
+#>  #### Digits
+#>
+#> ```ebnf
+#>  digits ::= digit , { digit | "_" } ;
+#>  digit ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+#>  ```
+#>
+
 fn _scan_digits(buffer: str, cur_pos: int) -> int | nil:
     idx := cur_pos
     next_c := _get_char(buffer, idx)
@@ -189,10 +300,14 @@ fn _scan_digits(buffer: str, cur_pos: int) -> int | nil:
         next_c = _get_char(buffer, idx)
     return idx
 
-# Hexadecimal Digits
-#
-# **Grammar**:
-#   hexdigits     ::= hexdigit , { hexdigit | "_" } ;
+#>  #### Hexadecimal Digits
+#>
+#> ```ebnf
+#>  
+#>  hexdigits     ::= hexdigit , { hexdigit | "_" } ;
+#>  hex_digit     ::= digit | "a" | "b" | "c" | "d" | "e" | "f"
+#>                          | "A" | "B" | "C" | "D" | "E" | "F" ;
+#> ```
 fn _scan_hexdigits(buffer: str, cur_pos: int) -> int | nil:
     idx := cur_pos
     next_c := _get_char(buffer, idx)
@@ -203,10 +318,14 @@ fn _scan_hexdigits(buffer: str, cur_pos: int) -> int | nil:
         next_c = _get_char(buffer, idx)
     return idx
 
-# Binary Digits
-#
-# **Grammar**:
-#    bindigits     ::= bindigit , { bindigit | "_" } ;
+#>  #### Binary Digits
+#>
+#> ```ebnf
+#>      bindigits     ::= bindigit , { bindigit | "_" } ;
+#>  ```
+#>
+
+# Scan binary digits
 fn _scan_bindigits(buffer: str, cur_pos: int) -> int | nil:
     idx := cur_pos
     next_c := _get_char(buffer, idx)
@@ -217,10 +336,14 @@ fn _scan_bindigits(buffer: str, cur_pos: int) -> int | nil:
         next_c = _get_char(buffer, idx)
     return idx
 
-# Exponent portion of an integer.
-#
-# **Grammar**
-#    exponent      ::= ( "e" | "E" ) , [ "+" | "-" ] , digits ;
+#>  #### Exponent_
+#>
+#> ```ebnf
+#>  exponent      ::= ( "e" | "E" ) , [ "+" | "-" ] , digits ;
+#> ```
+#>
+
+# Scan exponent
 fn _scan_exponent(buffer: str, cur_pos: int) -> int | nil:
     idx := cur_pos
     next_c := _get_char(buffer, idx)
@@ -231,6 +354,28 @@ fn _scan_exponent(buffer: str, cur_pos: int) -> int | nil:
     if next_c == \+ or next_c == \-:
         idx = idx + 1
     return _scan_digits(buffer, idx)
+
+#> ### Identifiers and Symbols
+#>
+#> Identifiers follow normal Unicode 'xid' and 'xid-continuation' character
+#> rules with the additional allowance of '$' - '$' may appear anywhere in
+#> the identifier, including as the entire identifier by itself; it is not
+#> required to be followed by a letter.
+#>
+#> A symbol literal is either an xid-shaped name (note: NOT the wyrm-widened
+#> identifier rule above - '$' is not part of a symbol name) or one of a
+#> fixed whitelist of operator spellings (see _OPERATOR_SYMBOLS below).
+#> Nothing else is a legal symbol; e.g. `'@` is a lex error, not a symbol.
+#>
+#> ```ebnf
+#>    identifier      ::= ( xid_start | "$" ) , { xid_continue | "$" } ;
+#>    symbol_literal  ::= "'" , ( xid_name | operator_symbol ) ;
+#>                   (* At least 31 significant characters recognized.
+#>                      A symbol's name may be a reserved word ('fn, 'return,
+#>                      'if): they are node kinds in the canonical s-expression
+#>                      format, so the literal is lexed whole rather than as
+#>                      "'" followed by a name. *)
+#> ```
 
 # Scan an xid character
 fn _scan_xid(buffer: str, cur_pos: int) -> int | nil:
@@ -428,8 +573,9 @@ class Scanner:
         return this ! _advance_with_token(error("unexpected token"), this.cur_pos + 1)
 
     # Scan xid
-    #   An xid is a separated word (delimated by spaces or error tokens)
-    #   This must be disambiguated by the parser - into keyword, identifier, etc...
+    #   An xid is a separated word (delimated by spaces or error tokens).
+    #   A word whose exact text is a hard keyword (see _HARD_KEYWORDS) is
+    #   retokenized to that keyword's own kind rather than 'TOK_XID.
     fn _scan_xid_token() -> Token | nil:
         idx := this.cur_pos
         next_c := _get_char(this.buffer, idx)
@@ -440,6 +586,10 @@ class Scanner:
         while next_c != 'EOF and is_wy_xid_continue(next_c):
             idx = idx + 1
             next_c = _get_char(this.buffer, idx)
+        text := this.buffer ! substr(this.cur_pos, idx - this.cur_pos)
+        kind := _lookup_keyword(text)
+        if kind != nil:
+            return this ! _advance_with_token(kind, idx)
         return this ! _advance_with_token('TOK_XID, idx)
 
     # Scan comment
@@ -473,23 +623,6 @@ class Scanner:
         return this ! _advance_with_token('TOK_STR, idx + len(end_seq))
 
     # Generate numeric tokens
-    #
-    # Token Types: TOK_LITERAL_NUMBER
-    #
-    # **Grammar**:
-    #
-    #    literal_float ::= digits , ( "." , digits , [ exponent ] | exponent ) ;
-    #    literal_int   ::= digits | ("0x" | "0X") , hexdigits | ("0b" | "0B"), bindigits;
-    #
-    # **Grammar Examples**:
-    #   0xde_ad
-    #   0XDEAD
-    #   0b0001
-    #   0b0
-    #   1.2e34
-    #   1E40
-    #   0124
-    #   00.0_0
     fn _scan_number() -> Token | nil:
         ch0 := _get_char(this.buffer, this.cur_pos)
         ch1 := _get_char(this.buffer, this.cur_pos + 1)
@@ -661,3 +794,4 @@ class TokenStream:
             this ! _push(cur)
             cur = scanner ! scan()
         return this.tokens
+

@@ -1,50 +1,19 @@
 
-## Language Syntax And Parsing
+## Semantic Explanation of Grammar
+
+The full grammar is formally defined in [grammar.md](grammar.md).
+This section defines informal details.
 
 ### Top-Level
 
 A wyrm module is a list of statements. Every statement produces
 a result. Any standalone expression is the value of the expression.
 
-The statement rule is valid for all special statements: `fn`,
-`class`, `do`, `with`, `import`
-
-### File Encoding
-
-Wyrm files shall be encoded in UTF-8.
-
 ### Statements and Blocks
 
-Newlines are substantial. Supported line termination is CR, CRLF, LF.
-Whitespace and comments may appear between any two tokens and are
-ignored with the exception of leading whitespace for the offside
-rule. Newlines are emitted as BREAK tokens. Alternatively, a SEMICOLON
-is also a BREAK token.
-
-A line ending with a \ outside of a is a continuation. A continuation
-allows the string to span multiple lines, and is treated as an escape
-that is deleted from the string. .
-
 Wyrm follows Python's general offside rules with an additional allowance
-for brace style code. The prefferred style is that of Python, braces are
+for brace style code. The preferred style is that of Python, braces are
 intended to allow one-liners and compressed scripts. 
-
-Whitespace preceeding non-comment characters outside a block formed by 
-grouping operators or strings form an indent. An INDENT mark is emitted
-when a line is indented further and pushed onto the the stack. When
-the indentation is shorter, a DEDENT mark is emitted for each closing
-element. Grouping characters include {} [] (). INDENT, DEDENT, and
-NEWLINE operations are ignored within. This means and offside rule
-block can not nest under a brace block.
-
-    block  ::= "{" , expression_list , "}"
-                | ":" BREAK INDENT , expression_list , DEDENT ;
-    expression_list  ::= expression , { BREAK , expression } , [ BREAK ] ;
-
-Example:
-    if name:
-    ->->->->print("Hello")  # Single tab indent
-    ........print("Bar")    # Invalid - whitespace mismatch
 
 ### Comments
 
@@ -52,28 +21,12 @@ A comment begins with '#' and goes to the end of a line.
 
 ### Literals / Atoms
 
-    literal_expr:
-      | signed_number
-      | strings
-      | character
-      | literal_symbol
-      | literal_bool
-      | literal_nil
-
 The value of any literal as a statement is the literal.
-
 
 #### Identifiers
 
 Identifiers are used for variable names, functions, classes, modules. A
-standalone identifier will evaluate.
-
-_Grammar_
- 
-    (* Note: xid_start and xid_continue require Unicode support, ASCII
-       simplification is letters with underscore and added digits *)
-
-    identifier      ::= xid_start | $, { xid_continue } ;
+standalone identifier will evaluate to its underyling value.
 
 _Example_
 
@@ -82,24 +35,8 @@ _Example_
 
 #### Numbers
 
-_Grammar_
-
-    (* The +/- is handled as a unary operator preceeding the literal.
-        literal_float ::= [ ("-" | "+") ] literal_float
-        literal_int   ::= [ ("-" | "+") ] literal_int  *)
-
-    literal_float ::= digits , ( "." , digits , [ exponent ] | exponent ) ;
-    literal_int   ::= digits | ("0x" | "0X") , hexdigits | ("0b" | "0B"), bindigits;
-
-    bindigit      ::= "0" | "1" ;
-    digit         ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
-    hexdigit      ::= digit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F" ;
-
-    digits        ::= digit , { digit | "_" } ;
-    bindigits     ::= bindigit , { bindigit | "_" } ;
-    hexdigits     ::= hexdigit , { hexdigit | "_" } ;
-
-    exponent      ::= ( "e" | "E" ) , [ "+" | "-" ] , digits ;
+Floating point and integers are supported. Numeric literals follow the
+same general rules as Python.
 
 _Examples_
    
@@ -108,14 +45,9 @@ _Examples_
     0b1010_0000  # Bitmake written in binary wtih separate character
     123e45       # Floating point
 
-
 #### Booleans
 
 Literal for boolean.
-
-_Grammar_
-
-    literal_bool ::= "true" | "false";
 
 _Example_
 
@@ -126,50 +58,30 @@ _Example_
 
 `nil` is the literal for a null object reference.
 
-_Grammar_
-
-    literal_nil ::= "nil" ;
-
 _Example_
 
     nil
 
 #### Symbol
 
-A symbol is a name or symbol in Wyrm code expressed as a literal.
-Symbols allow an expanded set of characters relative to identifiers,
-including common operator characters, so long as the result stays
-unambiguous with surrounding tokens.
-
-_Grammar_
-
-    (* Note: printable_character requires Unicode support, excluding
-       control (Cc), format (Cf), and separator (Z*) categories.
-       ASCII simplification is 0x21-0x7E. *)
-
-    literal_symbol      ::= "'" , symbol_char , { symbol_char } ;
-    symbol_char         ::= printable_character - excluded_char ;
-    excluded_char        ::= grouping_character | quote_character
-                              | "#" | ";" | "," ;
-    grouping_character   ::= "{" | "}" | "[" | "]" | "(" | ")" ;
-    quote_character       ::= "'" | '"' ;
-
-Whitespace (including newlines) is excluded via `printable_character`,
-since it is a separator and never a symbol constituent; a whitespace
-or BREAK token always terminates a symbol.
+A symbol is a name or symbol in Wyrm code expressed as a literal. A
+symbol's name is either an xid-shaped identifier or one of a fixed
+set of operator spellings (see `_OPERATOR_SYMBOLS` in tokenizer.wy).
+Nothing else is a legal symbol.
 
 _Examples_
 
     'name # symbol name
     '+
     '**
-    'cond?
 
 _Invalid_
 
     '(foo)   # grouping characters not permitted
     'a, b    # comma not permitted; terminates the symbol
     'foo bar # whitespace terminates the symbol after 'foo
+    'cond?   # '?' is not a legal symbol character; lexes as 'cond
+             # followed by an unexpected-token error on '?'
 
 An implementation may limit significant characters in a symbol. An
 implementation must support at least 31 codepoints of significance;
@@ -235,10 +147,6 @@ The value of any collection as a statement is the collection.
 
 #### Tuples
 
-_Grammar_
-
-    expr_tuple ::= expression, ',', {expression, ','}, [expression] ;
-
 Tuples denoted by the comma operator (least precedence):
 
     1, 2, 3, 4
@@ -252,11 +160,6 @@ are constant.
 
 #### List / Array
 
-_Grammar_
-
-    expr_coma_list ::= {expression, ','}, [expression] ;
-    expr_list ::= '[', expr_coma_list, ']'
-
 A list is a sequence of wyrm objects with constant time indexing. A
 list is mutable - individual elements may be assigned.
 
@@ -264,15 +167,12 @@ list is mutable - individual elements may be assigned.
 
 #### Pair List
 
-_Grammar_
-
-    expr_pair_list ::= '$[', expr_coma_list, ']'
-
 A pair list is a sequence of pairs. Wyrm provides the same general
 shorthand syntax as Scheme for defining lists, but substitutes
 brackets for parens. The pair list is a low level primitive and
-is critical to the representation of the underlying AST. It may
-be created leveraging the $[ sigil.
+is critical to the representation of the underlying AST. A pair
+list starts with a `$[` and concludes with a `]`. Otherwise, it
+follows identical rules to defining a normal list.
 
     $[]                # empty list, as in scheme '()
     $['a]              # single element, as in scheme cons('a, '())
@@ -293,7 +193,6 @@ Empty dictionary:
     {}
 
 Note: braces also define a block start token.
-
 
 ### Type Expression
 
@@ -321,14 +220,13 @@ is at compilation time.
 
 ### Operators
 
-Numerical operators follow same rules as C/C++/Python:
-
-    # signed_number ::= NUMBER | -NUMBER
-
-    power ::= primary, "**", primary | primary;
-
+Numerical operators follow same rules as C/C++/Python. `**` is
+right-associative and binds tighter than the unary operators on its
+left operand but not its right (see power_expr in parser.wy):
 
     a ** 2     # Exponents
+    2 ** -3    # unary minus binds inside the right operand
+    2 ** 3 ** 2  # right-associative: 2 ** (3 ** 2)
     a * b * c  # Multiplication, LTR
     a + b + c  # Addition, LTR
     a - b - c  # Subtraction, LTR
@@ -357,7 +255,6 @@ Comparisons:
 
     a <= b
     a >= b
-    a <=> b
     a < b
     a > b
     a == b
@@ -508,13 +405,6 @@ imports disallow closures, class construction, and runtime message invocations.
 
 ### Special Blocks
 
-The with keywords allows binding a series of immutable variables to expression
-values. Setting a variable defined using with is considered an error.
-
-    with:
-        speed_of_light: float = 299_792_458.0;
-        gravitational_constant = 6.6743e-11;
-
 The do keyword allows creation of a scope, the equivalent to defining a lambda
 function and immediately calling it. Used in an expression, the value of the
 do statement is the last executed line:
@@ -529,11 +419,6 @@ do statement is the last executed line:
     # complex_answer == 10
 
 ### Basic Functions
-
-_Grammar_
-
-    parameter ::= xid, [ ':', type_expr ]
-    expr_function ::= 'fn', [ '[', route, ']' ], [ xid ], '(', { parameter }, ')', [ '->', type_expr ], block
 
 Basic functions should look exceedingly familiar to Python users. Most all
 the same rules apply – including no function overloading in parameters.
@@ -871,20 +756,25 @@ be specified:
     class person:
         slot name: str = "John Doe"
 
-The with keyword allows specifying extended options on a slot. The
-normal syntax of the with statement applies. Constants set within
-the with statement are treated as parameters to the slot creator:
+A virtual slot is created by the addition of a code block. This nested
+code block may define lexically scoped new names, but 'getter' and
+'setter' messages are treated specially:
 
-    class person
-        slot name: str = "John Doe" with:
-            setter = fn (value) { this.name = value; }
-            getter = undefined;
+    class person:
+        ...
+        slot birth_timestamp: int
+        ...
+        slot age:
+            fn getter(): now() - this.birth_timestamp
+            fn setter(age: int): this.birth_timestamp = now() - age
 
-The slot creator accepts the following parameters:
+Internally these message are defined as such:
 
-    setter: function with parameter for the new value
+    fn [person] age::getter() { ... } # Note: invalid syntax
+    fn [person] age::setter() { ... }
 
-    getter: function that returns the value
+The only valid functions to be defined within this scope are `getter`
+and `setter`.
 
 ### Coroutines
 
@@ -982,10 +872,8 @@ active coroutine will return an error when accessing:
 ### Decorators
 
 A decorator leverages the homoiconic nature of the language for a light-weight
-macro system.
-
-Syntax:
-    decorator ::= '@', qualified-name, '(', call-args, ')', [ BREAK ], expression;
+macro system. A decorator may prefix any statement - not just an expression -
+and its argument list is optional (see decorator in parser.wy).
 
 Example:
 

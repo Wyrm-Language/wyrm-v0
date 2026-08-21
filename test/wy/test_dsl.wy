@@ -63,8 +63,26 @@ fn [DslTest] soft_hello():
 fn [DslTest] numbers():
     return @accept many(number)
 
-fn [DslTest] one_or_more_numbers():
-    return @accept oneplus(number)
+# manyflat() with a single-term subseq: each match is a bare token (not a
+# tuple), so this should behave just like many(number).
+fn [DslTest] flat_bare_numbers():
+    return @accept manyflat(number)
+
+# manyflat() with a multi-term subseq: each iteration captures a 2-tuple
+# $[number, number], which manyflat should splice into the outer list
+# rather than nesting one sub-list per iteration.
+fn [DslTest] flat_number_pairs():
+    return @accept manyflat($[number, number])
+
+# push(sym): unconditionally matches, answering the literal symbol,
+# without consuming any tokens.
+fn [DslTest] push_marker():
+    return @accept push('marker)
+
+# push(sym) as a non-final sequence element: injects a fixed marker ahead
+# of a real match, without consuming a token for it.
+fn [DslTest] push_then_number():
+    return @accept $[push('marker), number]
 
 fn [DslTest] number_list():
     return @accept $[number, many($[~'TOK_COMMA, number]), ~opt('TOK_COMMA)]
@@ -143,13 +161,58 @@ p6 := DslTest("hello")
 r6 := p6 ! numbers()
 check("many(term) collects zero", len(r6) == 0, true)
 
-# oneplus(): 'NO_MATCH (a genuine miss) rather than [] when none matched
-p7 := DslTest("hello")
-check("oneplus NO_MATCH on zero matches", p7 ! one_or_more_numbers() == 'NO_MATCH, true)
+# manyflat(term): single-term subseq behaves like many(term)
+p6a := DslTest("1 2 3")
+r6a := p6a ! flat_bare_numbers()
+check("manyflat(term) collects three", len(r6a) == 3, true)
+check("manyflat(term) first element", (r6a[0]).kind == 'TOK_LITERAL_NUMBER, true)
 
-p8 := DslTest("1 2")
-r8 := p8 ! one_or_more_numbers()
-check("oneplus collects two", len(r8) == 2, true)
+p6b := DslTest("hello")
+r6b := p6b ! flat_bare_numbers()
+check("manyflat(term) collects zero", len(r6b) == 0, true)
+
+# manyflat($[a, b]): each iteration's 2-tuple is spliced into the result,
+# so three pairs of numbers give a flat list of six tokens, not three
+# nested pairs.
+p6c := DslTest("1 2 3 4 5 6")
+r6c := p6c ! flat_number_pairs()
+check("manyflat(seq) splices pairs into a flat list", len(r6c) == 6, true)
+if len(r6c) == 6:
+    want6c := ["1", "2", "3", "4", "5", "6"]
+    got6c := [(r6c[0]) ! get_text(p6c.buffer), (r6c[1]) ! get_text(p6c.buffer), (r6c[2]) ! get_text(p6c.buffer),
+              (r6c[3]) ! get_text(p6c.buffer), (r6c[4]) ! get_text(p6c.buffer), (r6c[5]) ! get_text(p6c.buffer)]
+    check("manyflat(seq) preserves match order across iterations", got6c, want6c)
+else:
+    println("FAIL manyflat(seq) preserves match order across iterations skipped, shape was not flat")
+
+# manyflat($[a, b]): a dangling unpaired trailing number must not be
+# partially consumed - the loop should stop before it, same backtracking
+# behavior as many().
+p6d := DslTest("1 2 3 4 5")
+r6d := p6d ! flat_number_pairs()
+check("manyflat(seq) stops before an incomplete trailing pair", len(r6d) == 4, true)
+check("manyflat(seq) resets the incomplete pair's tokens", (p6d ! peek(0)).kind == 'TOK_LITERAL_NUMBER, true)
+
+# manyflat($[a, b]): zero matches collects an empty (not nested-empty) list
+p6e := DslTest("hello")
+r6e := p6e ! flat_number_pairs()
+check("manyflat(seq) collects zero", len(r6e) == 0, true)
+
+# push(sym): always matches, answers the literal symbol, consumes nothing
+p8a := DslTest("hello")
+check("push answers the literal symbol", p8a ! push_marker(), 'marker)
+check("push consumes no tokens", p8a.pos == 0, true)
+
+p8b := DslTest("")
+check("push matches even with no input left", p8b ! push_marker(), 'marker)
+
+# push(sym) as a non-final sequence element: the marker is captured
+# alongside the real match, and the real match still consumes its token
+p8c := DslTest("42")
+r8c := p8c ! push_then_number()
+check("push-then-term: marker captured first", r8c[0], 'marker)
+check("push-then-term: term captured second", (r8c[1]).kind == 'TOK_LITERAL_NUMBER, true)
+check("push-then-term: term still consumed", p8c.pos == 1, true)
 
 # a $[...] sequence with drop() and many(): "1, 2, 3" -> (first, [rest...])
 p9 := DslTest("1, 2, 3")
