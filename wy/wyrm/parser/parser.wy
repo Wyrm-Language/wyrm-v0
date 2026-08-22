@@ -982,9 +982,27 @@ fn [Parser] power_expr():
 # postfix
 
 fn $_mk_postfix(expr):
-    if cdr(expr) == nil:
+    ops := cdr(expr)
+    if ops == nil:
         return car(expr)
-    return expr
+    current := car(expr)
+    remaining := ops
+    while remaining != nil:
+        op := car(remaining)
+        op_kind := car(op)
+        if op_kind == 'call_op:
+            current = $['call, current, cdr(op)]
+        elif op_kind == 'index_op:
+            current = $['index, current, cdr(op)]
+        elif op_kind == 'attr_op:
+            current = $['attr, current, cdr(op)]
+        elif op_kind == 'message_op:
+            current = $['message, current, cadr(op), cddr(op)]
+        else:
+            # Unknown postfix op, return original
+            return expr
+        remaining = cdr(remaining)
+    return current
 
 #>  ```ebnf
 #>    postfix_expr    ::= primary , { postfix_op } ;
