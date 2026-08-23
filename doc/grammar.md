@@ -66,6 +66,7 @@ _Example_:
   * `1e-9`
   * `0xfeed_beef`
   * `1.2345_687e-9`
+  * `4.`
 
 (* Numbers are unsigned at the lexical level; a leading "-" or "+" is
    unary_expr's job, not the lexer's. *)
@@ -73,7 +74,7 @@ _Example_:
  int_literal ::= digit , { digit | "_" }
                  | "0x" , hex_digit , { hex_digit | "_" }
                  | "0b" , bin_digit , { bin_digit | "_" } ;
- float_literal ::= digit , { digit | "_" } , "." , digit , { digit | "_" } ,
+ float_literal ::= digit , { digit | "_" } , "." , [ digit , { digit | "_" } ] ,
                    [ ( "e" | "E" ) , [ "+" | "-" ] , digit , { digit } ]
                    | digit , { digit | "_" } ,
                    ( "e" | "E" ) , [ "+" | "-" ] , digit , { digit } ;
@@ -261,27 +262,39 @@ else:
   pass_stmt       ::= "pass" ;
 ```
 ```ebnf
-  var_stmt        ::= "var" , var_target , { "," , var_target } , [ "=" , expression ] ;
-  var_target      ::= identifier , [ ":" , type_constraint ] ;
+  var_stmt        ::= "var" , var_target , { "," , var_target } , [ "=" , tuple_expression ] ;
+  var_target      ::= identifier , [ ":" , type_expression ] ;
 ```
 
 _Example_:
 
 ```wyrm
-var foo: int = 5   # canonical declaration with type constraint
-var foo = 5        # declaration with inferred type
-foo := 5            # shorthand for the line above
+var foo: int = 5           # canonical declaration with type constraint
+var foo = 5                # declaration with inferred type
+var x: int, y: int = 6, 5  # multiple names, bound from a tuple init
+foo := 5                   # shorthand for the line above
+```
+
+_S-Expression_
+
+```scheme
+(define var_target type_expression expression) ; for 1 binding
+(define_values ((var_0 type_0)(var_1 type_1)) expression) ; for n binding
 ```
 
 ```ebnf
-  assignment_stmt ::= target , { "," , target } , assign_op , expression ;
+  assignment_stmt ::= target , { "," , target } , "=" , tuple_expression
+                     | target , "?=" , tuple_expression ;
 ```
 
 _Example_: `a, b = b, a` (swap; both names must already be declared)
 
+_Example_: `k ?= 4`
+
 ```ebnf
   target          ::= ( identifier | postfix_expr , "." , identifier ) , { "[" , expression , "]" } ;
 ```
+
 ```ebnf
   assign_op       ::= "=" | "?=" | ":=" ;
 ```
@@ -298,6 +311,12 @@ fn call_count():
     return foo
 ```
 
+## Type Expression
+
+```ebnf
+  type_atom       ::= qualified_name | "nil" ;
+  type_constraint ::= type_atom , { "|" , type_atom } ;
+```
 ## Modules and Imports
 ```ebnf
     import_stmt     ::= "import" , [ "static" ] , import_body ;
@@ -562,9 +581,3 @@ complex_answer := do:
 # complex_answer == 10
 ```
 
-## Type Expressions
-
-```ebnf
-  type_atom       ::= qualified_name | "nil" ;
-  type_constraint ::= type_atom , { "|" , type_atom } ;
-```

@@ -1,0 +1,6 @@
+var COUNT: int = 0
+var GRAVITY: float = 9.80665
+PI := 3.14
+var LINES = 4
+message := "Hello World!"
+var A1: int, B2: float = 4, 4.2

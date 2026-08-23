@@ -26,6 +26,7 @@
 # Term types:
 #     xid                   another rule: `(this ! xid()) catch 'NO_MATCH`
 #     'TOK_KIND             a token of that kind, consumed if `peek(0).kind` matches
+#     text('TOK_KIND)       if token matches kind, consume and return text of token
 #     "text"                a soft keyword: a 'TOK_XID token whose text matches
 #     ~(subseq)             match `subseq`, but leave it out of the sequence's result
 #     bool(subseq)          if sequence matched, return true, false, return false
@@ -119,7 +120,7 @@ fn _decode_apply_if(first, rest) -> pair:
     matched := mk_binop(mk_name('_vt), '!=, NO_MATCH_EXPR)
     is_err := $['is, mk_name('_vt), [mk_type('error)]]
     return mk_do([
-        $['decl, '_vt, _build_sequence_expr(rest)],
+        n_define('_vt, N_AUTO_TYPE, _build_sequence_expr(rest)),
         mk_expr_stmt(mk_if(
                 is_err,
                 [mk_expr_stmt(mk_name('_vt))],
@@ -143,6 +144,21 @@ fn $token_kind(kind):
 
 fn _decode_token_kind(kind) -> pair:
     return mk_expand($token_kind::$ast, 'kind, mk_sym(kind))
+
+
+# --- text('sym) match a token kind == symbol and return text
+fn $_text_tmpl(kind):
+    tok := this ! peek(0)
+    if tok.kind == kind:
+        this ! advance()
+        tok ! get_text(this.buffer)
+    else:
+        'NO_MATCH
+
+fn _decode_text(node) -> pair:
+    if car(node) != 'sym:
+        return error("text(): argument must be a token kind symbol, e.g. text('TOK_LITERAL_INT)")
+    return mk_expand($_text_tmpl::$ast, 'kind, mk_sym(cadr(node)))
 
 
 # --- "string" match a token string == text
@@ -313,6 +329,8 @@ fn _decode_call(node) -> pair:
         return _decode_manyflat(args)
     if cname == 'opt:
         return _decode_opt(args)
+    if cname == 'text:
+        return _decode_text(args[0])
     if cname == 'expect:
         return _decode_expect(args[0], args[1])
     if cname == 'bool:
@@ -432,8 +450,8 @@ fn _build_sequence_steps(remaining, n_capture_count) -> pair:
 # Preamble: declare the target list once, then descend through the steps.
 fn _build_sequence_expr(elements) -> pair:
     return $['do, [
-        $['decl, '_acc, NIL_EXPR],
-        $['decl, '_t, NIL_EXPR],
+        n_define('_acc, N_AUTO_TYPE, NIL_EXPR),
+        n_define('_t, N_AUTO_TYPE, NIL_EXPR),
         $['expr_stmt, _build_sequence_steps(chain(elements), 0)]
     ]]
 

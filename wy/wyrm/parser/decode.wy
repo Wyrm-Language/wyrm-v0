@@ -1,0 +1,67 @@
+# Decoding of raw token text into native values.
+
+# strip the leading ' off the symbol text
+fn decode_sym(text: str) -> sym:
+    return sym(text ! substr(1, len(text) - 1))
+
+# expect - our int(str) parses all valid tokens
+fn decode_int(text: str) -> int:
+    return int(text)
+
+# expect - our float(str) parses all valid tokens
+fn decode_float(text: str) -> float:
+    return float(text)
+
+# nuke leading/trailing quotes
+fn _strip_quotes(text: str) -> str:
+    n := len(text)
+    if n >= 6 and (text ! substr(0, 3)) == "\"\"\"" and (text ! substr(n - 3, 3)) == "\"\"\"":
+        return text ! substr(3, n - 6)
+    return text ! substr(1, n - 2)
+
+fn _char_at(body: str, idx: int) -> int | sym:
+    return body[idx] catch 'EOF
+
+# TODO: need a better interpretation here
+fn decode_str(text: str) -> str:
+    body := _strip_quotes(text)
+    n := len(body)
+    out := ""
+    run_start := 0
+    i := 0
+    while i < n:
+        if _char_at(body, i) != \\:
+            i = i + 1
+        else:
+            if run_start < i:
+                out = out + (body ! substr(run_start, i - run_start))
+            next_c := _char_at(body, i + 1)
+            if next_c == \return:
+                skip := 2
+                if _char_at(body, i + 2) == \newline:
+                    skip = 3
+                i = i + skip
+            elif next_c == \newline:
+                i = i + 2
+            elif next_c == \r:
+                out = out + "\r"
+                i = i + 2
+            elif next_c == \t:
+                out = out + "\t"
+                i = i + 2
+            elif next_c == \n:
+                out = out + "\n"
+                i = i + 2
+            elif next_c == \v:
+                out = out + "\v"
+                i = i + 2
+            elif next_c == \b:
+                out = out + "\b"
+                i = i + 2
+            else:
+                out = out + (body ! substr(i, 1))
+                i = i + 1
+            run_start = i
+    if run_start < n:
+        out = out + (body ! substr(run_start, n - run_start))
+    return out

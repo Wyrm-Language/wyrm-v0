@@ -14,7 +14,8 @@ import std::ctype::*
 #   error                   error token
 #   'TOK_END                end of stream marker
 #   'TOK_LITERAL_CHAR       grammar literal_char
-#   'TOK_LITERAL_NUMBER     grammar literal_int
+#   'TOK_LITERAL_INT        grammar int_literal
+#   'TOK_LITERAL_FLOAT      grammar float_literal
 #   'TOK_LITERAL_SYM        grammar literal_sym
 # 
 # Types to be handled by parser:
@@ -268,14 +269,15 @@ fn _find_end_whitespace(buffer: str, cur_pos: int) -> int:
 #>    * `1e-9`
 #>    * `0xfeed_beef`
 #>    * `1.2345_687e-9`
-#> 
+#>    * `4.`
+#>
 #>  (* Numbers are unsigned at the lexical level; a leading "-" or "+" is
 #>     unary_expr's job, not the lexer's. *)
 #> ```ebnf
 #>   int_literal ::= digit , { digit | "_" }
 #>                   | "0x" , hex_digit , { hex_digit | "_" }
 #>                   | "0b" , bin_digit , { bin_digit | "_" } ;
-#>   float_literal ::= digit , { digit | "_" } , "." , digit , { digit | "_" } ,
+#>   float_literal ::= digit , { digit | "_" } , "." , [ digit , { digit | "_" } ] ,
 #>                     [ ( "e" | "E" ) , [ "+" | "-" ] , digit , { digit } ]
 #>                     | digit , { digit | "_" } ,
 #>                     ( "e" | "E" ) , [ "+" | "-" ] , digit , { digit } ;
@@ -630,11 +632,11 @@ class Scanner:
         if ch0 == \0 and (ch1 == \b or ch1 == \B):
             bin_end := _scan_bindigits(this.buffer, this.cur_pos + 2)
             if bin_end != nil:
-                return this ! _advance_with_token('TOK_LITERAL_NUMBER, bin_end)
+                return this ! _advance_with_token('TOK_LITERAL_INT, bin_end)
         if ch0 == \0 and (ch1 == \x or ch1 == \X):
             hex_end := _scan_hexdigits(this.buffer, this.cur_pos + 2)
             if hex_end != nil:
-                return this ! _advance_with_token('TOK_LITERAL_NUMBER, hex_end)
+                return this ! _advance_with_token('TOK_LITERAL_INT, hex_end)
 
         # require digits or not numeric
         accept_end := _scan_digits(this.buffer, this.cur_pos)
@@ -644,12 +646,16 @@ class Scanner:
         var float_end: int | nil = nil
         next_char := _get_char(this.buffer, accept_end)
         
-        # accept "." digits if present
+        # accept "." with optional trailing digits (e.g. "4." or "4.5")
         if next_char == \.:
-            float_end = _scan_digits(this.buffer, accept_end + 1)
-            if float_end != nil:
-                accept_end = float_end
-                next_char = _get_char(this.buffer, accept_end)
+            dot_end := accept_end + 1
+            frac_end := _scan_digits(this.buffer, dot_end)
+            if frac_end != nil:
+                float_end = frac_end
+            else:
+                float_end = dot_end
+            accept_end = float_end
+            next_char = _get_char(this.buffer, accept_end)
     
         if (next_char == \e or next_char == \E):
             exp_end := _scan_exponent(this.buffer, accept_end)
@@ -658,9 +664,9 @@ class Scanner:
                 accept_end = exp_end
 
         if float_end == nil:
-            return this ! _advance_with_token('TOK_LITERAL_NUMBER, accept_end)
+            return this ! _advance_with_token('TOK_LITERAL_INT, accept_end)
         else:
-            return this ! _advance_with_token('TOK_LITERAL_NUMBER, accept_end)
+            return this ! _advance_with_token('TOK_LITERAL_FLOAT, accept_end)
 
 
 _GROUP_START := ('TOK_LBRACE, 'TOK_LBRACE_S, 'TOK_LBRACKET_S, 'TOK_LPAREN, 'TOK_LBRACKET)

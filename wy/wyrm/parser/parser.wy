@@ -1,4 +1,5 @@
 import wyrm::parser::tokenizer::*
+import wyrm::parser::decode::*
 import wyrm::ast
 import std::io::*
 
@@ -85,16 +86,16 @@ fn [Parser] nil_literal():
     @accept value('nil, 'TOK_KW_NIL)
 
 
-fn [Parser] xid() -> str:
+fn [Parser] xid() -> sym:
     v := @accept 'TOK_XID
     if is_match(v):
-        return v!get_text(this.buffer)
+        return sym(v!get_text(this.buffer))
     else:
         return v
 
 fn _mk_qualified_name(segs):
     if cdr(segs) == nil:
-        return car(segs)
+        return sym(car(segs))
     return cons('qualified_name, segs)
 
 # Qualified name; used for an expression of a fully qualified name
@@ -103,14 +104,28 @@ fn [Parser] qualified_name():
 
 # symbol_literal
 fn [Parser] symbol_literal():
-    @accept 'TOK_LITERAL_SYM
+    @accept apply_if(_mk_sym, text('TOK_SYM))
+
+fn _mk_sym(text):
+    return $['sym, decode_sym(text)]
 
 # string literal
 fn [Parser] string_literal():
-    @accept 'TOK_STR
+    @accept apply_if(_mk_string, text('TOK_STR))
+
+fn _mk_string(text):
+    return $['str, decode_str(text)]
+
+# integer literal
+fn _mk_int(text):
+    return $['int, decode_int(text)]
+
+# floating point literal
+fn _mk_float(text):
+    return $['float, decode_float(text)]
 
 fn [Parser] number_literal():
-    @accept 'TOK_LITERAL_NUMBER
+    @accept $[apply_if(_mk_int, text('TOK_LITERAL_INT)) | apply_if(_mk_float, text('TOK_LITERAL_FLOAT))]
 
 #>  ```ebnf
 #>    char_literal    ::= "\" , ( ( any_char - ( control_char | " " ) ) | identifier ) ;
@@ -131,8 +146,11 @@ fn [Parser] char_literal():
 #>  ```
 #>
 
+fn _mk_module(expr):
+    cons('module, expr)
+
 fn [Parser] program():
-    @accept many($[~opt(stmt_sep), top_level_stmt])
+    @accept apply_if(_mk_module, many($[~opt(stmt_sep), top_level_stmt]))
 
 
 fn [Parser] top_level_stmt():
@@ -379,52 +397,87 @@ fn [Parser] continue_stmt():
 fn [Parser] pass_stmt():
     @accept value('pass, 'TOK_KW_PASS)
 
-fn $_mk_var(expr):
-    targets := car(expr)
-    init := cadr(expr)
-    if init == nil:
-        return $['var, targets]
-    return $['var, targets, init]
 
 #>  ```ebnf
-#>    var_stmt        ::= "var" , var_target , { "," , var_target } , [ "=" , expression ] ;
-#>    var_target      ::= identifier , [ ":" , type_constraint ] ;
+#>    var_stmt        ::= "var" , var_target , { "," , var_target } , [ "=" , tuple_expression ] ;
+#>    var_target      ::= identifier , [ ":" , type_expression ] ;
 #>  ```
 #>
 #>  _Example_:
 #>
 #>  ```wyrm
-#>  var foo: int = 5   # canonical declaration with type constraint
-#>  var foo = 5        # declaration with inferred type
-#>  foo := 5            # shorthand for the line above
+#>  var foo: int = 5           # canonical declaration with type constraint
+#>  var foo = 5                # declaration with inferred type
+#>  var x: int, y: int = 6, 5  # multiple names, bound from a tuple init
+#>  foo := 5                   # shorthand for the line above
+#>  ```
+#>
+#>  _S-Expression_
+#>
+#>  ```scheme
+#>  (define var_target type_expression expression) ; for 1 binding
+#>  (define_values ((var_0 type_0)(var_1 type_1)) expression) ; for n binding
 #>  ```
 #>
 fn [Parser] var_stmt():
-    @accept apply_if($_mk_var,
+    @accept apply_if($_mk_define_var,
         ~'TOK_KW_VAR,
         cons(var_target, many($[~'TOK_COMMA, var_target])),
-        opt($[~'TOK_EQUAL, expression]))
+        opt($[~'TOK_EQUAL, tuple_expression]))
 
 fn [Parser] var_target():
     @accept $[xid, opt($[~'TOK_COLON, type_expression])]
+
+# var_target's type_expr is already a finished type node (or nil if
+# omitted) - not the raw type_atom list _mk_type_expression reduces.
+fn _mk_type_or_auto(type_expr):
+    if type_expr == nil:
+        return $['type, 'auto]
+    return type_expr
+
+fn _build_define(pairs, init):
+    if cdr(pairs) == nil:
+        p := car(pairs)
+        return $['define, sym(car(p)), _mk_type_or_auto(cadr(p)), init]
+    typed := nil
+    for p in pairs:
+        typed = cons($[car(p), _mk_type_or_auto(cadr(p))], typed)
+    return $['define_values, reverse(typed), init]
+
+fn $_mk_define_var(expr):
+    targets := car(expr)
+    init := cadr(expr)
+    return _build_define(targets, init)
 
 fn $_mk_assign(expr):
     targets := car(expr)
     op := cadr(expr)
     value := caddr(expr)
-    return $['assign, targets, op, value]
+    if op == 'assign_bind:
+        pairs := nil
+        for t in targets:
+            pairs = cons($[t, nil], pairs)
+        return _build_define(reverse(pairs), value)
+    if op == 'assign_qeq:
+        if cdr(targets) != nil:
+            return error("?= only supports a single assignment target")
+        return $['set_opt, car(targets), value]
+    return $['set, targets, value]
 
 #>  ```ebnf
-#>    assignment_stmt ::= target , { "," , target } , assign_op , expression ;
+#>    assignment_stmt ::= target , { "," , target } , "=" , tuple_expression
+#>                       | target , "?=" , tuple_expression ;
 #>  ```
 #>
 #>  _Example_: `a, b = b, a` (swap; both names must already be declared)
+#>
+#>  _Example_: `k ?= 4`
 #>
 fn [Parser] assignment_stmt():
     @accept apply_if($_mk_assign,
         cons(target, many($[~'TOK_COMMA, target])),
         assign_op,
-        expression)
+        tuple_expression)
 
 # Split a pair list into (all-but-last, last)
 fn _split_last(lst):
@@ -433,12 +486,6 @@ fn _split_last(lst):
     rest := _split_last(cdr(lst))
     return $[cons(car(lst), car(rest)), cadr(rest)]
 
-# postfix_expr's result is either a bare value (no postfix ops) or the
-# chain $[primary, op1, op2, ...]. A valid attribute target is a chain
-# whose last op is an attr_op; split it off into an 'attr node. Anything
-# else (a bare value, or a chain ending in call/index/message) is passed
-# through as-is - it is still a legal `target` per the grammar's
-# `identifier` alternative when bare, and permissively accepted otherwise.
 fn $_mk_target_base(expr):
     if expr is not pair:
         return expr
@@ -462,13 +509,7 @@ fn $_mk_target(expr):
 #>  ```ebnf
 #>    target          ::= ( identifier | postfix_expr , "." , identifier ) , { "[" , expression , "]" } ;
 #>  ```
-#
-# postfix_expr already greedily consumes any trailing ".identifier"
-# itself (it's one of postfix_op's alternatives), so a literal
-# `$[postfix_expr, ~'TOK_DOT, xid]` term can never see a trailing dot
-# to match. Instead, the whole receiver is parsed as one postfix_expr
-# and $_mk_target_base splits its last attr_op back off in the
-# semantic action.
+#>
 fn [Parser] target():
     @accept apply_if($_mk_target,
         apply_if($_mk_target_base, postfix_expr),
@@ -504,6 +545,32 @@ fn [Parser] static_stmt():
         ~'TOK_KW_STATIC, xid,
         opt($[~'TOK_COLON, type_expression]),
         opt($[~'TOK_EQUAL, expression]))
+
+#------------------------------------------------------------------------------
+#>  ## Type Expression
+#------------------------------------------------------------------------------
+
+#>
+#>  ```ebnf
+#>    type_atom       ::= qualified_name | "nil" ;
+#>    type_constraint ::= type_atom , { "|" , type_atom } ;
+#>  ```
+
+fn [Parser] type_atom():
+    @accept $[ $[push('type), qualified_name]
+             | $[push('type), value('nil, 'TOK_KW_NIL)]
+             ]
+
+fn [Parser] type_expression():
+    @accept apply_if(_mk_type_expression, cons(type_atom, many($[~'TOK_OR, type_atom])))
+
+fn _mk_type_expression(type_expr):
+    if type_expr == nil:
+        return $['type, 'auto]
+    if cdr(type_expr) == nil:
+        return car(type_expr)
+    # FIXME: should generated warning, algebraic types not supported
+    return $['type, 'auto]
 
 #------------------------------------------------------------------------------
 #>  ## Modules and Imports
@@ -1258,23 +1325,6 @@ fn [Parser] do_expr():
     @accept $[value('do, 'TOK_KW_DO), block]
 
 
-#>  ## Type Expressions
-#>
-#>  ```ebnf
-#>    type_atom       ::= qualified_name | "nil" ;
-#>    type_constraint ::= type_atom , { "|" , type_atom } ;
-#>  ```
-
-# `nil` is a hard keyword (never lexes as TOK_XID), but it is also a valid
-# type - the type of the nil value - so a type_atom has to accept it
-# alongside an ordinary qualified_name.
-fn [Parser] type_atom():
-    @accept $[qualified_name | value('nil, 'TOK_KW_NIL)]
-
-fn [Parser] type_expression():
-    @accept cons(type_atom, many($[~'TOK_OR, type_atom]))
-
-
 # (* ---------------------------------------------------------------------
 #    10. Operator precedence
 #    --------------------------------------------------------------------- *)
@@ -1303,7 +1353,7 @@ fn __main():
     f := open(car(__ARGS), "r")
     content := f!readall()
     program := Parser(content)!program()
-    print(program)
+    println(program)
 
 # Simple Demo
 if __name__ == "__main__":

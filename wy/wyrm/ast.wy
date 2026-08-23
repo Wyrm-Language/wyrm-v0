@@ -40,6 +40,20 @@ class Number(TreeItem):
     fn init(number: int):
         this.value = number
 
+# -------------------------------
+# S-Expression AST manipulation
+# -------------------------------
+
+N_AUTO_TYPE := $['type, 'auto]
+
+fn n_type(typename: sym | nil) -> pair:
+    if typename is nil:
+        return $['type, 'auto]
+    return $['type, typename]
+
+fn n_define(variable: sym, type_expr: pair | nil, initial: pair | nil) -> pair:
+    return $['define, variable, type_expr, initial]
+
 
 ##### SEXPR Manipulation
 
@@ -116,7 +130,7 @@ fn mk_str(s: str) -> pair:
     return $['str, s]
 
 fn mk_type(s: sym) -> pair:
-    return $['type, s, [], [] ]
+    return $['type, s]
 
 fn mk_binop(lhs: pair, op: sym, rhs: pair):
     return $['binop, op, lhs, rhs]
