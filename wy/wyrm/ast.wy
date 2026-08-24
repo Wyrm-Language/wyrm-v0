@@ -54,6 +54,11 @@ fn n_type(typename: sym | nil) -> pair:
 fn n_define(variable: sym, type_expr: pair | nil, initial: pair | nil) -> pair:
     return $['define, variable, type_expr, initial]
 
+fn n_set(target: sym | pair, value: pair) -> pair:
+    return $['set, target, value]
+
+fn n_set_values(targets: pair, value: pair) -> pair:
+    return $['set_values, targets, value]
 
 ##### SEXPR Manipulation
 
@@ -119,9 +124,6 @@ fn test_parse(s: str) -> pair:
 # on the wyrm poc code, and that's really broken.
 # ---------------------------
 NIL_EXPR := $['nil]
-
-fn mk_set(s: sym, initial: pair) -> pair:
-    return $['assign, mk_name(s), initial]
 
 fn mk_sym(s: sym) -> pair:
     return $['sym, s]

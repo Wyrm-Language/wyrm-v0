@@ -461,8 +461,12 @@ fn $_mk_assign(expr):
     if op == 'assign_qeq:
         if cdr(targets) != nil:
             return error("?= only supports a single assignment target")
-        return $['set_opt, car(targets), value]
-    return $['set, targets, value]
+        return $['if_set, car(targets), value]
+    # single value
+    if cdr(targets) is nil:
+        return n_set(car(targets), value)
+    # multiple values
+    return $['set_values, targets, value]
 
 #>  ```ebnf
 #>    assignment_stmt ::= target , { "," , target } , "=" , tuple_expression
@@ -472,6 +476,11 @@ fn $_mk_assign(expr):
 #>  _Example_: `a, b = b, a` (swap; both names must already be declared)
 #>
 #>  _Example_: `k ?= 4`
+#>
+#>  ```scheme
+#>  (set var value) ; set var to value
+#>  (set_values (var1 var2) value) ; set multiple values
+#>  ```
 #>
 fn [Parser] assignment_stmt():
     @accept apply_if($_mk_assign,

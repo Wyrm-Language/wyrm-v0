@@ -419,7 +419,7 @@ fn _build_sequence_steps(remaining, n_capture_count) -> pair:
         term = s_unary_target(term)
         capture_inc = 0
     else:
-        then_stmts!append(mk_set('_acc, mk_call('cons, [mk_name('_t), mk_name('_acc)])))
+        then_stmts!append(n_set('_acc, mk_call('cons, [mk_name('_t), mk_name('_acc)])))
 
     rest := _build_sequence_steps(cdr(remaining), n_capture_count + capture_inc)
     then_stmts!append(mk_expr_stmt(rest))
@@ -435,7 +435,7 @@ fn _build_sequence_steps(remaining, n_capture_count) -> pair:
     #   else:
     #       _t
     return mk_do([
-        mk_set('_t, _decode_term(term)),
+        n_set('_t, _decode_term(term)),
         mk_expr_stmt(mk_if(
                 is_err,
                 [mk_expr_stmt(mk_name('_t))],
