@@ -1,9 +1,9 @@
-import wyrm::parser::tokenizer::*
-import wyrm::parser::decode::*
+import wyrm::tokenizer::*
+import wyrm::decode::*
 import wyrm::ast
 import std::io::*
 
-import static wyrm::parser::_dsl::*
+import static wyrm::_dsl::*
 
 #>  # Wyrm Language Grammar
 #>

@@ -1,0 +1,30 @@
+
+
+
+
+class _Scope:
+    slot _i: int
+
+class _IfScope(_Scope):
+    slot _s: int
+
+class _ForScope(_Scope):
+    slot _s: int
+
+class _WhileScope(_Scope):
+    slot _s: int
+
+class _DoScope(_Scope):
+    slot _s: int
+
+
+
+class Compiler:
+    slot scope_stack: pair
+
+    fn init():
+        this.scope_stack = cons(_Scope(), nil)
+
+
+fn [Compiler] cur_scope() -> _Scope: car(this.scope_stack)
+

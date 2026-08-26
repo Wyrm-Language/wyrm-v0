@@ -371,7 +371,7 @@ fn _scan_exponent(buffer: str, cur_pos: int) -> int | nil:
 #>
 #> ```ebnf
 #>    identifier      ::= ( xid_start | "$" ) , { xid_continue | "$" } ;
-#>    symbol_literal  ::= "'" , ( xid_name | operator_symbol ) ;
+#>    symbol_literal  ::= "'" , ( identifier | operator_symbol ) ;
 #>                   (* At least 31 significant characters recognized.
 #>                      A symbol's name may be a reserved word ('fn, 'return,
 #>                      'if): they are node kinds in the canonical s-expression

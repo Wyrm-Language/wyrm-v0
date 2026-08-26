@@ -1,5 +1,4 @@
 # AST Types
-import wyrm::parser::tokenizer::Token
 import std::pairs::*
 
 class TreeItem:
