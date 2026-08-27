@@ -17,7 +17,12 @@ import std::ctype::*
 #   'TOK_LITERAL_INT        grammar int_literal
 #   'TOK_LITERAL_FLOAT      grammar float_literal
 #   'TOK_LITERAL_SYM        grammar literal_sym
-# 
+#   'TOK_STR                grammar string_literal
+#
+#   Literals don't include delimitting characters in their spans, so
+#   they may be easily processed (eg `"foo"` comes over as `foo` not
+#   `"foo"`)
+#
 # Types to be handled by parser:
 #   'TOK_XID                word/name/identifier
 #   'TOK_WS                 whitespace
@@ -41,11 +46,11 @@ _TRIPLE_CHARS := [
 _DUAL_CHARS := [
  ('TOK_EXPONENT, \*, \*),       # 'TOK_EXPONTENT    **      Exponent
  ('TOK_LBRACE_S, \$, \{),       # 'TOK_LBRACE_S     ${      Reserved
- ('TOK_LBRACKET_S, \$, \[),     # 'TOK_LBRACKET_S   $[      Scheme Pair 
+ ('TOK_LBRACKET_S, \$, \[),     # 'TOK_LBRACKET_S   $[      Scheme Pair
  ('TOK_RARROW, \-, \>),         # 'TOK_RARROW       ->      Return decorator
  ('TOK_LARROW, \<, \-),         # 'TOK_LARROW       <-      Cooroutine Inparem
 
- ('TOK_LSHIFT, \<, \<),         # 'TOK_LSHIFT       <<      Left shift   
+ ('TOK_LSHIFT, \<, \<),         # 'TOK_LSHIFT       <<      Left shift
  ('TOK_RSHIFT, \>, \>),         # 'TOK_RSHIFT       >>      Right shift
 
  ('TOK_LE, \<, \=),             # 'TOK_LE           <=      Less than equal
@@ -247,7 +252,7 @@ fn _find_end_whitespace(buffer: str, cur_pos: int) -> int:
     next_c := _get_char(buffer, idx)
     while (next_c != 'EOF):
         if _is_newline(next_c):
-            return idx        
+            return idx
         if is_space(next_c):
             idx = idx + 1
         elif next_c != \\:
@@ -305,7 +310,7 @@ fn _scan_digits(buffer: str, cur_pos: int) -> int | nil:
 #>  #### Hexadecimal Digits
 #>
 #> ```ebnf
-#>  
+#>
 #>  hexdigits     ::= hexdigit , { hexdigit | "_" } ;
 #>  hex_digit     ::= digit | "a" | "b" | "c" | "d" | "e" | "f"
 #>                          | "A" | "B" | "C" | "D" | "E" | "F" ;
@@ -461,13 +466,23 @@ fn _find_needle(buffer: str, cur_pos: int, needle: str) -> int | nil:
     return nil
 
 # `cur_pos` points just past the opening 'R"'.
-fn _scan_raw_string(buffer: str, cur_pos: int) -> int | nil:
+#
+# Returns (content_start, content_end, full_end): content_start/content_end
+# bound the text between the parens (the token's trimmed text); full_end is
+# the position just past the closing ')...tag..."' needle, i.e. where the
+# scanner should resume.
+fn _scan_raw_string(buffer: str, cur_pos: int):
     tag_end := _scan_raw_string_tag(buffer, cur_pos)
     if tag_end == nil:
         return nil
     tag := buffer ! substr(cur_pos, tag_end - cur_pos)
     needle := ")" + tag + "\""
-    return _find_needle(buffer, tag_end + 1, needle)
+    full_end := _find_needle(buffer, tag_end + 1, needle)
+    if full_end == nil:
+        return nil
+    content_start := tag_end + 1
+    content_end := full_end - len(needle)
+    return (content_start, content_end, full_end)
 
 # @brief Token analysis of source
 #
@@ -488,17 +503,22 @@ class Scanner:
         this.cur_pos = end_pos
         return Token(kind, start_pos, this.cur_pos)
 
+    # Advance the scanner while taking a subspan for a recorded token.
+    fn _advance_with_token_span(kind: sym | error, tok_start: int, tok_end: int, new_pos: int) -> Token | error:
+        this.cur_pos = new_pos
+        return Token(kind, tok_start, tok_end)
+
     fn scan() -> Token | error:
         var token: Token | nil
 
         next_c := _get_char(this.buffer, this.cur_pos)
         next_next_c := _get_char(this.buffer, this.cur_pos + 1)
         next_next_next_c := _get_char(this.buffer, this.cur_pos + 2)
-        
+
         # End Stream
         if next_c == 'EOF:
             return Token('TOK_END, this.cur_pos, this.cur_pos)
-        
+
         # Comment, newlines, spaces
         if next_c == \#:
             return this ! _scan_comment()
@@ -510,20 +530,26 @@ class Scanner:
             return this ! _advance_with_token('TOK_WS, _find_end_whitespace(this.buffer, this.cur_pos))
 
         # Literal symbol - name form ('foo) or operator form ('+, '<=>, ...)
+        # The token's text is trimmed to just the name/operator spelling -
+        # the leading "'" is not part of it, so callers get the raw
+        # symbol directly instead of having to strip it back off.
         if next_c == \':
-            lit_end := _scan_xid(this.buffer, this.cur_pos + 1)
+            sym_start := this.cur_pos + 1
+            lit_end := _scan_xid(this.buffer, sym_start)
             if lit_end != nil:
-                return this ! _advance_with_token('TOK_LITERAL_SYM, lit_end)
-            op_end := _scan_operator_symbol(this.buffer, this.cur_pos + 1)
+                return this ! _advance_with_token_span('TOK_LITERAL_SYM, sym_start, lit_end, lit_end)
+            op_end := _scan_operator_symbol(this.buffer, sym_start)
             if op_end != nil:
-                return this ! _advance_with_token('TOK_LITERAL_SYM, op_end)
+                return this ! _advance_with_token_span('TOK_LITERAL_SYM, sym_start, op_end, op_end)
             return this ! _advance_with_token(error("bad symbol literal"), this.cur_pos + 1)
 
         # Raw strings: R"(...)" or R"tag(...)tag"
+        # The token's text is trimmed to just the content between the
+        # parens - the R"...(" / ")..."  delimiters are not part of it.
         if next_c == \R and next_next_c == \":
-            raw_end := _scan_raw_string(this.buffer, this.cur_pos + 2)
-            if raw_end != nil:
-                return this ! _advance_with_token('TOK_STR, raw_end)
+            raw_bounds := _scan_raw_string(this.buffer, this.cur_pos + 2)
+            if raw_bounds != nil:
+                return this ! _advance_with_token_span('TOK_STR, raw_bounds[0], raw_bounds[1], raw_bounds[2])
 
         # Strings
         if next_c == \" and next_next_c == \" and next_next_next_c == \":
@@ -602,7 +628,9 @@ class Scanner:
     # Scan string
     #
     # Find the ending of the string; only minimally process escapes to skip
-    # escaped quotes.
+    # escaped quotes. `start_pos` is already just past the opening quote(s),
+    # and the returned token's text is trimmed to stop before the closing
+    # quote(s) - the surrounding quote marks are not part of it.
     fn _scan_finish_str(start_pos: int, single_line: bool, end_seq) -> Token | nil:
         idx := start_pos
         tok_match := _check_match(this.buffer, idx, true, end_seq)
@@ -622,7 +650,7 @@ class Scanner:
             tok_match = _check_match(this.buffer, idx, true, end_seq)
         if tok_match is error:
             return this ! _advance_with_token(tok_match, idx)
-        return this ! _advance_with_token('TOK_STR, idx + len(end_seq))
+        return this ! _advance_with_token_span('TOK_STR, start_pos, idx, idx + len(end_seq))
 
     # Generate numeric tokens
     fn _scan_number() -> Token | nil:
@@ -641,11 +669,11 @@ class Scanner:
         # require digits or not numeric
         accept_end := _scan_digits(this.buffer, this.cur_pos)
         if accept_end == nil { return nil }
-        
+
         # check for float
         var float_end: int | nil = nil
         next_char := _get_char(this.buffer, accept_end)
-        
+
         # accept "." with optional trailing digits (e.g. "4." or "4.5")
         if next_char == \.:
             dot_end := accept_end + 1
@@ -656,7 +684,7 @@ class Scanner:
                 float_end = dot_end
             accept_end = float_end
             next_char = _get_char(this.buffer, accept_end)
-    
+
         if (next_char == \e or next_char == \E):
             exp_end := _scan_exponent(this.buffer, accept_end)
             if exp_end != nil:
@@ -800,4 +828,3 @@ class TokenStream:
             this ! _push(cur)
             cur = scanner ! scan()
         return this.tokens
-

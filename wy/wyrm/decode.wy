@@ -1,8 +1,8 @@
 # Decoding of raw token text into native values.
 
-# strip the leading ' off the symbol text
+# expect - our sym(str) should generate proper symbol
 fn decode_sym(text: str) -> sym:
-    return sym(text ! substr(1, len(text) - 1))
+    return sym(text)
 
 # expect - our int(str) parses all valid tokens
 fn decode_int(text: str) -> int:
@@ -12,19 +12,12 @@ fn decode_int(text: str) -> int:
 fn decode_float(text: str) -> float:
     return float(text)
 
-# nuke leading/trailing quotes
-fn _strip_quotes(text: str) -> str:
-    n := len(text)
-    if n >= 6 and (text ! substr(0, 3)) == "\"\"\"" and (text ! substr(n - 3, 3)) == "\"\"\"":
-        return text ! substr(3, n - 6)
-    return text ! substr(1, n - 2)
-
 fn _char_at(body: str, idx: int) -> int | sym:
     return body[idx] catch 'EOF
 
 # TODO: need a better interpretation here
 fn decode_str(text: str) -> str:
-    body := _strip_quotes(text)
+    body := text
     n := len(body)
     out := ""
     run_start := 0

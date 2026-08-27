@@ -104,7 +104,7 @@ fn [Parser] qualified_name():
 
 # symbol_literal
 fn [Parser] symbol_literal():
-    @accept apply_if(_mk_sym, text('TOK_SYM))
+    @accept apply_if(_mk_sym, text('TOK_LITERAL_SYM))
 
 fn _mk_sym(text):
     return $['sym, decode_sym(text)]
