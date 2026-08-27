@@ -1,7 +1,7 @@
 #ifndef WYRMX_WCORE_H_
 #define WYRMX_WCORE_H_
 
-#include <wyrm/wcore.h>
+#include <wyrm/core.h>
 #include <wyrm/sys/string.h>
 
 constexpr bool operator==(const wyrm_value& lhs, const wyrm_value& rhs)

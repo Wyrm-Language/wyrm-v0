@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 
-#include <wyrm/wbox.h>
-#include <wyrmxx/wcore.h>
+#include <wyrm/box.h>
+#include <wyrmxx/core.h>
 #include <test_common/test_context_fixture.h>
 
 TEST_SUITE("wbox") {

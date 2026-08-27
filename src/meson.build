@@ -11,20 +11,23 @@ glib_dep = dependency('glib-2.0', version: '>=2.56', required: get_option('glib'
 cwyrm_lib_inc = include_directories('.', '../include')
 
 cwyrm_sources = files(
+    'bson.c',
     'context.c',
     'cwyrm.c',
     'fiber.c',
+    'gc.c',
     'machine.c',
+    'module.c',
+    'pair.c',
+    'slot.c',
     'wbox.c',
     'wclass.c',
     'wdict.c',
-    'wgc.c',
-    'wpair.c',
     'wobject.c',
     'wstate.c',
-    'wstring.c',
+    'string.c',
     'wtype.c',
-    'wvm.c',
+    'vm.c',
 )
 
 # Each modules module sets a dict named with keys:

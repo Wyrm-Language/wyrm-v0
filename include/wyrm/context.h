@@ -2,7 +2,7 @@
 #define WYRM_CONTEXT_H_
 
 #include <wyrm/types.h>
-#include <wyrm/wgc.h>
+#include <wyrm/gc.h>
 
 /* ------------------------------------------------------------------------- */
 /* Context API                                                               */
@@ -28,6 +28,8 @@ wyrm_error wyrm_context_init_s(wyrm_context* self, wyrm_main_loop* loop);
 void wyrm_context_finalize_f(wyrm_context* self);
 wyrm_error wyrm_context_activate(wyrm_context* self, wyrm_fiber* fiber);
 wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber);
+
+void wy_ctx_object_init_header_static_f(wyrm_context* context, wyrm_object* object, const wyrm_object_type* dtype);
 
 WYRM_INLINE wyrm_dict* wyrm_context_get_root_f(wyrm_context* context);
 WYRM_INLINE wyrm_error wyrm_context_set_root_f(wyrm_context* context, wyrm_dict* root);

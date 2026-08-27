@@ -3,7 +3,7 @@ import wyrm::decode::*
 import wyrm::ast
 import std::io::*
 
-import static wyrm::_dsl::*
+import wyrm::_dsl::*
 
 #>  # Wyrm Language Grammar
 #>

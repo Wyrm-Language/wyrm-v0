@@ -2,7 +2,7 @@
 #define TEST_FIBER_FIXTURE_H_
 
 #include <wyrm.h>
-#include <wyrm/wfiber.h>
+#include <wyrm/fiber.h>
 #include <test_common/test_context_fixture.h>
 
 class test_fiber_fixture

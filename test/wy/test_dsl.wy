@@ -1,7 +1,7 @@
-# Minimal fixture for wyrm::parser::_dsl's @accept / @expect decorators.
+# Minimal fixture for wyrm::_dsl's @accept / @expect decorators.
 
-import static wyrm::parser::_dsl
-import wyrm::parser::tokenizer::*
+import wyrm::_dsl::*
+import wyrm::tokenizer::*
 import std::io::*
 
 
@@ -12,11 +12,15 @@ class DslTest:
     slot buffer: str
     slot tokens: list
     slot pos: int
+    slot cache_hits: dict
+    slot cache_misses: list
 
     fn init(buffer: str):
         this.buffer = buffer
         this.tokens = TokenStream(buffer) ! scan()
         this.pos = 0
+        this.cache_hits = {}
+        this.cache_misses = []
 
     fn peek(n: int) -> Token:
         idx := this.pos + n
@@ -36,6 +40,33 @@ class DslTest:
     fn reset(mark: int):
         this.pos = mark
 
+    # --- packrat memo protocol required by @accept ---
+
+    fn _cache_key(id: int, pos: int) -> str:
+        return str(id) + ":" + str(pos)
+
+    fn get_cache(id: int, pos: int):
+        key := this ! _cache_key(id, pos)
+        if key in this.cache_hits:
+            entry := this.cache_hits[key]
+            this.pos = entry[1]
+            return entry[0]
+        if key in this.cache_misses:
+            return 'NO_MATCH
+        return 'NO_CACHE
+
+    fn put_hit(id: int, pos: int, end_pos: int, result):
+        key := this ! _cache_key(id, pos)
+        this.cache_hits[key] = [result, end_pos]
+
+    fn put_miss(id: int, pos: int):
+        key := this ! _cache_key(id, pos)
+        this.cache_misses ! append(key)
+
+    fn clear():
+        this.cache_hits = {}
+        this.cache_misses = []
+
 fn [DslTest] apply_dumb_fn():
     @accept apply_if(dumb_fn, "callme")
 
@@ -43,7 +74,7 @@ fn [DslTest] apply_dumb_fn_error():
     @accept apply_if(dumb_fn, error_rule)
 
 fn [DslTest] number():
-    return @accept 'TOK_LITERAL_NUMBER
+    return @accept 'TOK_LITERAL_INT
 
 fn [DslTest] error_rule():
     return error("Bad News")
@@ -52,7 +83,7 @@ fn [DslTest] error_match():
     return @accept error_rule
 
 fn [DslTest] expect_number():
-    return @accept expect("Number", $['TOK_LITERAL_NUMBER])
+    return @accept expect("Number", $['TOK_LITERAL_INT])
 
 fn [DslTest] bool_number():
     return @accept bool(number)
@@ -138,7 +169,7 @@ fn check(what: str, got, want):
 
 # a token kind: match and no-match
 p := DslTest("42")
-check("number matches", (p ! number()).kind == 'TOK_LITERAL_NUMBER, true)
+check("number matches", (p ! number()).kind == 'TOK_LITERAL_INT, true)
 check("number consumed", p.pos == 1, true)
 
 p2 := DslTest("hello")
@@ -165,7 +196,7 @@ check("many(term) collects zero", len(r6) == 0, true)
 p6a := DslTest("1 2 3")
 r6a := p6a ! flat_bare_numbers()
 check("manyflat(term) collects three", len(r6a) == 3, true)
-check("manyflat(term) first element", (r6a[0]).kind == 'TOK_LITERAL_NUMBER, true)
+check("manyflat(term) first element", (r6a[0]).kind == 'TOK_LITERAL_INT, true)
 
 p6b := DslTest("hello")
 r6b := p6b ! flat_bare_numbers()
@@ -191,7 +222,7 @@ else:
 p6d := DslTest("1 2 3 4 5")
 r6d := p6d ! flat_number_pairs()
 check("manyflat(seq) stops before an incomplete trailing pair", len(r6d) == 4, true)
-check("manyflat(seq) resets the incomplete pair's tokens", (p6d ! peek(0)).kind == 'TOK_LITERAL_NUMBER, true)
+check("manyflat(seq) resets the incomplete pair's tokens", (p6d ! peek(0)).kind == 'TOK_LITERAL_INT, true)
 
 # manyflat($[a, b]): zero matches collects an empty (not nested-empty) list
 p6e := DslTest("hello")
@@ -211,13 +242,13 @@ check("push matches even with no input left", p8b ! push_marker(), 'marker)
 p8c := DslTest("42")
 r8c := p8c ! push_then_number()
 check("push-then-term: marker captured first", r8c[0], 'marker)
-check("push-then-term: term captured second", (r8c[1]).kind == 'TOK_LITERAL_NUMBER, true)
+check("push-then-term: term captured second", (r8c[1]).kind == 'TOK_LITERAL_INT, true)
 check("push-then-term: term still consumed", p8c.pos == 1, true)
 
 # a $[...] sequence with drop() and many(): "1, 2, 3" -> (first, [rest...])
 p9 := DslTest("1, 2, 3")
 r9 := p9 ! number_list()
-check("sequence captures first", (r9[0]).kind == 'TOK_LITERAL_NUMBER, true)
+check("sequence captures first", (r9[0]).kind == 'TOK_LITERAL_INT, true)
 check("sequence captures rest via many", len(r9[1]) == 2, true)
 
 # verify expect is error
@@ -227,7 +258,7 @@ check("expected match return error", r10 is error, true)
 
 # expect(): required match raises through the enclosing rule
 p11 := DslTest("9")
-check("expect answers the match", (p11 ! required_number()).kind == 'TOK_LITERAL_NUMBER, true)
+check("expect answers the match", (p11 ! required_number()).kind == 'TOK_LITERAL_INT, true)
 
 p12 := DslTest("hello")
 got12 := p12 ! required_number() catch 'caught_error
@@ -236,7 +267,7 @@ check("expect errors on miss", got12 == 'caught_error, true)
 # opt(term): matches like the term, nil (not error) on miss, never consumes
 # on miss
 p13 := DslTest("42")
-check("opt matches", (p13 ! opt_number()).kind == 'TOK_LITERAL_NUMBER, true)
+check("opt matches", (p13 ! opt_number()).kind == 'TOK_LITERAL_INT, true)
 check("opt consumed", p13.pos == 1, true)
 
 p14 := DslTest("hello")
@@ -250,7 +281,7 @@ check("opt group nil on partial match", p15 ! opt_paren_number() == nil, true)
 check("opt group resets fully on partial match", p15.pos == 0, true)
 
 p16 := DslTest("(42)")
-check("opt group matches", (p16 ! opt_paren_number()).kind == 'TOK_LITERAL_NUMBER, true)
+check("opt group matches", (p16 ! opt_paren_number()).kind == 'TOK_LITERAL_INT, true)
 check("opt group consumes all three tokens", p16.pos == 3, true)
 
 # many($[...]): grouped/parenthesized repetition, not just the elem-~sep
@@ -258,7 +289,7 @@ check("opt group consumes all three tokens", p16.pos == 3, true)
 p17 := DslTest("(1)(2)(3)")
 r17 := p17 ! paren_numbers()
 check("grouped many collects three", len(r17) == 3, true)
-check("grouped many first element", (r17[0]).kind == 'TOK_LITERAL_NUMBER, true)
+check("grouped many first element", (r17[0]).kind == 'TOK_LITERAL_INT, true)
 
 p18 := DslTest("hello")
 r18 := p18 ! paren_numbers()
@@ -274,7 +305,7 @@ check("grouped many resets the incomplete group's tokens", (p19 ! peek(0)).kind 
 # first | term: try first, then term, no backtracking needed since neither
 # alternative here partially consumes
 p20 := DslTest("42")
-check("or matches first alt", (p20 ! number_or_hello()).kind == 'TOK_LITERAL_NUMBER, true)
+check("or matches first alt", (p20 ! number_or_hello()).kind == 'TOK_LITERAL_INT, true)
 
 p21 := DslTest("hello")
 check("or falls through to second alt", (p21 ! number_or_hello()) ! get_text(p21.buffer) == "hello", true)
@@ -288,19 +319,19 @@ check("or group backtracks into second alt", r22 ! get_text(p22.buffer) == "hell
 check("or group consumed all three tokens", p22.pos == 3, true)
 
 p23 := DslTest("(42)")
-check("or group matches first alt when it fits", (p23 ! paren_number_or_hello()).kind == 'TOK_LITERAL_NUMBER, true)
+check("or group matches first alt when it fits", (p23 ! paren_number_or_hello()).kind == 'TOK_LITERAL_INT, true)
 
 # opt() as a non-final sequence element must not abort the sequence when
 # it captures nothing - the rest of the sequence still has to run.
 p24 := DslTest("42")
 r24 := p24 ! opt_prefix_then_number()
 check("opt-then-term: opt absent still lets term match", r24[0] == nil, true)
-check("opt-then-term: term captured", (r24[1]).kind == 'TOK_LITERAL_NUMBER, true)
+check("opt-then-term: term captured", (r24[1]).kind == 'TOK_LITERAL_INT, true)
 
 p25 := DslTest("(42")
 r25 := p25 ! opt_prefix_then_number()
 check("opt-then-term: opt present is captured too", (r25[0]).kind == 'TOK_LPAREN, true)
-check("opt-then-term: term after opt still matches", (r25[1]).kind == 'TOK_LITERAL_NUMBER, true)
+check("opt-then-term: term after opt still matches", (r25[1]).kind == 'TOK_LITERAL_INT, true)
 
 # A rule that answers a genuine `nil` (not via opt()) as a non-final
 # sequence element must not be mistaken for `'NO_MATCH` either - the gate
@@ -308,7 +339,7 @@ check("opt-then-term: term after opt still matches", (r25[1]).kind == 'TOK_LITER
 p26 := DslTest("~42")
 r26 := p26 ! nil_then_number()
 check("plain nil-valued term: captured as nil, not a failure", r26[0] == nil, true)
-check("plain nil-valued term: rest of sequence still matches", (r26[1]).kind == 'TOK_LITERAL_NUMBER, true)
+check("plain nil-valued term: rest of sequence still matches", (r26[1]).kind == 'TOK_LITERAL_INT, true)
 
 # Bool Number
 p27 := DslTest("42")
@@ -325,7 +356,7 @@ check("bool number is false for letter", r28, false)
 p29 := DslTest("1, 2, 3,")
 r29 := p29 ! flat_numbers()
 check("flatten splices nested many() into one flat list", len(r29), 3)
-check("flatten preserves order", (r29[0]).kind == 'TOK_LITERAL_NUMBER and (r29[2]).kind == 'TOK_LITERAL_NUMBER, true)
+check("flatten preserves order", (r29[0]).kind == 'TOK_LITERAL_INT and (r29[2]).kind == 'TOK_LITERAL_INT, true)
 
 # flatten with only one number, no trailing repeats: many() collects an
 # empty list, should have 1 item

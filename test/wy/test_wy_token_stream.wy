@@ -1,5 +1,5 @@
-import wyrm::parser::tokenizer as tok
-import static wyrm::parser::tokenizer
+import wyrm::tokenizer as tok
+import wyrm::tokenizer::*
 import std::io::*;
 
 # Render a token list as a compact space separated string of kinds.

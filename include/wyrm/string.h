@@ -1,9 +1,9 @@
-#ifndef WYRM_WSTRING_H_
-#define WYRM_WSTRING_H_
+#ifndef WYRM_STRING_H_
+#define WYRM_STRING_H_
 
-#include <wyrm/wcore.h>
+#include <wyrm/core.h>
 #include <wyrm/types.h>
-#include <wyrm/wobject.h>
+#include <wyrm/object.h>
 #include <wyrm/sys/string.h>
 
 #ifdef __cplusplus

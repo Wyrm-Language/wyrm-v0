@@ -1,7 +1,7 @@
 #ifndef WYRM_FIBER_H_
 #define WYRM_FIBER_H_
 
-#include <wyrm/wcore.h>
+#include <wyrm/core.h>
 
 /* ------------------------------------------------------------------------- */
 /* Fiber API                                                                 */
@@ -19,13 +19,6 @@ WYRM_INLINE wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)
     if (!self) { return WYRM_NULL; }
     return self->parent;
 }
-
-WYRM_INLINE wyrm_value* wy_fiber_accum(wyrm_fiber* self)
-{
-    WYRM_ASSERT(self != WYRM_NULL);
-    return &self->accumulator;
-}
-
 
 WYRM_END_DECLS
 

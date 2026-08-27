@@ -1,4 +1,4 @@
-import wyrm::parser::parser::*
+import wyrm::parser::*
 import wyrm::ast::*
 import std::io::*
 
@@ -10,11 +10,11 @@ fn check(what: str, got, want):
 
 fn cmd_type(v: pair) -> sym: car(v)
 
-fn is_num_tok(t) -> bool: t.kind == 'TOK_LITERAL_NUMBER
+fn is_num_lit(t) -> bool: car(t) == 'int
 
-check("basic xid", Parser("std")!xid(), "std")
-check("basic xid split on operator", Parser("std.asdf")!xid(), "std")
-check("xid includes $", Parser("$_ope1n$.asdf")!xid(), "$_ope1n$")
+check("basic xid", Parser("std")!xid(), 'std)
+check("basic xid split on operator", Parser("std.asdf")!xid(), 'std)
+check("xid includes $", Parser("$_ope1n$.asdf")!xid(), '$_ope1n$)
 check("xid excludes keyword", Parser("fn")!xid(), 'NO_MATCH)
 
 basic_import := Parser("import std::io")!import_stmt()
@@ -55,7 +55,7 @@ check("bool non-parse", Parser("!")!bool_literal(), 'NO_MATCH)
 
 # Catch expression, left-associative chain
 check("catch expr", Parser("a catch b catch c")!expression(),
-    $[ 'catch, "a", $[ 'catch, "b", "c" ] ])
+    $[ 'catch, 'a, $[ 'catch, 'b, 'c ] ])
 
 # print("and expr", Parser("a and b and c")!expression(), "\n")
 # print("or expr", Parser("a or b and c or d")!expression(), "\n")
@@ -76,46 +76,51 @@ check("catch expr", Parser("a catch b catch c")!expression(),
 
 r_do := Parser("do: 5")!expression()
 check("do expr kind", car(r_do), 'do)
-check("do expr body", is_num_tok(cadr(r_do)), true)
+check("do expr body", is_num_lit(cadr(r_do)), true)
 
 check("return bare", Parser("return")!expression(), $[ 'return, nil ])
-check("return val", Parser("return a")!expression(), $[ 'return, "a" ])
+check("return val", Parser("return a")!expression(), $[ 'return, 'a ])
 check("yield bare", Parser("yield")!expression(), $[ 'yield, nil ])
-check("yield val", Parser("yield a")!expression(), $[ 'yield, "a" ])
-check("yield from", Parser("yield from a")!expression(), $[ 'yield_from, "a" ])
+check("yield val", Parser("yield a")!expression(), $[ 'yield, 'a ])
+check("yield from", Parser("yield from a")!expression(), $[ 'yield_from, 'a ])
 check("break", Parser("break")!expression(), 'break)
 check("continue", Parser("continue")!expression(), 'continue)
 check("pass", Parser("pass")!expression(), 'pass)
-check("if", Parser("if a: b")!expression(), $[ 'if, "a", "b", nil, nil ])
-check("if else", Parser("if a: b else: c")!expression(), $[ 'if, "a", "b", nil, "c" ])
-check("while", Parser("while a: b")!expression(), $[ 'while, "a", "b" ])
-check("for", Parser("for x in a: b")!expression(), $[ 'for, "x", "a", "b", nil ])
+check("if", Parser("if a: b")!expression(), $[ 'if, 'a, 'b, nil, nil ])
+check("if else", Parser("if a: b else: c")!expression(), $[ 'if, 'a, 'b, nil, 'c ])
+check("while", Parser("while a: b")!expression(), $[ 'while, 'a, 'b ])
+check("for", Parser("for x in a: b")!expression(), $[ 'for, 'x, 'a, 'b, nil ])
 
 # var statement tests
-check("var simple", Parser("var x")!stmt_line(), $[ 'var, $[ $[ "x", nil ] ] ])
-check("var with type", Parser("var x: int")!stmt_line(), $[ 'var, $[ $[ "x", $[ "int" ] ] ] ])
+#
+# A single target lowers to n_define ($['define, name, type, init]); more
+# than one lowers to n_set_values' $['define_values, targets, init] with
+# one $[name, type] per target. An omitted type is the auto type node.
+check("var simple", Parser("var x")!stmt_line(), $[ 'define, 'x, $[ 'type, 'auto ], nil ])
+check("var with type", Parser("var x: int")!stmt_line(), $[ 'define, 'x, $[ 'type, 'int ], nil ])
 
 r_var_init := Parser("var x = 5")!stmt_line()
-check("var with init target", $[ car(r_var_init), cadr(r_var_init) ], $[ 'var, $[ $[ "x", nil ] ] ])
-check("var with init value", is_num_tok(caddr(r_var_init)), true)
+check("var with init target", $[ car(r_var_init), cadr(r_var_init), caddr(r_var_init) ],
+    $[ 'define, 'x, $[ 'type, 'auto ] ])
+check("var with init value", is_num_lit(car(cdddr(r_var_init))), true)
 
 r_var_type_init := Parser("var x: int = 5")!stmt_line()
-check("var with type and init target", $[ car(r_var_type_init), cadr(r_var_type_init) ],
-    $[ 'var, $[ $[ "x", $[ "int" ] ] ] ])
-check("var with type and init value", is_num_tok(caddr(r_var_type_init)), true)
+check("var with type and init target", $[ car(r_var_type_init), cadr(r_var_type_init), caddr(r_var_type_init) ],
+    $[ 'define, 'x, $[ 'type, 'int ] ])
+check("var with type and init value", is_num_lit(car(cdddr(r_var_type_init))), true)
 
 check("var multiple", Parser("var x, y")!stmt_line(),
-    $[ 'var, $[ $[ "x", nil ], $[ "y", nil ] ] ])
+    $[ 'define_values, $[ $[ 'x, $[ 'type, 'auto ] ], $[ 'y, $[ 'type, 'auto ] ] ], nil ])
 
 r_var_multi_init := Parser("var x, y = 5")!stmt_line()
 check("var multiple with init target", $[ car(r_var_multi_init), cadr(r_var_multi_init) ],
-    $[ 'var, $[ $[ "x", nil ], $[ "y", nil ] ] ])
-check("var multiple with init value", is_num_tok(caddr(r_var_multi_init)), true)
+    $[ 'define_values, $[ $[ 'x, $[ 'type, 'auto ] ], $[ 'y, $[ 'type, 'auto ] ] ] ])
+check("var multiple with init value", is_num_lit(caddr(r_var_multi_init)), true)
 
 r_var_mixed := Parser("var x: int, y, z: str = 10")!stmt_line()
 check("var multiple mixed target", $[ car(r_var_mixed), cadr(r_var_mixed) ],
-    $[ 'var, $[ $[ "x", $[ "int" ] ], $[ "y", nil ], $[ "z", $[ "str" ] ] ] ])
-check("var multiple mixed value", is_num_tok(caddr(r_var_mixed)), true)
+    $[ 'define_values, $[ $[ 'x, $[ 'type, 'int ] ], $[ 'y, $[ 'type, 'auto ] ], $[ 'z, $[ 'type, 'str ] ] ] ])
+check("var multiple mixed value", is_num_lit(caddr(r_var_mixed)), true)
 
 # Test that var is not parsed as an expression
 check("var not expr", Parser("var x")!expression(), 'NO_MATCH)

@@ -1,7 +1,7 @@
-#ifndef WYRM_INL_PROTOTYPE_H_
-#define WYRM_INL_PROTOTYPE_H_
+#ifndef WYRM_WPROTOTYPE_H_
+#define WYRM_WPROTOTYPE_H_
 
-#include <wyrm.h>
+#include <wyrm/core.h>
 
 #ifdef __cplusplus
 extern "C" {

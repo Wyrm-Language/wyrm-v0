@@ -1,7 +1,9 @@
-#ifndef WYRM_INL_ALLOCATOR_H_
-#define WYRM_INL_ALLOCATOR_H_
+#ifndef WYRM_ALLOCATOR_H_
+#define WYRM_ALLOCATOR_H_
 
 #include <wyrm/types.h>
+
+typedef wyrm_allocator wy_allocator;
 
 WYRM_BEGIN_DECLS
 

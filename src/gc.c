@@ -1,4 +1,4 @@
-#include <wyrm/wgc.h>
+#include <wyrm/gc.h>
 #include <wyrm.h>
 
 

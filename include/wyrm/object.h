@@ -1,7 +1,10 @@
-#ifndef WYRM_INL_OBJECT_INL_H_
-#define WYRM_INL_OBJECT_INL_H_
+#ifndef WYRM_WOBJECT_H_
+#define WYRM_WOBJECT_H_
 
-#include <wyrm/types.h>
+#include <wyrm/core.h>
+
+#define WY_OBJECT_INITIALIZER(DTYPE) { .dtype = DTYPE, .flags = 0, .next = WYRM_NULL }
+#define WY_OBJECT_INITIALIZER_S(DTYPE) { .dtype = DTYPE, .flags = WYRM_GC_STATIC, .next = WYRM_NULL }
 
 WYRM_BEGIN_DECLS
 
@@ -10,6 +13,13 @@ WYRM_INLINE void wyrm_object_init_header_s(wyrm_object* self, const wyrm_object_
     self->dtype = dtype;
     self->flags = 0;
     self->next = WYRM_NULL;
+}
+
+
+WYRM_INLINE void wy_object_init_static_f(wyrm_object* self, const wyrm_object_type* dtype)
+{
+    wyrm_object_init_header_s(self, dtype);
+    self->flags |= WYRM_GC_STATIC;
 }
 
 
@@ -36,6 +46,8 @@ WYRM_INLINE wyrm_error wyrm_object_children_iter_next_f(wyrm_state* state, wyrm_
 {
     return self->dtype->children_iter_next(state, self, wa, object_ptr);
 }
+
+
 
 
 WYRM_END_DECLS

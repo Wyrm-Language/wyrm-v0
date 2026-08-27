@@ -2,10 +2,10 @@
 #define WYRM_API_H_
 
 #include <wyrm/types.h>
-#include <wyrm/wbox.h>
-#include <wyrm/wfiber.h>
-#include <wyrm/wstring.h>
-#include <wyrm/wcontext.h>
+#include <wyrm/box.h>
+#include <wyrm/fiber.h>
+#include <wyrm/string.h>
+#include <wyrm/context.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -154,12 +154,12 @@ void wyrm_context_gc_full_run(wyrm_state* state, wyrm_context* context);
 
 
 #include <wyrm/inl/util.h>
-#include <wyrm/inl/allocator.h>
+#include <wyrm/allocator.h>
 #include <wyrm/inl/class.h>
 #include <wyrm/inl/stack.h>
 #include <wyrm/inl/fiber.h>
 #include <wyrm/inl/state.h>
-#include <wyrm/inl/object.h>
+#include <wyrm/object.h>
 #include <wyrm/inl/op.h>
 #include <wyrm/inl/main_loop.h>
 

@@ -13,6 +13,8 @@ WYRM_BEGIN_DECLS
 // ----------------------------------------------------------------------------
 
 #define WYRM_HASH_INVALID WYRM_UWORD_MAX
+#define WYRM_WORK_AREA_LEN 8
+#define WY_SLOT_INVALID WYRM_UWORD_MAX
 
 // ----------------------------------------------------------------------------
 // Forward Definitions
@@ -28,6 +30,7 @@ struct wyrm_dict;
 struct wyrm_fiber;
 struct wyrm_machine;
 struct wyrm_main_loop;
+struct wy_module;
 struct wyrm_object;
 struct wyrm_object_list;
 struct wyrm_object_type;
@@ -51,6 +54,7 @@ typedef struct wyrm_dstruct wyrm_dstruct;
 typedef struct wyrm_dict wyrm_dict;
 typedef struct wyrm_fiber wyrm_fiber;
 typedef struct wyrm_machine wyrm_machine;
+typedef struct wy_module wy_module;
 typedef struct wyrm_object_type wyrm_object_type;
 typedef struct wyrm_object wyrm_object;
 typedef struct wyrm_main_loop wyrm_main_loop;
@@ -64,6 +68,10 @@ typedef struct wyrm_string wyrm_string;
 typedef struct wyrm_value wyrm_value;
 typedef struct wyrm_work_area wyrm_work_area;
 #endif
+
+typedef wyrm_value wy_value;
+typedef wyrm_object wy_object;
+
 
 // ----------------------------------------------------------------------------
 // Core Engine Types
@@ -103,6 +111,8 @@ typedef enum wyrm_type_tag
  * @brief Symbol table entry
  */
 typedef const char* wyrm_symtab_entry;
+typedef wyrm_symtab_entry wy_symbol;
+#define WYRM_SYMBOL_INVALID ((wy_symbol)WYRM_NULL)
 
 /**
  * @brief Result states for a wyrm callable invoked via wyrm_exec_fn.
@@ -184,12 +194,78 @@ struct wyrm_value
     wyrm_primitive data;
 };
 
-
 enum {
     WYRM_PRIMITIVE_SIZE = sizeof(wyrm_primitive)
 };
 
 static_assert(WYRM_PRIMITIVE_SIZE >= sizeof(uintptr_t), "Primitive must allow storage of a pointer");
+
+
+/**
+ * Generic 'User Data' Friendly Field
+ *
+ * A small working space intended for temporary stack parameters and type
+ * erased operations. Work areas should be tightly coupled to a single known
+ * API usage.
+ */
+struct wyrm_work_area
+{
+    wyrm_primitive data[WYRM_WORK_AREA_LEN];
+};
+
+/**
+ * Generic Garbage Collected Object
+ *
+ * All objects located on the heap hold this structure as their first member.
+ * The wyrm_object_type* determines the interpretation of the remainder of
+ * the structure as well as the fixed offset size.
+ */
+struct wyrm_object
+{
+    const wyrm_object_type* dtype;
+    wyrm_object* next;
+    wyrm_uword flags;
+};
+
+struct wyrm_object_type
+{
+    wyrm_object object;
+    wyrm_type_tag gc_type;
+
+    void (*finalize)(wyrm_context* context, wyrm_object* self);
+
+    wyrm_error (*children_iter_start)(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa);
+    wyrm_error (*children_iter_next)(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa, const wyrm_object** child);
+};
+
+// ----------------------------------------------------------------------------
+// Prototype
+// ----------------------------------------------------------------------------
+#define WYRM_BAD_SLOT WYRM_UWORD_MAX
+
+enum
+{
+    WYRM_PROTOTYPE_SLOT_FLAG_BOXED  = 0x0001,  ///< Slot is boxed, may escape
+    WYRM_PROTOTYPE_SLOT_FLAG_STATIC = 0x0002,  ///< Slot is statically allocated
+};
+
+#define WYRM_SLOT_DEFAULTS 0
+
+typedef struct wyrm_prototype_slot
+{
+    wyrm_uword flags;
+    wyrm_symtab_entry symtab_entry;
+    wyrm_value default_value;
+} wyrm_prototype_slot;
+
+struct wyrm_prototype
+{
+    wyrm_object object;
+    wyrm_prototype_slot* slots;
+    wyrm_uword slot_capacity;
+    wyrm_uword slot_count;
+};
+
 
 // ----------------------------------------------------------------------------
 // Functions

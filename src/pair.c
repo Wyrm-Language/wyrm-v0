@@ -1,4 +1,4 @@
-#include <wyrm/wpair.h>
+#include <wyrm/pair.h>
 #include <wyrm/sys/string.h>
 
 static wyrm_error start_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa)

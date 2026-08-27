@@ -40,6 +40,8 @@ enum wyrm_error {
 typedef enum wyrm_error wyrm_error;
 #endif
 
+typedef wyrm_error wy_error;
+
 
 static inline void wyrm_set_err(wyrm_error* error_ptr, wyrm_error error)
 {

@@ -2,7 +2,7 @@
 #define WYRM_INL_CLASS_H_
 
 #include <wyrm/types.h>
-#include <wyrm/inl/prototype.h>
+#include <wyrm/prototype.h>
 
 WYRM_BEGIN_DECLS
 

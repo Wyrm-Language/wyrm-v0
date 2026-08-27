@@ -98,6 +98,8 @@ wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber)
     return WYRM_ERR_NONE;
 }
 
+
+
 wyrm_error wyrm_context_activate(wyrm_context* self, wyrm_fiber* fiber)
 {
     wyrm_error last_error = WYRM_ERR_NONE;

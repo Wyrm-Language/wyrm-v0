@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 
 #include <wyrm.h>
-#include <wyrm/wpair.h>
-#include <wyrmxx/wcore.h>
+#include <wyrm/pair.h>
+#include <wyrmxx/core.h>
 #include <test_common/test_context_fixture.h>
 
 TEST_SUITE("wpair") {

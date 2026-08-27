@@ -1,7 +1,7 @@
 #ifndef WYRM_TYPES_H_
 #define WYRM_TYPES_H_
 
-#include <wyrm/wcore.h>
+#include <wyrm/core.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,31 +33,6 @@ struct wyrm_allocator {
 
 
 // ----------------------------------------------------------------------------
-// Wyrm Value
-// ----------------------------------------------------------------------------
-
-
-// ----------------------------------------------------------------------------
-// Work Area
-// ----------------------------------------------------------------------------
-
-#define WYRM_WORK_AREA_LEN 8
-
-/**
- * Generic 'User Data' Friendly Field
- *
- * A small working space intended for temporary stack parameters and type
- * erased operations. Work areas should be tightly coupled to a single known
- * API usage.
- */
-struct wyrm_work_area
-{
-    wyrm_primitive data[WYRM_WORK_AREA_LEN];
-};
-
-
-
-// ----------------------------------------------------------------------------
 // Wyrm GC Info
 // ----------------------------------------------------------------------------
 
@@ -69,23 +44,6 @@ enum
     WYRM_GC_FLAG_RO         = 0x010,
 };
 
-struct wyrm_object
-{
-    const wyrm_object_type* dtype;
-    wyrm_object* next;
-    wyrm_uword flags;
-};
-
-struct wyrm_object_type
-{
-    wyrm_object object;
-    wyrm_type_tag gc_type;
-
-    void (*finalize)(wyrm_context* context, wyrm_object* self);
-
-    wyrm_error (*children_iter_start)(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa);
-    wyrm_error (*children_iter_next)(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa, const wyrm_object** child);
-};
 
 extern const wyrm_object_type wyrm_type_type;
 extern const wyrm_object_type wyrm_type_object;
@@ -97,30 +55,6 @@ extern const wyrm_object_type wyrm_type_object;
 // ----------------------------------------------------------------------------
 // Prototype & Scope
 // ----------------------------------------------------------------------------
-#define WYRM_BAD_SLOT WYRM_UWORD_MAX
-
-enum
-{
-    WYRM_PROTOTYPE_SLOT_FLAG_BOXED  = 0x0001,  ///< Slot is boxed, may escape
-    WYRM_PROTOTYPE_SLOT_FLAG_STATIC = 0x0002,  ///< Slot is statically allocated
-};
-
-#define WYRM_SLOT_DEFAULTS 0
-
-typedef struct wyrm_prototype_slot
-{
-    wyrm_uword flags;
-    wyrm_symtab_entry symtab_entry;
-    wyrm_value default_value;
-} wyrm_prototype_slot;
-
-struct wyrm_prototype
-{
-    wyrm_object object;
-    wyrm_prototype_slot* slots;
-    wyrm_uword slot_capacity;
-    wyrm_uword slot_count;
-};
 
 struct wyrm_scope
 {
@@ -210,9 +144,6 @@ struct wyrm_fiber
 
     //! The total number of entries to preserve on
     wyrm_uword tail_preserve_count;
-
-    //! The accumulator
-    wyrm_value accumulator;
 };
 
 

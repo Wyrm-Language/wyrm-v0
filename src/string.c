@@ -1,5 +1,5 @@
-#include <wyrm/wstring.h>
-#include <wyrm/wcontext.h>
+#include <wyrm/string.h>
+#include <wyrm/context.h>
 #include <wyrm/sys/string.h>
 
 

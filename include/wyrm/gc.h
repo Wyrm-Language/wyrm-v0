@@ -1,9 +1,9 @@
 #ifndef WYRM_WGC_H_
 #define WYRM_WGC_H_
 
-#include <wyrm/wcore.h>
+#include <wyrm/core.h>
 #include <wyrm/types.h>
-#include <wyrm/wobject.h>
+#include <wyrm/object.h>
 
 WYRM_BEGIN_DECLS
 
