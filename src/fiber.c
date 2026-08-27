@@ -41,6 +41,7 @@ wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len)
     fiber->parent = WYRM_NULL;
     fiber->pending = WYRM_NULL;
     fiber->tail_preserve_count = 0;
+    fiber->accumulator = wyrm_value_Unset();
 
     wyrm_stack_init_f(&fiber->value_stack, stack, stack_len);
     wyrm_context_object_init_header_f(context, &fiber->object, &wyrm_type_fiber);

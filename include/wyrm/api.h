@@ -3,6 +3,7 @@
 
 #include <wyrm/types.h>
 #include <wyrm/wbox.h>
+#include <wyrm/wfiber.h>
 #include <wyrm/wstring.h>
 #include <wyrm/wcontext.h>
 
@@ -55,16 +56,6 @@ WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value);
 
 WYRM_INLINE wyrm_error wyrm_state_set_pending(wyrm_state* state, wyrm_exec_fn pending);
 WYRM_INLINE wyrm_error wyrm_state_call_continue(wyrm_state* state, wyrm_exec_fn result_cb, wyrm_exec_fn fn, const wyrm_value* args, wyrm_uword arg_count);
-
-
-/* ------------------------------------------------------------------------- */
-/* Fiber API                                                                 */
-/* ------------------------------------------------------------------------- */
-
-wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len);
-static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self);
-void wyrm_fiber_finalize_f(wyrm_fiber* self);
-wyrm_error wyrm_fiber_exec_f(wyrm_fiber* self, wyrm_state* state);
 
 
 /* ------------------------------------------------------------------------- */
@@ -154,17 +145,13 @@ void wyrm_context_gc_full_run(wyrm_state* state, wyrm_context* context);
 /* ---- Utility Functions ----- */
 
 
-/* ---------- wyrm_fiber inlines --------- */
-static inline wyrm_context* wyrm_fiber_get_context(wyrm_fiber* self)
-{
-    if (!self) { return WYRM_NULL; }
-    return self->parent;
-}
+
 
 
 #ifdef __cplusplus
 }
 #endif
+
 
 #include <wyrm/inl/util.h>
 #include <wyrm/inl/allocator.h>

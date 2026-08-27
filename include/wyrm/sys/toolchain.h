@@ -114,6 +114,8 @@ typedef float wyrm_float;
 
 typedef uintptr_t wyrm_uintptr;
 typedef wyrm_word wyrm_handle;
+typedef int32_t wy_i32;
+typedef uint32_t wy_u32;
 
 static_assert(sizeof(wyrm_uword) >= sizeof(uintptr_t), "uword must store full pointer bits");
 static_assert(sizeof(wyrm_float) <= sizeof(wyrm_uword), "fp must not exceed size of uword");

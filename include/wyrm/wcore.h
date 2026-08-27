@@ -6,9 +6,7 @@
 #include <wyrm/sys/errors.h>
 #include <wyrm/sys/thread_id.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+WYRM_BEGIN_DECLS
 
 // ----------------------------------------------------------------------------
 // Macros
@@ -206,6 +204,17 @@ WYRM_INLINE wyrm_primitive wyrm_primitive_null(void)
     return v;
 }
 
+/**
+ * @brief Create 'nil' primitive
+ */
+WYRM_INLINE wyrm_value wyrm_value_nil(void)
+{
+    wyrm_value v = {
+        .type = WYRM_TYPE_TAG_NIL,
+        .data = wyrm_primitive_null()
+    };
+    return v;
+}
 
 /**
  * @brief Create Unset primitive
@@ -224,8 +233,6 @@ WYRM_INLINE bool wyrm_type_tag_is_gc(wyrm_type_tag tag)
     return tag >= WYRM_TYPE_TAG_GC_PATH_START;
 }
 
-#ifdef __cplusplus
-}
-#endif
+WYRM_END_DECLS
 
 #endif

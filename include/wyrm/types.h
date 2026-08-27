@@ -210,6 +210,9 @@ struct wyrm_fiber
 
     //! The total number of entries to preserve on
     wyrm_uword tail_preserve_count;
+
+    //! The accumulator
+    wyrm_value accumulator;
 };
 
 

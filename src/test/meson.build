@@ -12,6 +12,7 @@ test_cwyrm_sources = files(
     'test_wpair.cpp',
     'test_wstring.cpp',
     'test_wtable.cpp',
+    'test_wvm.cpp',
     'test_wyrm.cpp',
 )
 

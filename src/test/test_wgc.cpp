@@ -28,7 +28,9 @@ wyrm_uword arena_check_count(wyrm_gc_arena* arena)
         ++count;
     }
     REQUIRE_EQ(arena->last, last);
-    REQUIRE_EQ(arena->last->next, WYRM_NULL);
+    if (arena->last) {
+        REQUIRE_EQ(arena->last->next, WYRM_NULL);
+    }
     return count;
 }
 

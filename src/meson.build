@@ -24,6 +24,7 @@ cwyrm_sources = files(
     'wstate.c',
     'wstring.c',
     'wtype.c',
+    'wvm.c',
 )
 
 # Each modules module sets a dict named with keys:

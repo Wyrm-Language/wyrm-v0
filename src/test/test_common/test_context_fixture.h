@@ -21,6 +21,11 @@ struct test_context_fixture : test_machine_fixture
         wyrm_machine_attach_context(&machine, context);
     }
 
+    ~test_context_fixture()
+    {
+        run_gc();
+    }
+
     wyrm_context* get_context_ptr()
     {
         return context;
