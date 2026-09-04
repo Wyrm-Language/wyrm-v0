@@ -8,6 +8,7 @@ namespace wyrmxx
         : context_{}
         , main_loop_{loop}
     {
-        check_wyrm_error(wyrm_context_init_s(&context_, main_loop_));
+        check_wyrm_error(wyrm_context_init_s(&context_));
+        check_wyrm_error(wyrm_context_attach_loop(&context_, main_loop_));
     }
 }

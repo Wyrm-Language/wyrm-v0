@@ -5,6 +5,7 @@ test_cwyrm_sources = files(
     'test_bson.cpp',
     'test_class.cpp',
     'test_context.cpp',
+    'test_fiber.cpp',
     'test_machine.cpp',
     'test_slot.cpp',
     'test_stack.cpp',

@@ -8,6 +8,22 @@ union cmem_header
     max_align_t pad_;
 };
 
+
+wyrm_allocator_cmem* wyrm_allocator_cmem_new(void)
+{
+    wyrm_allocator_cmem* allocator = malloc(sizeof(wyrm_allocator_cmem));
+    if (allocator == WYRM_NULL) { return WYRM_NULL; }
+    wyrm_allocator_cmem_init(allocator);
+    return allocator;
+}
+
+
+void wyrm_allocator_cmem_destroy(wyrm_allocator_cmem* allocator)
+{
+    free(allocator);
+}
+
+
 static void* genc_alloc(wyrm_allocator* clz, wyrm_uword n)
 {
     WYRM_ASSERT(clz && clz->clz == &wyrm_allocator_cmem_vt);

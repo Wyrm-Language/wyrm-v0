@@ -1,6 +1,6 @@
 
 platform_hosted = {
-    'sources'      : files('wyrm_allocator_cmem.c'),
+    'sources'      : files('allocator_cmem.c', 'cmachine.c'),
     'inc'          : [],
     'deps'         : [dependency('threads')],
     'public_inc'   : [],

@@ -22,12 +22,6 @@ option('glib',
        description: 'Enable GLib object and main loop integration.',
 )
 
-option('wy',
-       type: 'feature',
-       value: 'enabled',
-       description: 'Enable wy library for easy interaction in C projects'
-)
-
 option('wyrm',
        type: 'feature',
        value: 'enabled',

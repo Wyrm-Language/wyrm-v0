@@ -16,6 +16,13 @@ struct wyrm_allocator_cmem
     wyrm_uword active_size;
 };
 
+#ifndef __cplusplus
+typedef struct wyrm_allocator_cmem wyrm_allocator_cmem;
+#endif
+
+wyrm_allocator_cmem* wyrm_allocator_cmem_new(void);
+void wyrm_allocator_cmem_destroy(wyrm_allocator_cmem* allocator);
+
 WYRM_INLINE void wyrm_allocator_cmem_init(struct wyrm_allocator_cmem* allocator)
 {
     allocator->base.clz = &wyrm_allocator_cmem_vt;
@@ -27,9 +34,6 @@ WYRM_INLINE wyrm_allocator* wyrm_allocator_from_cmem(struct wyrm_allocator_cmem*
     return &allocator->base;
 }
 
-#ifndef __cplusplus
-typedef struct wyrm_allocator_cmem wyrm_allocator_cmem;
-#endif
 
 #ifdef __cplusplus
 }

@@ -12,7 +12,7 @@ public:
     test_fiber_fixture()
         : fiber{}
     {
-        fiber = wyrm_fiber_create(get_context_ptr(), stack_size);
+        fiber = wyrm_fiber_create(get_context_ptr(), stack_size, frame_count);
         wyrm_context_attach_fiber(get_context_ptr(), fiber);
     }
 
@@ -21,10 +21,13 @@ public:
     }
 
 
+    wyrm_fiber* get_fiber_ptr() const { return fiber; }
+
     operator wyrm_fiber*() const { return fiber; }
 
 private:
     static constexpr auto stack_size = 1024;
+    static constexpr auto frame_count = 1024;
 
     wyrm_fiber* fiber;
 };

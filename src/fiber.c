@@ -1,4 +1,6 @@
 #include <wyrm.h>
+#include <wyrm/fiber.h>
+#include <wyrm/stack.h>
 
 static void finalize_f(wyrm_context* context, wyrm_object* object);
 static wyrm_error start_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa);
@@ -9,8 +11,8 @@ static wyrm_error fiber_continue_with_return(wyrm_fiber* self)
     /* Not completed executing current task */
     if (self->pending != WYRM_NULL) { return WYRM_ERR_INVAL; }
 
-    wyrm_error last_error = wyrm_stack_pop_continuation_f(
-        &self->value_stack,
+    wyrm_error last_error = wy_fiber_pop_continuation_f(
+        self,
         &self->pending,
         self->tail_preserve_count);
 
@@ -26,9 +28,14 @@ static wyrm_error fiber_continue_with_return(wyrm_fiber* self)
     return last_error;
 }
 
-
-wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len)
+/**
+ * Create a fiber
+ */
+wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len, wy_uword frame_count)
 {
+    WYRM_ASSERT(context != WYRM_NULL);
+    if (stack_len == 0 || frame_count == 0) { return WYRM_NULL; }
+
     wyrm_fiber* fiber = wyrm_context_gc_alloc(context, sizeof(wyrm_fiber));
     if (fiber == WYRM_NULL) { return WYRM_NULL; }
 
@@ -38,11 +45,24 @@ wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len)
         return WYRM_NULL;
     }
 
+    /* One extra slot holds the sentinel frame that marks "no active frame". */
+    wy_mem_info_init_empty_s(&fiber->frame_memory);
+    if (WY_CONTEXT_MEM_INFO_RESERVE_COUNT(context, &fiber->frame_memory, frame_count + 1, wy_fiber_frame) != WYRM_ERR_NONE) {
+        wyrm_context_gc_free(context, stack);
+        wyrm_context_gc_free(context, fiber);
+        return WYRM_NULL;
+    }
+
+    wyrm_stack_init_f(&fiber->value_stack, stack, stack_len);
+
     fiber->parent = WYRM_NULL;
     fiber->pending = WYRM_NULL;
     fiber->tail_preserve_count = 0;
 
-    wyrm_stack_init_f(&fiber->value_stack, stack, stack_len);
+    fiber->current_frame = WY_MEM_INFO_BEGIN_PTR(wy_fiber_frame, &fiber->frame_memory);
+    fiber->current_frame->restore_base = wyrm_stack_base_f(&fiber->value_stack);
+    fiber->current_frame->fn = WYRM_NULL;
+
     wyrm_context_object_init_header_f(context, &fiber->object, &wyrm_type_fiber);
     return fiber;
 }
@@ -57,6 +77,9 @@ static void finalize_f(wyrm_context* context, wyrm_object* object)
     self->value_stack.entries_end = WYRM_NULL;
     self->value_stack.base = WYRM_NULL;
     self->value_stack.top = WYRM_NULL;
+
+    wy_context_mem_release_f(context, &self->frame_memory);
+    self->current_frame = WYRM_NULL;
 }
 
 
@@ -140,6 +163,46 @@ static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyr
 
     wa->data[0].word = idx;
     return WYRM_ERR_STOP_ITERATION;
+}
+
+
+/**
+ * Push a call frame
+ */
+wyrm_error wy_fiber_push_frame_f(wyrm_fiber* self, wyrm_exec_fn fn)
+{
+    WYRM_ASSERT(self != WYRM_NULL && fn != WYRM_NULL);
+
+    wy_fiber_frame* new_frame = self->current_frame + 1;
+    if (!WY_MEM_INFO_TOP_NOT_AT_END(wy_fiber_frame, new_frame, &self->frame_memory)) {
+        return WYRM_ERR_STACK_OVERFLOW;
+    }
+
+    new_frame->fn = fn;
+    new_frame->restore_base = wyrm_stack_base_f(&self->value_stack);
+
+    wyrm_stack_base_restore_f(&self->value_stack, wyrm_stack_top_f(&self->value_stack));
+    self->current_frame = new_frame;
+    return WYRM_ERR_NONE;
+}
+
+
+/**
+ * Pop a call frame, transferring the last N values to the new stack top
+ */
+wyrm_error wy_fiber_pop_continuation_f(wy_fiber* self, wyrm_exec_fn* out_continuation, wyrm_uword preserve_count)
+{
+    WYRM_ASSERT(self != WYRM_NULL && out_continuation != WYRM_NULL);
+
+    if (self->current_frame == WY_MEM_INFO_BEGIN_PTR(wy_fiber_frame, &self->frame_memory)) { return WYRM_ERR_EMPTY; }
+
+    wy_error last_error = wy_stack_base_reset_args_f(
+        &self->value_stack, self->current_frame->restore_base, preserve_count);
+    if (last_error != WYRM_ERR_NONE) { return last_error; }
+
+    *out_continuation = self->current_frame->fn;
+    self->current_frame--;
+    return WYRM_ERR_NONE;
 }
 
 

@@ -63,36 +63,6 @@ struct wyrm_scope
     wyrm_value* slots;
 };
 
-// ----------------------------------------------------------------------------
-// Stack
-// ----------------------------------------------------------------------------
-
-/**
- * @struct wyrm_stack
- *
- * Stack primitive for the Wyrm interpreter. Stack space is defined by a
- * pointer range (entries_begin, entries_end); Stack grows upward from
- * begin toward end.
- *
- * Stack shape:
- *      [previous base] Active argument + context for continuation
- *      ...
- *      ...
- *      ...
- *      [base - 2] Previous base pointer;
- *      [base - 1] Continuation pointer
- *      [base]
- *      ...  Active countext + arguments
- *      [top]
- */
-struct wyrm_stack
-{
-    wyrm_value* entries_begin;
-    wyrm_value* entries_end;
-
-    wyrm_value* base;
-    wyrm_value* top;
-};
 
 // ----------------------------------------------------------------------------
 // Wyrm Dict
@@ -125,27 +95,6 @@ struct wyrm_dict
     wyrm_uword* sparse;
     wyrm_uword sparse_capacity;
 };
-
-// ----------------------------------------------------------------------------
-// Fiber
-// ----------------------------------------------------------------------------
-
-extern const wyrm_object_type wyrm_type_fiber;
-
-/**
- * Fiber / stack
- */
-struct wyrm_fiber
-{
-    wyrm_object object;
-    wyrm_context* parent;
-    wyrm_stack value_stack;
-    wyrm_exec_fn pending;
-
-    //! The total number of entries to preserve on
-    wyrm_uword tail_preserve_count;
-};
-
 
 // ----------------------------------------------------------------------------
 // DStruct

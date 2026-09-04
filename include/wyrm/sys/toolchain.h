@@ -130,7 +130,6 @@ typedef wyrm_word wy_word;
 static_assert(sizeof(wyrm_uword) >= sizeof(uintptr_t), "uword must store full pointer bits");
 static_assert(sizeof(wyrm_float) <= sizeof(wyrm_uword), "fp must not exceed size of uword");
 
-
 #ifndef WYRM_BYTE_ALIGNMENT
 #if WYRM_CELL_BITS > 32
 #define WYRM_BYTE_ALIGNMENT 8
@@ -195,7 +194,29 @@ static inline wyrm_uword wyrm_pointer_decode_bits(wyrm_uword data) {
 #endif
 #endif
 
+/* Invalid Array Index:
+
+   Sentinel used whenever a value returns back an array index and we want
+   to have testable validity.
+*/
 #define WYRM_IDX_INVALID WYRM_UWORD_MAX
+
+/* Constraining Array Limits:
+
+   Define the maximum size allowed for internal Wyrm data structures, and the
+   maximum array length based on limiting overflow of a wy_uword. This is
+   a somewhat arbitrary limit based on current wyrm constants. The maximum
+   size of an element stored in an array is 1 << WY_MAX_ARRAY_ENTRY_SZ_BITS
+   or 4096 bytes currently; limiting overflow this leaves a maximum of
+   ~ 1 million elements on a 32 bit PC.
+
+   Array size and element count could theoretically be tweaked more, but these
+   constants provide fast checks without having deal with overflow logic.
+*/
+#define WY_MAX_ARRAY_ENTRY_SZ_BITS (12)
+#define WY_MAX_ARRAY_ENTRY_SZ (1 << WY_MAX_ARRAY_ENTRY_SZ_BITS)
+#define WY_MAX_ARRAY_LEN_SZ_BITS (32 - WY_MAX_ARRAY_ENTRY_SZ_BITS)
+#define WY_MAX_ARRAY_LEN (1 << WY_MAX_ARRAY_LEN_SZ_BITS)
 
 #ifdef __cplusplus
 #define WYRM_BEGIN_DECLS extern "C" {

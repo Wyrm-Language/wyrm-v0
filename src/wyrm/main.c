@@ -1,7 +1,12 @@
 #include <wyrm.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <wy.h>
+#include <wyrm/bson.h>
+#include <wyrm/module.h>
+#include <wyrm/platform/hosted/cmachine.h>
+#include <wyrm/fiber.h>
 
 wyrm_exec_state w_main(wyrm_state* state)
 {
@@ -39,35 +44,79 @@ wyrm_exec_state w_do_a_mul(wyrm_state* state)
     return WYRM_EXEC_CONTINUE;
 }
 
-int main(void) {
-    wyrm_error last_error = WYRM_ERR_NONE;
 
-    wy_options machine_options = {
-        .allocator = WY_ALLOCATOR_CMEM
-    };
+char* get_file_content(const char* path, wy_uword* out_file_size)
+{
+    FILE* fp = fopen(path, "rb");
+    if (!fp) {
+        return NULL;
+    }
 
-    wy_ctx* ctx = wy_init(&machine_options);
-    if (!ctx) {
-        fprintf(stderr, "Failed to initialize context\n");
+    fseek(fp, 0, SEEK_END);
+    long file_size = ftell(fp);
+    rewind(fp);
+
+    char* data = malloc(file_size + 1);
+    fread(data, file_size, 1, fp);
+    data[file_size] = '\0';
+    *out_file_size = file_size;
+
+    fclose(fp);
+    return data;
+}
+
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: wyrm <file>\n");
         return -1;
     }
 
+    const char* file_path = argv[1];
+    wy_uword file_size = 0;
+    char* file_content = get_file_content(file_path, &file_size);
+    if (!file_content) {
+        fprintf(stderr, "Failed to read file: %s\n", file_path);
+        return -1;
+    }
+
+    wy_machine* machine = wy_cmachine_new();
+    if (!machine) {
+        fprintf(stderr, "Failed to create machine\n");
+        return -1;
+    }
+
+    wy_context* context = wy_cmachine_context_new(machine);
+    if (context == WYRM_NULL) {
+        fprintf(stderr, "Failed to create context");
+        return -1;
+    }
+
+    wy_module* mod = wy_module_new_f(context);
+    if (wy_module_load(context, mod, (wy_u8*) file_content, file_size) != WYRM_ERR_NONE) {
+        fprintf(stderr, "Failed to load module\n");
+        return -1;
+    }
+
+    wy_fiber* fiber = wyrm_fiber_create(context, 8192, 1024);
+    if (fiber == WYRM_NULL) {
+        fprintf(stderr, "Failed to create fiber\n");
+        return -1;
+    }
+
+
     // TODO: add wy_eval or something...
-    wyrm_fiber* fiber = wy_get_primary_fiber(ctx);
+
     wyrm_fiber_push_continuation(fiber, w_main);
     wyrm_fiber_push_continuation(fiber, w_do_a_mul);
 
-    last_error = wyrm_context_activate(
-        wy_get_primary_context(ctx),
-        fiber);
+    wyrm_state state;
+    state.context = context;
+    state.fiber = fiber;
+    state.machine = machine;
 
-    if (last_error != WYRM_ERR_NONE) {
-        fprintf(stderr, "Failed to activate primary context: %d\n", (int)(last_error));
-        return -1;
-    }
+    wyrm_fiber_exec_f(fiber, &state);
 
-    int result = wy_run(ctx);
-    wy_destroy(ctx);
 
-    return result;
+    return 0;
 }

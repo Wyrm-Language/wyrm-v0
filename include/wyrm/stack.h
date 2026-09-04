@@ -1,10 +1,30 @@
-#ifndef WYRM_INL_STACK_INL_H_
-#define WYRM_INL_STACK_INL_H_
+#ifndef WYRM_STACK_INL_H_
+#define WYRM_STACK_INL_H_
 
 #include <wyrm/types.h>
 #include <wyrm/sys/string.h>
+#include <wyrm/value.h>
 
 WYRM_BEGIN_DECLS
+
+/**
+ * @struct wy_stack
+ *
+ * Stack primitive for the Wyrm interpreter. Stack space is defined by a
+ * pointer range (entries_begin, entries_end); Stack grows upward from
+ * begin toward end.
+ */
+struct wy_stack
+{
+    wyrm_value* entries_begin;
+    wyrm_value* entries_end;
+
+    wyrm_value* base;
+    wyrm_value* top;
+};
+
+typedef struct wy_stack wyrm_stack;
+typedef struct wy_stack wy_stack;
 
 WYRM_INLINE wyrm_error wyrm_stack_pop_discard_f(wyrm_stack* self, wyrm_uword count);
 
@@ -22,6 +42,37 @@ WYRM_INLINE void wyrm_stack_init_f(wyrm_stack* self, wyrm_value* memory, wyrm_uw
     self->entries_end   = memory + capacity;
     self->base          = memory;
     self->top           = memory;
+}
+
+/**
+ * Get current base pointer
+ */
+WYRM_INLINE wyrm_value* wyrm_stack_base_f(wyrm_stack* self)
+{
+    WYRM_ASSERT(self != WYRM_NULL);
+    return self->base;
+}
+
+/**
+ * Get current top pointer
+ */
+WYRM_INLINE wyrm_value* wyrm_stack_top_f(wyrm_stack* self)
+{
+    WYRM_ASSERT(self != WYRM_NULL);
+    return self->top;
+}
+
+/**
+ * Set the base pointer without moving any values
+ *
+ * @param self Stack
+ * @param base New base, within the stack's entry range
+ */
+WYRM_INLINE void wyrm_stack_base_restore_f(wyrm_stack* self, wyrm_value* base)
+{
+    WYRM_ASSERT(self != WYRM_NULL && base != WYRM_NULL);
+    WYRM_ASSERT(base >= self->entries_begin && base <= self->entries_end);
+    self->base = base;
 }
 
 
@@ -43,6 +94,28 @@ WYRM_INLINE wyrm_uword wyrm_stack_arg_count_f(wyrm_stack* self)
 {
     WYRM_ASSERT(self != WYRM_NULL);
     return (wyrm_uword) (self->top - self->base);
+}
+
+
+/**
+ * Retore active frame with argument preservation
+ */
+WYRM_INLINE wy_error wy_stack_base_reset_args_f(wyrm_stack* self, wyrm_value* base, wy_uword arg_count)
+{
+    WYRM_ASSERT(self != WYRM_NULL && base != WYRM_NULL);
+    WYRM_ASSERT(base >= self->entries_begin && base <= self->base);
+
+    wy_uword orig_arg_count = wyrm_stack_arg_count_f(self);
+    if (orig_arg_count < arg_count) { return WYRM_ERR_RANGE; }
+
+    if (orig_arg_count != arg_count) {
+        wyrm_value* dest_base = self->base;
+        wyrm_memmove(dest_base, self->top - arg_count, arg_count * sizeof(wyrm_value));
+        self->top = dest_base + arg_count;
+    }
+
+    self->base = base;
+    return WYRM_ERR_NONE;
 }
 
 
@@ -110,80 +183,6 @@ WYRM_INLINE wyrm_error wyrm_stack_pop_discard_f(wyrm_stack* self, wyrm_uword cou
         return WYRM_ERR_RANGE;
     }
     self->top -= count;
-    return WYRM_ERR_NONE;
-}
-
-/**
- * Push continuation to the stack.
- *
- * Set the next continuation for the next set of results. The base pointer
- * marks the space where arguments to the continuation are stored.
- *
- * @memberof wyrm_stack
- *
- * @param self Stack
- * @param cont_fn Required function to invoke when this frame's result is ready
- * @return WYRM_ERR_NONE on success, WYRM_ERR_STACK_OVERFLOW if full
- */
-WYRM_INLINE wyrm_error wyrm_stack_push_continuation_f(wyrm_stack* self, wyrm_exec_fn cont_fn)
-{
-    WYRM_ASSERT(self != WYRM_NULL && cont_fn != WYRM_NULL);
-
-    wyrm_value* saved_base = self->top;
-    if (saved_base >= self->entries_end) { return WYRM_ERR_STACK_OVERFLOW; }
-
-    wyrm_value* cont = saved_base + 1;
-    if (cont >= self->entries_end) { return WYRM_ERR_STACK_OVERFLOW; }
-
-    // base[-2]: saved base pointer
-    saved_base->type = WYRM_TYPE_TAG_VALUE_PTR;
-    saved_base->data.value_ptr = self->base;
-
-    // base[-1]: continuation
-    cont->type = WYRM_TYPE_TAG_FRAME;
-    cont->data.cb = cont_fn;
-
-    self->top  = cont + 1;
-    self->base = self->top;
-    return WYRM_ERR_NONE;
-}
-
-
-/**
- * Pop a stack frame, transferring last N values to the new stack top
- *
- * Restores the base pointer saved by wyrm_stack_push_continuation_f, then
- * moves preserve_count values from the top of the current frame to where the
- * saved-base-pointer slot was, collapsing the frame.
- *
- * @memberof wyrm_stack
- *
- * @param self           Stack
- * @param preserve_count Number of top-of-frame values to keep as results
- * @return WYRM_ERR_NONE on success
- *         WYRM_ERR_INVAL if top stack values invalid
- *         WYRM_ERR_RANGE if current frame holds fewer than preserve_count values
- */
-WYRM_INLINE wyrm_error wyrm_stack_pop_continuation_f(wyrm_stack* self, wyrm_exec_fn* out_continuation, wyrm_uword preserve_count)
-{
-    WYRM_ASSERT(self != WYRM_NULL && out_continuation != WYRM_NULL);
-    if ((wyrm_uword)(self->top - self->base) < preserve_count) { return WYRM_ERR_RANGE; }
-    if (self->base <= self->entries_begin) { return WYRM_ERR_EMPTY; }
-    wyrm_value* cont = self->base - 1;
-    if (cont <= self->entries_begin) { return WYRM_ERR_EMPTY; }
-    wyrm_value* old_base_value = cont - 1;
-
-    // Verify expected type and save (stack corruption otherwise)
-    if (old_base_value->type != WYRM_TYPE_TAG_VALUE_PTR) { return WYRM_ERR_INVAL; }
-    wyrm_value* old_base = old_base_value->data.value_ptr;
-
-    if (cont->type != WYRM_TYPE_TAG_FRAME) { return WYRM_ERR_INVAL; }
-    *out_continuation = cont->data.cb;
-
-    // Grab base to restore and find continuation
-    wyrm_memmove(old_base_value, self->top - preserve_count, preserve_count * sizeof(wyrm_value));
-    self->top  = old_base_value + preserve_count;
-    self->base = old_base;
     return WYRM_ERR_NONE;
 }
 

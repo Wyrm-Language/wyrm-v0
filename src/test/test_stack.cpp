@@ -17,12 +17,6 @@ static wyrm_primitive prim_uword(wyrm_uword v)
     return p;
 }
 
-static wyrm_exec_state test_exec_fn(wyrm_state* state)
-{
-    WYRM_UNUSED(state);
-    return WYRM_EXEC_DONE;
-}
-
 
 TEST_SUITE("stack") {
     TEST_CASE("push and pop round-trip") {
@@ -75,49 +69,23 @@ TEST_SUITE("stack") {
         CHECK(wyrm_stack_pop(WYRM_NULL, WYRM_NULL, WYRM_NULL) == WYRM_ERR_INVAL);
     }
 
-    TEST_CASE("push_continuation_f sets base and push_array_f adds args") {
+    TEST_CASE("base_reset_args_f with no preserve collapses to the saved base") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
-        // One value already on the stack (simulates caller context)
-        wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(99));
-
-        CHECK(wyrm_stack_push_continuation_f(&s, test_exec_fn) == WYRM_ERR_NONE);
-
-        // base advances past the 2 header slots
-        CHECK(s.base == s.entries_begin + 3);
-
-        wyrm_value args[2];
-        args[0].type = WYRM_TYPE_TAG_WORD; args[0].data = prim_uword(10);
-        args[1].type = WYRM_TYPE_TAG_WORD; args[1].data = prim_uword(20);
-
-        CHECK(wyrm_stack_push_array_f(&s, args, 2) == WYRM_ERR_NONE);
-
-        // 1 existing + 2 headers + 2 args
-        CHECK(s.top  == s.entries_begin + 5);
-        // saved slot holds the old base (entries_begin)
-        CHECK((s.base - 2)->data.value_ptr == s.entries_begin);
-    }
-
-    TEST_CASE("pop_continuation_f with no preserve collapses frame") {
-        wyrm_value mem[STACK_CAP];
-        wyrm_stack s = make_stack(mem);
-
+        // Caller value, then a frame rebased at the current top
         wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(1));
+        wyrm_value* saved_base = wyrm_stack_base_f(&s);
+        wyrm_stack_base_restore_f(&s, wyrm_stack_top_f(&s));
 
-        wyrm_value args[1];
-        args[0].type = WYRM_TYPE_TAG_WORD; args[0].data = prim_uword(42);
-        REQUIRE_EQ(wyrm_stack_push_continuation_f(&s, test_exec_fn), WYRM_ERR_NONE);
-        REQUIRE_EQ(wyrm_stack_push_array_f(&s, args, 1), WYRM_ERR_NONE);
+        wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(42));
 
-        wyrm_exec_fn out_fn = WYRM_NULL;
-        CHECK_EQ(wyrm_stack_pop_continuation_f(&s, &out_fn, 0), WYRM_ERR_NONE);
-        CHECK(s.base == s.entries_begin);
-        CHECK(s.top  == s.entries_begin + 1);  // original value survives
-        CHECK(out_fn == test_exec_fn);
+        CHECK_EQ(wy_stack_base_reset_args_f(&s, saved_base, 0), WYRM_ERR_NONE);
+        CHECK_EQ(s.base, s.entries_begin);
+        CHECK_EQ(s.top, s.entries_begin + 1);  // original value survives
     }
 
-    TEST_CASE("pop_continuation_f preserves results at call site") {
+    TEST_CASE("base_reset_args_f preserves results at the call site") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
@@ -125,48 +93,55 @@ TEST_SUITE("stack") {
         wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(99));
 
         // Enter frame with 2 args
+        wyrm_value* saved_base = wyrm_stack_base_f(&s);
+        wyrm_stack_base_restore_f(&s, wyrm_stack_top_f(&s));
+
         wyrm_value args[2];
         args[0].type = WYRM_TYPE_TAG_WORD; args[0].data = prim_uword(1);
         args[1].type = WYRM_TYPE_TAG_WORD; args[1].data = prim_uword(2);
-        REQUIRE(wyrm_stack_push_continuation_f(&s, test_exec_fn) == WYRM_ERR_NONE);
-        REQUIRE(wyrm_stack_push_array_f(&s, args, 2) == WYRM_ERR_NONE);
+        REQUIRE_EQ(wyrm_stack_push_array_f(&s, args, 2), WYRM_ERR_NONE);
+        CHECK_EQ(wyrm_stack_arg_count_f(&s), 2);
 
-        // Callee pushes 2 scratch values then 1 result at top
+        // Callee pushes a scratch value then 1 result at top
         wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(77));  // scratch
         wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(55));  // result to preserve
 
-        // Pop frame preserving 1 result
-        wyrm_exec_fn out_fn = WYRM_NULL;
-        CHECK(wyrm_stack_pop_continuation_f(&s, &out_fn, 1) == WYRM_ERR_NONE);
+        CHECK_EQ(wy_stack_base_reset_args_f(&s, saved_base, 1), WYRM_ERR_NONE);
         CHECK_EQ(s.base, s.entries_begin);
         // Stack: [99, 55]
         CHECK_EQ(s.top, s.entries_begin + 2);
-        CHECK_EQ(out_fn, test_exec_fn);
 
         wyrm_primitive out{};
         wyrm_stack_pop(&s, WYRM_NULL, &out); CHECK_EQ(out.uword, 55);
         wyrm_stack_pop(&s, WYRM_NULL, &out); CHECK_EQ(out.uword, 99);
     }
 
-    TEST_CASE("pop_continuation_f with too few entries returns WYRM_ERR_RANGE") {
+    TEST_CASE("base_reset_args_f with too few entries returns WYRM_ERR_RANGE") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
         wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(0));
-        REQUIRE_EQ(wyrm_stack_push_continuation_f(&s, test_exec_fn), WYRM_ERR_NONE);
+        wyrm_value* saved_base = wyrm_stack_base_f(&s);
+        wyrm_stack_base_restore_f(&s, wyrm_stack_top_f(&s));
 
-        // Frame has 0 entries, preserving 1 should fail
-        wyrm_exec_fn out_fn = WYRM_NULL;
-        CHECK_EQ(wyrm_stack_pop_continuation_f(&s, &out_fn, 1), WYRM_ERR_RANGE);
+        // Frame has 0 entries, preserving 1 should fail and leave the stack alone
+        CHECK_EQ(wy_stack_base_reset_args_f(&s, saved_base, 1), WYRM_ERR_RANGE);
+        CHECK_EQ(s.base, s.entries_begin + 1);
+        CHECK_EQ(s.top, s.entries_begin + 1);
     }
 
-    TEST_CASE("pop_continuation_f with no outer frame returns WYRM_ERR_EMPTY") {
+    TEST_CASE("base_reset_args_f keeps a full frame in place") {
         wyrm_value mem[STACK_CAP];
         wyrm_stack s = make_stack(mem);
 
-        wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(42));
-        // base == entries_begin — no frame was started
-        wyrm_exec_fn out_fn = WYRM_NULL;
-        CHECK_EQ(wyrm_stack_pop_continuation_f(&s, &out_fn, 0), WYRM_ERR_EMPTY);
+        wyrm_value* saved_base = wyrm_stack_base_f(&s);
+        wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(7));
+        wyrm_stack_push_f(&s, WYRM_TYPE_TAG_WORD, prim_uword(8));
+
+        CHECK_EQ(wy_stack_base_reset_args_f(&s, saved_base, 2), WYRM_ERR_NONE);
+        CHECK_EQ(s.base, s.entries_begin);
+        CHECK_EQ(s.top, s.entries_begin + 2);
+        CHECK_EQ(s.entries_begin[0].data.uword, 7);
+        CHECK_EQ(s.entries_begin[1].data.uword, 8);
     }
 }

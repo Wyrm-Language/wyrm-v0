@@ -57,21 +57,6 @@ WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value);
 WYRM_INLINE wyrm_error wyrm_state_set_pending(wyrm_state* state, wyrm_exec_fn pending);
 WYRM_INLINE wyrm_error wyrm_state_call_continue(wyrm_state* state, wyrm_exec_fn result_cb, wyrm_exec_fn fn, const wyrm_value* args, wyrm_uword arg_count);
 
-
-/* ------------------------------------------------------------------------- */
-/* Context API                                                               */
-/* ------------------------------------------------------------------------- */
-wyrm_error wyrm_context_init_s(wyrm_context* self, wyrm_main_loop* loop);
-void wyrm_context_finalize_f(wyrm_context* self);
-wyrm_error wyrm_context_activate(wyrm_context* self, wyrm_fiber* fiber);
-wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber);
-
-WYRM_INLINE wyrm_dict* wyrm_context_get_root_f(wyrm_context* context);
-WYRM_INLINE wyrm_error wyrm_context_set_root_f(wyrm_context* context, wyrm_dict* root);
-WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
-
-void wyrm_context_object_init_header_f(wyrm_context* context, wyrm_object* object, const wyrm_object_type* dtype);
-
 /* ------------------------------------------------------------------------- */
 /* Main Loop API                                                             */
 /* ------------------------------------------------------------------------- */
@@ -156,8 +141,8 @@ void wyrm_context_gc_full_run(wyrm_state* state, wyrm_context* context);
 #include <wyrm/inl/util.h>
 #include <wyrm/allocator.h>
 #include <wyrm/inl/class.h>
-#include <wyrm/inl/stack.h>
-#include <wyrm/inl/fiber.h>
+#include <wyrm/stack.h>
+#include <wyrm/fiber.h>
 #include <wyrm/inl/state.h>
 #include <wyrm/object.h>
 #include <wyrm/inl/op.h>
