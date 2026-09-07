@@ -9,7 +9,7 @@ WY_BEGIN_DECLS
 /**
  * @brief Result states for a wyrm callable invoked via wy_exec_fn.
  *
- * Each execution state determines interpretation of the fiber's value stack.
+ * Each execution context determines interpretation of the fiber's value stack.
  */
 typedef enum wy_exec_state_tag
 {
@@ -37,10 +37,10 @@ typedef enum wy_exec_state_tag
  * pushing args; the callee may freely push/pop scratch above frame_start
  * and reports its payload as the trailing N stack values, N given by
  * stack_values; the interpretation of the result is dependent on the
- * exec state contained within the return struct.
+ * exec context contained within the return struct.
  *
  */
-typedef wy_exec_state (*wy_exec_fn)(wy_state* state);
+typedef wy_exec_state (*wy_exec_fn)(wy_context* context);
 
 WY_END_DECLS
 

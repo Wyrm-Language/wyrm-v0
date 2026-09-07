@@ -48,11 +48,11 @@ static void table_finalize_f(wy_context* context, wy_object* object)
 }
 
 
-wy_value* wy_dict_get(wy_state* state, wy_dict* self, wy_type_tag tag, wy_primitive value)
+wy_value* wy_dict_get(wy_context* context, wy_dict* self, wy_type_tag tag, wy_primitive value)
 {
     if (self == WY_NULL) {return WY_NULL; }
     for (wy_uword i = 0; i < self->count; i++) {
-        if (wy_op_eq(state, self->dense[i].key.type, self->dense[i].key.data, tag, value)) {
+        if (wy_op_eq(context, self->dense[i].key.type, self->dense[i].key.data, tag, value)) {
             return &self->dense[i].value;
         }
     }
@@ -60,11 +60,11 @@ wy_value* wy_dict_get(wy_state* state, wy_dict* self, wy_type_tag tag, wy_primit
 }
 
 
-WY_INLINE wy_error expand_dict(wy_state* state, wy_dict* self, wy_uword count)
+WY_INLINE wy_error expand_dict(wy_context* context, wy_dict* self, wy_uword count)
 {
     if (count > self->dense_capacity) {
         wy_uword new_cap = wy_next_array_capacity(self->dense_capacity, 4);
-        wy_key_hash_value* hash_array = wy_context_gc_realloc(state->context, self->dense, new_cap * sizeof(wy_key_hash_value));
+        wy_key_hash_value* hash_array = wy_context_gc_realloc(context, self->dense, new_cap * sizeof(wy_key_hash_value));
         if (hash_array == WY_NULL) { return WY_ERR_NOMEM; }
         self->dense_capacity = new_cap;
         self->dense = hash_array;
@@ -72,7 +72,7 @@ WY_INLINE wy_error expand_dict(wy_state* state, wy_dict* self, wy_uword count)
 
     if (count > self->sparse_capacity) {
         wy_uword new_cap = wy_next_array_capacity(self->sparse_capacity, 6);
-        wy_uword* sparse = wy_context_gc_realloc(state->context, self->sparse, new_cap * sizeof(wy_uword));
+        wy_uword* sparse = wy_context_gc_realloc(context, self->sparse, new_cap * sizeof(wy_uword));
         if (sparse == WY_NULL) { return WY_ERR_NOMEM; }
         self->sparse_capacity = new_cap;
         self->sparse = sparse;
@@ -83,16 +83,16 @@ WY_INLINE wy_error expand_dict(wy_state* state, wy_dict* self, wy_uword count)
 
 
 
-wy_error wy_dict_set(wy_state* state, wy_dict* self, wy_type_tag key_type, wy_primitive key_value, wy_type_tag value_type, wy_primitive value)
+wy_error wy_dict_set(wy_context* context, wy_dict* self, wy_type_tag key_type, wy_primitive key_value, wy_type_tag value_type, wy_primitive value)
 {
     wy_error last_error = WY_ERR_NONE;
     if (self == WY_NULL) { return WY_ERR_INVAL; }
 
-    wy_value* slot = wy_dict_get(state, self, key_type, key_value);
+    wy_value* slot = wy_dict_get(context, self, key_type, key_value);
 
     if (!slot) {
         wy_uword new_count = self->count + 1;
-        last_error = expand_dict(state, self, new_count);
+        last_error = expand_dict(context, self, new_count);
         if (last_error != WY_ERR_NONE) { return last_error; }
         slot = &self->dense[self->count].value;
         self->dense[self->count].key.type = key_type;
@@ -107,9 +107,9 @@ wy_error wy_dict_set(wy_state* state, wy_dict* self, wy_type_tag key_type, wy_pr
 
 
 
-static wy_error start_children_iter(wy_state* state, wy_object* object, wy_work_area* wa)
+static wy_error start_children_iter(wy_context* context, wy_object* object, wy_work_area* wa)
 {
-    WY_UNUSED(state); WY_UNUSED(object);
+    WY_UNUSED(context); WY_UNUSED(object);
     wy_memset(wa, 0, sizeof(wy_work_area));
     wa->data[0].uword = 0;
     wa->data[1].uword = 0;
@@ -117,9 +117,9 @@ static wy_error start_children_iter(wy_state* state, wy_object* object, wy_work_
 }
 
 
-static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_area* wa, const wy_object** child)
+static wy_error next_children_iter(wy_context* context, wy_object* object, wy_work_area* wa, const wy_object** child)
 {
-    WY_UNUSED(state);
+    WY_UNUSED(context);
     wy_dict* self = (wy_dict*) object;
     wy_uword idx = wa->data[0].word;
     wy_uword subidx = wa->data[1].word;

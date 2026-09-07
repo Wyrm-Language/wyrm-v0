@@ -2,6 +2,7 @@
 #define WYRM_CONTEXT_H_
 
 #include <wyrm/fwd.h>
+#include <wyrm/fiber.h>
 #include <wyrm/gc.h>
 #include <wyrm/mem_info.h>
 
@@ -34,6 +35,8 @@ void wy_context_detach_loop(wy_context* context);
 wy_error wy_context_activate(wy_context* self, wy_fiber* fiber);
 wy_error wy_context_attach_fiber(wy_context* self, wy_fiber* fiber);
 
+wy_error wy_context_exec(wy_context* self);
+
 void wy_ctx_object_init_header_static_f(wy_context* context, wy_object* object, const wy_object_type* dtype);
 
 WY_INLINE wy_machine* wy_context_get_machine(wy_context* self);
@@ -45,7 +48,7 @@ void* wy_context_gc_realloc(wy_context* context, void* ptr, wy_uword new_size);
 void wy_context_gc_free(wy_context* context, void* ptr);
 void wy_context_push_gc(wy_context* context, wy_object* gc_info);
 
-void wy_context_gc_full_run(wy_state* state, wy_context* context);
+void wy_context_gc_full_run(wy_context* context);
 
 
 #define WY_CONTEXT_MEM_INFO_RESERVE_COUNT(context, mem_info, count, type) (wy_context_mem_reserve_count_f((context), (mem_info), (count), sizeof(type)))
@@ -76,6 +79,84 @@ WY_INLINE wy_machine* wy_context_get_machine(wy_context* self)
     return self->parent;
 }
 
+
+/**
+ * Get the fiber the context is currently running
+ */
+WY_INLINE wy_fiber* wy_context_get_fiber_f(wy_context* self)
+{
+    if (self == WY_NULL) { return WY_NULL; }
+    return self->current_fiber;
+}
+
+/**
+ * Count the values visible to the current call
+ * @return Number of values in the active frame
+ */
+WY_INLINE wy_uword wy_context_value_count(wy_context* self)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return 0; }
+    return wy_fiber_value_count_f(self->current_fiber);
+}
+
+/**
+ * Discard values until the active frame holds `count` of them
+ * @return WY_ERR_NONE on success, WY_ERR_RANGE if the frame holds fewer
+ */
+WY_INLINE wy_error wy_context_pop_to_value_count(wy_context* self, wy_uword count)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_pop_to_value_count_f(self->current_fiber, count);
+}
+
+/**
+ * Access a value in the active frame
+ * @return Pointer to the value, or WY_NULL when out of range
+ */
+WY_INLINE wy_value* wy_context_value_n(wy_context* self, wy_uword index)
+{
+    if (index >= wy_context_value_count(self)) { return WY_NULL; }
+    return wy_fiber_value_n(self->current_fiber, index);
+}
+
+/**
+ * Push a value onto the current fiber's stack
+ */
+WY_INLINE wy_error wy_context_push(wy_context* self, wy_value value)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_push_value_f(self->current_fiber, value);
+}
+
+/**
+ * Push a value and mark it as part of this call's result
+ */
+WY_INLINE wy_error wy_context_push_return(wy_context* self, wy_value value)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_push_return_f(self->current_fiber, value);
+}
+
+/**
+ * Set the function the current fiber runs next
+ */
+WY_INLINE wy_error wy_context_set_pending(wy_context* self, wy_exec_fn pending)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
+    if (self->current_fiber->pending != WY_NULL) { return WY_ERR_BUSY; }
+    self->current_fiber->pending = pending;
+    return WY_ERR_NONE;
+}
+
+/**
+ * Call `fn` with `args`, resuming at `result_cb` once it returns
+ */
+WY_INLINE wy_error wy_context_call_continue(wy_context* self, wy_exec_fn result_cb, wy_exec_fn fn, const wy_value* args, wy_uword arg_count)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
+    if (arg_count > 0 && args == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_exec_continue_f(self->current_fiber, result_cb, fn, args, arg_count);
+}
 
 
 WY_END_DECLS

@@ -25,15 +25,9 @@ static bool context_triggered(wy_primitive ud)
     /* Grab current context */
     wy_context* self = WY_PRIMITIVE_PTR(wy_context, ud);
 
-    /* State for operations */
-    wy_state state;
-    wy_state_init_context_f(&state, self);
-
-    /* TODO: determine correct fiber to execute, set state->current_fiber appropriately */
-    state.fiber = self->current_fiber;
-
-    if (state.fiber != WY_NULL) {
-        wy_error last_error = wy_state_exec(&state);
+    /* TODO: determine correct fiber to execute, set self->current_fiber appropriately */
+    if (self->current_fiber != WY_NULL) {
+        wy_error last_error = wy_context_exec(self);
         if (last_error != WY_ERR_NONE) {
             /* TODO: flag/update context and fiber */
         }
@@ -113,6 +107,19 @@ void wy_context_detach_loop(wy_context* self)
 }
 
 
+/**
+ * Run the context's current fiber until it yields or completes
+ *
+ * @param self Context with an attached fiber
+ * @return WY_ERR_NONE on success, WY_ERR_INVAL when no fiber is attached
+ */
+wy_error wy_context_exec(wy_context* self)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_exec_f(self->current_fiber, self);
+}
+
+
 wy_error wy_context_attach_fiber(wy_context* self, wy_fiber* fiber)
 {
     if (self == WY_NULL || fiber == WY_NULL) { return WY_ERR_INVAL; }
@@ -181,16 +188,16 @@ void wy_context_object_init_header_f(wy_context* context, wy_object* object, con
 }
 
 
-void wy_context_gc_full_run(wy_state* state, wy_context* context)
+void wy_context_gc_full_run(wy_context* context)
 {
     wy_gc_collect_start_f(context, &context->arena);
 
     if (context->current_fiber != WY_NULL) {
-        wy_gc_object_visit(state, (wy_object*) context->current_fiber);
+        wy_gc_object_visit(context, (wy_object*) context->current_fiber);
     }
 
     if (context->root_module != WY_NULL) {
-        wy_gc_object_visit(state, (wy_object*) context->root_module);
+        wy_gc_object_visit(context, (wy_object*) context->root_module);
     }
 
     wy_gc_collect_finish_f(context, &context->arena);

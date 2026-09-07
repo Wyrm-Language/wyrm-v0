@@ -66,20 +66,20 @@ void wy_gc_collect_start_f(wy_context* parent, wy_gc_arena* self)
 }
 
 
-void wy_gc_object_visit(wy_state* state, wy_object* parent)
+void wy_gc_object_visit(wy_context* context, wy_object* parent)
 {
     wy_work_area wa;
 
     parent->flags |= WY_GC_FLAG_MARKED;
 
-    if (wy_object_children_iter_start(state, parent, &wa) != WY_ERR_NONE) { return; }
+    if (wy_object_children_iter_start(context, parent, &wa) != WY_ERR_NONE) { return; }
     const wy_object* child = WY_NULL;
 
-    while (wy_object_children_iter_next_f(state, parent, &wa, &child) == WY_ERR_NONE) {
+    while (wy_object_children_iter_next_f(context, parent, &wa, &child) == WY_ERR_NONE) {
         WY_ASSERT(child != WY_NULL);
         if ((child->flags & WY_GC_FLAG_MARKED) == 0 &&
             (child->flags & WY_GC_STATIC) == 0) {
-            wy_gc_object_visit(state, (wy_object*) child);
+            wy_gc_object_visit(context, (wy_object*) child);
         }
     }
 }

@@ -23,7 +23,7 @@ void wy_gc_free(wy_gc_arena* arena, void* ptr);
 void wy_gc_track(wy_gc_arena* context, wy_object* gc_info);
 
 void wy_gc_collect_start_f(wy_context* parent, wy_gc_arena* self);
-void wy_gc_object_visit(wy_state* state, wy_object* parent);
+void wy_gc_object_visit(wy_context* context, wy_object* parent);
 void wy_gc_collect_finish_f(wy_context* parent, wy_gc_arena* self);
 
 WY_END_DECLS

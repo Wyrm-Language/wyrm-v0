@@ -2,18 +2,18 @@
 #include <wyrm/sys/string.h>
 #include <wyrm/work_area.h>
 
-static wy_error start_children_iter(wy_state* state, wy_object* object, wy_work_area* wa)
+static wy_error start_children_iter(wy_context* context, wy_object* object, wy_work_area* wa)
 {
-    WY_UNUSED(state);
+    WY_UNUSED(context);
     WY_ASSERT(object != WY_NULL);
     wy_memset(wa, 0, sizeof(wy_work_area));
     wa->data[0].word = 0;
     return WY_ERR_NONE;
 }
 
-static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_area* wa, const wy_object** child)
+static wy_error next_children_iter(wy_context* context, wy_object* object, wy_work_area* wa, const wy_object** child)
 {
-    WY_UNUSED(state);
+    WY_UNUSED(context);
     WY_ASSERT(object != WY_NULL);
     wy_pair* pair = (wy_pair*) object;
 

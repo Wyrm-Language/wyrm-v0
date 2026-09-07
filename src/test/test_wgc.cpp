@@ -88,11 +88,8 @@ TEST_SUITE("wgc") {
 
         wy_box_set_value_f(outer, box_value(inner));
 
-        wy_state state{};
-        wy_state_init_from_context_f(&state, fix.context);
-
         wy_gc_collect_start_f(fix.context, arena);
-        wy_gc_object_visit(&state, &outer->object);
+        wy_gc_object_visit(fix.context, &outer->object);
         wy_gc_collect_finish_f(fix.context, arena);
 
         REQUIRE(arena_contains(arena, &outer->object));

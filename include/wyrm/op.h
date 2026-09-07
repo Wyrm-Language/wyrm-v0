@@ -10,13 +10,13 @@ extern "C" {
 
 #define WY_HASH_INVALID WY_UWORD_MAX
 
-WY_INLINE bool wy_op_eq(wy_state* state, wy_type_tag lhst, wy_primitive lhs, wy_type_tag rhst, wy_primitive rhs);
-WY_INLINE wy_uword wy_op_hash(wy_state* state, wy_type_tag vt, wy_primitive v);
+WY_INLINE bool wy_op_eq(wy_context* context, wy_type_tag lhst, wy_primitive lhs, wy_type_tag rhst, wy_primitive rhs);
+WY_INLINE wy_uword wy_op_hash(wy_context* context, wy_type_tag vt, wy_primitive v);
 
 
-WY_INLINE bool wy_op_eq(wy_state* state, wy_type_tag lhst, wy_primitive lhs, wy_type_tag rhst, wy_primitive rhs)
+WY_INLINE bool wy_op_eq(wy_context* context, wy_type_tag lhst, wy_primitive lhs, wy_type_tag rhst, wy_primitive rhs)
 {
-    WY_UNUSED(state);
+    WY_UNUSED(context);
     if (lhst != rhst) { return false; }
     switch (lhst) {
     case WY_TYPE_TAG_NIL:
@@ -42,9 +42,9 @@ WY_INLINE bool wy_op_eq(wy_state* state, wy_type_tag lhst, wy_primitive lhs, wy_
     }
 }
 
-WY_INLINE wy_uword wy_op_hash(wy_state* state, wy_type_tag vt, wy_primitive v)
+WY_INLINE wy_uword wy_op_hash(wy_context* context, wy_type_tag vt, wy_primitive v)
 {
-    WY_UNUSED(state);
+    WY_UNUSED(context);
     switch (vt) {
     case WY_TYPE_TAG_NIL:
         return 0;

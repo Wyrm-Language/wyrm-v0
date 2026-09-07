@@ -18,45 +18,37 @@ namespace {
 wy_uword g_result = 0;
 wy_uword g_result_count = 0;
 
-wy_exec_state exec_record_result(wy_state* state)
+wy_exec_state exec_record_result(wy_context* context)
 {
-    g_result_count = wy_state_value_count(state);
-    wy_value* a = wy_state_value_n(state, 0);
+    g_result_count = wy_context_value_count(context);
+    wy_value* a = wy_context_value_n(context, 0);
     g_result = (a == WY_NULL) ? 0 : (wy_uword) a->data.word;
     return WY_EXEC_DONE;
 }
 
-wy_exec_state exec_mul_int(wy_state* state)
+wy_exec_state exec_mul_int(wy_context* context)
 {
-    wy_value* a = wy_state_value_n(state, 0);
-    wy_value* b = wy_state_value_n(state, 1);
+    wy_value* a = wy_context_value_n(context, 0);
+    wy_value* b = wy_context_value_n(context, 1);
     REQUIRE_NE(a, WY_NULL);
     REQUIRE_NE(b, WY_NULL);
 
-    wy_state_push_return(state, wy_value_word(a->data.word * b->data.word));
+    wy_context_push_return(context, wy_value_word(a->data.word * b->data.word));
     return WY_EXEC_DONE;
 }
 
-wy_exec_state exec_call_mul(wy_state* state)
+wy_exec_state exec_call_mul(wy_context* context)
 {
     wy_value args[2] = { word_value(8), word_value(32) };
-    REQUIRE_EQ(wy_state_call_continue(state, exec_record_result, exec_mul_int, args, 2), WY_ERR_NONE);
+    REQUIRE_EQ(wy_context_call_continue(context, exec_record_result, exec_mul_int, args, 2), WY_ERR_NONE);
     return WY_EXEC_CONTINUE;
 }
 
-wy_exec_state exec_tail_call(wy_state* state)
+wy_exec_state exec_tail_call(wy_context* context)
 {
-    wy_state_push_return(state, wy_value_word(7));
-    REQUIRE_EQ(wy_state_set_pending(state, exec_record_result), WY_ERR_NONE);
+    wy_context_push_return(context, wy_value_word(7));
+    REQUIRE_EQ(wy_context_set_pending(context, exec_record_result), WY_ERR_NONE);
     return WY_EXEC_TAIL_CALL;
-}
-
-wy_state make_state(test_fiber_fixture& ctx)
-{
-    wy_state state{};
-    wy_state_init_from_context_f(&state, ctx.get_context_ptr());
-    state.fiber = ctx.get_fiber_ptr();
-    return state;
 }
 
 }  // namespace
@@ -112,8 +104,7 @@ TEST_SUITE("fiber")
 
         REQUIRE_EQ(wy_fiber_push_continuation(fiber, exec_call_mul), WY_ERR_NONE);
 
-        wy_state state = make_state(ctx);
-        CHECK_EQ(wy_fiber_exec_f(fiber, &state), WY_ERR_NONE);
+        CHECK_EQ(wy_context_exec(ctx.get_context_ptr()), WY_ERR_NONE);
 
         CHECK_EQ(g_result_count, 1);
         CHECK_EQ(g_result, 8 * 32);
@@ -127,8 +118,7 @@ TEST_SUITE("fiber")
 
         REQUIRE_EQ(wy_fiber_push_continuation(fiber, exec_tail_call), WY_ERR_NONE);
 
-        wy_state state = make_state(ctx);
-        CHECK_EQ(wy_fiber_exec_f(fiber, &state), WY_ERR_NONE);
+        CHECK_EQ(wy_context_exec(ctx.get_context_ptr()), WY_ERR_NONE);
 
         CHECK_EQ(g_result_count, 1);
         CHECK_EQ(g_result, 7);

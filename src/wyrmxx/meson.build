@@ -1,6 +1,5 @@
 wyrmxx_sources = files(
     'context.cpp',
-    'state.cpp'
 )
 
 wyrmxx_lib = library('wyrmxx',

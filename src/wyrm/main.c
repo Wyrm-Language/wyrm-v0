@@ -7,39 +7,39 @@
 #include <wyrm/platform/hosted/cmachine.h>
 #include <wyrm/fiber.h>
 
-wy_exec_state w_main(wy_state* state)
+wy_exec_state w_main(wy_context* context)
 {
-    printf("Last of the call stack, expect values = 0 actual = %ld\n", wy_state_value_count(state));
+    printf("Last of the call stack, expect values = 0 actual = %ld\n", wy_context_value_count(context));
     return WY_EXEC_DONE;
 }
 
-wy_exec_state w_print_int(wy_state* state)
+wy_exec_state w_print_int(wy_context* context)
 {
-    wy_value* a = wy_state_value_n(state, 0);
+    wy_value* a = wy_context_value_n(context, 0);
     printf("w_print_int: %ld\n", a->data.word);
     return WY_EXEC_DONE;
 }
 
-wy_exec_state w_mul_int(wy_state* state)
+wy_exec_state w_mul_int(wy_context* context)
 {
-    wy_value* a = wy_state_value_n(state, 0);
-    wy_value* b = wy_state_value_n(state, 1);
+    wy_value* a = wy_context_value_n(context, 0);
+    wy_value* b = wy_context_value_n(context, 1);
 
-    wy_state_push_return(state, wy_value_word(a->data.word * b->data.word));
+    wy_context_push_return(context, wy_value_word(a->data.word * b->data.word));
     printf("w_mul_int: %ld x %ld\n", a->data.word, b->data.word);;
     return WY_EXEC_DONE;
 }
 
-wy_exec_state w_do_a_mul(wy_state* state)
+wy_exec_state w_do_a_mul(wy_context* context)
 {
-    WY_UNUSED(state);
+    WY_UNUSED(context);
     printf("pushing arguments\n");
     wy_value v_ints[2] = {
         { .type = WY_TYPE_TAG_WORD, .data.word = 8 },
         {.type = WY_TYPE_TAG_WORD, .data.word = 32 },
     };
 
-    wy_state_call_continue(state, w_print_int, w_mul_int, v_ints, 2);
+    wy_context_call_continue(context, w_print_int, w_mul_int, v_ints, 2);
     return WY_EXEC_CONTINUE;
 }
 
@@ -121,11 +121,7 @@ int main(int argc, char** argv) {
     wy_fiber_push_continuation(fiber, w_main);
     wy_fiber_push_continuation(fiber, w_do_a_mul);
 
-    wy_state state;
-    wy_state_init_from_context_f(&state, context);
-    state.fiber = fiber;
-
-    wy_fiber_exec_f(fiber, &state);
+    wy_context_exec(context);
 
 
     return 0;

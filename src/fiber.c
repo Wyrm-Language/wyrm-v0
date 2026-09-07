@@ -4,8 +4,8 @@
 #include <wyrm/work_area.h>
 
 static void finalize_f(wy_context* context, wy_object* object);
-static wy_error start_children_iter(wy_state* state, wy_object* object, wy_work_area* wa);
-static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_area* wa, const wy_object** child);
+static wy_error start_children_iter(wy_context* context, wy_object* object, wy_work_area* wa);
+static wy_error next_children_iter(wy_context* context, wy_object* object, wy_work_area* wa, const wy_object** child);
 
 static wy_error fiber_continue_with_return(wy_fiber* self)
 {
@@ -85,9 +85,9 @@ static void finalize_f(wy_context* context, wy_object* object)
 
 
 
-wy_error wy_fiber_exec_f(wy_fiber* self, wy_state* state)
+wy_error wy_fiber_exec_f(wy_fiber* self, wy_context* context)
 {
-    WY_ASSERT(self != WY_NULL && state != WY_NULL && state->fiber == self);
+    WY_ASSERT(self != WY_NULL && context != WY_NULL && wy_context_get_fiber_f(context) == self);
     wy_error last_error = WY_ERR_NONE;
 
     // Continue execution through continuation stack if no forward stack present
@@ -103,7 +103,7 @@ wy_error wy_fiber_exec_f(wy_fiber* self, wy_state* state)
         wy_exec_fn pending = self->pending;
         self->pending = WY_NULL;
 
-        wy_exec_state result = pending(state);
+        wy_exec_state result = pending(context);
 
         switch (result) {
         case WY_EXEC_TAIL_CALL:
@@ -138,17 +138,17 @@ wy_error wy_fiber_exec_f(wy_fiber* self, wy_state* state)
 }
 
 
-static wy_error start_children_iter(wy_state* state, wy_object* object, wy_work_area* wa)
+static wy_error start_children_iter(wy_context* context, wy_object* object, wy_work_area* wa)
 {
-    WY_UNUSED(state); WY_UNUSED(object);
+    WY_UNUSED(context); WY_UNUSED(object);
     wy_memset(wa, 0, sizeof(wy_work_area));
     wa->data[0].word = 0;
     return WY_ERR_NONE;
 }
 
-static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_area* wa, const wy_object** child)
+static wy_error next_children_iter(wy_context* context, wy_object* object, wy_work_area* wa, const wy_object** child)
 {
-    WY_UNUSED(state);
+    WY_UNUSED(context);
     wy_fiber* self = (wy_fiber*) object;
     wy_word idx = wa->data[0].word;
     while ((self->value_stack.entries_begin + idx) < self->value_stack.top) {

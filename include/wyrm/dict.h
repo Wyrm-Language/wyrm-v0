@@ -38,8 +38,8 @@ struct wy_dict
 extern const wy_object_type wy_type_table;
 
 wy_error wy_dict_new(wy_context* self, wy_dict** out);
-wy_value* wy_dict_get(wy_state* state, wy_dict* self, wy_type_tag tag, wy_primitive value);
-wy_error wy_dict_set(wy_state* state, wy_dict* self, wy_type_tag key_type, wy_primitive key_value, wy_type_tag value_type, wy_primitive value);
+wy_value* wy_dict_get(wy_context* context, wy_dict* self, wy_type_tag tag, wy_primitive value);
+wy_error wy_dict_set(wy_context* context, wy_dict* self, wy_type_tag key_type, wy_primitive key_value, wy_type_tag value_type, wy_primitive value);
 
 
 

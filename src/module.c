@@ -175,18 +175,18 @@ static void finalize(wy_context* context, wy_object* self_s)
 }
 
 
-static wy_error children_iter_start(wy_state* state, wy_object* self, wy_work_area* wa)
+static wy_error children_iter_start(wy_context* context, wy_object* self, wy_work_area* wa)
 {
-    WY_UNUSED(state); WY_UNUSED(self);
+    WY_UNUSED(context); WY_UNUSED(self);
     wy_memset(wa, 0, sizeof(wy_work_area));
     wa->data[0].uword = 0;
     wa->data[1].uword = 0;
     return WY_ERR_NONE;
 }
 
-static wy_error children_iter_next(wy_state* state, wy_object* object, wy_work_area* wa, const wy_object** child)
+static wy_error children_iter_next(wy_context* context, wy_object* object, wy_work_area* wa, const wy_object** child)
 {
-    WY_UNUSED(state);
+    WY_UNUSED(context);
 
     wy_module* self = (wy_module*) object;
     wy_value* globals = WY_MEM_INFO_BEGIN_PTR(wy_value, &self->global_memory);

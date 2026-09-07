@@ -31,17 +31,17 @@ static void finalize(wy_context* context, wy_object* self)
 }
 
 
-static wy_error children_iter_start(wy_state* state, wy_object* self, wy_work_area* wa)
+static wy_error children_iter_start(wy_context* context, wy_object* self, wy_work_area* wa)
 {
-    WY_UNUSED(state); WY_UNUSED(self);
+    WY_UNUSED(context); WY_UNUSED(self);
     memset(wa, 0, sizeof(wy_work_area));
     wa->data[0].flag = false;
     return WY_ERR_NONE;
 }
 
-static wy_error children_iter_next(wy_state* state, wy_object* self, wy_work_area* wa, const wy_object** child)
+static wy_error children_iter_next(wy_context* context, wy_object* self, wy_work_area* wa, const wy_object** child)
 {
-    WY_UNUSED(state);
+    WY_UNUSED(context);
     wy_class* cls = (wy_class*) self;
     bool done = wa->data[0].flag;
     wa->data[0].flag = true;

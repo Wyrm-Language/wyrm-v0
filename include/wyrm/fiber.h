@@ -3,6 +3,7 @@
 
 #include <wyrm/fwd.h>
 #include <wyrm/mem_info.h>
+#include <wyrm/object.h>
 #include <wyrm/stack.h>
 
 /* ------------------------------------------------------------------------- */
@@ -46,7 +47,7 @@ struct wy_fiber
 wy_fiber* wy_fiber_create(wy_context* context, wy_uword stack_len, wy_uword frame_count);
 WY_INLINE wy_context* wy_fiber_get_context(wy_fiber* self);
 void wy_fiber_finalize_f(wy_fiber* self);
-wy_error wy_fiber_exec_f(wy_fiber* self, wy_state* state);
+wy_error wy_fiber_exec_f(wy_fiber* self, wy_context* context);
 
 WY_INLINE wy_context* wy_fiber_get_context(wy_fiber* self)
 {

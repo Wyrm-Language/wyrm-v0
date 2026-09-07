@@ -33,9 +33,7 @@ struct test_context_fixture : test_machine_fixture
 
     void run_gc()
     {
-        wy_state state{};
-        wy_state_init_from_context_f(&state, context);
-        wy_context_gc_full_run(&state, context);
+        wy_context_gc_full_run(context);
     }
 
 };

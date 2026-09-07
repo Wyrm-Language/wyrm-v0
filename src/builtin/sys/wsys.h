@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-wy_exec_state wy_mod_sys_stop(wy_state* state);
+wy_exec_state wy_mod_sys_stop(wy_context* context);
 
 #ifdef __cplusplus
 }
