@@ -194,7 +194,7 @@ static wy_error children_iter_next(wy_context* context, wy_object* object, wy_wo
     for (wy_uword cur = wa->data[0].uword; cur < self->global_count; cur = wa->data[0].uword) {
         wa->data[0].uword++;
 
-        if (wy_type_is_object(globals[cur].type)) {
+        if (wy_value_is_gc_ref_f(globals[cur])) {
             *child = globals[cur].data.gc_object;
             return WY_ERR_NONE;
         }

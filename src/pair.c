@@ -20,14 +20,14 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
     switch (wa->data[0].word) {
     case 0:
         wa->data[0].word++;
-        if (wy_type_is_object(pair->car.type) && pair->car.data.gc_object != WY_NULL) {
+        if (wy_value_is_gc_ref_f(pair->car)) {
             *child = pair->car.data.gc_object;
             return WY_ERR_NONE;
         }
         /* intentional fall through */
     case 1:
         wa->data[0].word++;
-        if (wy_type_is_object(pair->cdr.type) && pair->cdr.data.gc_object != WY_NULL) {
+        if (wy_value_is_gc_ref_f(pair->cdr)) {
             *child = pair->cdr.data.gc_object;
             return WY_ERR_NONE;
         }

@@ -28,8 +28,8 @@ WY_INLINE wy_pair* wy_pair_new_f(wy_context* context)
     wy_pair* pair = (wy_pair*) wy_context_gc_alloc(context, sizeof(wy_pair));
     if (pair == WY_NULL) { return WY_NULL; }
 
-    pair->car = wy_value_Unset();
-    pair->cdr = wy_value_Unset();
+    pair->car = wy_value_unset();
+    pair->cdr = wy_value_unset();
 
     wy_context_object_init_header_f(context, &pair->object, &wy_pair_type);
     return pair;

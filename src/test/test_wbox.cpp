@@ -11,6 +11,6 @@ TEST_SUITE("wbox") {
         REQUIRE_EQ(wy_box_new_f(fix.context, &box), WY_ERR_NONE);
 
         REQUIRE_NE(box, WY_NULL);
-        REQUIRE_EQ(wy_box_value_f(box), wy_value_Unset());
+        REQUIRE_EQ(wy_box_value_f(box), wy_value_unset());
     }
 }

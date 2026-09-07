@@ -129,15 +129,6 @@ WY_INLINE wy_error wy_context_push(wy_context* self, wy_value value)
 }
 
 /**
- * Push a value and mark it as part of this call's result
- */
-WY_INLINE wy_error wy_context_push_return(wy_context* self, wy_value value)
-{
-    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
-    return wy_fiber_push_return_f(self->current_fiber, value);
-}
-
-/**
  * Set the function the current fiber runs next
  */
 WY_INLINE wy_error wy_context_set_pending(wy_context* self, wy_exec_fn pending)
@@ -149,13 +140,55 @@ WY_INLINE wy_error wy_context_set_pending(wy_context* self, wy_exec_fn pending)
 }
 
 /**
- * Call `fn` with `args`, resuming at `result_cb` once it returns
+ * Get the number of results the caller reserved for this call
  */
-WY_INLINE wy_error wy_context_call_continue(wy_context* self, wy_exec_fn result_cb, wy_exec_fn fn, const wy_value* args, wy_uword arg_count)
+WY_INLINE wy_uword wy_context_result_count(wy_context* self)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return 0; }
+    return wy_fiber_result_count_f(self->current_fiber);
+}
+
+/**
+ * Access a reserved result slot of the current call
+ */
+WY_INLINE wy_value* wy_context_result_n(wy_context* self, wy_uword index)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_NULL; }
+    return wy_fiber_result_n(self->current_fiber, index);
+}
+
+/**
+ * Store result `result` of the current call, truncating if unreserved
+ */
+WY_INLINE bool wy_context_set_result(wy_context* self, wy_uword index, wy_value value)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return false; }
+    return wy_fiber_set_result_f(self->current_fiber, index, value);
+}
+
+/**
+ * Reuse the current call's frame to call `fn`
+ *
+ * The top `arg_count` values become the arguments. `fn` inherits this call's
+ * reserved return slots and the written count is reset.
+ */
+WY_INLINE wy_error wy_context_tail_call(wy_context* self, wy_exec_fn fn, wy_uword arg_count)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_tail_call_f(self->current_fiber, fn, arg_count);
+}
+
+/**
+ * Call `fn` with `args`, resuming at `result_cb` with `result_count` results
+ *
+ * Reserve `result_count` return slots for the function call and value with
+ * the given arguments.
+ */
+WY_INLINE wy_error wy_context_call_continue(wy_context* self, wy_exec_fn result_cb, wy_exec_fn fn, const wy_value* args, wy_uword arg_count, wy_uword result_count)
 {
     if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
     if (arg_count > 0 && args == WY_NULL) { return WY_ERR_INVAL; }
-    return wy_fiber_exec_continue_f(self->current_fiber, result_cb, fn, args, arg_count);
+    return wy_fiber_exec_continue_f(self->current_fiber, result_cb, fn, args, arg_count, result_count);
 }
 
 

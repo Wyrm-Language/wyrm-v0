@@ -127,7 +127,7 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
     while (idx < self->count) {
         if (subidx == 0) {
             subidx++;
-            if (wy_type_is_object(self->dense[idx].key.type)) {
+            if (wy_value_is_gc_ref_f(self->dense[idx].key)) {
                 wa->data[0].uword = idx;
                 wa->data[1].uword = subidx;
                 *child = self->dense[idx].key.data.gc_object;
@@ -136,7 +136,7 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
         } else {
             wy_word cur_idx = idx;
             subidx = 0; idx++;
-            if (wy_type_is_object(self->dense[cur_idx].value.type)) {
+            if (wy_value_is_gc_ref_f(self->dense[cur_idx].value)) {
                 wa->data[0].uword = idx;
                 wa->data[1].uword = subidx;
                 *child = self->dense[cur_idx].value.data.gc_object;

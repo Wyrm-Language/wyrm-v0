@@ -10,7 +10,7 @@ wy_error wy_box_new_f(wy_context* context, wy_box** out)
     wy_box* box = wy_context_gc_alloc(context, sizeof(wy_box));
     if (box == WY_NULL) { return WY_ERR_NOMEM; }
 
-    box->value = wy_value_Unset();
+    box->value = wy_value_unset();
     wy_context_object_init_header_f(context, &box->object, &wy_box_type);
 
     *out = box;
@@ -35,7 +35,7 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
 
     if (wa->data[0].word == 0) {
         wa->data[0].word = 1;
-        if (wy_type_is_object(box->value.type) && box->value.data.gc_object != WY_NULL) {
+        if (wy_value_is_gc_ref_f(box->value)) {
             *child = box->value.data.gc_object;
             return WY_ERR_NONE;
         }

@@ -25,8 +25,8 @@ wy_exec_state w_mul_int(wy_context* context)
     wy_value* a = wy_context_value_n(context, 0);
     wy_value* b = wy_context_value_n(context, 1);
 
-    wy_context_push_return(context, wy_value_word(a->data.word * b->data.word));
-    printf("w_mul_int: %ld x %ld\n", a->data.word, b->data.word);;
+    wy_context_set_result(context, 0, wy_value_word(a->data.word * b->data.word));
+    printf("w_mul_int: %ld x %ld\n", a->data.word, b->data.word);
     return WY_EXEC_DONE;
 }
 
@@ -39,7 +39,7 @@ wy_exec_state w_do_a_mul(wy_context* context)
         {.type = WY_TYPE_TAG_WORD, .data.word = 32 },
     };
 
-    wy_context_call_continue(context, w_print_int, w_mul_int, v_ints, 2);
+    wy_context_call_continue(context, w_print_int, w_mul_int, v_ints, 2, 1);
     return WY_EXEC_CONTINUE;
 }
 
@@ -118,8 +118,8 @@ int main(int argc, char** argv) {
 
     // TODO: add wy_eval or something...
 
-    wy_fiber_push_continuation(fiber, w_main);
-    wy_fiber_push_continuation(fiber, w_do_a_mul);
+    wy_fiber_push_continuation(fiber, w_main, 0);
+    wy_fiber_push_continuation(fiber, w_do_a_mul, 0);
 
     wy_context_exec(context);
 

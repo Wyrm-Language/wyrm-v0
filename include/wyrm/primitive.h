@@ -91,6 +91,7 @@ union wy_primitive {
 };
 
 WY_INLINE wy_primitive wy_primitive_int(wy_word value) { const wy_primitive v = {.word = value}; return v; }
+WY_INLINE wy_primitive wy_primitive_uword(wy_uword value) { const wy_primitive v = {.uword = value}; return v; }
 WY_INLINE wy_primitive wy_primitive_ptr(void* value) { const wy_primitive v = {.ptr = value}; return v; }
 
 

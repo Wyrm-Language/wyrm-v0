@@ -12,14 +12,7 @@ static wy_error fiber_continue_with_return(wy_fiber* self)
     /* Not completed executing current task */
     if (self->pending != WY_NULL) { return WY_ERR_INVAL; }
 
-    wy_error last_error = wy_fiber_pop_continuation_f(
-        self,
-        &self->pending,
-        self->tail_preserve_count);
-
-    if (last_error == WY_ERR_NONE) {
-        self->tail_preserve_count = 0;
-    }
+    wy_error last_error = wy_fiber_pop_continuation_f(self, &self->pending);
 
     /* No continuation, fine - just return */
     if (last_error == WY_ERR_EMPTY) {
@@ -58,11 +51,11 @@ wy_fiber* wy_fiber_create(wy_context* context, wy_uword stack_len, wy_uword fram
 
     fiber->parent = WY_NULL;
     fiber->pending = WY_NULL;
-    fiber->tail_preserve_count = 0;
 
     fiber->current_frame = WY_MEM_INFO_BEGIN_PTR(wy_fiber_frame, &fiber->frame_memory);
     fiber->current_frame->restore_base = wy_stack_base_f(&fiber->value_stack);
     fiber->current_frame->fn = WY_NULL;
+    fiber->current_frame->result_count = 0;
 
     wy_context_object_init_header_f(context, &fiber->object, &wy_type_fiber);
     return fiber;
@@ -107,11 +100,9 @@ wy_error wy_fiber_exec_f(wy_fiber* self, wy_context* context)
 
         switch (result) {
         case WY_EXEC_TAIL_CALL:
-            last_error = wy_stack_replace_frame_f(&self->value_stack, self->tail_preserve_count);
+            /* wy_fiber_tail_call_f already rebuilt the frame's arguments. */
             if (self->pending == WY_NULL) {
                 last_error = WY_ERR_INVAL;
-            } else {
-                self->tail_preserve_count = 0;
             }
             break;
 
@@ -155,7 +146,7 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
         wy_value* cur = self->value_stack.entries_begin + idx;
         idx++;
 
-        if (wy_type_is_object(cur->type)) {
+        if (wy_value_is_gc_ref_f(*cur)) {
             *child = cur->data.gc_object;
             wa->data[0].word = idx;
             return WY_ERR_NONE;
@@ -168,9 +159,11 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
 
 
 /**
- * Push a call frame
+ * Push a call frame, reserving the caller's result slots
+ *
+ * @memberof wy_fiber
  */
-wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn)
+wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn, wy_uword result_count)
 {
     WY_ASSERT(self != WY_NULL && fn != WY_NULL);
 
@@ -179,8 +172,13 @@ wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn)
         return WY_ERR_STACK_OVERFLOW;
     }
 
+    /* Results live below the base, so they are reserved before rebasing. */
+    wy_error last_error = wy_stack_reserve_f(&self->value_stack, result_count);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+
     new_frame->fn = fn;
     new_frame->restore_base = wy_stack_base_f(&self->value_stack);
+    new_frame->result_count = result_count;
 
     wy_stack_base_restore_f(&self->value_stack, wy_stack_top_f(&self->value_stack));
     self->current_frame = new_frame;
@@ -189,20 +187,46 @@ wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn)
 
 
 /**
- * Pop a call frame, transferring the last N values to the new stack top
+ * Pop a call frame, leaving its results on the caller's stack
+ *
+ * @memberof wy_fiber
  */
-wy_error wy_fiber_pop_continuation_f(wy_fiber* self, wy_exec_fn* out_continuation, wy_uword preserve_count)
+wy_error wy_fiber_pop_continuation_f(wy_fiber* self, wy_exec_fn* out_continuation)
 {
     WY_ASSERT(self != WY_NULL && out_continuation != WY_NULL);
 
-    if (self->current_frame == WY_MEM_INFO_BEGIN_PTR(wy_fiber_frame, &self->frame_memory)) { return WY_ERR_EMPTY; }
+    if (wy_fiber_frame_depth_f(self) == 0) { return WY_ERR_EMPTY; }
 
-    wy_error last_error = wy_stack_base_reset_args_f(
-        &self->value_stack, self->current_frame->restore_base, preserve_count);
+    wy_fiber_frame* frame = self->current_frame;
+
+    /* Drop arguments and scratch; the reserved results sit just below base. */
+    self->value_stack.top = self->value_stack.base;
+    wy_stack_base_restore_f(&self->value_stack, frame->restore_base);
+
+    *out_continuation = frame->fn;
+    self->current_frame--;
+    return WY_ERR_NONE;
+}
+
+
+/**
+ * Reuse the active frame for a call to `fn`
+ *
+ * Moves the top `arg_count` values down to the base as the new arguments and
+ * makes `fn` pending. The frame keeps its continuation and its reserved
+ * result slots, so `fn` returns to whoever the current call would have and
+ * writes into the same slots.
+ */
+wy_error wy_fiber_tail_call_f(wy_fiber* self, wy_exec_fn fn, wy_uword arg_count)
+{
+    WY_ASSERT(self != WY_NULL);
+    if (fn == WY_NULL) { return WY_ERR_INVAL; }
+    if (self->pending != WY_NULL) { return WY_ERR_BUSY; }
+
+    wy_error last_error = wy_stack_replace_frame_f(&self->value_stack, arg_count);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
-    *out_continuation = self->current_frame->fn;
-    self->current_frame--;
+    self->pending = fn;
     return WY_ERR_NONE;
 }
 

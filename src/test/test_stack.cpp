@@ -69,79 +69,72 @@ TEST_SUITE("stack") {
         CHECK(wy_stack_pop(WY_NULL, WY_NULL, WY_NULL) == WY_ERR_INVAL);
     }
 
-    TEST_CASE("base_reset_args_f with no preserve collapses to the saved base") {
+    TEST_CASE("reserve_f marks the reserved slots unset") {
+        wy_value mem[STACK_CAP];
+        wy_stack s = make_stack(mem);
+
+        // Poison the region so an uninitialized reserve would be visible
+        for (int i = 0; i < STACK_CAP; i++) {
+            mem[i].type = WY_TYPE_TAG_OBJECT;
+            mem[i].data = prim_uword(0xbadbad);
+        }
+        s.top = s.entries_begin;
+
+        REQUIRE_EQ(wy_stack_reserve_f(&s, 3), WY_ERR_NONE);
+        CHECK_EQ(s.top, s.entries_begin + 3);
+        for (int i = 0; i < 3; i++) {
+            // Unset carries an object tag, so the collector must see the null
+            CHECK_EQ(s.entries_begin[i].type, wy_value_unset().type);
+            CHECK_EQ(s.entries_begin[i].data.gc_object, WY_NULL);
+            CHECK_FALSE(wy_value_is_gc_ref_f(s.entries_begin[i]));
+        }
+    }
+
+    TEST_CASE("reserve_f past capacity returns WY_ERR_STACK_OVERFLOW") {
+        wy_value mem[STACK_CAP];
+        wy_stack s = make_stack(mem);
+
+        CHECK_EQ(wy_stack_reserve_f(&s, STACK_CAP + 1), WY_ERR_STACK_OVERFLOW);
+        CHECK_EQ(s.top, s.entries_begin);
+
+        CHECK_EQ(wy_stack_reserve_f(&s, STACK_CAP), WY_ERR_NONE);
+        CHECK_EQ(wy_stack_reserve_f(&s, 1), WY_ERR_STACK_OVERFLOW);
+    }
+
+    TEST_CASE("replace_frame_f moves the tail-call arguments to the base") {
         wy_value mem[STACK_CAP];
         wy_stack s = make_stack(mem);
 
         // Caller value, then a frame rebased at the current top
-        wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(1));
-        wy_value* saved_base = wy_stack_base_f(&s);
-        wy_stack_base_restore_f(&s, wy_stack_top_f(&s));
-
-        wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(42));
-
-        CHECK_EQ(wy_stack_base_reset_args_f(&s, saved_base, 0), WY_ERR_NONE);
-        CHECK_EQ(s.base, s.entries_begin);
-        CHECK_EQ(s.top, s.entries_begin + 1);  // original value survives
-    }
-
-    TEST_CASE("base_reset_args_f preserves results at the call site") {
-        wy_value mem[STACK_CAP];
-        wy_stack s = make_stack(mem);
-
-        // Caller pushes one value
         wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(99));
-
-        // Enter frame with 2 args
-        wy_value* saved_base = wy_stack_base_f(&s);
         wy_stack_base_restore_f(&s, wy_stack_top_f(&s));
 
-        wy_value args[2];
-        args[0].type = WY_TYPE_TAG_WORD; args[0].data = prim_uword(1);
-        args[1].type = WY_TYPE_TAG_WORD; args[1].data = prim_uword(2);
-        REQUIRE_EQ(wy_stack_push_array_f(&s, args, 2), WY_ERR_NONE);
+        // Old arguments and scratch, then the new arguments on top
+        wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(1));
+        wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(77));
+        wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(10));
+        wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(20));
+
+        CHECK_EQ(wy_stack_replace_frame_f(&s, 2), WY_ERR_NONE);
+
+        // Base is unchanged; the frame now holds just the new arguments
+        CHECK_EQ(s.base, s.entries_begin + 1);
         CHECK_EQ(wy_stack_arg_count_f(&s), 2);
-
-        // Callee pushes a scratch value then 1 result at top
-        wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(77));  // scratch
-        wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(55));  // result to preserve
-
-        CHECK_EQ(wy_stack_base_reset_args_f(&s, saved_base, 1), WY_ERR_NONE);
-        CHECK_EQ(s.base, s.entries_begin);
-        // Stack: [99, 55]
-        CHECK_EQ(s.top, s.entries_begin + 2);
-
-        wy_primitive out{};
-        wy_stack_pop(&s, WY_NULL, &out); CHECK_EQ(out.uword, 55);
-        wy_stack_pop(&s, WY_NULL, &out); CHECK_EQ(out.uword, 99);
+        CHECK_EQ(s.base[0].data.uword, 10);
+        CHECK_EQ(s.base[1].data.uword, 20);
+        CHECK_EQ(s.entries_begin[0].data.uword, 99);
     }
 
-    TEST_CASE("base_reset_args_f with too few entries returns WY_ERR_RANGE") {
+    TEST_CASE("replace_frame_f with too few entries returns WY_ERR_RANGE") {
         wy_value mem[STACK_CAP];
         wy_stack s = make_stack(mem);
 
         wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(0));
-        wy_value* saved_base = wy_stack_base_f(&s);
         wy_stack_base_restore_f(&s, wy_stack_top_f(&s));
 
-        // Frame has 0 entries, preserving 1 should fail and leave the stack alone
-        CHECK_EQ(wy_stack_base_reset_args_f(&s, saved_base, 1), WY_ERR_RANGE);
+        // Frame holds no values, so keeping 1 must fail and change nothing
+        CHECK_EQ(wy_stack_replace_frame_f(&s, 1), WY_ERR_RANGE);
         CHECK_EQ(s.base, s.entries_begin + 1);
         CHECK_EQ(s.top, s.entries_begin + 1);
-    }
-
-    TEST_CASE("base_reset_args_f keeps a full frame in place") {
-        wy_value mem[STACK_CAP];
-        wy_stack s = make_stack(mem);
-
-        wy_value* saved_base = wy_stack_base_f(&s);
-        wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(7));
-        wy_stack_push_f(&s, WY_TYPE_TAG_WORD, prim_uword(8));
-
-        CHECK_EQ(wy_stack_base_reset_args_f(&s, saved_base, 2), WY_ERR_NONE);
-        CHECK_EQ(s.base, s.entries_begin);
-        CHECK_EQ(s.top, s.entries_begin + 2);
-        CHECK_EQ(s.entries_begin[0].data.uword, 7);
-        CHECK_EQ(s.entries_begin[1].data.uword, 8);
     }
 }

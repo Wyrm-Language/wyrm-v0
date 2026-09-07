@@ -11,8 +11,8 @@ TEST_SUITE("wpair") {
         wy_pair* pair = wy_pair_new_f(fix.context);
 
         REQUIRE_NE(pair, WY_NULL);
-        REQUIRE_EQ(wy_pair_car_f(pair), wy_value_Unset());
-        REQUIRE_EQ(wy_pair_cdr_f(pair), wy_value_Unset());
+        REQUIRE_EQ(wy_pair_car_f(pair), wy_value_unset());
+        REQUIRE_EQ(wy_pair_cdr_f(pair), wy_value_unset());
     }
 
     TEST_CASE("cons")

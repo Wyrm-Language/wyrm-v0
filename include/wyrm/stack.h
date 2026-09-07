@@ -13,6 +13,24 @@ WY_BEGIN_DECLS
  * Stack primitive for the Wyrm interpreter. Stack space is defined by a
  * pointer range (entries_begin, entries_end); Stack grows upward from
  * begin toward end.
+ *
+ * A call frame is laid out with the caller-reserved result slots directly
+ * below the base, in reverse order, and the parameters at and above it:
+ *
+ *      [entries_begin]
+ *      ...              Caller values
+ *      [base - n]       Result n - 1    (lowest reserved slot)
+ *      ...
+ *      [base - 1]       Result 0
+ *      [base]           Parameter 0
+ *      ...              Parameters, then callee scratch
+ *      [top]
+ *      ...              Free space
+ *      [entries_end]
+ *
+ * Placing results below the base lets a callee write them where the caller
+ * already expects them, so returning collapses a frame without moving any
+ * values.
  */
 struct wy_stack
 {
@@ -95,23 +113,17 @@ WY_INLINE wy_uword wy_stack_arg_count_f(wy_stack* self)
 
 
 /**
- * Retore active frame with argument preservation
+ * Reserve `count` unset slots at the top of the stack
  */
-WY_INLINE wy_error wy_stack_base_reset_args_f(wy_stack* self, wy_value* base, wy_uword arg_count)
+WY_INLINE wy_error wy_stack_reserve_f(wy_stack* self, wy_uword count)
 {
-    WY_ASSERT(self != WY_NULL && base != WY_NULL);
-    WY_ASSERT(base >= self->entries_begin && base <= self->base);
+    WY_ASSERT(self != WY_NULL);
+    if ((wy_uword) (self->entries_end - self->top) < count) { return WY_ERR_STACK_OVERFLOW; }
 
-    wy_uword orig_arg_count = wy_stack_arg_count_f(self);
-    if (orig_arg_count < arg_count) { return WY_ERR_RANGE; }
-
-    if (orig_arg_count != arg_count) {
-        wy_value* dest_base = self->base;
-        wy_memmove(dest_base, self->top - arg_count, arg_count * sizeof(wy_value));
-        self->top = dest_base + arg_count;
+    for (wy_uword idx = 0; idx < count; idx++) {
+        self->top[idx] = wy_value_unset();
     }
-
-    self->base = base;
+    self->top += count;
     return WY_ERR_NONE;
 }
 
@@ -184,16 +196,23 @@ WY_INLINE wy_error wy_stack_pop_discard_f(wy_stack* self, wy_uword count)
 }
 
 /**
- * Replace the top of the stack.
- * @memberof wy_stack
+ * Move the top `arg_count` values down to the base, discarding the rest
+ *
+ * Used by tail calls, where the reused frame keeps its base and its
+ * caller-reserved result slots but takes a fresh set of arguments.
+ *
+ * @param self Stack
+ * @param arg_count Number of top-of-frame values to keep as the new arguments
+ * @return WY_ERR_NONE on success,
+ *         WY_ERR_RANGE if the frame holds fewer than `arg_count` values
  */
-WY_INLINE wy_error wy_stack_replace_frame_f(wy_stack* self, wy_uword preserve_count)
+WY_INLINE wy_error wy_stack_replace_frame_f(wy_stack* self, wy_uword arg_count)
 {
     WY_ASSERT(self != WY_NULL);
 
-    if ((wy_uword)(self->top - self->base) < preserve_count) { return WY_ERR_RANGE; }
-    wy_memmove(self->base, self->top - preserve_count, preserve_count * sizeof(wy_value));
-    self->top = self->base + preserve_count;
+    if ((wy_uword)(self->top - self->base) < arg_count) { return WY_ERR_RANGE; }
+    wy_memmove(self->base, self->top - arg_count, arg_count * sizeof(wy_value));
+    self->top = self->base + arg_count;
     return WY_ERR_NONE;
 }
 

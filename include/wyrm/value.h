@@ -21,9 +21,33 @@ enum {
 
 static_assert(WY_PRIMITIVE_SIZE >= sizeof(uintptr_t), "Primitive must allow storage of a pointer");
 
+/**
+ * @brief Test whether a value holds a traversable object reference
+ *
+ * @param value Value to test
+ * @return true when the value references an allocated object
+ */
+WY_INLINE bool wy_value_is_gc_ref_f(wy_value value)
+{
+    return wy_type_is_object(value.type) && value.data.gc_object != WY_NULL;
+}
+
+
+/**
+ * @brief Create a word primitive value
+ */
 WY_INLINE wy_value wy_value_word(wy_word value)
 {
     wy_value v = { .type = WY_TYPE_TAG_WORD, .data = wy_primitive_int(value) };
+    return v;
+}
+
+/**
+ * @brief Create a word primitive value
+ */
+WY_INLINE wy_value wy_value_uword(wy_uword value)
+{
+    wy_value v = { .type = WY_TYPE_TAG_WORD, .data = wy_primitive_uword(value) };
     return v;
 }
 
@@ -52,7 +76,7 @@ WY_INLINE wy_value wy_value_nil(void)
 /**
  * @brief Create Unset primitive
  */
-WY_INLINE wy_value wy_value_Unset(void)
+WY_INLINE wy_value wy_value_unset(void)
 {
     wy_value v = {
         .type = WY_TYPE_TAG_ERROR,
