@@ -14,8 +14,8 @@ namespace wyrmxx
         glib_mainloop(const glib_mainloop&) = delete;
         glib_mainloop& operator=(const glib_mainloop&) = delete;
 
-        glib_mainloop(wyrm_allocator* alloc)
-            : main_loop{wyrm_glib_mainloop_new(alloc)}
+        glib_mainloop(wy_allocator* alloc)
+            : main_loop{wy_glib_mainloop_new(alloc)}
         {
             if (!self_) { throw out_of_memory{}; }
         }
@@ -37,15 +37,15 @@ namespace wyrmxx
             return *this;
         }
 
-        wyrm_uword get_active_sources() const
+        wy_uword get_active_sources() const
         {
-            return wyrm_glib_mainloop_get_active_sources(self_);
+            return wy_glib_mainloop_get_active_sources(self_);
         }
 
         void release() noexcept
         {
             if (self_) {
-                wyrm_glib_mainloop_destroy(self_);
+                wy_glib_mainloop_destroy(self_);
                 self_ = nullptr;
             }
         }

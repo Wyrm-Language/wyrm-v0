@@ -9,32 +9,32 @@ TEST_SUITE("wclass")
     {
         test_context_fixture fix;
 
-        wyrm_class* cls = WYRM_NULL;
+        wy_class* cls = WY_NULL;
 
-        REQUIRE_EQ(wyrm_class_new(fix.get_context_ptr(), &cls), WYRM_ERR_NONE);
-        REQUIRE_NE(cls, WYRM_NULL);
+        REQUIRE_EQ(wy_class_new(fix.get_context_ptr(), &cls), WY_ERR_NONE);
+        REQUIRE_NE(cls, WY_NULL);
     }
 
     TEST_CASE("slot accessors")
     {
         test_context_fixture fix;
 
-        wyrm_class* cls = WYRM_NULL;
-        REQUIRE_EQ(wyrm_class_new(fix.get_context_ptr(), &cls), WYRM_ERR_NONE);
+        wy_class* cls = WY_NULL;
+        REQUIRE_EQ(wy_class_new(fix.get_context_ptr(), &cls), WY_ERR_NONE);
 
-        wyrm_symtab_entry name {};
-        wyrm_symtab_entry age {};
-        wyrm_machine_insert_symbol(fix.get_machine_ptr(), "name", &name);
-        wyrm_machine_insert_symbol(fix.get_machine_ptr(), "age", &age);
+        wy_symtab_entry name {};
+        wy_symtab_entry age {};
+        wy_machine_insert_symbol(fix.get_machine_ptr(), "name", &name);
+        wy_machine_insert_symbol(fix.get_machine_ptr(), "age", &age);
 
-        wyrm_class_add_slot_f(cls, name, WYRM_SLOT_DEFAULTS);
-        wyrm_class_add_slot_f(cls, age, WYRM_SLOT_DEFAULTS);
+        wy_class_add_slot_f(cls, name, WY_SLOT_DEFAULTS);
+        wy_class_add_slot_f(cls, age, WY_SLOT_DEFAULTS);
 
-        auto slot_name = wyrm_class_get_slot_selector_f(cls, name);
-        auto slot_age = wyrm_class_get_slot_selector_f(cls, age);
+        auto slot_name = wy_class_get_slot_selector_f(cls, name);
+        auto slot_age = wy_class_get_slot_selector_f(cls, age);
 
-        REQUIRE_NE(slot_name, WYRM_BAD_SLOT);
-        REQUIRE_NE(slot_age, WYRM_BAD_SLOT);
+        REQUIRE_NE(slot_name, WY_BAD_SLOT);
+        REQUIRE_NE(slot_age, WY_BAD_SLOT);
         REQUIRE_NE(slot_name, slot_age);
     }
 }

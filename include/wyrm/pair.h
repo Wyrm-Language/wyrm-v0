@@ -4,33 +4,33 @@
 #include <wyrm/core.h>
 #include <wyrm/context.h>
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
-extern const wyrm_object_type wyrm_pair_type;
+extern const wy_object_type wy_pair_type;
 
 /**
  * A pair data structure
  */
-struct wyrm_pair
+struct wy_pair
 {
-    wyrm_object object;
-    wyrm_value car;
-    wyrm_value cdr;
+    wy_object object;
+    wy_value car;
+    wy_value cdr;
 };
 
 
 /**
  * @brief Construct new pair with both items unset
  */
-WYRM_INLINE wyrm_pair* wyrm_pair_new_f(wyrm_context* context)
+WY_INLINE wy_pair* wy_pair_new_f(wy_context* context)
 {
-    wyrm_pair* pair = (wyrm_pair*) wyrm_context_gc_alloc(context, sizeof(wyrm_pair));
-    if (pair == WYRM_NULL) { return WYRM_NULL; }
+    wy_pair* pair = (wy_pair*) wy_context_gc_alloc(context, sizeof(wy_pair));
+    if (pair == WY_NULL) { return WY_NULL; }
 
-    pair->car = wyrm_value_Unset();
-    pair->cdr = wyrm_value_Unset();
+    pair->car = wy_value_Unset();
+    pair->cdr = wy_value_Unset();
 
-    wyrm_context_object_init_header_f(context, &pair->object, &wyrm_pair_type);
+    wy_context_object_init_header_f(context, &pair->object, &wy_pair_type);
     return pair;
 }
 
@@ -38,10 +38,10 @@ WYRM_INLINE wyrm_pair* wyrm_pair_new_f(wyrm_context* context)
 /**
  * @brief Construct pair as (cons head tail)
  */
-WYRM_INLINE wyrm_pair* wyrm_pair_cons_f(wyrm_context* context, wyrm_value head, wyrm_value tail)
+WY_INLINE wy_pair* wy_pair_cons_f(wy_context* context, wy_value head, wy_value tail)
 {
-    wyrm_pair* pair = wyrm_pair_new_f(context);
-    if (pair != WYRM_NULL) {
+    wy_pair* pair = wy_pair_new_f(context);
+    if (pair != WY_NULL) {
         pair->car = head;
         pair->cdr = tail;
     }
@@ -52,7 +52,7 @@ WYRM_INLINE wyrm_pair* wyrm_pair_cons_f(wyrm_context* context, wyrm_value head, 
 /**
  * @brief Get head of the pair
  */
-WYRM_INLINE wyrm_value wyrm_pair_car_f(wyrm_pair* pair)
+WY_INLINE wy_value wy_pair_car_f(wy_pair* pair)
 {
     return pair->car;
 }
@@ -61,11 +61,11 @@ WYRM_INLINE wyrm_value wyrm_pair_car_f(wyrm_pair* pair)
 /**
  * @brief Get tail of the pair
  */
-WYRM_INLINE wyrm_value wyrm_pair_cdr_f(wyrm_pair* pair)
+WY_INLINE wy_value wy_pair_cdr_f(wy_pair* pair)
 {
     return pair->cdr;
 }
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

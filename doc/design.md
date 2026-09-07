@@ -49,7 +49,7 @@ A fiber is an execution stack frame contained within a context.
 A wyrm value consists of an enumerated type tag and a register value. The
 register value should align to a single machine register on most
 architectures. The numerated type fills another machine word. The
-`wyrm_value` struct contains both.
+`wy_value` struct contains both.
 
 Primitive and Fundamental types as defined in the language-spec are
 special case implemented within the VM. Each fundamental type includes a
@@ -58,7 +58,7 @@ entry in the register value enumeration.
 Important types by type tag:
 
   - **Error Type** - default initialized for default constructed / zerod
-    wyrm_value. The register value is a pointer to error information. A
+    wy_value. The register value is a pointer to error information. A
     default initialized / NULL register value is treated as a unique
     indicator for a "Not Set" error.
   - **Pair Type** - low level value utilized for sexpr tree building. The

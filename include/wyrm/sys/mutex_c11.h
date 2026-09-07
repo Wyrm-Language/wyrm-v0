@@ -5,10 +5,10 @@
 #include <wyrm/sys/toolchain.h>
 #include <wyrm/sys/errors.h>
 
-#if defined(WYRM_THREAD_USE_C11) && WYRM_THREAD_USE_C11
+#if defined(WY_THREAD_USE_C11) && WY_THREAD_USE_C11
 #include <threads.h>
 
-struct wyrm_sys_mutex
+struct wy_sys_mutex
 {
     struct {
         mtx_t v;
@@ -16,34 +16,34 @@ struct wyrm_sys_mutex
     } impl;
 };
 
-static inline wyrm_error wyrm_sys_mutex_init(struct wyrm_sys_mutex *mutex, const char *name)
+static inline wy_error wy_sys_mutex_init(struct wy_sys_mutex *mutex, const char *name)
 {
-    if (mutex == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    if (mutex == WY_NULL) { return WY_ERR_INVAL; }
     mutex->impl.name = name;
     mtx_init(&mutex->impl.v, mtx_plain);
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
-static inline wyrm_error wyrm_sys_mutex_lock(struct wyrm_sys_mutex *mutex)
+static inline wy_error wy_sys_mutex_lock(struct wy_sys_mutex *mutex)
 {
-    if (mutex == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (mtx_lock(&mutex->impl.v) != thrd_success) { return WYRM_ERR_UNKNOWN; }
-    return WYRM_ERR_NONE;
+    if (mutex == WY_NULL) { return WY_ERR_INVAL; }
+    if (mtx_lock(&mutex->impl.v) != thrd_success) { return WY_ERR_UNKNOWN; }
+    return WY_ERR_NONE;
 }
 
-static inline wyrm_error wyrm_sys_mutex_unlock(struct wyrm_sys_mutex *mutex)
+static inline wy_error wy_sys_mutex_unlock(struct wy_sys_mutex *mutex)
 {
-    if (mutex == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (mtx_unlock(&mutex->impl.v) != thrd_success) { return WYRM_ERR_UNKNOWN; }
-    return WYRM_ERR_NONE;
+    if (mutex == WY_NULL) { return WY_ERR_INVAL; }
+    if (mtx_unlock(&mutex->impl.v) != thrd_success) { return WY_ERR_UNKNOWN; }
+    return WY_ERR_NONE;
 }
 
-static inline void wyrm_sys_mutex_unlock_f(struct wyrm_sys_mutex *mutex)
+static inline void wy_sys_mutex_unlock_f(struct wy_sys_mutex *mutex)
 {
-#if defined(WYRM_ASSERT_CHECKS) && WYRM_ASSERT_CHECKS
-    WYRM_ASSERT(mutex != WYRM_NULL);
+#if defined(WY_ASSERT_CHECKS) && WY_ASSERT_CHECKS
+    WY_ASSERT(mutex != WY_NULL);
     int _r = mtx_unlock(&mutex->impl.v);
-    WYRM_ASSERT(_r == thrd_success);
+    WY_ASSERT(_r == thrd_success);
 #else
     (void) mtx_unlock(&mutex->impl.v);
 #endif

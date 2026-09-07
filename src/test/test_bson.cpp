@@ -41,14 +41,14 @@ TEST_SUITE("bson")
         wy_bson_doc_reader_start(&dc, hello_1_header, std::size(hello_1_header));
 
         auto err = wy_bson_doc_reader_get(&dc, &tag_type, &name, &buffer, &buffer_len);
-        REQUIRE_EQ(err, WYRM_ERR_NONE);
+        REQUIRE_EQ(err, WY_ERR_NONE);
         REQUIRE_EQ(tag_type, WY_BSON_TAG_STRING);
 
         const char* sname;
         wy_uword slen;
         wy_bson_get_str(buffer, &sname, &slen);
 
-        REQUIRE_EQ(wyrm_memcmp(sname, "hello_1", slen), 0);
+        REQUIRE_EQ(wy_memcmp(sname, "hello_1", slen), 0);
         REQUIRE_EQ(tag_type, WY_BSON_TAG_STRING);
     }
 
@@ -70,10 +70,10 @@ TEST_SUITE("bson")
         wy_bson_doc_reader_start(&arr_doc, buffer, buffer_len);
 
         wy_bson_doc_reader_get(&arr_doc, &tag_type, &name, &buffer, &buffer_len);
-        REQUIRE_EQ(wyrm_strcmp_f(name, "0"), 0);
+        REQUIRE_EQ(wy_strcmp_f(name, "0"), 0);
         REQUIRE_EQ(tag_type, WY_BSON_TAG_I32);
         REQUIRE_EQ(wy_bson_get_i32(buffer), 0);
 
-        REQUIRE_EQ(wy_bson_doc_reader_get(&arr_doc, &tag_type, &name, &buffer, &buffer_len), WYRM_ERR_STOP_ITERATION);
+        REQUIRE_EQ(wy_bson_doc_reader_get(&arr_doc, &tag_type, &name, &buffer, &buffer_len), WY_ERR_STOP_ITERATION);
     }
 }

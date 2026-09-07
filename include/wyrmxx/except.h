@@ -9,31 +9,31 @@ namespace wyrmxx
     class except_base : public std::runtime_error
     {
     public:
-        except_base(wyrm_error error, const char* ext = "")
+        except_base(wy_error error, const char* ext = "")
             : std::runtime_error(ext)
             , error_{error}
         {
         }
 
-        wyrm_error get_error() const { return error_; }
+        wy_error get_error() const { return error_; }
 
     private:
-        wyrm_error error_;
+        wy_error error_;
     };
 
     class out_of_memory : public except_base
     {
     public:
-        explicit out_of_memory(const char* ext = "") : except_base{WYRM_ERR_NOMEM, ext} {}
+        explicit out_of_memory(const char* ext = "") : except_base{WY_ERR_NOMEM, ext} {}
     };
 
-    inline void check_wyrm_error(wyrm_error err, const char* ext = "")
+    inline void check_wy_error(wy_error err, const char* ext = "")
     {
         switch (err) {
-        case WYRM_ERR_NOMEM:
+        case WY_ERR_NOMEM:
             throw out_of_memory(ext);
 
-        case WYRM_ERR_NONE:
+        case WY_ERR_NONE:
             return;
 
         default:

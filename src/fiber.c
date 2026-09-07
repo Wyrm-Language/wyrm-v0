@@ -2,27 +2,27 @@
 #include <wyrm/fiber.h>
 #include <wyrm/stack.h>
 
-static void finalize_f(wyrm_context* context, wyrm_object* object);
-static wyrm_error start_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa);
-static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa, const wyrm_object** child);
+static void finalize_f(wy_context* context, wy_object* object);
+static wy_error start_children_iter(wy_state* state, wy_object* object, wy_work_area* wa);
+static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_area* wa, const wy_object** child);
 
-static wyrm_error fiber_continue_with_return(wyrm_fiber* self)
+static wy_error fiber_continue_with_return(wy_fiber* self)
 {
     /* Not completed executing current task */
-    if (self->pending != WYRM_NULL) { return WYRM_ERR_INVAL; }
+    if (self->pending != WY_NULL) { return WY_ERR_INVAL; }
 
-    wyrm_error last_error = wy_fiber_pop_continuation_f(
+    wy_error last_error = wy_fiber_pop_continuation_f(
         self,
         &self->pending,
         self->tail_preserve_count);
 
-    if (last_error == WYRM_ERR_NONE) {
+    if (last_error == WY_ERR_NONE) {
         self->tail_preserve_count = 0;
     }
 
     /* No continuation, fine - just return */
-    if (last_error == WYRM_ERR_EMPTY) {
-        last_error = WYRM_ERR_NONE;
+    if (last_error == WY_ERR_EMPTY) {
+        last_error = WY_ERR_NONE;
     }
 
     return last_error;
@@ -31,98 +31,98 @@ static wyrm_error fiber_continue_with_return(wyrm_fiber* self)
 /**
  * Create a fiber
  */
-wyrm_fiber* wyrm_fiber_create(wyrm_context* context, wyrm_uword stack_len, wy_uword frame_count)
+wy_fiber* wy_fiber_create(wy_context* context, wy_uword stack_len, wy_uword frame_count)
 {
-    WYRM_ASSERT(context != WYRM_NULL);
-    if (stack_len == 0 || frame_count == 0) { return WYRM_NULL; }
+    WY_ASSERT(context != WY_NULL);
+    if (stack_len == 0 || frame_count == 0) { return WY_NULL; }
 
-    wyrm_fiber* fiber = wyrm_context_gc_alloc(context, sizeof(wyrm_fiber));
-    if (fiber == WYRM_NULL) { return WYRM_NULL; }
+    wy_fiber* fiber = wy_context_gc_alloc(context, sizeof(wy_fiber));
+    if (fiber == WY_NULL) { return WY_NULL; }
 
-    wyrm_value* stack = wyrm_context_gc_alloc(context, stack_len * sizeof(wyrm_value));
-    if (stack == WYRM_NULL) {
-        wyrm_context_gc_free(context, fiber);
-        return WYRM_NULL;
+    wy_value* stack = wy_context_gc_alloc(context, stack_len * sizeof(wy_value));
+    if (stack == WY_NULL) {
+        wy_context_gc_free(context, fiber);
+        return WY_NULL;
     }
 
     /* One extra slot holds the sentinel frame that marks "no active frame". */
     wy_mem_info_init_empty_s(&fiber->frame_memory);
-    if (WY_CONTEXT_MEM_INFO_RESERVE_COUNT(context, &fiber->frame_memory, frame_count + 1, wy_fiber_frame) != WYRM_ERR_NONE) {
-        wyrm_context_gc_free(context, stack);
-        wyrm_context_gc_free(context, fiber);
-        return WYRM_NULL;
+    if (WY_CONTEXT_MEM_INFO_RESERVE_COUNT(context, &fiber->frame_memory, frame_count + 1, wy_fiber_frame) != WY_ERR_NONE) {
+        wy_context_gc_free(context, stack);
+        wy_context_gc_free(context, fiber);
+        return WY_NULL;
     }
 
-    wyrm_stack_init_f(&fiber->value_stack, stack, stack_len);
+    wy_stack_init_f(&fiber->value_stack, stack, stack_len);
 
-    fiber->parent = WYRM_NULL;
-    fiber->pending = WYRM_NULL;
+    fiber->parent = WY_NULL;
+    fiber->pending = WY_NULL;
     fiber->tail_preserve_count = 0;
 
     fiber->current_frame = WY_MEM_INFO_BEGIN_PTR(wy_fiber_frame, &fiber->frame_memory);
-    fiber->current_frame->restore_base = wyrm_stack_base_f(&fiber->value_stack);
-    fiber->current_frame->fn = WYRM_NULL;
+    fiber->current_frame->restore_base = wy_stack_base_f(&fiber->value_stack);
+    fiber->current_frame->fn = WY_NULL;
 
-    wyrm_context_object_init_header_f(context, &fiber->object, &wyrm_type_fiber);
+    wy_context_object_init_header_f(context, &fiber->object, &wy_type_fiber);
     return fiber;
 }
 
 
-static void finalize_f(wyrm_context* context, wyrm_object* object)
+static void finalize_f(wy_context* context, wy_object* object)
 {
-    wyrm_fiber* self = (wyrm_fiber*) object;
+    wy_fiber* self = (wy_fiber*) object;
 
-    wyrm_context_gc_free(context, self->value_stack.entries_begin);
-    self->value_stack.entries_begin = WYRM_NULL;
-    self->value_stack.entries_end = WYRM_NULL;
-    self->value_stack.base = WYRM_NULL;
-    self->value_stack.top = WYRM_NULL;
+    wy_context_gc_free(context, self->value_stack.entries_begin);
+    self->value_stack.entries_begin = WY_NULL;
+    self->value_stack.entries_end = WY_NULL;
+    self->value_stack.base = WY_NULL;
+    self->value_stack.top = WY_NULL;
 
     wy_context_mem_release_f(context, &self->frame_memory);
-    self->current_frame = WYRM_NULL;
+    self->current_frame = WY_NULL;
 }
 
 
 
-wyrm_error wyrm_fiber_exec_f(wyrm_fiber* self, wyrm_state* state)
+wy_error wy_fiber_exec_f(wy_fiber* self, wy_state* state)
 {
-    WYRM_ASSERT(self != WYRM_NULL && state != WYRM_NULL && state->fiber == self);
-    wyrm_error last_error = WYRM_ERR_NONE;
+    WY_ASSERT(self != WY_NULL && state != WY_NULL && state->fiber == self);
+    wy_error last_error = WY_ERR_NONE;
 
     // Continue execution through continuation stack if no forward stack present
-    if (self->pending == WYRM_NULL) {
+    if (self->pending == WY_NULL) {
         last_error = fiber_continue_with_return(self);
     }
 
-    if (last_error != WYRM_ERR_NONE || self->pending == WYRM_NULL) {
+    if (last_error != WY_ERR_NONE || self->pending == WY_NULL) {
         return last_error;
     }
 
-    while (last_error == WYRM_ERR_NONE && self->pending != WYRM_NULL) {
-        wyrm_exec_fn pending = self->pending;
-        self->pending = WYRM_NULL;
+    while (last_error == WY_ERR_NONE && self->pending != WY_NULL) {
+        wy_exec_fn pending = self->pending;
+        self->pending = WY_NULL;
 
-        wyrm_exec_state result = pending(state);
+        wy_exec_state result = pending(state);
 
         switch (result) {
-        case WYRM_EXEC_TAIL_CALL:
-            last_error = wyrm_stack_replace_frame_f(&self->value_stack, self->tail_preserve_count);
-            if (self->pending == WYRM_NULL) {
-                last_error = WYRM_ERR_INVAL;
+        case WY_EXEC_TAIL_CALL:
+            last_error = wy_stack_replace_frame_f(&self->value_stack, self->tail_preserve_count);
+            if (self->pending == WY_NULL) {
+                last_error = WY_ERR_INVAL;
             } else {
                 self->tail_preserve_count = 0;
             }
             break;
 
-        case WYRM_EXEC_CONTINUE:
-            if (self->pending == WYRM_NULL) {
-                last_error = WYRM_ERR_INVAL;
+        case WY_EXEC_CONTINUE:
+            if (self->pending == WY_NULL) {
+                last_error = WY_ERR_INVAL;
             }
             break;
 
-        case WYRM_EXEC_DONE:
-            if (self->pending != WYRM_NULL) {
-                last_error = WYRM_ERR_INVAL;
+        case WY_EXEC_DONE:
+            if (self->pending != WY_NULL) {
+                last_error = WY_ERR_INVAL;
                 break;
             }
 
@@ -130,85 +130,85 @@ wyrm_error wyrm_fiber_exec_f(wyrm_fiber* self, wyrm_state* state)
             break;
 
         default:
-            last_error = WYRM_ERR_INVAL;
+            last_error = WY_ERR_INVAL;
         }
     }
     return last_error;
 }
 
 
-static wyrm_error start_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa)
+static wy_error start_children_iter(wy_state* state, wy_object* object, wy_work_area* wa)
 {
-    WYRM_UNUSED(state); WYRM_UNUSED(object);
-    wyrm_memset(wa, 0, sizeof(wyrm_work_area));
+    WY_UNUSED(state); WY_UNUSED(object);
+    wy_memset(wa, 0, sizeof(wy_work_area));
     wa->data[0].word = 0;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
-static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa, const wyrm_object** child)
+static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_area* wa, const wy_object** child)
 {
-    WYRM_UNUSED(state);
-    wyrm_fiber* self = (wyrm_fiber*) object;
-    wyrm_word idx = wa->data[0].word;
+    WY_UNUSED(state);
+    wy_fiber* self = (wy_fiber*) object;
+    wy_word idx = wa->data[0].word;
     while ((self->value_stack.entries_begin + idx) < self->value_stack.top) {
-        wyrm_value* cur = self->value_stack.entries_begin + idx;
+        wy_value* cur = self->value_stack.entries_begin + idx;
         idx++;
 
         if (wy_type_is_object(cur->type)) {
             *child = cur->data.gc_object;
             wa->data[0].word = idx;
-            return WYRM_ERR_NONE;
+            return WY_ERR_NONE;
         }
     }
 
     wa->data[0].word = idx;
-    return WYRM_ERR_STOP_ITERATION;
+    return WY_ERR_STOP_ITERATION;
 }
 
 
 /**
  * Push a call frame
  */
-wyrm_error wy_fiber_push_frame_f(wyrm_fiber* self, wyrm_exec_fn fn)
+wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn)
 {
-    WYRM_ASSERT(self != WYRM_NULL && fn != WYRM_NULL);
+    WY_ASSERT(self != WY_NULL && fn != WY_NULL);
 
     wy_fiber_frame* new_frame = self->current_frame + 1;
     if (!WY_MEM_INFO_TOP_NOT_AT_END(wy_fiber_frame, new_frame, &self->frame_memory)) {
-        return WYRM_ERR_STACK_OVERFLOW;
+        return WY_ERR_STACK_OVERFLOW;
     }
 
     new_frame->fn = fn;
-    new_frame->restore_base = wyrm_stack_base_f(&self->value_stack);
+    new_frame->restore_base = wy_stack_base_f(&self->value_stack);
 
-    wyrm_stack_base_restore_f(&self->value_stack, wyrm_stack_top_f(&self->value_stack));
+    wy_stack_base_restore_f(&self->value_stack, wy_stack_top_f(&self->value_stack));
     self->current_frame = new_frame;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
 
 /**
  * Pop a call frame, transferring the last N values to the new stack top
  */
-wyrm_error wy_fiber_pop_continuation_f(wy_fiber* self, wyrm_exec_fn* out_continuation, wyrm_uword preserve_count)
+wy_error wy_fiber_pop_continuation_f(wy_fiber* self, wy_exec_fn* out_continuation, wy_uword preserve_count)
 {
-    WYRM_ASSERT(self != WYRM_NULL && out_continuation != WYRM_NULL);
+    WY_ASSERT(self != WY_NULL && out_continuation != WY_NULL);
 
-    if (self->current_frame == WY_MEM_INFO_BEGIN_PTR(wy_fiber_frame, &self->frame_memory)) { return WYRM_ERR_EMPTY; }
+    if (self->current_frame == WY_MEM_INFO_BEGIN_PTR(wy_fiber_frame, &self->frame_memory)) { return WY_ERR_EMPTY; }
 
     wy_error last_error = wy_stack_base_reset_args_f(
         &self->value_stack, self->current_frame->restore_base, preserve_count);
-    if (last_error != WYRM_ERR_NONE) { return last_error; }
+    if (last_error != WY_ERR_NONE) { return last_error; }
 
     *out_continuation = self->current_frame->fn;
     self->current_frame--;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
 
-const wyrm_object_type wyrm_type_fiber = {
-    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
-    .gc_type = WYRM_TYPE_TAG_FIBER,
+const wy_object_type wy_type_fiber = {
+    .object = WY_OBJECT_TYPE_OBJECT_INIT,
+    .gc_type = WY_TYPE_TAG_FIBER,
 
     .finalize = finalize_f,
     .children_iter_start = start_children_iter,

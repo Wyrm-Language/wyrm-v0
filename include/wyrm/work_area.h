@@ -3,9 +3,9 @@
 
 #include <wyrm/primitive.h>
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
-#define WYRM_WORK_AREA_LEN 8
+#define WY_WORK_AREA_LEN 8
 
 /**
  * Generic 'User Data' Friendly Field
@@ -16,9 +16,9 @@ WYRM_BEGIN_DECLS
  */
 typedef struct wy_work_area
 {
-    wyrm_primitive data[WYRM_WORK_AREA_LEN];
+    wy_primitive data[WY_WORK_AREA_LEN];
 } wy_work_area;
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

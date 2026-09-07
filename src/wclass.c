@@ -2,58 +2,58 @@
 
 #define SLOT_COUNT 256
 
-wyrm_error wyrm_class_new(wyrm_context* context, wyrm_class** out)
+wy_error wy_class_new(wy_context* context, wy_class** out)
 {
-    wyrm_class* cls = wyrm_context_gc_alloc(context, sizeof(wyrm_class));
-    if (!cls) { return WYRM_ERR_NOMEM; }
+    wy_class* cls = wy_context_gc_alloc(context, sizeof(wy_class));
+    if (!cls) { return WY_ERR_NOMEM; }
 
-    cls->super = WYRM_NULL;
-    cls->sym_name.symtab_entry = WYRM_NULL;
+    cls->super = WY_NULL;
+    cls->sym_name.symtab_entry = WY_NULL;
 
-    wyrm_prototype_init_f(&cls->prototype);
-    wyrm_error last_error = wyrm_prototype_reserve_f(context, &cls->prototype, SLOT_COUNT);
-    if (last_error != WYRM_ERR_NONE) {
-        wyrm_context_gc_free(context, cls);
-        return WYRM_ERR_NOMEM;
+    wy_prototype_init_f(&cls->prototype);
+    wy_error last_error = wy_prototype_reserve_f(context, &cls->prototype, SLOT_COUNT);
+    if (last_error != WY_ERR_NONE) {
+        wy_context_gc_free(context, cls);
+        return WY_ERR_NOMEM;
     }
 
-    wyrm_context_object_init_header_f(context, &cls->prototype.object, &wyrm_type_class);
+    wy_context_object_init_header_f(context, &cls->prototype.object, &wy_type_class);
     *out = cls;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
 
-static void finalize(wyrm_context* context, wyrm_object* self)
+static void finalize(wy_context* context, wy_object* self)
 {
-    wyrm_class* cls = (wyrm_class*) self;
-    wyrm_prototype_finalize_f(context, &cls->prototype);
+    wy_class* cls = (wy_class*) self;
+    wy_prototype_finalize_f(context, &cls->prototype);
 }
 
 
-static wyrm_error children_iter_start(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa)
+static wy_error children_iter_start(wy_state* state, wy_object* self, wy_work_area* wa)
 {
-    WYRM_UNUSED(state); WYRM_UNUSED(self);
-    memset(wa, 0, sizeof(wyrm_work_area));
+    WY_UNUSED(state); WY_UNUSED(self);
+    memset(wa, 0, sizeof(wy_work_area));
     wa->data[0].flag = false;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
-static wyrm_error children_iter_next(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa, const wyrm_object** child)
+static wy_error children_iter_next(wy_state* state, wy_object* self, wy_work_area* wa, const wy_object** child)
 {
-    WYRM_UNUSED(state);
-    wyrm_class* cls = (wyrm_class*) self;
+    WY_UNUSED(state);
+    wy_class* cls = (wy_class*) self;
     bool done = wa->data[0].flag;
     wa->data[0].flag = true;
-    if (done || cls->super == WYRM_NULL) {
-        return WYRM_ERR_STOP_ITERATION;
+    if (done || cls->super == WY_NULL) {
+        return WY_ERR_STOP_ITERATION;
     }
-    *child = (wyrm_object*) cls->super;
-    return WYRM_ERR_NONE;
+    *child = (wy_object*) cls->super;
+    return WY_ERR_NONE;
 }
 
-const wyrm_object_type wyrm_type_class = {
-    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
-    .gc_type = WYRM_TYPE_TAG_CLASS,
+const wy_object_type wy_type_class = {
+    .object = WY_OBJECT_TYPE_OBJECT_INIT,
+    .gc_type = WY_TYPE_TAG_CLASS,
 
     .finalize = finalize,
     .children_iter_start = children_iter_start,

@@ -11,9 +11,9 @@ namespace wyrmxx
     public:
         context(main_loop loop);
 
-        operator wyrm_context*() & { return &context_; }
+        operator wy_context*() & { return &context_; }
 
-        wyrm_context context_;
+        wy_context context_;
         main_loop main_loop_;
     };
 }

@@ -7,40 +7,40 @@
 #include <wyrm/platform/hosted/cmachine.h>
 #include <wyrm/fiber.h>
 
-wyrm_exec_state w_main(wyrm_state* state)
+wy_exec_state w_main(wy_state* state)
 {
-    printf("Last of the call stack, expect values = 0 actual = %ld\n", wyrm_state_value_count(state));
-    return WYRM_EXEC_DONE;
+    printf("Last of the call stack, expect values = 0 actual = %ld\n", wy_state_value_count(state));
+    return WY_EXEC_DONE;
 }
 
-wyrm_exec_state w_print_int(wyrm_state* state)
+wy_exec_state w_print_int(wy_state* state)
 {
-    wyrm_value* a = wyrm_state_value_n(state, 0);
+    wy_value* a = wy_state_value_n(state, 0);
     printf("w_print_int: %ld\n", a->data.word);
-    return WYRM_EXEC_DONE;
+    return WY_EXEC_DONE;
 }
 
-wyrm_exec_state w_mul_int(wyrm_state* state)
+wy_exec_state w_mul_int(wy_state* state)
 {
-    wyrm_value* a = wyrm_state_value_n(state, 0);
-    wyrm_value* b = wyrm_state_value_n(state, 1);
+    wy_value* a = wy_state_value_n(state, 0);
+    wy_value* b = wy_state_value_n(state, 1);
 
-    wyrm_state_push_return(state, wyrm_value_word(a->data.word * b->data.word));
+    wy_state_push_return(state, wy_value_word(a->data.word * b->data.word));
     printf("w_mul_int: %ld x %ld\n", a->data.word, b->data.word);;
-    return WYRM_EXEC_DONE;
+    return WY_EXEC_DONE;
 }
 
-wyrm_exec_state w_do_a_mul(wyrm_state* state)
+wy_exec_state w_do_a_mul(wy_state* state)
 {
-    WYRM_UNUSED(state);
+    WY_UNUSED(state);
     printf("pushing arguments\n");
-    wyrm_value v_ints[2] = {
-        { .type = WYRM_TYPE_TAG_WORD, .data.word = 8 },
-        {.type = WYRM_TYPE_TAG_WORD, .data.word = 32 },
+    wy_value v_ints[2] = {
+        { .type = WY_TYPE_TAG_WORD, .data.word = 8 },
+        {.type = WY_TYPE_TAG_WORD, .data.word = 32 },
     };
 
-    wyrm_state_call_continue(state, w_print_int, w_mul_int, v_ints, 2);
-    return WYRM_EXEC_CONTINUE;
+    wy_state_call_continue(state, w_print_int, w_mul_int, v_ints, 2);
+    return WY_EXEC_CONTINUE;
 }
 
 
@@ -86,37 +86,37 @@ int main(int argc, char** argv) {
     }
 
     wy_context* context = wy_cmachine_context_new(machine);
-    if (context == WYRM_NULL) {
+    if (context == WY_NULL) {
         fprintf(stderr, "Failed to create context");
         return -1;
     }
 
     wy_module* mod = wy_module_new_f(context);
-    if (wy_module_load(context, mod, (wy_u8*) file_content, file_size) != WYRM_ERR_NONE) {
+    if (wy_module_load(context, mod, (wy_u8*) file_content, file_size) != WY_ERR_NONE) {
         fprintf(stderr, "Failed to load module\n");
         return -1;
     }
     wy_context_set_root(context, mod);
 
-    wy_fiber* fiber = wyrm_fiber_create(context, 8192, 1024);
-    if (fiber == WYRM_NULL) {
+    wy_fiber* fiber = wy_fiber_create(context, 8192, 1024);
+    if (fiber == WY_NULL) {
         fprintf(stderr, "Failed to create fiber\n");
         return -1;
     }
-    wyrm_context_attach_fiber(context, fiber);
+    wy_context_attach_fiber(context, fiber);
 
 
 
     // TODO: add wy_eval or something...
 
-    wyrm_fiber_push_continuation(fiber, w_main);
-    wyrm_fiber_push_continuation(fiber, w_do_a_mul);
+    wy_fiber_push_continuation(fiber, w_main);
+    wy_fiber_push_continuation(fiber, w_do_a_mul);
 
-    wyrm_state state;
-    wyrm_state_init_from_context_f(&state, context);
+    wy_state state;
+    wy_state_init_from_context_f(&state, context);
     state.fiber = fiber;
 
-    wyrm_fiber_exec_f(fiber, &state);
+    wy_fiber_exec_f(fiber, &state);
 
 
     return 0;

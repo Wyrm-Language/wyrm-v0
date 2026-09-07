@@ -4,35 +4,35 @@
 #include <wyrm/sys/mutex.h>
 #include <wyrm/sys/errors.h>
 
-#if defined(WYRM_THREAD_USE_NONE) && WYRM_THREAD_USE_NONE
+#if defined(WY_THREAD_USE_NONE) && WY_THREAD_USE_NONE
 
-struct wyrm_sys_mutex
+struct wy_sys_mutex
 {
     char _unused;
 };
 
-static inline wyrm_error wyrm_sys_mutex_init(struct wyrm_sys_mutex *mutex, const char *name)
+static inline wy_error wy_sys_mutex_init(struct wy_sys_mutex *mutex, const char *name)
 {
-    WYRM_UNUSED(mutex);
-    WYRM_UNUSED(name);
-    return WYRM_ERR_NONE;
+    WY_UNUSED(mutex);
+    WY_UNUSED(name);
+    return WY_ERR_NONE;
 }
 
-static inline wyrm_error wyrm_sys_mutex_lock(struct wyrm_sys_mutex *mutex)
+static inline wy_error wy_sys_mutex_lock(struct wy_sys_mutex *mutex)
 {
-    WYRM_UNUSED(mutex);
-    return WYRM_ERR_NONE;
+    WY_UNUSED(mutex);
+    return WY_ERR_NONE;
 }
 
-static inline wyrm_error wyrm_sys_mutex_unlock(struct wyrm_sys_mutex *mutex)
+static inline wy_error wy_sys_mutex_unlock(struct wy_sys_mutex *mutex)
 {
-    WYRM_UNUSED(mutex);
-    return WYRM_ERR_NONE;
+    WY_UNUSED(mutex);
+    return WY_ERR_NONE;
 }
 
-static inline void wyrm_sys_mutex_unlock_f(struct wyrm_sys_mutex *mutex)
+static inline void wy_sys_mutex_unlock_f(struct wy_sys_mutex *mutex)
 {
-    WYRM_UNUSED(mutex);
+    WY_UNUSED(mutex);
 }
 
 #endif

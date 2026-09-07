@@ -3,11 +3,11 @@
 
 #include <wyrm/core.h>
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
-wyrm_error wy_vm_exec_bytecode(wyrm_context* ctx, size_t pos, const wy_u32 buffer[], size_t len);
+wy_error wy_vm_exec_bytecode(wy_context* ctx, size_t pos, const wy_u32 buffer[], size_t len);
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 
 #endif

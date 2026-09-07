@@ -12,49 +12,49 @@ TEST_SUITE("table") {
     {
         test_state_fixture state;
 
-        wyrm_dict* new_dict = nullptr;
-        REQUIRE_EQ(wyrm_dict_new(state.context, &new_dict), WYRM_ERR_NONE);
+        wy_dict* new_dict = nullptr;
+        REQUIRE_EQ(wy_dict_new(state.context, &new_dict), WY_ERR_NONE);
         REQUIRE_NE(new_dict, nullptr);
 
-        wyrm_dict& dict = *new_dict;;
+        wy_dict& dict = *new_dict;;
 
-        wyrm_primitive s1{};
-        wyrm_primitive s2{};
+        wy_primitive s1{};
+        wy_primitive s2{};
 
-        REQUIRE_EQ(wyrm_string_strdup(state.get_context_ptr(), "dog", &s1.str), WYRM_ERR_NONE);
-        REQUIRE_EQ(wyrm_string_strdup(state.get_context_ptr(), "cat", &s2.str), WYRM_ERR_NONE);
+        REQUIRE_EQ(wy_string_strdup(state.get_context_ptr(), "dog", &s1.str), WY_ERR_NONE);
+        REQUIRE_EQ(wy_string_strdup(state.get_context_ptr(), "cat", &s2.str), WY_ERR_NONE);
 
-        wyrm_dict_set(&state, &dict, WYRM_TYPE_TAG_STR, s1, WYRM_TYPE_TAG_WORD, wyrm_primitive_int(0xfeed));
-        wyrm_dict_set(&state, &dict, WYRM_TYPE_TAG_STR, s2, WYRM_TYPE_TAG_NIL, wyrm_primitive_null());
+        wy_dict_set(&state, &dict, WY_TYPE_TAG_STR, s1, WY_TYPE_TAG_WORD, wy_primitive_int(0xfeed));
+        wy_dict_set(&state, &dict, WY_TYPE_TAG_STR, s2, WY_TYPE_TAG_NIL, wy_primitive_null());
 
-        wyrm_value* v1 = wyrm_dict_get(&state, &dict, WYRM_TYPE_TAG_STR, s1);
-        wyrm_value* v2 = wyrm_dict_get(&state, &dict, WYRM_TYPE_TAG_STR, s2);
+        wy_value* v1 = wy_dict_get(&state, &dict, WY_TYPE_TAG_STR, s1);
+        wy_value* v2 = wy_dict_get(&state, &dict, WY_TYPE_TAG_STR, s2);
 
         REQUIRE((v1 != nullptr));
         REQUIRE((v2 != nullptr));
 
-        REQUIRE_EQ(v1->type, WYRM_TYPE_TAG_WORD);
-        REQUIRE_EQ(v2->type, WYRM_TYPE_TAG_NIL);
+        REQUIRE_EQ(v1->type, WY_TYPE_TAG_WORD);
+        REQUIRE_EQ(v2->type, WY_TYPE_TAG_NIL);
 
         REQUIRE_EQ(v1->data.word, 0xfeed);
-        wyrm_primitive nil = wyrm_primitive_null();
-        REQUIRE_EQ(wyrm_memcmp(&v2->data, &nil, sizeof(wyrm_primitive)), 0);
+        wy_primitive nil = wy_primitive_null();
+        REQUIRE_EQ(wy_memcmp(&v2->data, &nil, sizeof(wy_primitive)), 0);
     }
 
     TEST_CASE("simple uword get/set") {
         test_state_fixture state;
 
-        wyrm_dict* new_dict = nullptr;
-        REQUIRE_EQ(wyrm_dict_new(state.context, &new_dict), WYRM_ERR_NONE);
+        wy_dict* new_dict = nullptr;
+        REQUIRE_EQ(wy_dict_new(state.context, &new_dict), WY_ERR_NONE);
         REQUIRE_NE(new_dict, nullptr);
 
-        wyrm_dict& dict = *new_dict;;
+        wy_dict& dict = *new_dict;;
 
-        REQUIRE_EQ(wyrm_dict_get(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5}), WYRM_NULL);
-        REQUIRE_EQ(wyrm_dict_set(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5}, WYRM_TYPE_TAG_UWORD, {.uword=0xfeed}), WYRM_ERR_NONE);
+        REQUIRE_EQ(wy_dict_get(&state, &dict, WY_TYPE_TAG_UWORD, {.uword=5}), WY_NULL);
+        REQUIRE_EQ(wy_dict_set(&state, &dict, WY_TYPE_TAG_UWORD, {.uword=5}, WY_TYPE_TAG_UWORD, {.uword=0xfeed}), WY_ERR_NONE);
 
-        auto res = wyrm_dict_get(&state, &dict, WYRM_TYPE_TAG_UWORD, {.uword=5});
-        REQUIRE_NE(res, WYRM_NULL);
+        auto res = wy_dict_get(&state, &dict, WY_TYPE_TAG_UWORD, {.uword=5});
+        REQUIRE_NE(res, WY_NULL);
         REQUIRE_EQ(res->data.uword, 0xfeed);
     }
 }

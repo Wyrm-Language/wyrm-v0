@@ -9,8 +9,8 @@ TEST_SUITE("allocator")
         test_allocator_fixture fixture;
         auto alloc = fixture.get();
 
-        void* d = wyrm_allocator_alloc(alloc, 5);
-        wyrm_allocator_free(alloc, d);
+        void* d = wy_allocator_alloc(alloc, 5);
+        wy_allocator_free(alloc, d);
 
         fixture.check();
     }

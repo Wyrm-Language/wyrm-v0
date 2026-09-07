@@ -4,20 +4,20 @@
 namespace wyrmxx
 {
     state_::state_()
-        : wyrm_state{}
+        : wy_state{}
     {
-        wyrm_state_init_s(this);
+        wy_state_init_s(this);
     }
 
     state_::~state_()
     {
-        wyrm_state_delete(this);
+        wy_state_delete(this);
     }
 
-    state::state(wyrm_allocator* allocator)
+    state::state(wy_allocator* allocator)
         : state{}
     {
-        auto state_ptr = wyrm_state_new(allocator);
+        auto state_ptr = wy_state_new(allocator);
         if (!state_ptr) { throw out_of_memory{}; }
 
         self_ = state_ptr;

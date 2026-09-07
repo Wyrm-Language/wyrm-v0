@@ -2,7 +2,7 @@
 #ifndef WYRM_CONFIG_H_
 #define WYRM_CONFIG_H_
 
-#mesondefine WYRM_HAVE_HOSTED
-#mesondefine WYRM_HAVE_GLIB
+#mesondefine WY_HAVE_HOSTED
+#mesondefine WY_HAVE_GLIB
 
 #endif

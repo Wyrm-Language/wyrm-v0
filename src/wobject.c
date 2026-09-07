@@ -1,6 +1,6 @@
 #include <wyrm.h>
 
-const wyrm_object_type wyrm_type_object = {
-    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
-    .gc_type = WYRM_TYPE_TAG_OBJECT
+const wy_object_type wy_type_object = {
+    .object = WY_OBJECT_TYPE_OBJECT_INIT,
+    .gc_type = WY_TYPE_TAG_OBJECT
 };

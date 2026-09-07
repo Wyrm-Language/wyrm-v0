@@ -10,10 +10,10 @@ extern "C"
 #endif
 
 /// @brief OS thread identifier — opaque; defined by the active platform backend
-struct wyrm_sys_thread_id;
+struct wy_sys_thread_id;
 
 /// @brief Return the identifier of the calling thread.
-static inline struct wyrm_sys_thread_id wyrm_sys_get_thread_id(void);
+static inline struct wy_sys_thread_id wy_sys_get_thread_id(void);
 
 #ifdef __cplusplus
 }
@@ -25,7 +25,7 @@ static inline struct wyrm_sys_thread_id wyrm_sys_get_thread_id(void);
 #include <wyrm/sys/thread_id_none.h>
 
 #ifndef __cplusplus
-typedef struct wyrm_sys_thread_id wyrm_sys_thread_id;
+typedef struct wy_sys_thread_id wy_sys_thread_id;
 #endif
 
 #endif

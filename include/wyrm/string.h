@@ -10,44 +10,44 @@
 extern "C" {
 #endif
 
-extern const wyrm_object_type wyrm_string_type;
+extern const wy_object_type wy_string_type;
 
-struct wyrm_string
+struct wy_string
 {
-    wyrm_object object;
+    wy_object object;
     const char* str;
-    wyrm_uword len;
-    wyrm_uword hash;
+    wy_uword len;
+    wy_uword hash;
 };
 
-wyrm_error wyrm_string_new(wyrm_context* machine, const char* src, wyrm_uword len, wyrm_string** out_str);
-wyrm_error wyrm_string_strdup(wyrm_context* machine, const char* src, wyrm_string** out_str);
+wy_error wy_string_new(wy_context* machine, const char* src, wy_uword len, wy_string** out_str);
+wy_error wy_string_strdup(wy_context* machine, const char* src, wy_string** out_str);
 
-WYRM_INLINE bool wyrm_string_eq_f(wyrm_string* lhs, wyrm_string* rhs);
-WYRM_INLINE wyrm_uword wyrm_string_hash_f(wyrm_string* str);
+WY_INLINE bool wy_string_eq_f(wy_string* lhs, wy_string* rhs);
+WY_INLINE wy_uword wy_string_hash_f(wy_string* str);
 
 
-WYRM_INLINE wyrm_uword wyrm_hash_buffer(const char* start, const char* end)
+WY_INLINE wy_uword wy_hash_buffer(const char* start, const char* end)
 {
-    wyrm_uword hash = 0;
+    wy_uword hash = 0;
     for (const char* cur = start; cur != end; ++cur) {
-        hash = hash + (wyrm_uword)(*cur);
+        hash = hash + (wy_uword)(*cur);
     }
     return hash;
 }
 
 
-WYRM_INLINE bool wyrm_string_eq_f(wyrm_string* lhs, wyrm_string* rhs)
+WY_INLINE bool wy_string_eq_f(wy_string* lhs, wy_string* rhs)
 {
-    WYRM_ASSERT(lhs != WYRM_NULL && rhs != WYRM_NULL);
+    WY_ASSERT(lhs != WY_NULL && rhs != WY_NULL);
     if (lhs == rhs) { return true; }
     if (lhs->hash != rhs->hash) { return false; }
     if (lhs->len != rhs->len) { return false; }
     if (lhs->len == 0) { return true; }
-    return wyrm_strncmp_f(lhs->str, rhs->str, lhs->len) == 0;
+    return wy_strncmp_f(lhs->str, rhs->str, lhs->len) == 0;
 }
 
-WYRM_INLINE wyrm_uword wyrm_string_hash_f(wyrm_string* str)
+WY_INLINE wy_uword wy_string_hash_f(wy_string* str)
 {
     if (!str) { return 0; }
     return str->hash;

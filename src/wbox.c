@@ -4,48 +4,48 @@
 /**
  * @brief Allocate a new box.
  */
-wyrm_error wyrm_box_new_f(wyrm_context* context, wyrm_box** out)
+wy_error wy_box_new_f(wy_context* context, wy_box** out)
 {
-    wyrm_box* box = wyrm_context_gc_alloc(context, sizeof(wyrm_box));
-    if (box == WYRM_NULL) { return WYRM_ERR_NOMEM; }
+    wy_box* box = wy_context_gc_alloc(context, sizeof(wy_box));
+    if (box == WY_NULL) { return WY_ERR_NOMEM; }
 
-    box->value = wyrm_value_Unset();
-    wyrm_context_object_init_header_f(context, &box->object, &wyrm_box_type);
+    box->value = wy_value_Unset();
+    wy_context_object_init_header_f(context, &box->object, &wy_box_type);
 
     *out = box;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
 
-static wyrm_error start_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa)
+static wy_error start_children_iter(wy_state* state, wy_object* object, wy_work_area* wa)
 {
-    WYRM_UNUSED(state);
-    WYRM_ASSERT(object != WYRM_NULL);
-    wyrm_memset(wa, 0, sizeof(wyrm_work_area));
+    WY_UNUSED(state);
+    WY_ASSERT(object != WY_NULL);
+    wy_memset(wa, 0, sizeof(wy_work_area));
     wa->data[0].word = 0;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
-static wyrm_error next_children_iter(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa, const wyrm_object** child)
+static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_area* wa, const wy_object** child)
 {
-    WYRM_UNUSED(state);
-    WYRM_ASSERT(object != WYRM_NULL);
-    wyrm_box* box = (wyrm_box*) object;
+    WY_UNUSED(state);
+    WY_ASSERT(object != WY_NULL);
+    wy_box* box = (wy_box*) object;
 
     if (wa->data[0].word == 0) {
         wa->data[0].word = 1;
-        if (wyrm_type_tag_is_gc(box->value.type) && box->value.data.gc_object != WYRM_NULL) {
+        if (wy_type_tag_is_gc(box->value.type) && box->value.data.gc_object != WY_NULL) {
             *child = box->value.data.gc_object;
-            return WYRM_ERR_NONE;
+            return WY_ERR_NONE;
         }
     }
-    return WYRM_ERR_STOP_ITERATION;
+    return WY_ERR_STOP_ITERATION;
 }
 
 
-const wyrm_object_type wyrm_box_type = {
-    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
-    .gc_type = WYRM_TYPE_TAG_BOX,
+const wy_object_type wy_box_type = {
+    .object = WY_OBJECT_TYPE_OBJECT_INIT,
+    .gc_type = WY_TYPE_TAG_BOX,
 
     .children_iter_start = start_children_iter,
     .children_iter_next = next_children_iter,

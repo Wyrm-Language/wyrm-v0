@@ -25,10 +25,10 @@ TEST_SUITE("wstate")
         test_allocator_fixture alloc_fixture;
 
 
-        auto state = wyrm_state_new(alloc_fixture.ptr());
+        auto state = wy_state_new(alloc_fixture.ptr());
         REQUIRE_NE(state, nullptr);
 
-        wyrm_state_delete(state);
+        wy_state_delete(state);
 
         alloc_fixture.check();
     }

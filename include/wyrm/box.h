@@ -13,28 +13,28 @@ extern "C" {
 // Wyrm Box
 // ----------------------------------------------------------------------------
 
-extern const wyrm_object_type wyrm_box_type;
+extern const wy_object_type wy_box_type;
 
 /**
  * @brief Box type - for lifting a name onto the heap.
  */
-struct wyrm_box
+struct wy_box
 {
-    wyrm_object object;
-    wyrm_value value;
+    wy_object object;
+    wy_value value;
 };
 
-wyrm_error wyrm_box_new_f(wyrm_context* self, wyrm_box** out);
+wy_error wy_box_new_f(wy_context* self, wy_box** out);
 
 /**
  * @brief Retrieve value stored in a box
  */
-WYRM_INLINE wyrm_value wyrm_box_value_f(wyrm_box* box) { return box->value; }
+WY_INLINE wy_value wy_box_value_f(wy_box* box) { return box->value; }
 
 /**
  * @brief Set value stored in a box
  */
-WYRM_INLINE void wyrm_box_set_value_f(wyrm_box* box, wyrm_value value) { box->value = value; }
+WY_INLINE void wy_box_set_value_f(wy_box* box, wy_value value) { box->value = value; }
 
 #ifdef __cplusplus
 }

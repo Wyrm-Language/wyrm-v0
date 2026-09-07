@@ -8,12 +8,12 @@ TEST_SUITE("context")
 {
     TEST_CASE("init succeeds and registers a wakeable") {
         test_main_loop_fixture loop;
-        wyrm_context ctx{};
-        wyrm_context_init_s(&ctx);
-        REQUIRE_EQ(wyrm_context_attach_loop(&ctx, loop), WYRM_ERR_NONE);
+        wy_context ctx{};
+        wy_context_init_s(&ctx);
+        REQUIRE_EQ(wy_context_attach_loop(&ctx, loop), WY_ERR_NONE);
         REQUIRE_EQ(ctx.main_loop, loop.ptr());
-        REQUIRE_NE(ctx.wakeable_source.ptr, WYRM_NULL);
+        REQUIRE_NE(ctx.wakeable_source.ptr, WY_NULL);
 
-        wyrm_context_finalize_f(&ctx);
+        wy_context_finalize_f(&ctx);
     }
 }

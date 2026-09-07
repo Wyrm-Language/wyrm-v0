@@ -8,28 +8,28 @@
 extern "C" {
 #endif
 
-extern const wyrm_allocator_vt wyrm_allocator_cmem_vt;
+extern const wy_allocator_vt wy_allocator_cmem_vt;
 
-struct wyrm_allocator_cmem
+struct wy_allocator_cmem
 {
-    wyrm_allocator base;
-    wyrm_uword active_size;
+    wy_allocator base;
+    wy_uword active_size;
 };
 
 #ifndef __cplusplus
-typedef struct wyrm_allocator_cmem wyrm_allocator_cmem;
+typedef struct wy_allocator_cmem wy_allocator_cmem;
 #endif
 
-wyrm_allocator_cmem* wyrm_allocator_cmem_new(void);
-void wyrm_allocator_cmem_destroy(wyrm_allocator_cmem* allocator);
+wy_allocator_cmem* wy_allocator_cmem_new(void);
+void wy_allocator_cmem_destroy(wy_allocator_cmem* allocator);
 
-WYRM_INLINE void wyrm_allocator_cmem_init(struct wyrm_allocator_cmem* allocator)
+WY_INLINE void wy_allocator_cmem_init(struct wy_allocator_cmem* allocator)
 {
-    allocator->base.clz = &wyrm_allocator_cmem_vt;
+    allocator->base.clz = &wy_allocator_cmem_vt;
     allocator->active_size = 0;
 }
 
-WYRM_INLINE wyrm_allocator* wyrm_allocator_from_cmem(struct wyrm_allocator_cmem* allocator)
+WY_INLINE wy_allocator* wy_allocator_from_cmem(struct wy_allocator_cmem* allocator)
 {
     return &allocator->base;
 }

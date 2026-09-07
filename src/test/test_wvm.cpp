@@ -13,25 +13,25 @@ TEST_SUITE("wvm") {
         wy_u32 bad_instruction[] = { 0xffffffffu };
         test_fiber_fixture ctx;
 
-        wyrm_error result = wy_vm_exec_bytecode(ctx.context, 0, bad_instruction, std::size(bad_instruction));
-        REQUIRE_EQ(result, WYRM_ERR_INVAL);
+        wy_error result = wy_vm_exec_bytecode(ctx.context, 0, bad_instruction, std::size(bad_instruction));
+        REQUIRE_EQ(result, WY_ERR_INVAL);
     }
 
     TEST_CASE("noop leaves accumulator unchanged")
     {
-        wy_u32 buffer[] = { wy_opcode_p0(WYRM_OP_NOOP)};
+        wy_u32 buffer[] = { wy_opcode_p0(WY_OP_NOOP)};
         test_fiber_fixture ctx;
 
-        wyrm_error result = wy_vm_exec_bytecode(ctx.context, 0, buffer, std::size(buffer));
-        REQUIRE_EQ(result, WYRM_ERR_NONE);
+        wy_error result = wy_vm_exec_bytecode(ctx.context, 0, buffer, std::size(buffer));
+        REQUIRE_EQ(result, WY_ERR_NONE);
     }
 
     TEST_CASE("pass has evaluates to nil")
     {
-        wy_u32 buffer[] = { wy_opcode_p0(WYRM_OP_PASS)};
+        wy_u32 buffer[] = { wy_opcode_p0(WY_OP_PASS)};
         test_fiber_fixture ctx;
 
-        wyrm_error result = wy_vm_exec_bytecode(ctx.context, 0, buffer, std::size(buffer));
-        REQUIRE_EQ(result, WYRM_ERR_NONE);
+        wy_error result = wy_vm_exec_bytecode(ctx.context, 0, buffer, std::size(buffer));
+        REQUIRE_EQ(result, WY_ERR_NONE);
     }
 }

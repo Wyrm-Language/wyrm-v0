@@ -10,9 +10,9 @@ extern "C" {
 /**
  * Get the next array size given current capacity and initial capacity
  */
-WYRM_INLINE wyrm_uword wyrm_next_array_capacity(wyrm_uword current_capacity, wyrm_uword initial)
+WY_INLINE wy_uword wy_next_array_capacity(wy_uword current_capacity, wy_uword initial)
 {
-    if (current_capacity >= WYRM_UWORD_HALF) return WYRM_UWORD_MAX;
+    if (current_capacity >= WY_UWORD_HALF) return WY_UWORD_MAX;
     return current_capacity == 0 ? initial : current_capacity * 2;
 }
 

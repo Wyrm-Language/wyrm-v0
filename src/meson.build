@@ -42,7 +42,7 @@ subdir('platform/common')     # sets platform_common; always enabled
 modules += platform_common
 
 if get_option('hosted')
-    cfg.set('WYRM_HAVE_HOSTED', 1)
+    cfg.set('WY_HAVE_HOSTED', 1)
 
     subdir('platform/hosted')
     modules += platform_hosted
@@ -52,12 +52,12 @@ if get_option('hosted')
 endif
 
 if glib_dep.found()
-    cfg.set('WYRM_HAVE_GLIB', 1)
+    cfg.set('WY_HAVE_GLIB', 1)
     subdir('platform/glib')
     modules += platform_glib
 endif
 
-wyrm_opt = get_option('wyrm')
+wy_opt = get_option('wyrm')
 
 # -----------------------------------------------------------------------------
 # Build Optional / Extensions to Core
@@ -125,7 +125,7 @@ pkgconfig.generate(cwyrm_lib,
     version:     meson.project_version(),
 )
 
-if not wyrm_opt.disabled()
+if not wy_opt.disabled()
     subdir('wyrm')
 endif
 
@@ -148,5 +148,5 @@ summary({
     'cxx_bindings' : not cxx_bindings.disabled(),
     'tests'        : not tests_opt.disabled(),
 #    'wy'     : not wy_opt.disabled(),
-#    'wyrm'   : not wyrm_opt.disabled(),
+#    'wyrm'   : not wy_opt.disabled(),
 }, section: 'Configuration', bool_yn: true)

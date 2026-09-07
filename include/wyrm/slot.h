@@ -6,7 +6,7 @@
 #include <wyrm/util.h>
 
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
 typedef struct wy_slot_dict_entry
 {
@@ -28,7 +28,7 @@ typedef struct wy_slot_dict
     wy_uword capacity;
 } wy_slot_dict;
 
-#define WY_SLOT_DICT_INITIALIZER  { .entry_table = WYRM_NULL, .entry_count = 0, .capacity = 0 }
+#define WY_SLOT_DICT_INITIALIZER  { .entry_table = WY_NULL, .entry_count = 0, .capacity = 0 }
 
 wy_error wy_slot_dict_expand_f(wy_slot_dict* self, wy_allocator* allocator, wy_uword new_capacity);
 wy_error wy_slot_dict_add_entry(wy_slot_dict* self, wy_symbol sym, wy_uword idx);
@@ -40,18 +40,18 @@ void wy_slot_finalize_f(wy_slot_dict* self, wy_allocator* allocator);
  * @param table Table entries
  * @param capacity Capacity of the table (length)
  * @param symbol Symbol to look or add
- * @return WYRM_NULL if not insertable, insertion point if not found, entry if found
+ * @return WY_NULL if not insertable, insertion point if not found, entry if found
  */
-WYRM_INLINE wy_slot_dict_entry* wy_slot_dict_find_entry_(wy_slot_dict_entry table[], wy_uword capacity, wy_symbol symbol)
+WY_INLINE wy_slot_dict_entry* wy_slot_dict_find_entry_(wy_slot_dict_entry table[], wy_uword capacity, wy_symbol symbol)
 {
-    wy_uword hash = wy_util_rehash((wyrm_uintptr) symbol);
+    wy_uword hash = wy_util_rehash((wy_uintptr) symbol);
     for (wy_uword i = 0; i < capacity; ++i) {
         wy_slot_dict_entry* entry = &table[(hash + i) % capacity];
-        if (entry->symbol == symbol || entry->symbol == WYRM_SYMBOL_INVALID) {
+        if (entry->symbol == symbol || entry->symbol == WY_SYMBOL_INVALID) {
             return entry;
         }
     }
-    return WYRM_NULL;
+    return WY_NULL;
 }
 
 /**
@@ -61,13 +61,13 @@ WYRM_INLINE wy_slot_dict_entry* wy_slot_dict_find_entry_(wy_slot_dict_entry tabl
  * @param symbol Symbol name in slot dictionary
  * @return Slot index for the symbol
  */
-WYRM_INLINE wyrm_uword wy_slot_dict_get(wy_slot_dict* self, wy_symbol symbol)
+WY_INLINE wy_uword wy_slot_dict_get(wy_slot_dict* self, wy_symbol symbol)
 {
     wy_slot_dict_entry* entry = wy_slot_dict_find_entry_(self->entry_table, self->capacity, symbol);
-    if (entry == WYRM_NULL || entry->symbol != symbol) { return WY_SLOT_INVALID; }
+    if (entry == WY_NULL || entry->symbol != symbol) { return WY_SLOT_INVALID; }
     return entry->slot;
 }
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

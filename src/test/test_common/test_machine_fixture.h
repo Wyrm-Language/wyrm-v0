@@ -13,13 +13,13 @@ class test_machine_failure : public std::runtime_error
 };
 
 
-struct wyrm_test_main_loop_state {
-    wyrm_uword fired_count;
+struct wy_test_main_loop_state {
+    wy_uword fired_count;
 };
 
 
-WYRM_INLINE bool wyrm_test_main_loop_count_cb(wyrm_primitive ud) {
-    auto state = reinterpret_cast<wyrm_test_main_loop_state*>(ud.tagged_ptr);
+WY_INLINE bool wy_test_main_loop_count_cb(wy_primitive ud) {
+    auto state = reinterpret_cast<wy_test_main_loop_state*>(ud.tagged_ptr);
     state->fired_count += 1;
     return false;
 }
@@ -27,15 +27,15 @@ WYRM_INLINE bool wyrm_test_main_loop_count_cb(wyrm_primitive ud) {
 struct test_machine_fixture
 {
     test_allocator_fixture allocator;
-    wyrm_machine machine;
+    wy_machine machine;
 
     test_machine_fixture()
         : machine{}
     {
-        wyrm_machine_init_s(&machine, allocator.ptr());
+        wy_machine_init_s(&machine, allocator.ptr());
     }
 
-    wyrm_machine* get_machine_ptr() { return &machine; }
+    wy_machine* get_machine_ptr() { return &machine; }
 };
 
 #endif

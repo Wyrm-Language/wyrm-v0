@@ -11,11 +11,11 @@ namespace wyrmxx
         fiber(const fiber&) = delete;
         fiber& operator=(const fiber&) = delete;
 
-        explicit fiber(wyrm_fiber* self) : fiber_{self} {}
+        explicit fiber(wy_fiber* self) : fiber_{self} {}
         fiber(fiber&& other) noexcept : fiber_{other.fiber_} {}
         fiber& operator=(fiber&& other) noexcept { fiber_ = other.fiber_; return *this; }
 
-        wyrm_fiber* fiber_;
+        wy_fiber* fiber_;
     };
 
 }

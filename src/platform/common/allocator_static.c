@@ -1,61 +1,61 @@
 #include <wyrm/platform/common/allocator_static.h>
 #include <wyrm/sys/string.h>
 
-#define MAX_ALLOC_SZ (WYRM_WORD_MAX - sizeof(wyrm_uword))
+#define MAX_ALLOC_SZ (WY_WORD_MAX - sizeof(wy_uword))
 
-static wyrm_word static_alloc_size(wyrm_allocator_static* a, const void *buffer)
+static wy_word static_alloc_size(wy_allocator_static* a, const void *buffer)
 {
-    const char* header = (const char *)buffer - sizeof(wyrm_word);
+    const char* header = (const char *)buffer - sizeof(wy_word);
     if (header >= a->storage && header < a->storage_current) {
-        wyrm_word sz;
-        wyrm_memcpy(&sz, header, (wyrm_uword)sizeof(wyrm_word));
+        wy_word sz;
+        wy_memcpy(&sz, header, (wy_uword)sizeof(wy_word));
         return sz;
     }
 
     return -1;
 }
 
-static void *static_alloc(wyrm_allocator *allocator, wyrm_uword len)
+static void *static_alloc(wy_allocator *allocator, wy_uword len)
 {
-    wyrm_allocator_static *static_allocator = (wyrm_allocator_static *)allocator;
+    wy_allocator_static *static_allocator = (wy_allocator_static *)allocator;
 
-    WYRM_ASSERT(allocator && allocator->clz == &wyrm_allocator_static_vt);
-    if (!len) { return WYRM_NULL; }
-    if (len > MAX_ALLOC_SZ) { return WYRM_NULL; }
+    WY_ASSERT(allocator && allocator->clz == &wy_allocator_static_vt);
+    if (!len) { return WY_NULL; }
+    if (len > MAX_ALLOC_SZ) { return WY_NULL; }
 
-    wyrm_uword mod_len  = len % WYRM_BYTE_ALIGNMENT;
-    wyrm_uword next_len = len;
-    if (mod_len > 0) { next_len += WYRM_BYTE_ALIGNMENT - mod_len; }
+    wy_uword mod_len  = len % WY_BYTE_ALIGNMENT;
+    wy_uword next_len = len;
+    if (mod_len > 0) { next_len += WY_BYTE_ALIGNMENT - mod_len; }
 
-    wyrm_uword total = (wyrm_uword)sizeof(wyrm_word) + next_len;
-    if (total > static_allocator->storage_remaining) { return WYRM_NULL; }
+    wy_uword total = (wy_uword)sizeof(wy_word) + next_len;
+    if (total > static_allocator->storage_remaining) { return WY_NULL; }
 
     char *header = static_allocator->storage_current;
-    wyrm_word s_len = (wyrm_word)len;
-    wyrm_memcpy(header, &s_len, (wyrm_uword)sizeof(wyrm_word));
+    wy_word s_len = (wy_word)len;
+    wy_memcpy(header, &s_len, (wy_uword)sizeof(wy_word));
 
-    char *result = header + sizeof(wyrm_word);
+    char *result = header + sizeof(wy_word);
     static_allocator->storage_current   += total;
     static_allocator->storage_remaining -= total;
     return (void *)result;
 }
 
-static void *static_realloc(struct wyrm_allocator *self, void *buffer, wyrm_uword new_sz)
+static void *static_realloc(struct wy_allocator *self, void *buffer, wy_uword new_sz)
 {
-    wyrm_allocator_static *sa = (wyrm_allocator_static *)self;
-    wyrm_uword old_sz = 0;
+    wy_allocator_static *sa = (wy_allocator_static *)self;
+    wy_uword old_sz = 0;
 
     if (new_sz > MAX_ALLOC_SZ) {
-        return WYRM_NULL;
+        return WY_NULL;
     }
 
     // Previous buffer - determine old allocated size, error check allocation
     if (buffer) {
-        wyrm_word last_sz = static_alloc_size(sa, buffer);
+        wy_word last_sz = static_alloc_size(sa, buffer);
         if (last_sz < 0) {
-            return WYRM_NULL;
+            return WY_NULL;
         }
-        old_sz = (wyrm_uword) last_sz;
+        old_sz = (wy_uword) last_sz;
     }
 
     if (old_sz >= new_sz) {
@@ -65,32 +65,32 @@ static void *static_realloc(struct wyrm_allocator *self, void *buffer, wyrm_uwor
     void *new_buffer = static_alloc(self, new_sz);
     if (new_buffer && old_sz > 0)
     {
-        wyrm_memcpy(new_buffer, buffer, old_sz);
+        wy_memcpy(new_buffer, buffer, old_sz);
     }
     return new_buffer;
 }
 
-static void static_free(wyrm_allocator *allocator, void *buffer)
+static void static_free(wy_allocator *allocator, void *buffer)
 {
-    WYRM_UNUSED(allocator);
-    WYRM_UNUSED(buffer);
+    WY_UNUSED(allocator);
+    WY_UNUSED(buffer);
 
-    WYRM_ASSERT(allocator && allocator->clz == &wyrm_allocator_static_vt);
-    WYRM_ASSERT(!buffer || buffer >= (void *)((wyrm_allocator_static *)allocator)->storage);
-    WYRM_ASSERT(!buffer || buffer < (void *)((wyrm_allocator_static *)allocator)->storage_current);
+    WY_ASSERT(allocator && allocator->clz == &wy_allocator_static_vt);
+    WY_ASSERT(!buffer || buffer >= (void *)((wy_allocator_static *)allocator)->storage);
+    WY_ASSERT(!buffer || buffer < (void *)((wy_allocator_static *)allocator)->storage_current);
 }
 
 
-static wyrm_uword static_estimate_heap_size(wyrm_allocator *allocator)
+static wy_uword static_estimate_heap_size(wy_allocator *allocator)
 {
-    wyrm_allocator_static *sa = (wyrm_allocator_static *)allocator;
+    wy_allocator_static *sa = (wy_allocator_static *)allocator;
     if (sa->storage_current > sa->storage) {
         return sa->storage_current - sa->storage;
     }
     return 0;
 }
 
-const wyrm_allocator_vt wyrm_allocator_static_vt =
+const wy_allocator_vt wy_allocator_static_vt =
 {
     .alloc              = static_alloc,
     .realloc            = static_realloc,

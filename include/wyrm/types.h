@@ -7,28 +7,28 @@
 extern "C" {
 #endif
 
-typedef enum wyrm_state_flag_tag
+typedef enum wy_state_flag_tag
 {
-    WYRM_STATE_FLAG_OWNS_SELF       = 0x0001,
-} wyrm_state_flag;
+    WY_STATE_FLAG_OWNS_SELF       = 0x0001,
+} wy_state_flag;
 
 // ----------------------------------------------------------------------------
 // Allocator
 // ----------------------------------------------------------------------------
 
 /// @brief Virtual table for allocator
-typedef struct wyrm_allocator_vt {
-    void* (*alloc)(wyrm_allocator* self, wyrm_uword len);
-    void* (*realloc)(wyrm_allocator* self, void* buffer, wyrm_uword new_sz);
-    void (*free)(wyrm_allocator* self, void* buffer);
-    wyrm_uword (*estimate_heap_size)(wyrm_allocator* self);
-} wyrm_allocator_vt;
+typedef struct wy_allocator_vt {
+    void* (*alloc)(wy_allocator* self, wy_uword len);
+    void* (*realloc)(wy_allocator* self, void* buffer, wy_uword new_sz);
+    void (*free)(wy_allocator* self, void* buffer);
+    wy_uword (*estimate_heap_size)(wy_allocator* self);
+} wy_allocator_vt;
 
 /// @brief Allocator data structure
 ///
 /// The base data structure for an allocator.
-struct wyrm_allocator {
-    const wyrm_allocator_vt* clz;
+struct wy_allocator {
+    const wy_allocator_vt* clz;
 };
 
 
@@ -36,11 +36,11 @@ struct wyrm_allocator {
 // Prototype & Scope
 // ----------------------------------------------------------------------------
 
-struct wyrm_scope
+struct wy_scope
 {
-    wyrm_object object;
-    wyrm_prototype* prototype;
-    wyrm_value* slots;
+    wy_object object;
+    wy_prototype* prototype;
+    wy_value* slots;
 };
 
 
@@ -51,29 +51,29 @@ struct wyrm_scope
 /**
  * Key Hash Value
  */
-typedef struct wyrm_key_hash_value
+typedef struct wy_key_hash_value
 {
-    wyrm_value key;
-    wyrm_uword key_hash;
-    wyrm_value value;
-} wyrm_key_hash_value;
+    wy_value key;
+    wy_uword key_hash;
+    wy_value value;
+} wy_key_hash_value;
 
 /**
  * Dictionary type
  */
-struct wyrm_dict
+struct wy_dict
 {
-    wyrm_object object;
+    wy_object object;
 
-    wyrm_allocator* allocator;
+    wy_allocator* allocator;
 
-    wyrm_uword count;
+    wy_uword count;
 
-    wyrm_key_hash_value* dense;
-    wyrm_uword dense_capacity;
+    wy_key_hash_value* dense;
+    wy_uword dense_capacity;
 
-    wyrm_uword* sparse;
-    wyrm_uword sparse_capacity;
+    wy_uword* sparse;
+    wy_uword sparse_capacity;
 };
 
 // ----------------------------------------------------------------------------
@@ -83,22 +83,22 @@ struct wyrm_dict
 /**
  * DStruct
  */
-typedef struct wyrm_dstruct_type
+typedef struct wy_dstruct_type
 {
     const char* name;
-} wyrm_dstruct_type;
+} wy_dstruct_type;
 
-typedef void (*wyrm_dstruct_finalizer)(wyrm_context* state, wyrm_dstruct* dstruct);
+typedef void (*wy_dstruct_finalizer)(wy_context* state, wy_dstruct* dstruct);
 
 /**
  * Datastruct
  */
-struct wyrm_dstruct
+struct wy_dstruct
 {
-    wyrm_object obj;
-    const wyrm_dstruct_type* dtype;
+    wy_object obj;
+    const wy_dstruct_type* dtype;
 
-    wyrm_dstruct_finalizer finalizer;
+    wy_dstruct_finalizer finalizer;
 
     void* data;
 };
@@ -108,11 +108,11 @@ struct wyrm_dstruct
 // Class
 // ----------------------------------------------------------------------------
 
-struct wyrm_class
+struct wy_class
 {
-    wyrm_prototype prototype;
-    wyrm_class* super;
-    wyrm_primitive sym_name;
+    wy_prototype prototype;
+    wy_class* super;
+    wy_primitive sym_name;
 };
 
 // ----------------------------------------------------------------------------
@@ -122,23 +122,23 @@ struct wyrm_class
 /**
  * I/O condition flags for file descriptor events
  */
-enum wyrm_io_flag
+enum wy_io_flag
 {
-    WYRM_IO_IN = 1,
-    WYRM_IO_PRI = 2,
-    WYRM_IO_OUT = 4,
-    WYRM_IO_ERR = 8,
-    WYRM_IO_HUP = 16,
-    WYRM_IO_NVAL = 32,
+    WY_IO_IN = 1,
+    WY_IO_PRI = 2,
+    WY_IO_OUT = 4,
+    WY_IO_ERR = 8,
+    WY_IO_HUP = 16,
+    WY_IO_NVAL = 32,
 };
 
 /**
  * I/O condition type.
  *
- * A combination of wyrm_io_flag values bitwise OR'd together to indicate the
+ * A combination of wy_io_flag values bitwise OR'd together to indicate the
  * reason for IO handling entry.
  */
-typedef wyrm_uword wyrm_io_condition;
+typedef wy_uword wy_io_condition;
 
 /**
  * @brief Main loop source priority abstraction
@@ -146,14 +146,14 @@ typedef wyrm_uword wyrm_io_condition;
  * Priority values are backend-agnostic and intentionally limited to a small
  * portable set.
  */
-enum wyrm_priority
+enum wy_priority
 {
-    WYRM_PRIORITY_HIGH,
-    WYRM_PRIORITY_DEFAULT,
-    WYRM_PRIORITY_IDLE,
+    WY_PRIORITY_HIGH,
+    WY_PRIORITY_DEFAULT,
+    WY_PRIORITY_IDLE,
 };
 
-typedef enum wyrm_priority wyrm_priority;
+typedef enum wy_priority wy_priority;
 
 /**
  * Source callback for idle and timer events
@@ -164,36 +164,36 @@ typedef enum wyrm_priority wyrm_priority;
  * then the memory _MUST_ be referenced / managed externally and kept
  * for the lifespan of the callback.
  */
-typedef bool (*wyrm_source_cb)(wyrm_primitive user_data);
+typedef bool (*wy_source_cb)(wy_primitive user_data);
 
 /**
  * Source callback for file descriptor events
  */
-typedef bool (*wyrm_source_handle_cb)(wyrm_handle handle, wyrm_io_condition condition, wyrm_primitive user_data);
+typedef bool (*wy_source_handle_cb)(wy_handle handle, wy_io_condition condition, wy_primitive user_data);
 
 /**
  * Main loop virtual table
  */
-typedef struct wyrm_main_loop_vt
+typedef struct wy_main_loop_vt
 {
-    wyrm_error (*add_fd)(wyrm_main_loop* ref, wyrm_primitive *out, wyrm_handle fd, wyrm_io_condition events, wyrm_priority priority, wyrm_source_handle_cb cb, wyrm_primitive ud);
-    wyrm_error (*add_timer)(wyrm_main_loop* self, wyrm_primitive *out, uint32_t ms, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
-    wyrm_error (*add_idle)(wyrm_main_loop* self, wyrm_primitive *out, wyrm_source_cb cb, wyrm_primitive ud);
-    wyrm_error (*add_wakeable)(wyrm_main_loop* self, wyrm_primitive *out, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
-    wyrm_error (*trigger)(wyrm_main_loop* self, wyrm_primitive src);
-    wyrm_error (*remove)(wyrm_main_loop* self, wyrm_primitive src);
-    wyrm_error (*iterate)(wyrm_main_loop* self, bool may_block);
-    wyrm_error (*run)(wyrm_main_loop* self);
-    wyrm_error (*quit)(wyrm_main_loop* self);
-} wyrm_main_loop_vt;
+    wy_error (*add_fd)(wy_main_loop* ref, wy_primitive *out, wy_handle fd, wy_io_condition events, wy_priority priority, wy_source_handle_cb cb, wy_primitive ud);
+    wy_error (*add_timer)(wy_main_loop* self, wy_primitive *out, uint32_t ms, wy_priority priority, wy_source_cb cb, wy_primitive ud);
+    wy_error (*add_idle)(wy_main_loop* self, wy_primitive *out, wy_source_cb cb, wy_primitive ud);
+    wy_error (*add_wakeable)(wy_main_loop* self, wy_primitive *out, wy_priority priority, wy_source_cb cb, wy_primitive ud);
+    wy_error (*trigger)(wy_main_loop* self, wy_primitive src);
+    wy_error (*remove)(wy_main_loop* self, wy_primitive src);
+    wy_error (*iterate)(wy_main_loop* self, bool may_block);
+    wy_error (*run)(wy_main_loop* self);
+    wy_error (*quit)(wy_main_loop* self);
+} wy_main_loop_vt;
 
 /**
  * Main Loop Abstraction
  */
-typedef struct wyrm_main_loop
+typedef struct wy_main_loop
 {
-    const wyrm_main_loop_vt *vt;
-} wyrm_main_loop;
+    const wy_main_loop_vt *vt;
+} wy_main_loop;
 
 
 
@@ -214,22 +214,22 @@ typedef struct wyrm_main_loop
  * @brief State Definition for all Interpreter/Object Calls
  *
  * This structure is intended to live on the stack or heap. Always initialize
- * using the wyrm_state_init_* functions - do not bitwise copy. State objects
+ * using the wy_state_init_* functions - do not bitwise copy. State objects
  * allow bidirectional communication of complex VM information.
  *
  * Any call that requires memory allocation or interaction with the virtual
- * machine shall utilize a wyrm_state* as the first parameter to the function.
+ * machine shall utilize a wy_state* as the first parameter to the function.
  * This explicitly defines the current machine, context, and fiber.
  *
  */
-struct wyrm_state
+struct wy_state
 {
-    wyrm_uword state_flags;
-    wyrm_machine* machine;
-    wyrm_context* context;
-    wyrm_fiber* fiber;
+    wy_uword state_flags;
+    wy_machine* machine;
+    wy_context* context;
+    wy_fiber* fiber;
 
-    wyrm_allocator* state_alloc_;
+    wy_allocator* state_alloc_;
 };
 
 

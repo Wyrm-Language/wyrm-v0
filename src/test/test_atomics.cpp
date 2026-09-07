@@ -3,13 +3,13 @@
 
 TEST_SUITE("atomics")
 {
-    TEST_CASE("wyrm_ref increments and wyrm_deref decrements") {
-        wyrm_atomic_word a = 0;
+    TEST_CASE("wy_ref increments and wy_deref decrements") {
+        wy_atomic_word a = 0;
 
-        wyrm_ref(&a);
-        wyrm_ref(&a);
+        wy_ref(&a);
+        wy_ref(&a);
 
-        CHECK(wyrm_deref(&a) == false);
-        CHECK(wyrm_deref(&a) == true);
+        CHECK(wy_deref(&a) == false);
+        CHECK(wy_deref(&a) == true);
     }
 }

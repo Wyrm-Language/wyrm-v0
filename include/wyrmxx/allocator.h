@@ -9,17 +9,17 @@ namespace wyrmxx
     class allocator final
     {
     public:
-        explicit allocator(wyrm_allocator* alloc) noexcept
+        explicit allocator(wy_allocator* alloc) noexcept
             : self_{alloc}
         {
         }
 
-        operator wyrm_allocator*() const { return self_; }
+        operator wy_allocator*() const { return self_; }
 
         template<typename T>
         T* alloc()
         {
-            auto new_ptr = static_cast<T*>(wyrm_allocator_alloc(self_, sizeof(T)));
+            auto new_ptr = static_cast<T*>(wy_allocator_alloc(self_, sizeof(T)));
             if (!new_ptr) { throw out_of_memory{}; }
             return new_ptr;
         }
@@ -27,11 +27,11 @@ namespace wyrmxx
         template<typename T>
         void free(T* ptr)
         {
-            wyrm_allocator_free(self_, static_cast<void*>(ptr));
+            wy_allocator_free(self_, static_cast<void*>(ptr));
         }
 
     private:
-        wyrm_allocator* self_;
+        wy_allocator* self_;
     };
 
 }

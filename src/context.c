@@ -16,25 +16,25 @@
  *       determine which fiber needs to run. Currently, only
  *       1 fiber, so not an issue.
  *
- * @param ud the wyrm_context programmed into the main loop directly
+ * @param ud the wy_context programmed into the main loop directly
  * @return Always returns true; this trigger is active until context
  *         itself is destroyed.
  */
-static bool context_triggered(wyrm_primitive ud)
+static bool context_triggered(wy_primitive ud)
 {
     /* Grab current context */
-    wyrm_context* self = WYRM_PRIMITIVE_PTR(wyrm_context, ud);
+    wy_context* self = WY_PRIMITIVE_PTR(wy_context, ud);
 
     /* State for operations */
-    wyrm_state state;
-    wyrm_state_init_context_f(&state, self);
+    wy_state state;
+    wy_state_init_context_f(&state, self);
 
     /* TODO: determine correct fiber to execute, set state->current_fiber appropriately */
     state.fiber = self->current_fiber;
 
-    if (state.fiber != WYRM_NULL) {
-        wyrm_error last_error = wyrm_state_exec(&state);
-        if (last_error != WYRM_ERR_NONE) {
+    if (state.fiber != WY_NULL) {
+        wy_error last_error = wy_state_exec(&state);
+        if (last_error != WY_ERR_NONE) {
             /* TODO: flag/update context and fiber */
         }
     }
@@ -42,29 +42,29 @@ static bool context_triggered(wyrm_primitive ud)
 }
 
 
-void wyrm_context_init_s(wyrm_context* self)
+void wy_context_init_s(wy_context* self)
 {
-    self->parent = WYRM_NULL;
-    self->root_module = WYRM_NULL;
-    self->current_fiber = WYRM_NULL;
-    self->main_loop = WYRM_NULL;
-    self->wakeable_source = wyrm_primitive_null();
+    self->parent = WY_NULL;
+    self->root_module = WY_NULL;
+    self->current_fiber = WY_NULL;
+    self->main_loop = WY_NULL;
+    self->wakeable_source = wy_primitive_null();
 
-    wyrm_gc_init_f(&self->arena, WYRM_NULL);
+    wy_gc_init_f(&self->arena, WY_NULL);
 }
 
 
-void wyrm_context_finalize_f(wyrm_context* self)
+void wy_context_finalize_f(wy_context* self)
 {
-    if (self == WYRM_NULL) { return; }
+    if (self == WY_NULL) { return; }
 
     /* Free the wakeable source */
-    if (self->main_loop != WYRM_NULL) {
-        wyrm_context_detach_loop(self);
+    if (self->main_loop != WY_NULL) {
+        wy_context_detach_loop(self);
     }
 
     /* Free all objects */
-    wyrm_gc_finalize_f(self, &self->arena);
+    wy_gc_finalize_f(self, &self->arena);
 }
 
 /**
@@ -77,141 +77,141 @@ void wyrm_context_finalize_f(wyrm_context* self)
  *
  * @param context The context receiving the module.
  * @param module The dynamic module state object
- * @return WYRM_ERR_NONE on success; WYRM_ERR_BUSY if root already set.
+ * @return WY_ERR_NONE on success; WY_ERR_BUSY if root already set.
  */
-wyrm_error wy_context_set_root(wyrm_context* context, wy_module* module)
+wy_error wy_context_set_root(wy_context* context, wy_module* module)
 {
-    if (context->root_module != WYRM_NULL) { return WYRM_ERR_BUSY; }
+    if (context->root_module != WY_NULL) { return WY_ERR_BUSY; }
     context->root_module = module;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
-wyrm_error wyrm_context_attach_loop(wyrm_context* self, wyrm_main_loop* loop)
+wy_error wy_context_attach_loop(wy_context* self, wy_main_loop* loop)
 {
-    if (self->main_loop != WYRM_NULL) { return WYRM_ERR_BUSY; }
+    if (self->main_loop != WY_NULL) { return WY_ERR_BUSY; }
 
-    wyrm_error last_error = wyrm_main_loop_add_wakeable(
+    wy_error last_error = wy_main_loop_add_wakeable(
         loop,
         &self->wakeable_source,
-        WYRM_PRIORITY_DEFAULT,
+        WY_PRIORITY_DEFAULT,
         context_triggered,
-        wyrm_primitive_ptr(self));
-    if (last_error == WYRM_ERR_NONE) {
+        wy_primitive_ptr(self));
+    if (last_error == WY_ERR_NONE) {
         self->main_loop = loop;
     }
 
     return last_error;
 }
 
-void wyrm_context_detach_loop(wyrm_context* self)
+void wy_context_detach_loop(wy_context* self)
 {
     if (self->main_loop) {
-        wyrm_main_loop_remove(self->main_loop, self->wakeable_source);
-        self->wakeable_source = wyrm_primitive_null();
-        self->main_loop = WYRM_NULL;
+        wy_main_loop_remove(self->main_loop, self->wakeable_source);
+        self->wakeable_source = wy_primitive_null();
+        self->main_loop = WY_NULL;
     }
 }
 
 
-wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber)
+wy_error wy_context_attach_fiber(wy_context* self, wy_fiber* fiber)
 {
-    if (self == WYRM_NULL || fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (fiber->parent != WYRM_NULL) { return WYRM_ERR_BUSY; }
+    if (self == WY_NULL || fiber == WY_NULL) { return WY_ERR_INVAL; }
+    if (fiber->parent != WY_NULL) { return WY_ERR_BUSY; }
     self->current_fiber = fiber;
     fiber->parent = self;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
 
 
-wyrm_error wyrm_context_activate(wyrm_context* self, wyrm_fiber* fiber)
+wy_error wy_context_activate(wy_context* self, wy_fiber* fiber)
 {
-    wyrm_error last_error = WYRM_ERR_NONE;
-    WYRM_UNUSED(fiber);
+    wy_error last_error = WY_ERR_NONE;
+    WY_UNUSED(fiber);
 
-    if (self != WYRM_NULL &&
-        self->main_loop != WYRM_NULL)
+    if (self != WY_NULL &&
+        self->main_loop != WY_NULL)
     {
-        last_error = wyrm_main_loop_trigger(self->main_loop, self->wakeable_source);
+        last_error = wy_main_loop_trigger(self->main_loop, self->wakeable_source);
     } else {
-        last_error = WYRM_ERR_INVAL;
+        last_error = WY_ERR_INVAL;
     }
     return last_error;
 }
 
 
-void* wyrm_context_gc_alloc(wyrm_context* context, wyrm_uword dsize)
+void* wy_context_gc_alloc(wy_context* context, wy_uword dsize)
 {
-    wyrm_machine* machine = wyrm_context_get_machine(context);
-    if (machine == WYRM_NULL) { return WYRM_NULL; }
+    wy_machine* machine = wy_context_get_machine(context);
+    if (machine == WY_NULL) { return WY_NULL; }
 
-    return wyrm_allocator_alloc(machine->allocator, dsize);
+    return wy_allocator_alloc(machine->allocator, dsize);
 }
 
 
-void* wyrm_context_gc_realloc(wyrm_context* context, void* ptr, wyrm_uword new_size)
+void* wy_context_gc_realloc(wy_context* context, void* ptr, wy_uword new_size)
 {
-    wyrm_machine* machine = wyrm_context_get_machine(context);
-    if (machine == WYRM_NULL) { return WYRM_NULL; }
+    wy_machine* machine = wy_context_get_machine(context);
+    if (machine == WY_NULL) { return WY_NULL; }
 
-    return wyrm_allocator_realloc(machine->allocator, ptr, new_size);
+    return wy_allocator_realloc(machine->allocator, ptr, new_size);
 }
 
 
-void wyrm_context_gc_free(wyrm_context* context, void* ptr)
+void wy_context_gc_free(wy_context* context, void* ptr)
 {
-    wyrm_machine* machine = wyrm_context_get_machine(context);
-    if (machine != WYRM_NULL) {
-        wyrm_allocator_free(machine->allocator, ptr);
+    wy_machine* machine = wy_context_get_machine(context);
+    if (machine != WY_NULL) {
+        wy_allocator_free(machine->allocator, ptr);
     }
 }
 
 
-void wyrm_context_push_gc(wyrm_context* context, wyrm_object* gc_info)
+void wy_context_push_gc(wy_context* context, wy_object* gc_info)
 {
-    wyrm_gc_track(&context->arena, gc_info);
+    wy_gc_track(&context->arena, gc_info);
 }
 
 
-void wyrm_context_object_init_header_f(wyrm_context* context, wyrm_object* object, const wyrm_object_type* dtype)
+void wy_context_object_init_header_f(wy_context* context, wy_object* object, const wy_object_type* dtype)
 {
-    WYRM_ASSERT(context != WYRM_NULL && object != WYRM_NULL && dtype != WYRM_NULL);
-    wyrm_object_init_header_s(object, dtype);
-    wyrm_context_push_gc(context, object);
+    WY_ASSERT(context != WY_NULL && object != WY_NULL && dtype != WY_NULL);
+    wy_object_init_header_s(object, dtype);
+    wy_context_push_gc(context, object);
 }
 
 
-void wyrm_context_gc_full_run(wyrm_state* state, wyrm_context* context)
+void wy_context_gc_full_run(wy_state* state, wy_context* context)
 {
-    wyrm_gc_collect_start_f(context, &context->arena);
+    wy_gc_collect_start_f(context, &context->arena);
 
-    if (context->current_fiber != WYRM_NULL) {
-        wyrm_gc_object_visit(state, (wyrm_object*) context->current_fiber);
+    if (context->current_fiber != WY_NULL) {
+        wy_gc_object_visit(state, (wy_object*) context->current_fiber);
     }
 
-    if (context->root_module != WYRM_NULL) {
-        wyrm_gc_object_visit(state, (wyrm_object*) context->root_module);
+    if (context->root_module != WY_NULL) {
+        wy_gc_object_visit(state, (wy_object*) context->root_module);
     }
 
-    wyrm_gc_collect_finish_f(context, &context->arena);
+    wy_gc_collect_finish_f(context, &context->arena);
 }
 
 /**
  * Grow `mem_info` to hold at least `sz` bytes
  */
-wyrm_error wy_context_mem_reserve_f(wy_context* context, wy_mem_info* mem_info, wy_uword sz)
+wy_error wy_context_mem_reserve_f(wy_context* context, wy_mem_info* mem_info, wy_uword sz)
 {
-    WYRM_ASSERT(context != WYRM_NULL && mem_info != WYRM_NULL);
+    WY_ASSERT(context != WY_NULL && mem_info != WY_NULL);
 
-    if (wy_mem_info_sz_f(mem_info) >= sz) { return WYRM_ERR_NONE; }
-    if (wy_mem_info_is_static_f(mem_info)) { return WYRM_ERR_INVAL; }
+    if (wy_mem_info_sz_f(mem_info) >= sz) { return WY_ERR_NONE; }
+    if (wy_mem_info_is_static_f(mem_info)) { return WY_ERR_INVAL; }
 
-    void* begin = wyrm_context_gc_realloc(context, mem_info->begin, sz);
-    if (begin == WYRM_NULL) { return WYRM_ERR_NOMEM; }
+    void* begin = wy_context_gc_realloc(context, mem_info->begin, sz);
+    if (begin == WY_NULL) { return WY_ERR_NOMEM; }
 
     mem_info->begin = begin;
     mem_info->end = (void*) ((char*) begin + sz);
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
 /**
@@ -219,10 +219,10 @@ wyrm_error wy_context_mem_reserve_f(wy_context* context, wy_mem_info* mem_info, 
  */
 void wy_context_mem_release_f(wy_context* context, wy_mem_info* mem_info)
 {
-    WYRM_ASSERT(context != WYRM_NULL && mem_info != WYRM_NULL);
+    WY_ASSERT(context != WY_NULL && mem_info != WY_NULL);
 
     if (!wy_mem_info_is_static_f(mem_info)) {
-        wyrm_context_gc_free(context, mem_info->begin);
+        wy_context_gc_free(context, mem_info->begin);
     }
     wy_mem_info_init_empty_s(mem_info);
 }

@@ -3,16 +3,16 @@
 
 #include <wyrm/sys/atomics.h>
 
-#if defined(WYRM_ATOMICS_USE_NONE) && WYRM_ATOMICS_USE_NONE
+#if defined(WY_ATOMICS_USE_NONE) && WY_ATOMICS_USE_NONE
 
-typedef wyrm_word wyrm_atomic_word;
+typedef wy_word wy_atomic_word;
 
-static inline void wyrm_ref(wyrm_atomic_word* v)
+static inline void wy_ref(wy_atomic_word* v)
 {
     *v += 1;
 }
 
-static inline bool wyrm_deref(wyrm_atomic_word* v)
+static inline bool wy_deref(wy_atomic_word* v)
 {
     *v -= 1;
     return *v == 0;

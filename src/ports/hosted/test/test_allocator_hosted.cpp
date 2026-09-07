@@ -3,8 +3,8 @@
 
 TEST_SUITE("allocator_hosted")
 {
-    TEST_CASE("wyrm_allocator_hosted is valid") {
-        wyrm_allocator* hosted = wyrm_allocator_hosted_get_sys();
+    TEST_CASE("wy_allocator_hosted is valid") {
+        wy_allocator* hosted = wy_allocator_hosted_get_sys();
         CHECK(hosted != nullptr);
     }
 }

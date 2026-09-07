@@ -11,50 +11,47 @@
  * independently here to allow portability to freestanding / malformed C
  * implementations.
  */
-enum wyrm_error {
-    WYRM_ERR_NONE = 0,                  ///< Operation completed successfully
-    WYRM_ERR_CONTINUE = 1,              ///< Operation paused and return result set to continuation
-    WYRM_ERR_INCONSISTENT_STATE = 2,    ///< Operation detected inconsistent state within VM, fatal error
+enum wy_error {
+    WY_ERR_NONE = 0,                  ///< Operation completed successfully
+    WY_ERR_CONTINUE = 1,              ///< Operation paused and return result set to continuation
+    WY_ERR_INCONSISTENT_STATE = 2,    ///< Operation detected inconsistent state within VM, fatal error
 
-    WYRM_ERR_UNKNOWN,           ///< General / unknown failure
-    WYRM_ERR_INVAL,             ///< Invalid parameter (such as nullptr)
-    WYRM_ERR_BAD_TYPE,          ///< Unable to convert to given type
-    WYRM_ERR_BUSY,              ///< Object is busy
-    WYRM_ERR_UNBOUND,           ///< Unbound or unknown variable
-    WYRM_ERR_PERM,              ///< Bad permissions
-    WYRM_ERR_EMPTY,             ///< Container is empty
-    WYRM_ERR_CHILDREN,          ///< Container has children
-    WYRM_ERR_RANGE,             ///< Out of range
-    WYRM_ERR_CYCLE,             ///< Cycle detected
-    WYRM_ERR_KEY,               ///< Key not found
-    WYRM_ERR_STACK_OVERFLOW,    ///< Insufficient memory in stack
-    WYRM_ERR_STOP_ITERATION,    ///< Iterator is completed
+    WY_ERR_UNKNOWN,           ///< General / unknown failure
+    WY_ERR_INVAL,             ///< Invalid parameter (such as nullptr)
+    WY_ERR_BAD_TYPE,          ///< Unable to convert to given type
+    WY_ERR_BUSY,              ///< Object is busy
+    WY_ERR_UNBOUND,           ///< Unbound or unknown variable
+    WY_ERR_PERM,              ///< Bad permissions
+    WY_ERR_EMPTY,             ///< Container is empty
+    WY_ERR_CHILDREN,          ///< Container has children
+    WY_ERR_RANGE,             ///< Out of range
+    WY_ERR_CYCLE,             ///< Cycle detected
+    WY_ERR_KEY,               ///< Key not found
+    WY_ERR_STACK_OVERFLOW,    ///< Insufficient memory in stack
+    WY_ERR_STOP_ITERATION,    ///< Iterator is completed
 
-    WYRM_ERR_EXISTS,
-    WYRM_ERR_NOMEM,
-    WYRM_ERR_BAD_ARGUMENT_TYPE,
-    WYRM_ERR_NOSUPPORT,     ///< Operation not supported by this backend
+    WY_ERR_EXISTS,
+    WY_ERR_NOMEM,
+    WY_ERR_BAD_ARGUMENT_TYPE,
+    WY_ERR_NOSUPPORT,     ///< Operation not supported by this backend
 };
 
 #ifndef __cplusplus
-typedef enum wyrm_error wyrm_error;
+typedef enum wy_error wy_error;
 #endif
 
-typedef wyrm_error wy_error;
-
-
-static inline void wyrm_set_err(wyrm_error* error_ptr, wyrm_error error)
+static inline void wy_set_err(wy_error* error_ptr, wy_error error)
 {
-    if (error_ptr != WYRM_NULL) {
+    if (error_ptr != WY_NULL) {
         *error_ptr = error;
     }
 }
 
-static inline bool wyrm_check_success(wyrm_error* error_ptr, wyrm_error error)
+static inline bool wy_check_success(wy_error* error_ptr, wy_error error)
 {
-    if (error != WYRM_ERR_NONE)
+    if (error != WY_ERR_NONE)
     {
-        wyrm_set_err(error_ptr, error);
+        wy_set_err(error_ptr, error);
         return false;
     }
     return true;

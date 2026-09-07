@@ -11,13 +11,13 @@ extern "C" {
 /**
  * Initialize state with no active process.
  */
-WYRM_INLINE void wyrm_state_init_s(wyrm_state* state)
+WY_INLINE void wy_state_init_s(wy_state* state)
 {
     state->state_flags = 0;
-    state->machine = WYRM_NULL;
-    state->context = WYRM_NULL;
-    state->fiber = WYRM_NULL;
-    state->state_alloc_ = WYRM_NULL;
+    state->machine = WY_NULL;
+    state->context = WY_NULL;
+    state->fiber = WY_NULL;
+    state->state_alloc_ = WY_NULL;
 }
 
 
@@ -27,98 +27,98 @@ WYRM_INLINE void wyrm_state_init_s(wyrm_state* state)
  * @param state State object
  * @param context Context data
  */
-WYRM_INLINE void wyrm_state_init_from_context_f(wyrm_state* state, wyrm_context* context)
+WY_INLINE void wy_state_init_from_context_f(wy_state* state, wy_context* context)
 {
-    wyrm_state_init_s(state);
-    state->machine = wyrm_context_get_machine(context);
+    wy_state_init_s(state);
+    state->machine = wy_context_get_machine(context);
     state->context = context;
 }
 
 /**
  * Initialize state from a context
  */
-WYRM_INLINE void wyrm_state_init_context_f(wyrm_state* state, wyrm_context* context)
+WY_INLINE void wy_state_init_context_f(wy_state* state, wy_context* context)
 {
-    WYRM_ASSERT(state != WYRM_NULL && context != WYRM_NULL);
-    wyrm_state_init_s(state);
-    state->machine = wyrm_context_get_machine(context);
+    WY_ASSERT(state != WY_NULL && context != WY_NULL);
+    wy_state_init_s(state);
+    state->machine = wy_context_get_machine(context);
     state->context = context;
 }
 
 /**
  * Construct New State
  */
-WYRM_INLINE wyrm_state* wyrm_state_new(wyrm_allocator* alloc)
+WY_INLINE wy_state* wy_state_new(wy_allocator* alloc)
 {
-    wyrm_state* state = (wyrm_state*) wyrm_allocator_alloc(alloc, sizeof(wyrm_state));
-    if (state == WYRM_NULL) { return WYRM_NULL; }
-    wyrm_state_init_s(state);
-    state->state_flags |= (wyrm_uword) WYRM_STATE_FLAG_OWNS_SELF;
+    wy_state* state = (wy_state*) wy_allocator_alloc(alloc, sizeof(wy_state));
+    if (state == WY_NULL) { return WY_NULL; }
+    wy_state_init_s(state);
+    state->state_flags |= (wy_uword) WY_STATE_FLAG_OWNS_SELF;
     state->state_alloc_ = alloc;
     return state;
 }
 
-WYRM_INLINE void wyrm_state_delete(wyrm_state* state)
+WY_INLINE void wy_state_delete(wy_state* state)
 {
-    if (state == WYRM_NULL) { return; }
-    wyrm_allocator* alloc = state->state_alloc_;
+    if (state == WY_NULL) { return; }
+    wy_allocator* alloc = state->state_alloc_;
 
-    if (wyrm_state_check_flag_f(state, WYRM_STATE_FLAG_OWNS_SELF)) {
-        WYRM_ASSERT(alloc != WYRM_NULL);
-        wyrm_allocator_free(alloc, state);
+    if (wy_state_check_flag_f(state, WY_STATE_FLAG_OWNS_SELF)) {
+        WY_ASSERT(alloc != WY_NULL);
+        wy_allocator_free(alloc, state);
     }
 }
 
-WYRM_INLINE bool wyrm_state_check_flag_f(wyrm_state* state, wyrm_state_flag flag)
+WY_INLINE bool wy_state_check_flag_f(wy_state* state, wy_state_flag flag)
 {
-    WYRM_ASSERT(state != WYRM_NULL);
-    return (state->state_flags & ((wyrm_uword) flag)) != 0;
+    WY_ASSERT(state != WY_NULL);
+    return (state->state_flags & ((wy_uword) flag)) != 0;
 }
 
-WYRM_INLINE wyrm_uword wyrm_state_value_count(wyrm_state* state)
+WY_INLINE wy_uword wy_state_value_count(wy_state* state)
 {
-    if (state == WYRM_NULL || state->fiber == WYRM_NULL) { return 0; }
-    return wyrm_fiber_value_count_f(state->fiber);
+    if (state == WY_NULL || state->fiber == WY_NULL) { return 0; }
+    return wy_fiber_value_count_f(state->fiber);
 }
 
-WYRM_INLINE wyrm_error wyrm_state_pop_to_value_count(wyrm_state* state, wyrm_uword count)
+WY_INLINE wy_error wy_state_pop_to_value_count(wy_state* state, wy_uword count)
 {
-    if (state == WYRM_NULL || state->fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    return wyrm_fiber_pop_to_value_count_f(state->fiber, count);
+    if (state == WY_NULL || state->fiber == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_pop_to_value_count_f(state->fiber, count);
 }
 
-WYRM_INLINE wyrm_value* wyrm_state_value_n(wyrm_state* state, wyrm_uword index)
+WY_INLINE wy_value* wy_state_value_n(wy_state* state, wy_uword index)
 {
-    if (index >= wyrm_state_value_count(state)) { return WYRM_NULL; }
-    return wyrm_fiber_value_n(state->fiber, index);
+    if (index >= wy_state_value_count(state)) { return WY_NULL; }
+    return wy_fiber_value_n(state->fiber, index);
 }
 
-WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value)
+WY_INLINE wy_error wy_state_push(wy_state* state, wy_value value)
 {
-    if (state == WYRM_NULL || state->fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    return wyrm_fiber_push_value_f(state->fiber, value);
+    if (state == WY_NULL || state->fiber == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_push_value_f(state->fiber, value);
 }
 
-WYRM_INLINE wyrm_error wyrm_state_push_return(wyrm_state* state, wyrm_value value)
+WY_INLINE wy_error wy_state_push_return(wy_state* state, wy_value value)
 {
-    if (state == WYRM_NULL || state->fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    return wyrm_fiber_push_return_f(state->fiber, value);
+    if (state == WY_NULL || state->fiber == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_push_return_f(state->fiber, value);
 }
 
-WYRM_INLINE wyrm_error wyrm_state_set_pending(wyrm_state* state, wyrm_exec_fn pending)
+WY_INLINE wy_error wy_state_set_pending(wy_state* state, wy_exec_fn pending)
 {
-    if (state == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (state->fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (state->fiber->pending != WYRM_NULL) { return WYRM_ERR_BUSY; }
+    if (state == WY_NULL) { return WY_ERR_INVAL; }
+    if (state->fiber == WY_NULL) { return WY_ERR_INVAL; }
+    if (state->fiber->pending != WY_NULL) { return WY_ERR_BUSY; }
     state->fiber->pending = pending;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
-WYRM_INLINE wyrm_error wyrm_state_call_continue(wyrm_state* state, wyrm_exec_fn result_cb, wyrm_exec_fn fn, const wyrm_value* args, wyrm_uword arg_count)
+WY_INLINE wy_error wy_state_call_continue(wy_state* state, wy_exec_fn result_cb, wy_exec_fn fn, const wy_value* args, wy_uword arg_count)
 {
-    if (state == WYRM_NULL || state->fiber == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (arg_count > 0 && args == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    return wyrm_fiber_exec_continue_f(state->fiber, result_cb, fn, args, arg_count);
+    if (state == WY_NULL || state->fiber == WY_NULL) { return WY_ERR_INVAL; }
+    if (arg_count > 0 && args == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_exec_continue_f(state->fiber, result_cb, fn, args, arg_count);
 }
 
 

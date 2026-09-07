@@ -4,7 +4,7 @@
 #include <wyrm/object.h>
 #include <wyrm/work_area.h>
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
 /**
  * Type descriptor for a garbage collected object
@@ -12,31 +12,31 @@ WYRM_BEGIN_DECLS
  * Supplies the collector with the operations it needs to finalize an object
  * and to walk the objects it references.
  */
-struct wyrm_object_type
+struct wy_object_type
 {
-    wyrm_object object;
-    wyrm_type_tag gc_type;
+    wy_object object;
+    wy_type_tag gc_type;
 
-    void (*finalize)(wyrm_context* context, wyrm_object* self);
+    void (*finalize)(wy_context* context, wy_object* self);
 
-    wyrm_error (*children_iter_start)(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa);
-    wyrm_error (*children_iter_next)(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa, const wyrm_object** child);
+    wy_error (*children_iter_start)(wy_state* state, wy_object* self, wy_work_area* wa);
+    wy_error (*children_iter_next)(wy_state* state, wy_object* self, wy_work_area* wa, const wy_object** child);
 };
 
-extern const wyrm_object_type wyrm_type_type;
-extern const wyrm_object_type wyrm_type_object;
+extern const wy_object_type wy_type_type;
+extern const wy_object_type wy_type_object;
 
-#define WYRM_OBJECT_STATIC_INITIALIZER(DTYPE)   { .dtype = DTYPE, .next = WYRM_NULL, .flags = (WYRM_GC_STATIC | WYRM_GC_FLAG_RO)  }
-#define WYRM_OBJECT_TYPE_OBJECT_INIT WYRM_OBJECT_STATIC_INITIALIZER(&wyrm_type_type)
+#define WY_OBJECT_STATIC_INITIALIZER(DTYPE)   { .dtype = DTYPE, .next = WY_NULL, .flags = (WY_GC_STATIC | WY_GC_FLAG_RO)  }
+#define WY_OBJECT_TYPE_OBJECT_INIT WY_OBJECT_STATIC_INITIALIZER(&wy_type_type)
 
 /**
  * Run an object's finalizer and mark it finalized
  */
-WYRM_INLINE void wyrm_object_finalize_f(wyrm_context* context, wyrm_object* self)
+WY_INLINE void wy_object_finalize_f(wy_context* context, wy_object* self)
 {
-    WYRM_ASSERT(context != WYRM_NULL && self != WYRM_NULL);
-    self->flags |= WYRM_GC_FLAG_FINALIZED;
-    if (self->dtype->finalize != WYRM_NULL) {
+    WY_ASSERT(context != WY_NULL && self != WY_NULL);
+    self->flags |= WY_GC_FLAG_FINALIZED;
+    if (self->dtype->finalize != WY_NULL) {
         self->dtype->finalize(context, self);
     }
 }
@@ -44,27 +44,27 @@ WYRM_INLINE void wyrm_object_finalize_f(wyrm_context* context, wyrm_object* self
 /**
  * Begin iterating the objects referenced by `self`
  *
- * @return WYRM_ERR_INVAL on bad arguments, WYRM_ERR_NOSUPPORT if the type
+ * @return WY_ERR_INVAL on bad arguments, WY_ERR_NOSUPPORT if the type
  *         does not implement iteration
  */
-WYRM_INLINE wyrm_error wyrm_object_children_iter_start(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa)
+WY_INLINE wy_error wy_object_children_iter_start(wy_state* state, wy_object* self, wy_work_area* wa)
 {
-    if (self == WYRM_NULL || self->dtype == WYRM_NULL || wa == WYRM_NULL) { return WYRM_ERR_INVAL; }
-    if (self->dtype->children_iter_start == WYRM_NULL ||
-        self->dtype->children_iter_next == WYRM_NULL) { return WYRM_ERR_NOSUPPORT; }
+    if (self == WY_NULL || self->dtype == WY_NULL || wa == WY_NULL) { return WY_ERR_INVAL; }
+    if (self->dtype->children_iter_start == WY_NULL ||
+        self->dtype->children_iter_next == WY_NULL) { return WY_ERR_NOSUPPORT; }
     return self->dtype->children_iter_start(state, self, wa);
 }
 
 /**
  * Advance to the next referenced object
  *
- * @return WYRM_ERR_STOP_ITERATION once the last child has been returned
+ * @return WY_ERR_STOP_ITERATION once the last child has been returned
  */
-WYRM_INLINE wyrm_error wyrm_object_children_iter_next_f(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa, const wyrm_object** object_ptr)
+WY_INLINE wy_error wy_object_children_iter_next_f(wy_state* state, wy_object* self, wy_work_area* wa, const wy_object** object_ptr)
 {
     return self->dtype->children_iter_next(state, self, wa, object_ptr);
 }
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

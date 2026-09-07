@@ -62,11 +62,11 @@ wyrm -Iwy --check script_path.wy
 - Unit tests leverage C++ bindings
 - Use spaces not tabs, no trailing whitespace, all files should end with a newline
 - **No recursion in VM execution** — security property. Does not apply to test or host application code.
-- **No unguarded dynamic allocation** — all through `wyrm_allocator` vtable.
+- **No unguarded dynamic allocation** — all through `wy_allocator` vtable.
 - Inline functions over macros.
-- `WYRM_ASSERT` is active unless `WYRM_DISABLE_EXTRA_CHECKS=1`.
-- Use WYRM_ASSERT only for internal logic checks to the library (extending unit tests)
-- Errors found during input sanitization or logic checks on library users should use proper handling - return error instead of WYRM_ASSERT.
+- `WY_ASSERT` is active unless `WY_DISABLE_EXTRA_CHECKS=1`.
+- Use WY_ASSERT only for internal logic checks to the library (extending unit tests)
+- Errors found during input sanitization or logic checks on library users should use proper handling - return error instead of WY_ASSERT.
 - 100% unit test coverage target on release builds.
 
 ### C API Conventions

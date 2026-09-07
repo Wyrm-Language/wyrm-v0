@@ -3,20 +3,18 @@
 
 #include <wyrm/types.h>
 
-typedef wyrm_allocator wy_allocator;
-
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
 /**
  * Allocates memory of the specified length using the provided allocator.
  *
  * @param self Pointer to the allocator instance used for memory allocation.
  * @param len  The size of memory (in bytes) to allocate.
- * @return A pointer to the allocated memory on success. Returns `WYRM_NULL` if
+ * @return A pointer to the allocated memory on success. Returns `WY_NULL` if
  *         allocation fails or if the provided allocator is invalid.
  */
-WYRM_INLINE void* wyrm_allocator_alloc(wyrm_allocator* self, wyrm_uword len) {
-    if (self == WYRM_NULL || self->clz == WYRM_NULL) { return WYRM_NULL; }
+WY_INLINE void* wy_allocator_alloc(wy_allocator* self, wy_uword len) {
+    if (self == WY_NULL || self->clz == WY_NULL) { return WY_NULL; }
     return self->clz->alloc(self, len);
 }
 
@@ -27,13 +25,13 @@ WYRM_INLINE void* wyrm_allocator_alloc(wyrm_allocator* self, wyrm_uword len) {
  * @param header_sz  The size (in bytes) of the header to be included in the allocation.
  * @param element_sz The size (in bytes) of a single array element.
  * @param count      The number of elements to allocate in the array.
- * @return A pointer to the allocated memory on success. Returns `WYRM_NULL` if
+ * @return A pointer to the allocated memory on success. Returns `WY_NULL` if
  *         allocation fails or if the provided allocator is invalid.
  */
-WYRM_INLINE void* wyrm_allocator_alloc_array(wyrm_allocator* self, size_t header_sz, wyrm_uword element_sz, wyrm_uword count)
+WY_INLINE void* wy_allocator_alloc_array(wy_allocator* self, size_t header_sz, wy_uword element_sz, wy_uword count)
 {
-    if (self == WYRM_NULL) { return WYRM_NULL; }
-    return wyrm_allocator_alloc(self, header_sz + (element_sz * count));
+    if (self == WY_NULL) { return WY_NULL; }
+    return wy_allocator_alloc(self, header_sz + (element_sz * count));
 }
 
 /**
@@ -45,8 +43,8 @@ WYRM_INLINE void* wyrm_allocator_alloc_array(wyrm_allocator* self, size_t header
  * @return A pointer to the reallocated memory buffer on success. Returns `NULL` if the
  *         reallocation fails or if the provided allocator is invalid.
  */
-WYRM_INLINE void* wyrm_allocator_realloc(wyrm_allocator* self, void* buffer, wyrm_uword len) {
-    if (self == WYRM_NULL || self->clz == WYRM_NULL) { return WYRM_NULL; }
+WY_INLINE void* wy_allocator_realloc(wy_allocator* self, void* buffer, wy_uword len) {
+    if (self == WY_NULL || self->clz == WY_NULL) { return WY_NULL; }
     return self->clz->realloc(self, buffer, len);
 }
 
@@ -56,8 +54,8 @@ WYRM_INLINE void* wyrm_allocator_realloc(wyrm_allocator* self, void* buffer, wyr
  * @param self   Pointer to the allocator instance used for memory deallocation.
  * @param buffer Pointer to the memory to be freed. If `NULL`, no action is taken.
  */
-WYRM_INLINE void wyrm_allocator_free(wyrm_allocator* self, void* buffer) {
-    if (self != WYRM_NULL && self->clz != WYRM_NULL) {
+WY_INLINE void wy_allocator_free(wy_allocator* self, void* buffer) {
+    if (self != WY_NULL && self->clz != WY_NULL) {
         self->clz->free(self, buffer);
     }
 }
@@ -68,17 +66,17 @@ WYRM_INLINE void wyrm_allocator_free(wyrm_allocator* self, void* buffer) {
  * @param self Pointer to the allocator instance used
  * @return Estimated heap usage by this allocator
  */
-WYRM_INLINE wyrm_uword wyrm_allocator_estimate_heap_size(wyrm_allocator* self)
+WY_INLINE wy_uword wy_allocator_estimate_heap_size(wy_allocator* self)
 {
-    if (self == WYRM_NULL ||
-        self->clz == WYRM_NULL ||
-        self->clz->estimate_heap_size == WYRM_NULL) {
+    if (self == WY_NULL ||
+        self->clz == WY_NULL ||
+        self->clz->estimate_heap_size == WY_NULL) {
         return 0;
     }
     return self->clz->estimate_heap_size(self);
 }
 
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

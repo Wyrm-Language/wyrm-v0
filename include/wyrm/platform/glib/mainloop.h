@@ -7,22 +7,22 @@
 extern "C" {
 #endif
 
-extern const wyrm_main_loop_vt wyrm_glib_mainloop_vt_;
+extern const wy_main_loop_vt wy_glib_mainloop_vt_;
 
 /**
  * Constructor - create new mainloop
  */
-wyrm_main_loop *wyrm_glib_mainloop_new(wyrm_allocator *alloc);
+wy_main_loop *wy_glib_mainloop_new(wy_allocator *alloc);
 
 /**
  * Destroy main loop
  */
-wyrm_error wyrm_glib_mainloop_destroy(wyrm_main_loop* ref);
+wy_error wy_glib_mainloop_destroy(wy_main_loop* ref);
 
 /**
  * Get total active sources
  */
-wyrm_uword wyrm_glib_mainloop_get_active_sources(wyrm_main_loop* ref);
+wy_uword wy_glib_mainloop_get_active_sources(wy_main_loop* ref);
 
 #ifdef __cplusplus
 }

@@ -18,7 +18,7 @@ struct test_context_fixture : test_machine_fixture
         : main_loop_{}
         , context{main_loop_.get()}
     {
-        wyrm_machine_attach_context(&machine, context);
+        wy_machine_attach_context(&machine, context);
     }
 
     ~test_context_fixture()
@@ -26,16 +26,16 @@ struct test_context_fixture : test_machine_fixture
         run_gc();
     }
 
-    wyrm_context* get_context_ptr()
+    wy_context* get_context_ptr()
     {
         return context;
     }
 
     void run_gc()
     {
-        wyrm_state state{};
-        wyrm_state_init_from_context_f(&state, context);
-        wyrm_context_gc_full_run(&state, context);
+        wy_state state{};
+        wy_state_init_from_context_f(&state, context);
+        wy_context_gc_full_run(&state, context);
     }
 
 };

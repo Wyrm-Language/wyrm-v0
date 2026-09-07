@@ -4,56 +4,56 @@
 #include <doctest/doctest.h>
 #include <wyrm.h>
 
-typedef struct wyrm_test_main_loop_state {
-    wyrm_uword fired_count;
-} wyrm_test_main_loop_state;
+typedef struct wy_test_main_loop_state {
+    wy_uword fired_count;
+} wy_test_main_loop_state;
 
-static inline bool wyrm_test_main_loop_count_cb(wyrm_primitive ud) {
-    wyrm_test_main_loop_state *state = (wyrm_test_main_loop_state *)(uintptr_t)ud.tagged_ptr;
+static inline bool wy_test_main_loop_count_cb(wy_primitive ud) {
+    wy_test_main_loop_state *state = (wy_test_main_loop_state *)(uintptr_t)ud.tagged_ptr;
     state->fired_count += 1;
     return false;
 }
 
-static inline void wyrm_test_main_loop_wakeable_sanity(wyrm_main_loop* loop) {
-    wyrm_test_main_loop_state state = {0};
-    wyrm_primitive user_data = {0};
-    wyrm_primitive source = {0};
+static inline void wy_test_main_loop_wakeable_sanity(wy_main_loop* loop) {
+    wy_test_main_loop_state state = {0};
+    wy_primitive user_data = {0};
+    wy_primitive source = {0};
 
-    user_data.tagged_ptr = (wyrm_uintptr)&state;
+    user_data.tagged_ptr = (wy_uintptr)&state;
 
     REQUIRE(
-        wyrm_main_loop_add_wakeable(
+        wy_main_loop_add_wakeable(
             loop,
             &source,
-            WYRM_PRIORITY_DEFAULT,
-            wyrm_test_main_loop_count_cb,
-            user_data) == WYRM_ERR_NONE);
+            WY_PRIORITY_DEFAULT,
+            wy_test_main_loop_count_cb,
+            user_data) == WY_ERR_NONE);
 
-    CHECK(wyrm_main_loop_trigger(loop, source) == WYRM_ERR_NONE);
-    CHECK(wyrm_main_loop_iterate(loop, false) == WYRM_ERR_NONE);
+    CHECK(wy_main_loop_trigger(loop, source) == WY_ERR_NONE);
+    CHECK(wy_main_loop_iterate(loop, false) == WY_ERR_NONE);
     CHECK(state.fired_count == 1);
 
-    CHECK(wyrm_main_loop_trigger(loop, source) == WYRM_ERR_INVAL);
+    CHECK(wy_main_loop_trigger(loop, source) == WY_ERR_INVAL);
 }
 
 
-static inline void wyrm_test_main_loop_timer_sanity(wyrm_main_loop* loop, uint32_t timer_ms) {
-    wyrm_test_main_loop_state state = {0};
-    wyrm_primitive user_data = {0};
-    wyrm_primitive source = {0};
+static inline void wy_test_main_loop_timer_sanity(wy_main_loop* loop, uint32_t timer_ms) {
+    wy_test_main_loop_state state = {0};
+    wy_primitive user_data = {0};
+    wy_primitive source = {0};
 
-    user_data.tagged_ptr = (wyrm_uintptr)&state;
+    user_data.tagged_ptr = (wy_uintptr)&state;
 
     REQUIRE(
-        wyrm_main_loop_add_timer(
+        wy_main_loop_add_timer(
             loop,
             &source,
             timer_ms,
-            WYRM_PRIORITY_DEFAULT,
-            wyrm_test_main_loop_count_cb,
-            user_data) == WYRM_ERR_NONE);
+            WY_PRIORITY_DEFAULT,
+            wy_test_main_loop_count_cb,
+            user_data) == WY_ERR_NONE);
 
-    CHECK(wyrm_main_loop_iterate(loop, true) == WYRM_ERR_NONE);
+    CHECK(wy_main_loop_iterate(loop, true) == WY_ERR_NONE);
     CHECK(state.fired_count == 1);
 }
 

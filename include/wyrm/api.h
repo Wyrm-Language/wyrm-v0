@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-const char* wyrm_lib_implementation(void);
+const char* wy_lib_implementation(void);
 
 
 
@@ -21,62 +21,62 @@ const char* wyrm_lib_implementation(void);
 /* Primitive Operations                                                      */
 /* ------------------------------------------------------------------------- */
 
-WYRM_INLINE bool wyrm_op_eq(wyrm_state* state, wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs);
-WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_state* state, wyrm_type_tag vt, wyrm_primitive v);
+WY_INLINE bool wy_op_eq(wy_state* state, wy_type_tag lhst, wy_primitive lhs, wy_type_tag rhst, wy_primitive rhs);
+WY_INLINE wy_uword wy_op_hash(wy_state* state, wy_type_tag vt, wy_primitive v);
 
 /* ------------------------------------------------------------------------- */
 /* Object API                                                                */
 /* ------------------------------------------------------------------------- */
 
-WYRM_INLINE void wyrm_object_init_header_s(wyrm_object* self, const wyrm_object_type* dtype);
-WYRM_INLINE void wyrm_object_finalize_f(wyrm_context* context, wyrm_object* self);
-WYRM_INLINE wyrm_error wyrm_object_children_iter_start(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa);
-WYRM_INLINE wyrm_error wyrm_object_children_iter_next_f(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa, const wyrm_object** object_ptr);
+WY_INLINE void wy_object_init_header_s(wy_object* self, const wy_object_type* dtype);
+WY_INLINE void wy_object_finalize_f(wy_context* context, wy_object* self);
+WY_INLINE wy_error wy_object_children_iter_start(wy_state* state, wy_object* self, wy_work_area* wa);
+WY_INLINE wy_error wy_object_children_iter_next_f(wy_state* state, wy_object* self, wy_work_area* wa, const wy_object** object_ptr);
 
 /* ------------------------------------------------------------------------- */
 /* State API                                                                 */
 /* ------------------------------------------------------------------------- */
 
-WYRM_INLINE void wyrm_state_init_s(wyrm_state* state);
-WYRM_INLINE wyrm_state* wyrm_state_new(wyrm_allocator* mem);
-WYRM_INLINE void wyrm_state_delete(wyrm_state* state);
-WYRM_INLINE bool wyrm_state_check_flag_f(wyrm_state* state, wyrm_state_flag flag);
+WY_INLINE void wy_state_init_s(wy_state* state);
+WY_INLINE wy_state* wy_state_new(wy_allocator* mem);
+WY_INLINE void wy_state_delete(wy_state* state);
+WY_INLINE bool wy_state_check_flag_f(wy_state* state, wy_state_flag flag);
 
-wyrm_error wyrm_state_exec(wyrm_state* state);
-WYRM_INLINE wyrm_uword wyrm_state_value_count(wyrm_state* state);
-WYRM_INLINE wyrm_value* wyrm_state_value_n(wyrm_state* state, wyrm_uword idx);
-WYRM_INLINE wyrm_error wyrm_state_push(wyrm_state* state, wyrm_value value);
+wy_error wy_state_exec(wy_state* state);
+WY_INLINE wy_uword wy_state_value_count(wy_state* state);
+WY_INLINE wy_value* wy_state_value_n(wy_state* state, wy_uword idx);
+WY_INLINE wy_error wy_state_push(wy_state* state, wy_value value);
 
-WYRM_INLINE wyrm_error wyrm_state_set_pending(wyrm_state* state, wyrm_exec_fn pending);
-WYRM_INLINE wyrm_error wyrm_state_call_continue(wyrm_state* state, wyrm_exec_fn result_cb, wyrm_exec_fn fn, const wyrm_value* args, wyrm_uword arg_count);
+WY_INLINE wy_error wy_state_set_pending(wy_state* state, wy_exec_fn pending);
+WY_INLINE wy_error wy_state_call_continue(wy_state* state, wy_exec_fn result_cb, wy_exec_fn fn, const wy_value* args, wy_uword arg_count);
 
 /* ------------------------------------------------------------------------- */
 /* Main Loop API                                                             */
 /* ------------------------------------------------------------------------- */
 
-WYRM_INLINE wyrm_error wyrm_main_loop_add_fd(wyrm_main_loop* ref, wyrm_primitive *out, wyrm_handle fd, wyrm_io_condition events, wyrm_priority priority, wyrm_source_handle_cb cb, wyrm_primitive ud);
-WYRM_INLINE wyrm_error wyrm_main_loop_add_timer(wyrm_main_loop* self, wyrm_primitive *out, uint32_t ms, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
-WYRM_INLINE wyrm_error wyrm_main_loop_add_idle(wyrm_main_loop* self, wyrm_primitive *out, wyrm_source_cb cb, wyrm_primitive ud);
-WYRM_INLINE wyrm_error wyrm_main_loop_add_wakeable(wyrm_main_loop* self, wyrm_primitive *out, wyrm_priority priority, wyrm_source_cb cb, wyrm_primitive ud);
-WYRM_INLINE wyrm_error wyrm_main_loop_trigger(wyrm_main_loop* self, wyrm_primitive src);
-WYRM_INLINE wyrm_error wyrm_main_loop_remove(wyrm_main_loop* self, wyrm_primitive src);
-WYRM_INLINE wyrm_error wyrm_main_loop_iterate(wyrm_main_loop* self, bool may_block);
-WYRM_INLINE wyrm_error wyrm_main_loop_run(wyrm_main_loop* self);
-WYRM_INLINE wyrm_error wyrm_main_loop_quit(wyrm_main_loop* self);
+WY_INLINE wy_error wy_main_loop_add_fd(wy_main_loop* ref, wy_primitive *out, wy_handle fd, wy_io_condition events, wy_priority priority, wy_source_handle_cb cb, wy_primitive ud);
+WY_INLINE wy_error wy_main_loop_add_timer(wy_main_loop* self, wy_primitive *out, uint32_t ms, wy_priority priority, wy_source_cb cb, wy_primitive ud);
+WY_INLINE wy_error wy_main_loop_add_idle(wy_main_loop* self, wy_primitive *out, wy_source_cb cb, wy_primitive ud);
+WY_INLINE wy_error wy_main_loop_add_wakeable(wy_main_loop* self, wy_primitive *out, wy_priority priority, wy_source_cb cb, wy_primitive ud);
+WY_INLINE wy_error wy_main_loop_trigger(wy_main_loop* self, wy_primitive src);
+WY_INLINE wy_error wy_main_loop_remove(wy_main_loop* self, wy_primitive src);
+WY_INLINE wy_error wy_main_loop_iterate(wy_main_loop* self, bool may_block);
+WY_INLINE wy_error wy_main_loop_run(wy_main_loop* self);
+WY_INLINE wy_error wy_main_loop_quit(wy_main_loop* self);
 
 
 /* ------------------------------------------------------------------------- */
 /* Primitives                                                                */
 /* ------------------------------------------------------------------------- */
 
-#define WYRM_PRIMITIVE_PTR(dtype, v) ((dtype*) (v).ptr)
+#define WY_PRIMITIVE_PTR(dtype, v) ((dtype*) (v).ptr)
 
-WYRM_INLINE wyrm_primitive wyrm_primitive_int(wyrm_word value) { const wyrm_primitive v = {.word = value}; return v; }
-WYRM_INLINE wyrm_primitive wyrm_primitive_ptr(void* value) { const wyrm_primitive v = {.ptr = value}; return v; }
+WY_INLINE wy_primitive wy_primitive_int(wy_word value) { const wy_primitive v = {.word = value}; return v; }
+WY_INLINE wy_primitive wy_primitive_ptr(void* value) { const wy_primitive v = {.ptr = value}; return v; }
 
-WYRM_INLINE wyrm_value wyrm_value_word(wyrm_word value)
+WY_INLINE wy_value wy_value_word(wy_word value)
 {
-    wyrm_value v = { .type = WYRM_TYPE_TAG_WORD, .data = wyrm_primitive_int(value) };
+    wy_value v = { .type = WY_TYPE_TAG_WORD, .data = wy_primitive_int(value) };
     return v;
 }
 
@@ -85,23 +85,23 @@ WYRM_INLINE wyrm_value wyrm_value_word(wyrm_word value)
 /* Class                                                                     */
 /* ------------------------------------------------------------------------- */
 
-extern const wyrm_object_type wyrm_type_class;
+extern const wy_object_type wy_type_class;
 
-wyrm_error wyrm_class_new(wyrm_context* context, wyrm_class** out);
-WYRM_INLINE void wyrm_class_set_name_f(wyrm_class* self, wyrm_primitive name);
-WYRM_INLINE wyrm_error wyrm_class_add_slot_f(wyrm_class* self, wyrm_symtab_entry slot_name, wyrm_uword flags);
-WYRM_INLINE wyrm_uword wyrm_class_get_slot_selector_f(wyrm_class* self, wyrm_symtab_entry sym_name);
+wy_error wy_class_new(wy_context* context, wy_class** out);
+WY_INLINE void wy_class_set_name_f(wy_class* self, wy_primitive name);
+WY_INLINE wy_error wy_class_add_slot_f(wy_class* self, wy_symtab_entry slot_name, wy_uword flags);
+WY_INLINE wy_uword wy_class_get_slot_selector_f(wy_class* self, wy_symtab_entry sym_name);
 
 
 /* ------------------------------------------------------------------------- */
 /* Dict                                                                      */
 /* ------------------------------------------------------------------------- */
 
-extern const wyrm_object_type wyrm_type_table;
+extern const wy_object_type wy_type_table;
 
-wyrm_error wyrm_dict_new(wyrm_context* self, wyrm_dict** out);
-wyrm_value* wyrm_dict_get(wyrm_state* state, wyrm_dict* self, wyrm_type_tag tag, wyrm_primitive value);
-wyrm_error wyrm_dict_set(wyrm_state* state, wyrm_dict* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value);
+wy_error wy_dict_new(wy_context* self, wy_dict** out);
+wy_value* wy_dict_get(wy_state* state, wy_dict* self, wy_type_tag tag, wy_primitive value);
+wy_error wy_dict_set(wy_state* state, wy_dict* self, wy_type_tag key_type, wy_primitive key_value, wy_type_tag value_type, wy_primitive value);
 
 
 #ifdef __cplusplus

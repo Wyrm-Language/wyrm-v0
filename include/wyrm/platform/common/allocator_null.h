@@ -7,18 +7,18 @@
 extern "C" {
 #endif
 
-extern const wyrm_allocator_vt wyrm_allocator_null_vt;
-typedef wyrm_allocator wyrm_allocator_null;
-extern wyrm_allocator_null wyrm_allocator_null_global;
+extern const wy_allocator_vt wy_allocator_null_vt;
+typedef wy_allocator wy_allocator_null;
+extern wy_allocator_null wy_allocator_null_global;
 
 /**
  * Null Allocator
  *
  * Allocation always fails. Free is a noop.
  */
-WYRM_INLINE void wyrm_allocator_null_init(wyrm_allocator_null *allocator)
+WY_INLINE void wy_allocator_null_init(wy_allocator_null *allocator)
 {
-    allocator->clz       = &wyrm_allocator_null_vt;
+    allocator->clz       = &wy_allocator_null_vt;
 }
 
 #ifdef __cplusplus

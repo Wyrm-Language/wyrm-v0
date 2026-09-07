@@ -5,28 +5,28 @@
 #include <wyrm/types.h>
 #include <wyrm/object.h>
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
-typedef struct wyrm_gc_arena
+typedef struct wy_gc_arena
 {
-    wyrm_allocator* allocator;
-    wyrm_object* first;
-    wyrm_object* last;
-} wyrm_gc_arena;
+    wy_allocator* allocator;
+    wy_object* first;
+    wy_object* last;
+} wy_gc_arena;
 
-void wyrm_gc_init_f(wyrm_gc_arena* self, wyrm_allocator* allocator);
-void wyrm_gc_finalize_f(wyrm_context* parent, wyrm_gc_arena* self);
+void wy_gc_init_f(wy_gc_arena* self, wy_allocator* allocator);
+void wy_gc_finalize_f(wy_context* parent, wy_gc_arena* self);
 
-void* wyrm_gc_alloc(wyrm_gc_arena* arena, wyrm_uword dsize);
-void* wyrm_gc_realloc(wyrm_gc_arena* arena, void* ptr, wyrm_uword new_size);
-void wyrm_gc_free(wyrm_gc_arena* arena, void* ptr);
+void* wy_gc_alloc(wy_gc_arena* arena, wy_uword dsize);
+void* wy_gc_realloc(wy_gc_arena* arena, void* ptr, wy_uword new_size);
+void wy_gc_free(wy_gc_arena* arena, void* ptr);
 
-void wyrm_gc_track(wyrm_gc_arena* context, wyrm_object* gc_info);
+void wy_gc_track(wy_gc_arena* context, wy_object* gc_info);
 
-void wyrm_gc_collect_start_f(wyrm_context* parent, wyrm_gc_arena* self);
-void wyrm_gc_object_visit(wyrm_state* state, wyrm_object* parent);
-void wyrm_gc_collect_finish_f(wyrm_context* parent, wyrm_gc_arena* self);
+void wy_gc_collect_start_f(wy_context* parent, wy_gc_arena* self);
+void wy_gc_object_visit(wy_state* state, wy_object* parent);
+void wy_gc_collect_finish_f(wy_context* parent, wy_gc_arena* self);
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

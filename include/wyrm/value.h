@@ -4,23 +4,23 @@
 #include <wyrm/fwd.h>
 #include <wyrm/primitive.h>
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
 /**
  * @brief A typed primitive
  */
 struct wy_value
 {
-    wyrm_type_tag type;
+    wy_type_tag type;
     wy_primitive data;
 };
 
 enum {
-    WYRM_PRIMITIVE_SIZE = sizeof(wy_primitive)
+    WY_PRIMITIVE_SIZE = sizeof(wy_primitive)
 };
 
-static_assert(WYRM_PRIMITIVE_SIZE >= sizeof(uintptr_t), "Primitive must allow storage of a pointer");
+static_assert(WY_PRIMITIVE_SIZE >= sizeof(uintptr_t), "Primitive must allow storage of a pointer");
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

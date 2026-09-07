@@ -3,7 +3,7 @@
 
 #include <wyrm/sys/toolchain.h>
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
 enum
 {
@@ -26,38 +26,38 @@ typedef struct wy_mem_info wy_mem_info;
 #define WY_MEM_INFO_COUNT(type, info) (wy_mem_info_count_f((info), sizeof(type)))
 #define WY_MEM_INFO_TOP_NOT_AT_END(type, top, info) (wy_mem_info_capacity_at_ptr((info), (void*) (top)) >= sizeof(type))
 
-WYRM_INLINE void wy_mem_info_init_empty_s(wy_mem_info* mem_info)
+WY_INLINE void wy_mem_info_init_empty_s(wy_mem_info* mem_info)
 {
-    mem_info->begin = WYRM_NULL;
-    mem_info->end = WYRM_NULL;
+    mem_info->begin = WY_NULL;
+    mem_info->end = WY_NULL;
     mem_info->flags = 0;
 }
 
-WYRM_INLINE wy_uword wy_mem_info_sz_f(const wy_mem_info* mem_info)
+WY_INLINE wy_uword wy_mem_info_sz_f(const wy_mem_info* mem_info)
 {
     return (wy_uword) ((char*) mem_info->end - (char*) mem_info->begin);
 }
 
-WYRM_INLINE wy_uword wy_mem_info_count_f(const wy_mem_info* mem_info, wy_uword block_sz)
+WY_INLINE wy_uword wy_mem_info_count_f(const wy_mem_info* mem_info, wy_uword block_sz)
 {
     return wy_mem_info_sz_f(mem_info) / block_sz;
 }
 
-WYRM_INLINE wy_uword wy_mem_info_capacity_at_ptr(const wy_mem_info* mem_info, void* ptr)
+WY_INLINE wy_uword wy_mem_info_capacity_at_ptr(const wy_mem_info* mem_info, void* ptr)
 {
     return (wy_uword) ((char*) mem_info->end - (char*) ptr);
 }
 
-WYRM_INLINE bool wy_mem_info_is_static_f(const wy_mem_info* mem_info)
+WY_INLINE bool wy_mem_info_is_static_f(const wy_mem_info* mem_info)
 {
     return (bool) (mem_info->flags & WY_MEM_INFO_ALLOC_STATIC);
 }
 
-WYRM_INLINE wy_uword wy_mem_info_block_count_sz_f(wy_uword block_sz, wy_uword count)
+WY_INLINE wy_uword wy_mem_info_block_count_sz_f(wy_uword block_sz, wy_uword count)
 {
     return block_sz * count;
 }
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

@@ -7,12 +7,12 @@
 
 #include <stdio.h>
 
-static wy_error module_handle_code_section_f(wyrm_context* context, wy_module* self, const wy_u8* section_ptr, wy_u8 section_type, wy_uword section_size);
+static wy_error module_handle_code_section_f(wy_context* context, wy_module* self, const wy_u8* section_ptr, wy_u8 section_type, wy_uword section_size);
 
 
 void wy_module_init_static_f(wy_module* self)
 {
-    wyrm_object_init_header_s(&self->head, &wy_module_type);
+    wy_object_init_header_s(&self->head, &wy_module_type);
     self->global_count = 0;
     self->code_count = 0;
 
@@ -20,28 +20,28 @@ void wy_module_init_static_f(wy_module* self)
     wy_mem_info_init_empty_s(&self->global_memory);
 }
 
-wy_module* wy_module_new_f(wyrm_context* context)
+wy_module* wy_module_new_f(wy_context* context)
 {
-    wy_module* self = (wy_module*) wyrm_context_gc_alloc(context, sizeof(wy_module));
-    if (!self) { return WYRM_NULL; }
+    wy_module* self = (wy_module*) wy_context_gc_alloc(context, sizeof(wy_module));
+    if (!self) { return WY_NULL; }
 
     wy_module_init_static_f(self);
-    wyrm_context_push_gc(context, WY_MODULE_GET_OBJ(self));
+    wy_context_push_gc(context, WY_MODULE_GET_OBJ(self));
     return self;
 }
 
-wy_error wy_module_load(wyrm_context* context, wy_module* self, const wy_u8* dbuf, wy_uword dbuf_size)
+wy_error wy_module_load(wy_context* context, wy_module* self, const wy_u8* dbuf, wy_uword dbuf_size)
 {
-    if (dbuf_size < 8) { return WYRM_ERR_INVAL; }
+    if (dbuf_size < 8) { return WY_ERR_INVAL; }
     if (dbuf[0] != (wy_u8) 'W' ||
         dbuf[1] != (wy_u8) 'Y' ||
         dbuf[2] != (wy_u8) 'C' ||
         dbuf[3] != (wy_u8) 0x02) {
-        return WYRM_ERR_INVAL;
+        return WY_ERR_INVAL;
     }
 
     /* self *must be* a from scratch / uninitialized module */
-    if (self->code_count > 0 || self->global_count > 0) { return WYRM_ERR_INVAL; }
+    if (self->code_count > 0 || self->global_count > 0) { return WY_ERR_INVAL; }
 
     const wy_u8* section_ptr;
     wy_u8 section_type;
@@ -52,50 +52,50 @@ wy_error wy_module_load(wyrm_context* context, wy_module* self, const wy_u8* dbu
     wy_bson_doc_reader_start(&doc_reader, (const wy_u8*) dbuf + 4, dbuf_size - 4);
 
     // Header
-    wy_error last_error = WYRM_ERR_NONE;
-    while (last_error == WYRM_ERR_NONE) {
+    wy_error last_error = WY_ERR_NONE;
+    while (last_error == WY_ERR_NONE) {
         last_error = wy_bson_doc_reader_get(&doc_reader,
             &section_type, &section_name,
             &section_ptr, &section_size);
-        if (last_error != WYRM_ERR_NONE) { break; }
+        if (last_error != WY_ERR_NONE) { break; }
 
-        if (wyrm_strcmp_f(section_name, "header") == 0) {
-
-        }
-        else if (wyrm_strcmp_f(section_name, "statics") == 0) {
+        if (wy_strcmp_f(section_name, "header") == 0) {
 
         }
-        else if (wyrm_strcmp_f(section_name, "slot_defaults") == 0) {
+        else if (wy_strcmp_f(section_name, "statics") == 0) {
 
         }
-        else if (wyrm_strcmp_f( section_name, "symbols") == 0) {
+        else if (wy_strcmp_f(section_name, "slot_defaults") == 0) {
 
         }
-        else if (wyrm_strcmp_f(section_name, "functions") == 0) {
+        else if (wy_strcmp_f( section_name, "symbols") == 0) {
 
         }
-        else if (wyrm_strcmp_f(section_name, "classes") == 0) {
+        else if (wy_strcmp_f(section_name, "functions") == 0) {
 
         }
-        else if (wyrm_strcmp_f(section_name, "messages") == 0) {
+        else if (wy_strcmp_f(section_name, "classes") == 0) {
 
         }
-        else if (wyrm_strcmp_f(section_name, "code") == 0) {
+        else if (wy_strcmp_f(section_name, "messages") == 0) {
+
+        }
+        else if (wy_strcmp_f(section_name, "code") == 0) {
             last_error = module_handle_code_section_f(context, self, section_ptr, section_type, section_size);
         }
-        else if (wyrm_strcmp_f(section_name, "debug") == 0) {
+        else if (wy_strcmp_f(section_name, "debug") == 0) {
 
         }
-        else if (wyrm_strcmp_f(section_name, "exports") == 0) {
+        else if (wy_strcmp_f(section_name, "exports") == 0) {
 
         }
-        else if (wyrm_strcmp_f(section_name, "free") == 0) {
+        else if (wy_strcmp_f(section_name, "free") == 0) {
 
         }
     }
 
-    if (last_error == WYRM_ERR_STOP_ITERATION) {
-        last_error = WYRM_ERR_NONE;
+    if (last_error == WY_ERR_STOP_ITERATION) {
+        last_error = WY_ERR_NONE;
     }
 
 
@@ -104,36 +104,36 @@ wy_error wy_module_load(wyrm_context* context, wy_module* self, const wy_u8* dbu
 
 static wy_error module_handle_code_section_f(wy_context* context, wy_module* self, const wy_u8* section_ptr, wy_u8 section_type, wy_uword section_size)
 {
-    if (section_type != WY_BSON_TAG_BINARY) { return WYRM_ERR_INVAL; }
-    if (self->code_count > 0) { /* Unexpected code section! */ return WYRM_ERR_INVAL; }
-    wy_error last_error = WYRM_ERR_NONE;
+    if (section_type != WY_BSON_TAG_BINARY) { return WY_ERR_INVAL; }
+    if (self->code_count > 0) { /* Unexpected code section! */ return WY_ERR_INVAL; }
+    wy_error last_error = WY_ERR_NONE;
     const wy_u8* code_buffer;
     wy_u8 code_subtype;
     wy_uword code_sz;
 
     last_error = wy_bson_get_binary_f(section_ptr, section_size, &code_buffer, &code_subtype, &code_sz);
-    if (last_error != WYRM_ERR_NONE) { return last_error; }
+    if (last_error != WY_ERR_NONE) { return last_error; }
 
-    if ((code_sz % 4) != 0) { return WYRM_ERR_INVAL; }
+    if ((code_sz % 4) != 0) { return WY_ERR_INVAL; }
     wy_uword code_len = code_sz / 4;
 
     last_error = wy_module_reserve_code_f(context, self, code_len);
-    if (last_error != WYRM_ERR_NONE) { return last_error; }
+    if (last_error != WY_ERR_NONE) { return last_error; }
 
     wy_uword drop;
     last_error = wy_module_code_push(self, code_buffer, code_len, &drop);
     return last_error;
 }
 
-wy_error wy_module_reserve_code_f(wyrm_context* context, wy_module* self, wy_uword len)
+wy_error wy_module_reserve_code_f(wy_context* context, wy_module* self, wy_uword len)
 {
-    if (WY_MEM_INFO_COUNT(wy_u32, &self->code_memory) >= len) { return WYRM_ERR_NONE; }
-    if (len == 0) { return WYRM_ERR_INVAL; }
+    if (WY_MEM_INFO_COUNT(wy_u32, &self->code_memory) >= len) { return WY_ERR_NONE; }
+    if (len == 0) { return WY_ERR_INVAL; }
 
     wy_error last_error = WY_CONTEXT_MEM_INFO_RESERVE_COUNT(context, &self->code_memory, len, wy_u32);
-    if (last_error != WYRM_ERR_NONE) { return last_error; }
+    if (last_error != WY_ERR_NONE) { return last_error; }
 
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
 /**
@@ -148,24 +148,24 @@ wy_error wy_module_reserve_code_f(wyrm_context* context, wy_module* self, wy_uwo
  * @param code_buffer Binary buffer (may be unaligned)
  * @param len Total u32 code points to push
  * @param out_offset Pointer to the beginning of pushed data
- * @return WYRM_ERR_NONE on success otherwise appropriate error
+ * @return WY_ERR_NONE on success otherwise appropriate error
  */
 wy_error wy_module_code_push(wy_module* self, const wy_u8* code_buffer, wy_uword len, wy_uword* out_offset)
 {
     wy_uword new_len = self->code_count + len;
     wy_uword orig = self->code_count;
     if (new_len <= WY_MEM_INFO_COUNT(wy_u32, &self->code_memory)) {
-        wyrm_memcpy(WY_MEM_INFO_BEGIN_PTR(wy_u32, &self->code_memory) + orig,
+        wy_memcpy(WY_MEM_INFO_BEGIN_PTR(wy_u32, &self->code_memory) + orig,
             code_buffer,
             sizeof(wy_u32) * len);
         self->code_count = new_len;
-        if (out_offset != WYRM_NULL) { *out_offset = orig; }
-        return WYRM_ERR_NONE;
+        if (out_offset != WY_NULL) { *out_offset = orig; }
+        return WY_ERR_NONE;
     }
-    return WYRM_ERR_NOMEM;
+    return WY_ERR_NOMEM;
 }
 
-static void finalize(wyrm_context* context, wyrm_object* self_s)
+static void finalize(wy_context* context, wy_object* self_s)
 {
     wy_module* self = (wy_module*) self_s;
 
@@ -174,18 +174,18 @@ static void finalize(wyrm_context* context, wyrm_object* self_s)
 }
 
 
-static wyrm_error children_iter_start(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa)
+static wy_error children_iter_start(wy_state* state, wy_object* self, wy_work_area* wa)
 {
-    WYRM_UNUSED(state); WYRM_UNUSED(self);
-    wyrm_memset(wa, 0, sizeof(wyrm_work_area));
+    WY_UNUSED(state); WY_UNUSED(self);
+    wy_memset(wa, 0, sizeof(wy_work_area));
     wa->data[0].uword = 0;
     wa->data[1].uword = 0;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
-static wyrm_error children_iter_next(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa, const wyrm_object** child)
+static wy_error children_iter_next(wy_state* state, wy_object* object, wy_work_area* wa, const wy_object** child)
 {
-    WYRM_UNUSED(state);
+    WY_UNUSED(state);
 
     wy_module* self = (wy_module*) object;
     wy_value* globals = WY_MEM_INFO_BEGIN_PTR(wy_value, &self->global_memory);
@@ -195,17 +195,17 @@ static wyrm_error children_iter_next(wyrm_state* state, wyrm_object* object, wyr
 
         if (wy_type_is_object(globals[cur].type)) {
             *child = globals[cur].data.gc_object;
-            return WYRM_ERR_NONE;
+            return WY_ERR_NONE;
         }
     }
 
-    return WYRM_ERR_STOP_ITERATION;
+    return WY_ERR_STOP_ITERATION;
 }
 
 
-const wyrm_object_type wy_module_type = {
-    .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
-    .gc_type = WYRM_TYPE_TAG_MODULE,
+const wy_object_type wy_module_type = {
+    .object = WY_OBJECT_TYPE_OBJECT_INIT,
+    .gc_type = WY_TYPE_TAG_MODULE,
 
     .children_iter_start = children_iter_start,
     .children_iter_next = children_iter_next,

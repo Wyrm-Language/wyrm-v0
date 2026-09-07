@@ -9,40 +9,40 @@ extern "C"
 {
 #endif
 
-WYRM_INLINE void* wyrm_memcpy(void* dest, const void* src, wyrm_uword len) {
+WY_INLINE void* wy_memcpy(void* dest, const void* src, wy_uword len) {
     return memcpy(dest, src, (size_t) len);
 }
 
-WYRM_INLINE int wyrm_memcmp(const void* dest, const void* src, wyrm_uword len)
+WY_INLINE int wy_memcmp(const void* dest, const void* src, wy_uword len)
 {
     return memcmp(dest, src, len);
 }
 
-WYRM_INLINE void* wyrm_memmove(void* dest, const void* src, wyrm_uword len) {
+WY_INLINE void* wy_memmove(void* dest, const void* src, wy_uword len) {
     return memmove(dest, src, (size_t) len);
 }
 
-WYRM_INLINE void wyrm_memset(void* buffer, int ch, wyrm_uword len)
+WY_INLINE void wy_memset(void* buffer, int ch, wy_uword len)
 {
     memset(buffer, ch, (size_t) len);
 }
 
-WYRM_INLINE wyrm_uword wyrm_strlen_f(const char* value)
+WY_INLINE wy_uword wy_strlen_f(const char* value)
 {
-    return (wyrm_uword) strlen(value);
+    return (wy_uword) strlen(value);
 }
 
-WYRM_INLINE void wyrm_strncpy_f(char* dest, const char* src, wyrm_uword sz)
+WY_INLINE void wy_strncpy_f(char* dest, const char* src, wy_uword sz)
 {
     (void) memmove(dest, src, (size_t) sz);
 }
 
-WYRM_INLINE int wyrm_strcmp_f(const char* lh, const char* rh)
+WY_INLINE int wy_strcmp_f(const char* lh, const char* rh)
 {
     return strcmp(lh, rh);
 }
 
-WYRM_INLINE int wyrm_strncmp_f(const char* lh, const char* rh, size_t len)
+WY_INLINE int wy_strncmp_f(const char* lh, const char* rh, size_t len)
 {
     return strncmp(lh, rh, len);
 }

@@ -3,44 +3,44 @@
 
 wy_machine* wy_cmachine_new(void)
 {
-    wyrm_allocator_cmem* allocator = wyrm_allocator_cmem_new();
-    if (allocator == WYRM_NULL) { return WYRM_NULL; }
+    wy_allocator_cmem* allocator = wy_allocator_cmem_new();
+    if (allocator == WY_NULL) { return WY_NULL; }
 
-    wyrm_allocator* machine_allocator = wyrm_allocator_from_cmem(allocator);
-    wyrm_machine* machine = wyrm_allocator_alloc(machine_allocator, sizeof(wyrm_machine));
-    if (machine == WYRM_NULL) { wyrm_allocator_cmem_destroy(allocator); return WYRM_NULL; }
+    wy_allocator* machine_allocator = wy_allocator_from_cmem(allocator);
+    wy_machine* machine = wy_allocator_alloc(machine_allocator, sizeof(wy_machine));
+    if (machine == WY_NULL) { wy_allocator_cmem_destroy(allocator); return WY_NULL; }
 
-    wyrm_machine_init_s(machine, machine_allocator);
+    wy_machine_init_s(machine, machine_allocator);
     return machine;
 }
 
 
 void wy_cmachine_destroy(wy_machine* machine)
 {
-    if (machine == WYRM_NULL) { return; }
+    if (machine == WY_NULL) { return; }
 
-    wyrm_allocator* machine_allocator = machine->allocator;
-    wyrm_machine_finalize_f(machine);
+    wy_allocator* machine_allocator = machine->allocator;
+    wy_machine_finalize_f(machine);
 
-    wyrm_allocator_free(machine_allocator, machine);
-    wyrm_allocator_cmem_destroy((wyrm_allocator_cmem*) machine_allocator);
+    wy_allocator_free(machine_allocator, machine);
+    wy_allocator_cmem_destroy((wy_allocator_cmem*) machine_allocator);
 }
 
 
 wy_context* wy_cmachine_context_new(wy_machine* machine)
 {
-    if (machine == WYRM_NULL) { return WYRM_NULL; }
-    if (machine->context != WYRM_NULL) { return WYRM_NULL; }
+    if (machine == WY_NULL) { return WY_NULL; }
+    if (machine->context != WY_NULL) { return WY_NULL; }
 
-    wy_context* ctx = wyrm_allocator_alloc(machine->allocator, sizeof(wy_context));
-    if (ctx == WYRM_NULL) { return WYRM_NULL; }
+    wy_context* ctx = wy_allocator_alloc(machine->allocator, sizeof(wy_context));
+    if (ctx == WY_NULL) { return WY_NULL; }
 
-    wyrm_context_init_s(ctx);
-    wy_error last_error = wyrm_machine_attach_context(machine, ctx);
-    if (last_error != WYRM_ERR_NONE) {
-        wyrm_context_finalize_f(ctx);
-        wyrm_allocator_free(machine->allocator, ctx);
-        return WYRM_NULL;
+    wy_context_init_s(ctx);
+    wy_error last_error = wy_machine_attach_context(machine, ctx);
+    if (last_error != WY_ERR_NONE) {
+        wy_context_finalize_f(ctx);
+        wy_allocator_free(machine->allocator, ctx);
+        return WY_NULL;
     }
 
     return ctx;
@@ -49,9 +49,9 @@ wy_context* wy_cmachine_context_new(wy_machine* machine)
 
 void wy_cmachine_context_destroy(wy_context* ctx)
 {
-    if (ctx == WYRM_NULL) { return; }
-    wyrm_machine* machine = wyrm_context_get_machine(ctx);
+    if (ctx == WY_NULL) { return; }
+    wy_machine* machine = wy_context_get_machine(ctx);
 
-    wyrm_context_finalize_f(ctx);
-    wyrm_allocator_free(machine->allocator, ctx);
+    wy_context_finalize_f(ctx);
+    wy_allocator_free(machine->allocator, ctx);
 }

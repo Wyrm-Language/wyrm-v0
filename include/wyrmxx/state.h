@@ -6,7 +6,7 @@
 
 namespace wyrmxx
 {
-    class state_ final : public wyrm_state
+    class state_ final : public wy_state
     {
     public:
         state_(const state_&) = delete;
@@ -22,15 +22,15 @@ namespace wyrmxx
         state(const state&) = delete;
         state& operator=(const state&) = delete;
 
-        explicit state(wyrm_allocator* allocator);
+        explicit state(wy_allocator* allocator);
 
-        state(wyrm_state* ptr, bool release)
+        state(wy_state* ptr, bool release)
             : self_{ptr}, release_{release}
         {
         }
 
         ~state() {
-            if (release_) { wyrm_state_delete(self_); }
+            if (release_) { wy_state_delete(self_); }
         }
 
         state(state&& other) noexcept : state() {
@@ -42,12 +42,12 @@ namespace wyrmxx
             return *this;
         }
 
-        operator wyrm_state*() const { return self_; }
+        operator wy_state*() const { return self_; }
 
     private:
         state() : self_{nullptr}, release_{false} {}
 
-        wyrm_state* self_;
+        wy_state* self_;
         bool release_;
     };
 }

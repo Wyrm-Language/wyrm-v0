@@ -4,12 +4,12 @@
 #include <wyrm/types.h>
 #include <wyrm/prototype.h>
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
 /**
  * Set the primitive for the class name
  */
-WYRM_INLINE void wyrm_class_set_name_f(wyrm_class* self, wyrm_primitive name)
+WY_INLINE void wy_class_set_name_f(wy_class* self, wy_primitive name)
 {
     self->sym_name = name;
 }
@@ -17,16 +17,16 @@ WYRM_INLINE void wyrm_class_set_name_f(wyrm_class* self, wyrm_primitive name)
 /**
  * Get selector for the given symbol
  */
-WYRM_INLINE wyrm_uword wyrm_class_get_slot_selector_f(wyrm_class* self, wyrm_symtab_entry sym_name)
+WY_INLINE wy_uword wy_class_get_slot_selector_f(wy_class* self, wy_symtab_entry sym_name)
 {
-    return wyrm_prototype_get_slot_selector_f(&self->prototype, sym_name);
+    return wy_prototype_get_slot_selector_f(&self->prototype, sym_name);
 }
 
-WYRM_INLINE wyrm_error wyrm_class_add_slot_f(wyrm_class* self, wyrm_symtab_entry slot_name, wyrm_uword flags)
+WY_INLINE wy_error wy_class_add_slot_f(wy_class* self, wy_symtab_entry slot_name, wy_uword flags)
 {
-    return wyrm_prototype_add_slot_f(&self->prototype, slot_name, flags);
+    return wy_prototype_add_slot_f(&self->prototype, slot_name, flags);
 }
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

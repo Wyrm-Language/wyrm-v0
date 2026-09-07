@@ -13,41 +13,41 @@
 #include <wyrm/object_type.h>
 #include <wyrm/work_area.h>
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
 // ----------------------------------------------------------------------------
 // Macros
 // ----------------------------------------------------------------------------
 
-#define WYRM_HASH_INVALID WYRM_UWORD_MAX
-#define WY_SLOT_INVALID WYRM_UWORD_MAX
+#define WY_HASH_INVALID WY_UWORD_MAX
+#define WY_SLOT_INVALID WY_UWORD_MAX
 
 // ----------------------------------------------------------------------------
 // Prototype
 // ----------------------------------------------------------------------------
-#define WYRM_BAD_SLOT WYRM_UWORD_MAX
+#define WY_BAD_SLOT WY_UWORD_MAX
 
 enum
 {
-    WYRM_PROTOTYPE_SLOT_FLAG_BOXED  = 0x0001,  ///< Slot is boxed, may escape
-    WYRM_PROTOTYPE_SLOT_FLAG_STATIC = 0x0002,  ///< Slot is statically allocated
+    WY_PROTOTYPE_SLOT_FLAG_BOXED  = 0x0001,  ///< Slot is boxed, may escape
+    WY_PROTOTYPE_SLOT_FLAG_STATIC = 0x0002,  ///< Slot is statically allocated
 };
 
-#define WYRM_SLOT_DEFAULTS 0
+#define WY_SLOT_DEFAULTS 0
 
-typedef struct wyrm_prototype_slot
+typedef struct wy_prototype_slot
 {
-    wyrm_uword flags;
-    wyrm_symtab_entry symtab_entry;
-    wyrm_value default_value;
-} wyrm_prototype_slot;
+    wy_uword flags;
+    wy_symtab_entry symtab_entry;
+    wy_value default_value;
+} wy_prototype_slot;
 
-struct wyrm_prototype
+struct wy_prototype
 {
-    wyrm_object object;
-    wyrm_prototype_slot* slots;
-    wyrm_uword slot_capacity;
-    wyrm_uword slot_count;
+    wy_object object;
+    wy_prototype_slot* slots;
+    wy_uword slot_capacity;
+    wy_uword slot_count;
 };
 
 
@@ -58,20 +58,20 @@ struct wyrm_prototype
 /**
  * @brief Create a null primitive value
  */
-WYRM_INLINE wyrm_primitive wyrm_primitive_null(void)
+WY_INLINE wy_primitive wy_primitive_null(void)
 {
-    wyrm_primitive v = { .gc_object = WYRM_NULL };
+    wy_primitive v = { .gc_object = WY_NULL };
     return v;
 }
 
 /**
  * @brief Create 'nil' primitive
  */
-WYRM_INLINE wyrm_value wyrm_value_nil(void)
+WY_INLINE wy_value wy_value_nil(void)
 {
-    wyrm_value v = {
-        .type = WYRM_TYPE_TAG_NIL,
-        .data = wyrm_primitive_null()
+    wy_value v = {
+        .type = WY_TYPE_TAG_NIL,
+        .data = wy_primitive_null()
     };
     return v;
 }
@@ -79,21 +79,21 @@ WYRM_INLINE wyrm_value wyrm_value_nil(void)
 /**
  * @brief Create Unset primitive
  */
-WYRM_INLINE wyrm_value wyrm_value_Unset(void)
+WY_INLINE wy_value wy_value_Unset(void)
 {
-    wyrm_value v = {
-        .type = WYRM_TYPE_TAG_ERROR,
-        .data = wyrm_primitive_null()
+    wy_value v = {
+        .type = WY_TYPE_TAG_ERROR,
+        .data = wy_primitive_null()
     };
     return v;
 }
 
 //! Transitional alias for wy_type_is_object()
-WYRM_INLINE bool wyrm_type_tag_is_gc(wyrm_type_tag tag)
+WY_INLINE bool wy_type_tag_is_gc(wy_type_tag tag)
 {
     return wy_type_is_object(tag);
 }
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

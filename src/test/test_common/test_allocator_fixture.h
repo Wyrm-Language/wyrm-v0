@@ -21,7 +21,7 @@ class test_allocator_fixture
 public:
     struct ext_alloc
     {
-        wyrm_allocator a;
+        wy_allocator a;
         test_allocator_fixture* self;
     };
 
@@ -38,10 +38,10 @@ public:
     }
 
     wyrmxx::allocator get() { return wyrmxx::allocator{ptr()}; }
-    operator wyrm_allocator*() & { return &allocator_.a; }
+    operator wy_allocator*() & { return &allocator_.a; }
 
     ext_alloc& allocator() { return allocator_; }
-    wyrm_allocator* ptr() { return &allocator_.a; }
+    wy_allocator* ptr() { return &allocator_.a; }
     ext_alloc allocator_;
 
     bool cleared() const { return allocations_.empty(); }
@@ -64,7 +64,7 @@ public:
 
 
 private:
-    static test_allocator_fixture& get_self(wyrm_allocator* self)
+    static test_allocator_fixture& get_self(wy_allocator* self)
     {
         return *reinterpret_cast<ext_alloc*>(self)->self;
     }
@@ -74,20 +74,20 @@ private:
         return std::find(allocations_.begin(), allocations_.end(), buffer) != allocations_.end();
     }
 
-    static void* n_alloc(wyrm_allocator* self, wyrm_uword len)
+    static void* n_alloc(wy_allocator* self, wy_uword len)
     {
         auto& thiz = get_self(self);
-        if (thiz.locked_) { return WYRM_NULL; }
+        if (thiz.locked_) { return WY_NULL; }
         auto buf = std::malloc(len);
         thiz.allocations_.push_back(buf);
         return buf;
     }
 
-    static void* n_realloc(wyrm_allocator* self, void* buffer, wyrm_uword len)
+    static void* n_realloc(wy_allocator* self, void* buffer, wy_uword len)
     {
         auto& thiz = get_self(self);
 
-        if (thiz.locked_) { return WYRM_NULL; }
+        if (thiz.locked_) { return WY_NULL; }
 
         if (buffer) {
             if (!thiz.is_valid(buffer)) { throw test_allocator_failure("realloc of unallocated buffer"); }
@@ -104,7 +104,7 @@ private:
         return new_buf;
     }
 
-    static void n_free(wyrm_allocator* self, void* buffer)
+    static void n_free(wy_allocator* self, void* buffer)
     {
         auto& thiz = get_self(self);
         if (buffer) {
@@ -115,13 +115,13 @@ private:
         }
     }
 
-    static wyrm_uword heap_estimate(wyrm_allocator* self)
+    static wy_uword heap_estimate(wy_allocator* self)
     {
         auto& thiz = get_self(self);
         return thiz.allocations_.size() * 32;
     }
 
-    static inline wyrm_allocator_vt vt = {
+    static inline wy_allocator_vt vt = {
         .alloc = n_alloc,
         .realloc = n_realloc,
         .free = n_free,

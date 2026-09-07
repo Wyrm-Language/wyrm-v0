@@ -4,7 +4,7 @@
 #include <wyrm/core.h>
 #include <wyrm/sys/string.h>
 
-WYRM_BEGIN_DECLS
+WY_BEGIN_DECLS
 
 
 /**
@@ -43,11 +43,11 @@ enum
     WY_BSON_TAG_D128 = 19,          // Decimal128
 };
 
-WYRM_INLINE wy_i32 wy_bson_get_i32(const wy_u8* buffer) { wy_i32 v; wyrm_memcpy(&v, buffer, sizeof(wy_i32)); return v; }
-WYRM_INLINE wy_i64 wy_bson_get_i64(const wy_u8* buffer) { wy_i64 v; wyrm_memcpy(&v, buffer, sizeof(wy_i64)); return v; }
-WYRM_INLINE wy_u64 wy_bson_get_u64(const wy_u8* buffer) { wy_u64 v; wyrm_memcpy(&v, buffer, sizeof(wy_u64)); return v; }
+WY_INLINE wy_i32 wy_bson_get_i32(const wy_u8* buffer) { wy_i32 v; wy_memcpy(&v, buffer, sizeof(wy_i32)); return v; }
+WY_INLINE wy_i64 wy_bson_get_i64(const wy_u8* buffer) { wy_i64 v; wy_memcpy(&v, buffer, sizeof(wy_i64)); return v; }
+WY_INLINE wy_u64 wy_bson_get_u64(const wy_u8* buffer) { wy_u64 v; wy_memcpy(&v, buffer, sizeof(wy_u64)); return v; }
 
-WYRM_INLINE void wy_bson_get_str(const wy_u8* buffer, const char** out_str, wyrm_uword* out_len)
+WY_INLINE void wy_bson_get_str(const wy_u8* buffer, const char** out_str, wy_uword* out_len)
 {
     wy_i32 len = wy_bson_get_i32(buffer);
     *out_str = (const char*) &buffer[4];
@@ -62,22 +62,22 @@ WYRM_INLINE void wy_bson_get_str(const wy_u8* buffer, const char** out_str, wyrm
  * @param out_buffer Output data buffer
  * @param out_subtype Output data subtype
  * @param out_len Output data size in bytes
- * @return WYRM_ERR_NONE or appropriate error code
+ * @return WY_ERR_NONE or appropriate error code
  */
-WYRM_INLINE wy_error wy_bson_get_binary_f(const wy_u8* buffer, wy_uword sz, const wy_u8** out_buffer, wy_u8* out_subtype, wy_uword* out_len)
+WY_INLINE wy_error wy_bson_get_binary_f(const wy_u8* buffer, wy_uword sz, const wy_u8** out_buffer, wy_u8* out_subtype, wy_uword* out_len)
 {
-    if (sz < 5) { return WYRM_ERR_INVAL; }
+    if (sz < 5) { return WY_ERR_INVAL; }
     wy_i32 decode_len = wy_bson_get_i32(buffer);
-    if (decode_len < 0 || sz < ((wy_uword)decode_len + 5)) { return WYRM_ERR_INVAL; }
+    if (decode_len < 0 || sz < ((wy_uword)decode_len + 5)) { return WY_ERR_INVAL; }
 
     *out_buffer = &buffer[5];
     *out_subtype = buffer[4];
     *out_len = (wy_uword) decode_len;
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
 
-WYRM_INLINE bool wy_bson_get_bool(const wy_u8* buffer) { return buffer[0] != 0; }
+WY_INLINE bool wy_bson_get_bool(const wy_u8* buffer) { return buffer[0] != 0; }
 
 wy_error wy_bson_doc_reader_start(wy_bson_doc_reader* reader, const wy_u8* data, wy_uword data_len);
 
@@ -92,6 +92,6 @@ wy_error wy_bson_doc_reader_find(wy_bson_doc_reader* reader, const char* name,
     const wy_u8** out_buffer,
     wy_uword* out_length);
 
-WYRM_END_DECLS
+WY_END_DECLS
 
 #endif

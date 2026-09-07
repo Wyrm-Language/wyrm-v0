@@ -1127,7 +1127,7 @@ is read, the chunk is placed, and the output variables are written.
 
 Generated C block:
 
-    wyrm_error w_mymodule_quadratic_formula(wyrm_state* state)
+    wy_error w_mymodule_quadratic_formula(wy_state* state)
     {
         /* magic start */
         /* magic block start */
@@ -1150,8 +1150,8 @@ Generated C block:
 
 Type Mapping:
 
- - int -> wyrm_word
+ - int -> wy_word
  - float -> float
  - bool -> bool
- - str (input only) -> wyrm_string*
- - object -> wyrm_value
+ - str (input only) -> wy_string*
+ - object -> wy_value

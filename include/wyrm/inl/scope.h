@@ -10,31 +10,31 @@ extern "C" {
 /**
  * Initialize scope
  */
-WYRM_INLINE wyrm_error wyrm_scope_initialize_f(wyrm_context* context, wyrm_scope* self, wyrm_prototype* prototype)
+WY_INLINE wy_error wy_scope_initialize_f(wy_context* context, wy_scope* self, wy_prototype* prototype)
 {
     self->prototype = prototype;
-    self->slots = WYRM_NULL;
+    self->slots = WY_NULL;
 
     if (prototype->slot_count > 0) {
-        self->slots = (wyrm_value*) wyrm_context_gc_alloc(context, sizeof(wyrm_value) * prototype->slot_count);
-        if (self->slots == WYRM_NULL) { return WYRM_ERR_NOMEM; }
-        for (wyrm_uword i = 0; i < prototype->slot_count; ++i) {
-            self->slots[i].type = WYRM_TYPE_TAG_ERROR;
+        self->slots = (wy_value*) wy_context_gc_alloc(context, sizeof(wy_value) * prototype->slot_count);
+        if (self->slots == WY_NULL) { return WY_ERR_NOMEM; }
+        for (wy_uword i = 0; i < prototype->slot_count; ++i) {
+            self->slots[i].type = WY_TYPE_TAG_ERROR;
         }
     }
 
-    return WYRM_ERR_NONE;
+    return WY_ERR_NONE;
 }
 
 /**
  * Dereference value in the scope
  */
-WYRM_INLINE wyrm_value* wyrm_scope_deref(wyrm_scope* self, wyrm_uword index)
+WY_INLINE wy_value* wy_scope_deref(wy_scope* self, wy_uword index)
 {
-    if (self == WYRM_NULL || self->slots == WYRM_NULL || index >= self->prototype->slot_count) { return WYRM_NULL; }
-    wyrm_value* slot = &self->slots[index];
-    if (slot->type == WYRM_TYPE_TAG_BOX) {
-        if (slot->data.box_ptr == WYRM_NULL) { return WYRM_NULL; }
+    if (self == WY_NULL || self->slots == WY_NULL || index >= self->prototype->slot_count) { return WY_NULL; }
+    wy_value* slot = &self->slots[index];
+    if (slot->type == WY_TYPE_TAG_BOX) {
+        if (slot->data.box_ptr == WY_NULL) { return WY_NULL; }
         return &slot->data.box_ptr->value;;
     }
     return slot;

@@ -9,55 +9,55 @@ extern "C" {
 #endif
 
 
-WYRM_INLINE bool wyrm_op_eq(wyrm_state* state, wyrm_type_tag lhst, wyrm_primitive lhs, wyrm_type_tag rhst, wyrm_primitive rhs)
+WY_INLINE bool wy_op_eq(wy_state* state, wy_type_tag lhst, wy_primitive lhs, wy_type_tag rhst, wy_primitive rhs)
 {
-    WYRM_UNUSED(state);
+    WY_UNUSED(state);
     if (lhst != rhst) { return false; }
     switch (lhst) {
-    case WYRM_TYPE_TAG_NIL:
+    case WY_TYPE_TAG_NIL:
         /* primitive value of nil type ignored at runtime, but should be 0 */
-        WYRM_ASSERT(lhs.uword == 0 && rhs.uword == 0);
+        WY_ASSERT(lhs.uword == 0 && rhs.uword == 0);
         return true;
-    case WYRM_TYPE_TAG_SYMBOL:
+    case WY_TYPE_TAG_SYMBOL:
         return lhs.symtab_entry == rhs.symtab_entry;
-    case WYRM_TYPE_TAG_UWORD:
+    case WY_TYPE_TAG_UWORD:
         return lhs.uword == rhs.uword;
-    case WYRM_TYPE_TAG_WORD:
+    case WY_TYPE_TAG_WORD:
         return lhs.word == rhs.word;
-    case WYRM_TYPE_TAG_STR:
-        return wyrm_string_eq_f(lhs.str, rhs.str);
-    case WYRM_TYPE_TAG_FUNCTION:
+    case WY_TYPE_TAG_STR:
+        return wy_string_eq_f(lhs.str, rhs.str);
+    case WY_TYPE_TAG_FUNCTION:
         return lhs.cb == rhs.cb;
 
-    case WYRM_TYPE_TAG_TABLE:
-    case WYRM_TYPE_TAG_BOX:
+    case WY_TYPE_TAG_TABLE:
+    case WY_TYPE_TAG_BOX:
     default:
         // TODO:
         return false;
     }
 }
 
-WYRM_INLINE wyrm_uword wyrm_op_hash(wyrm_state* state, wyrm_type_tag vt, wyrm_primitive v)
+WY_INLINE wy_uword wy_op_hash(wy_state* state, wy_type_tag vt, wy_primitive v)
 {
-    WYRM_UNUSED(state);
+    WY_UNUSED(state);
     switch (vt) {
-    case WYRM_TYPE_TAG_NIL:
+    case WY_TYPE_TAG_NIL:
         return 0;
 
-    case WYRM_TYPE_TAG_SYMBOL:
-        return (wyrm_uword) v.symtab_entry;
+    case WY_TYPE_TAG_SYMBOL:
+        return (wy_uword) v.symtab_entry;
 
-    case WYRM_TYPE_TAG_UWORD:
+    case WY_TYPE_TAG_UWORD:
         return v.uword;
 
-    case WYRM_TYPE_TAG_WORD:
-        return (wyrm_uword) v.word;
+    case WY_TYPE_TAG_WORD:
+        return (wy_uword) v.word;
 
-    case WYRM_TYPE_TAG_STR:
-        return wyrm_string_hash_f(v.str);
+    case WY_TYPE_TAG_STR:
+        return wy_string_hash_f(v.str);
 
     default:
-        return WYRM_HASH_INVALID;
+        return WY_HASH_INVALID;
     }
 }
 

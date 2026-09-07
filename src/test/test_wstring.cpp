@@ -7,11 +7,11 @@ TEST_SUITE("wstring") {
     TEST_CASE("init sets allocator and null context") {
         test_context_fixture fix;
 
-        wyrm_string* str_ptr = WYRM_NULL;
-        REQUIRE_EQ(wyrm_string_strdup(fix.get_context_ptr(), "Hello World", &str_ptr), WYRM_ERR_NONE);
-        REQUIRE_NE(str_ptr, WYRM_NULL);
+        wy_string* str_ptr = WY_NULL;
+        REQUIRE_EQ(wy_string_strdup(fix.get_context_ptr(), "Hello World", &str_ptr), WY_ERR_NONE);
+        REQUIRE_NE(str_ptr, WY_NULL);
 
-        fix.allocator.watch(str_ptr->str); str_ptr = WYRM_NULL;
+        fix.allocator.watch(str_ptr->str); str_ptr = WY_NULL;
         fix.run_gc();
         fix.allocator.check_watched_free();
     }
@@ -19,13 +19,13 @@ TEST_SUITE("wstring") {
     TEST_CASE("hash different for common keywords") {
         test_context_fixture fix;
 
-        wyrm_string* str1 = WYRM_NULL;
-        REQUIRE_EQ(wyrm_string_strdup(fix.get_context_ptr(), "if", &str1), WYRM_ERR_NONE);
-        REQUIRE_NE(str1, WYRM_NULL);
+        wy_string* str1 = WY_NULL;
+        REQUIRE_EQ(wy_string_strdup(fix.get_context_ptr(), "if", &str1), WY_ERR_NONE);
+        REQUIRE_NE(str1, WY_NULL);
 
-        wyrm_string* str2 = WYRM_NULL;
-        REQUIRE_EQ(wyrm_string_strdup(fix.get_context_ptr(), "fn", &str2), WYRM_ERR_NONE);
-        REQUIRE_NE(str2, WYRM_NULL);
+        wy_string* str2 = WY_NULL;
+        REQUIRE_EQ(wy_string_strdup(fix.get_context_ptr(), "fn", &str2), WY_ERR_NONE);
+        REQUIRE_NE(str2, WY_NULL);
 
         REQUIRE_NE(str1->hash, str2->hash);
     }
@@ -33,13 +33,13 @@ TEST_SUITE("wstring") {
     TEST_CASE("prefix match not equal") {
         test_context_fixture fix;
 
-        wyrm_string* str1 = WYRM_NULL;
-        REQUIRE_EQ(wyrm_string_new(fix.get_context_ptr(), "if2", 2, &str1), WYRM_ERR_NONE);
-        REQUIRE_NE(str1, WYRM_NULL);
+        wy_string* str1 = WY_NULL;
+        REQUIRE_EQ(wy_string_new(fix.get_context_ptr(), "if2", 2, &str1), WY_ERR_NONE);
+        REQUIRE_NE(str1, WY_NULL);
 
-        wyrm_string* str2 = WYRM_NULL;
-        REQUIRE_EQ(wyrm_string_new(fix.get_context_ptr(), "if2", 3, &str2), WYRM_ERR_NONE);
-        REQUIRE_NE(str2, WYRM_NULL);
+        wy_string* str2 = WY_NULL;
+        REQUIRE_EQ(wy_string_new(fix.get_context_ptr(), "if2", 3, &str2), WY_ERR_NONE);
+        REQUIRE_NE(str2, WY_NULL);
 
         REQUIRE_NE(str1->hash, str2->hash);
     }
@@ -47,9 +47,9 @@ TEST_SUITE("wstring") {
     TEST_CASE("oom handled") {
         test_context_fixture fix;
 
-        wyrm_string sentinel{};
-        wyrm_string* str_ptr = &sentinel;
+        wy_string sentinel{};
+        wy_string* str_ptr = &sentinel;
         fix.allocator.set_locked(true);
-        REQUIRE_EQ(wyrm_string_strdup(fix.get_context_ptr(), "Hello World", &str_ptr), WYRM_ERR_NOMEM);
+        REQUIRE_EQ(wy_string_strdup(fix.get_context_ptr(), "Hello World", &str_ptr), WY_ERR_NOMEM);
     }
 }

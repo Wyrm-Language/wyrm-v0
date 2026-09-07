@@ -17,7 +17,7 @@ extern "C" {
  *
  * @return System memory allocator
  */
-wyrm_allocator* wyrm_allocator_hosted_get_sys(void);
+wy_allocator* wy_allocator_hosted_get_sys(void);
 
 #ifdef __cplusplus
 }

@@ -2,34 +2,34 @@
 #include <wyrm/platform/common/allocator_null.h>
 
 
-static void *null_alloc(wyrm_allocator *allocator, wyrm_uword len)
+static void *null_alloc(wy_allocator *allocator, wy_uword len)
 {
-    WYRM_UNUSED(allocator);
-    WYRM_UNUSED(len);
-    return WYRM_NULL;
+    WY_UNUSED(allocator);
+    WY_UNUSED(len);
+    return WY_NULL;
 }
 
-static void *null_realloc(struct wyrm_allocator *self, void *buffer, wyrm_uword new_sz)
+static void *null_realloc(struct wy_allocator *self, void *buffer, wy_uword new_sz)
 {
-    WYRM_UNUSED(self);
-    WYRM_UNUSED(buffer);
-    WYRM_UNUSED(new_sz);
-    return WYRM_NULL;
+    WY_UNUSED(self);
+    WY_UNUSED(buffer);
+    WY_UNUSED(new_sz);
+    return WY_NULL;
 }
 
-static void null_free(wyrm_allocator *allocator, void *buffer)
+static void null_free(wy_allocator *allocator, void *buffer)
 {
-    WYRM_UNUSED(allocator);
-    WYRM_UNUSED(buffer);
+    WY_UNUSED(allocator);
+    WY_UNUSED(buffer);
 }
 
-static wyrm_uword null_estimate_heap_size(wyrm_allocator *allocator)
+static wy_uword null_estimate_heap_size(wy_allocator *allocator)
 {
-    WYRM_UNUSED(allocator);
+    WY_UNUSED(allocator);
     return 0;
 }
 
-const wyrm_allocator_vt wyrm_allocator_null_vt =
+const wy_allocator_vt wy_allocator_null_vt =
 {
     .alloc              = null_alloc,
     .realloc            = null_realloc,
@@ -37,6 +37,6 @@ const wyrm_allocator_vt wyrm_allocator_null_vt =
     .estimate_heap_size = null_estimate_heap_size,
 };
 
-wyrm_allocator wyrm_allocator_null_global = {
-    .clz = &wyrm_allocator_null_vt,
+wy_allocator wy_allocator_null_global = {
+    .clz = &wy_allocator_null_vt,
 };
