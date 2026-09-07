@@ -1,4 +1,5 @@
 #include <wyrm.h>
+#include <wyrm/work_area.h>
 
 /**
  * @brief Allocate a new box.

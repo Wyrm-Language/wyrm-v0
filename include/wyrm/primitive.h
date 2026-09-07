@@ -2,36 +2,15 @@
 #define WYRM_PRIMITIVE_H_
 
 #include <wyrm/sys/toolchain.h>
+#include <wyrm/sys/atomics.h>
+#include <wyrm/sys/errors.h>
+#include <wyrm/sys/thread_id.h>
 
 #include <wyrm/exec_fn.h>
+#include <wyrm/fwd.h>
 #include <wyrm/symtab_entry.h>
 
 WYRM_BEGIN_DECLS
-
-// FIXME: naming conversion
-struct wyrm_object;
-struct wyrm_box;
-struct wyrm_pair;
-struct wyrm_class;
-struct wyrm_string;
-union wy_primitive;
-
-struct wy_value;
-
-#ifndef __cplusplus
-typedef struct wyrm_object wyrm_object;
-typedef struct wyrm_box wyrm_box;
-typedef struct wyrm_pair wyrm_pair;
-typedef struct wyrm_class wyrm_class;
-typedef struct wyrm_string wyrm_string;
-typedef union wy_primitive wy_primitive;
-typedef struct wy_value wy_value;
-#endif
-
-// FIXME: name cleanup
-typedef wy_value wyrm_value;
-typedef wy_primitive wyrm_primitive;
-
 
 /**
  * @brief Primitive Types
@@ -45,7 +24,6 @@ typedef enum wyrm_type_tag
 
     WYRM_TYPE_TAG_FUNCTION,
     WYRM_TYPE_TAG_SYMBOL,
-    WYRM_TYPE_TAG_VALUE_PTR,
 
     WYRM_TYPE_TAG_GC_PATH_START,
 
@@ -57,10 +35,17 @@ typedef enum wyrm_type_tag
     WYRM_TYPE_TAG_FIBER,
     WYRM_TYPE_TAG_DTYPE,
     WYRM_TYPE_TAG_CLASS,
+    WYRM_TYPE_TAG_MODULE,
 
     WYRM_TYPE_TAG_TABLE
 } wyrm_type_tag;
 
+/**
+ * Test whether a tag denotes a garbage collected object reference
+ *
+ * @param tag Type tag to test
+ * @return true when the tagged primitive holds a wy_object pointer
+ */
 WYRM_INLINE bool wy_type_is_object(wyrm_type_tag tag)
 {
     return tag >= WYRM_TYPE_TAG_GC_PATH_START;
@@ -74,7 +59,7 @@ WYRM_INLINE bool wy_type_is_object(wyrm_type_tag tag)
  * primitive may be used independently in some cases.
  */
 union wy_primitive {
-    wyrm_object* gc_object;
+    wy_object* gc_object;
 
     wyrm_word word;
     wyrm_handle handle;

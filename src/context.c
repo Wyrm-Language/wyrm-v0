@@ -42,15 +42,15 @@ static bool context_triggered(wyrm_primitive ud)
 }
 
 
-wyrm_error wyrm_context_init_s(wyrm_context* self)
+void wyrm_context_init_s(wyrm_context* self)
 {
     self->parent = WYRM_NULL;
+    self->root_module = WYRM_NULL;
     self->current_fiber = WYRM_NULL;
     self->main_loop = WYRM_NULL;
     self->wakeable_source = wyrm_primitive_null();
 
     wyrm_gc_init_f(&self->arena, WYRM_NULL);
-    return WYRM_ERR_NONE;
 }
 
 
@@ -67,6 +67,24 @@ void wyrm_context_finalize_f(wyrm_context* self)
     wyrm_gc_finalize_f(self, &self->arena);
 }
 
+/**
+ * Set the root module associated with the context.
+ *
+ * A context "runs" via association with a root module. This module is the
+ * 'main' entry point for the context. After the module has executed, the
+ * context may remain - allowing asynchronous events keyed off an associated
+ * main loop if constructed.
+ *
+ * @param context The context receiving the module.
+ * @param module The dynamic module state object
+ * @return WYRM_ERR_NONE on success; WYRM_ERR_BUSY if root already set.
+ */
+wyrm_error wy_context_set_root(wyrm_context* context, wy_module* module)
+{
+    if (context->root_module != WYRM_NULL) { return WYRM_ERR_BUSY; }
+    context->root_module = module;
+    return WYRM_ERR_NONE;
+}
 
 wyrm_error wyrm_context_attach_loop(wyrm_context* self, wyrm_main_loop* loop)
 {
@@ -171,8 +189,8 @@ void wyrm_context_gc_full_run(wyrm_state* state, wyrm_context* context)
         wyrm_gc_object_visit(state, (wyrm_object*) context->current_fiber);
     }
 
-    if (context->root != WYRM_NULL) {
-        wyrm_gc_object_visit(state, (wyrm_object*) context->root);
+    if (context->root_module != WYRM_NULL) {
+        wyrm_gc_object_visit(state, (wyrm_object*) context->root_module);
     }
 
     wyrm_gc_collect_finish_f(context, &context->arena);

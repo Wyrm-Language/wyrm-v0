@@ -54,12 +54,21 @@ WYRM_INLINE void wy_bson_get_str(const wy_u8* buffer, const char** out_str, wyrm
     *out_len = len;
 }
 
-
-WYRM_INLINE wy_error wy_bson_get_binary_f(const wy_u8* buffer, wy_uword len, const wy_u8** out_buffer, wy_u8* out_subtype, wy_uword* out_len)
+/**
+ * Get BSON bianry data
+ *
+ * @param buffer Input buffer
+ * @param sz Size of the input buffer
+ * @param out_buffer Output data buffer
+ * @param out_subtype Output data subtype
+ * @param out_len Output data size in bytes
+ * @return WYRM_ERR_NONE or appropriate error code
+ */
+WYRM_INLINE wy_error wy_bson_get_binary_f(const wy_u8* buffer, wy_uword sz, const wy_u8** out_buffer, wy_u8* out_subtype, wy_uword* out_len)
 {
-    if (len < 5) { return WYRM_ERR_INVAL; }
+    if (sz < 5) { return WYRM_ERR_INVAL; }
     wy_i32 decode_len = wy_bson_get_i32(buffer);
-    if (decode_len < 0 || len < ((wy_uword)decode_len + 5)) { return WYRM_ERR_INVAL; }
+    if (decode_len < 0 || sz < ((wy_uword)decode_len + 5)) { return WYRM_ERR_INVAL; }
 
     *out_buffer = &buffer[5];
     *out_subtype = buffer[4];

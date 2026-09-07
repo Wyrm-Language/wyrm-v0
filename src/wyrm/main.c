@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <wy.h>
 #include <wyrm/bson.h>
 #include <wyrm/module.h>
 #include <wyrm/platform/hosted/cmachine.h>
@@ -97,12 +96,15 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Failed to load module\n");
         return -1;
     }
+    wy_context_set_root(context, mod);
 
     wy_fiber* fiber = wyrm_fiber_create(context, 8192, 1024);
     if (fiber == WYRM_NULL) {
         fprintf(stderr, "Failed to create fiber\n");
         return -1;
     }
+    wyrm_context_attach_fiber(context, fiber);
+
 
 
     // TODO: add wy_eval or something...
@@ -111,9 +113,8 @@ int main(int argc, char** argv) {
     wyrm_fiber_push_continuation(fiber, w_do_a_mul);
 
     wyrm_state state;
-    state.context = context;
+    wyrm_state_init_from_context_f(&state, context);
     state.fiber = fiber;
-    state.machine = machine;
 
     wyrm_fiber_exec_f(fiber, &state);
 

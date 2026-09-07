@@ -28,8 +28,6 @@ WYRM_INLINE bool wyrm_op_eq(wyrm_state* state, wyrm_type_tag lhst, wyrm_primitiv
         return wyrm_string_eq_f(lhs.str, rhs.str);
     case WYRM_TYPE_TAG_FUNCTION:
         return lhs.cb == rhs.cb;
-    case WYRM_TYPE_TAG_VALUE_PTR:
-        return lhs.ptr == rhs.ptr;
 
     case WYRM_TYPE_TAG_TABLE:
     case WYRM_TYPE_TAG_BOX:

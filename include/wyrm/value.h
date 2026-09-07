@@ -1,7 +1,7 @@
 #ifndef WYRM_VALUE_H_
 #define WYRM_VALUE_H_
 
-#include <wyrm/sys/toolchain.h>
+#include <wyrm/fwd.h>
 #include <wyrm/primitive.h>
 
 WYRM_BEGIN_DECLS

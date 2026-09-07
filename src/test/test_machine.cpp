@@ -24,7 +24,7 @@ TEST_SUITE("machine") {
         wyrm_machine machine;
         wyrm_context ctx;
         REQUIRE_EQ(wyrm_machine_init_s(&machine, alloc.ptr()), WYRM_ERR_NONE);
-        REQUIRE_EQ(wyrm_context_init_s(&ctx), WYRM_ERR_NONE);
+        wyrm_context_init_s(&ctx);
         CHECK_EQ(wyrm_machine_attach_context(&machine, &ctx), WYRM_ERR_NONE);
         CHECK_EQ(wyrm_context_get_machine(&ctx), &machine);
     }

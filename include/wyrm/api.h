@@ -6,6 +6,7 @@
 #include <wyrm/fiber.h>
 #include <wyrm/string.h>
 #include <wyrm/context.h>
+#include <wyrm/machine.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,14 +15,6 @@ extern "C" {
 const char* wyrm_lib_implementation(void);
 
 
-
-
-wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc);
-wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context);
-void wyrm_machine_finalize_f(wyrm_machine* self);
-
-wyrm_error wyrm_machine_find_symbol(wyrm_machine* self, const char* cstr, wyrm_symtab_entry* out);
-wyrm_error wyrm_machine_insert_symbol(wyrm_machine* self, const char* cstr, wyrm_symtab_entry* out);
 
 
 /* ------------------------------------------------------------------------- */
@@ -88,9 +81,6 @@ WYRM_INLINE wyrm_value wyrm_value_word(wyrm_word value)
 }
 
 
-
-
-
 /* ------------------------------------------------------------------------- */
 /* Class                                                                     */
 /* ------------------------------------------------------------------------- */
@@ -112,25 +102,6 @@ extern const wyrm_object_type wyrm_type_table;
 wyrm_error wyrm_dict_new(wyrm_context* self, wyrm_dict** out);
 wyrm_value* wyrm_dict_get(wyrm_state* state, wyrm_dict* self, wyrm_type_tag tag, wyrm_primitive value);
 wyrm_error wyrm_dict_set(wyrm_state* state, wyrm_dict* self, wyrm_type_tag key_type, wyrm_primitive key_value, wyrm_type_tag value_type, wyrm_primitive value);
-
-
-
-// SCAFFOLDING - TO BE REMOVED
-void* wyrm_context_gc_alloc(wyrm_context* context, wyrm_uword dsize);
-void* wyrm_context_gc_realloc(wyrm_context* context, void* ptr, wyrm_uword new_size);
-void wyrm_context_gc_free(wyrm_context* context, void* ptr);
-void wyrm_context_push_gc(wyrm_context* context, wyrm_object* gc_info);
-
-void wyrm_context_gc_full_run(wyrm_state* state, wyrm_context* context);
-
-
-
-
-
-/* ---- Utility Functions ----- */
-
-
-
 
 
 #ifdef __cplusplus

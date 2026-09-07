@@ -51,6 +51,7 @@ wyrm_error wyrm_machine_init_s(wyrm_machine* self, wyrm_allocator* alloc)
 wyrm_error wyrm_machine_attach_context(wyrm_machine* self, wyrm_context* context)
 {
     if (self == WYRM_NULL || context == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    if (self->context != WYRM_NULL) { /* todo: multithread support */ return WYRM_ERR_BUSY; }
     self->context = context;
     context->parent = self;
 

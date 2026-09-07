@@ -14,8 +14,10 @@ void wy_module_init_static_f(wy_module* self)
 {
     wyrm_object_init_header_s(&self->head, &wy_module_type);
     self->global_count = 0;
-    self->global_capacity = 0;
-    self->globals = NULL;
+    self->code_count = 0;
+
+    wy_mem_info_init_empty_s(&self->code_memory);
+    wy_mem_info_init_empty_s(&self->global_memory);
 }
 
 wy_module* wy_module_new_f(wyrm_context* context)
@@ -23,15 +25,13 @@ wy_module* wy_module_new_f(wyrm_context* context)
     wy_module* self = (wy_module*) wyrm_context_gc_alloc(context, sizeof(wy_module));
     if (!self) { return WYRM_NULL; }
 
+    wy_module_init_static_f(self);
     wyrm_context_push_gc(context, WY_MODULE_GET_OBJ(self));
     return self;
 }
 
 wy_error wy_module_load(wyrm_context* context, wy_module* self, const wy_u8* dbuf, wy_uword dbuf_size)
 {
-    WYRM_UNUSED(self);
-    WYRM_UNUSED(context);
-
     if (dbuf_size < 8) { return WYRM_ERR_INVAL; }
     if (dbuf[0] != (wy_u8) 'W' ||
         dbuf[1] != (wy_u8) 'Y' ||
@@ -41,7 +41,7 @@ wy_error wy_module_load(wyrm_context* context, wy_module* self, const wy_u8* dbu
     }
 
     /* self *must be* a from scratch / uninitialized module */
-    if (self->code_size > 0 || self->global_count > 0) { return WYRM_ERR_INVAL; }
+    if (self->code_count > 0 || self->global_count > 0) { return WYRM_ERR_INVAL; }
 
     const wy_u8* section_ptr;
     wy_u8 section_type;
@@ -105,80 +105,76 @@ wy_error wy_module_load(wyrm_context* context, wy_module* self, const wy_u8* dbu
 static wy_error module_handle_code_section_f(wy_context* context, wy_module* self, const wy_u8* section_ptr, wy_u8 section_type, wy_uword section_size)
 {
     if (section_type != WY_BSON_TAG_BINARY) { return WYRM_ERR_INVAL; }
+    if (self->code_count > 0) { /* Unexpected code section! */ return WYRM_ERR_INVAL; }
     wy_error last_error = WYRM_ERR_NONE;
     const wy_u8* code_buffer;
     wy_u8 code_subtype;
-    wy_uword code_size;
+    wy_uword code_sz;
 
-    last_error = wy_bson_get_binary_f(section_ptr, section_size, &code_buffer, &code_subtype, &code_size);
+    last_error = wy_bson_get_binary_f(section_ptr, section_size, &code_buffer, &code_subtype, &code_sz);
     if (last_error != WYRM_ERR_NONE) { return last_error; }
 
-    last_error = wy_module_reserve_code_f(context, self, code_size);
+    if ((code_sz % 4) != 0) { return WYRM_ERR_INVAL; }
+    wy_uword code_len = code_sz / 4;
+
+    last_error = wy_module_reserve_code_f(context, self, code_len);
     if (last_error != WYRM_ERR_NONE) { return last_error; }
 
     wy_uword drop;
-    last_error = wy_module_code_push(self, (const wy_u32*) code_buffer, code_size, &drop);
+    last_error = wy_module_code_push(self, code_buffer, code_len, &drop);
     return last_error;
 }
 
-wy_error wy_module_init_reserve_f(wy_module* self, wy_allocator* allocator, wy_uword capacity)
+wy_error wy_module_reserve_code_f(wyrm_context* context, wy_module* self, wy_uword len)
 {
-    if (self->global_capacity >= capacity) { return WYRM_ERR_NONE; }
-    if (capacity == 0 || allocator == WYRM_NULL) { return WYRM_ERR_INVAL; }
+    if (WY_MEM_INFO_COUNT(wy_u32, &self->code_memory) >= len) { return WYRM_ERR_NONE; }
+    if (len == 0) { return WYRM_ERR_INVAL; }
 
-    wyrm_value* new_globals = (wyrm_value*) wyrm_allocator_realloc(allocator, self->globals, sizeof(wyrm_value) * capacity);
-    if (new_globals == NULL) { return WYRM_ERR_NOMEM; }
+    wy_error last_error = WY_CONTEXT_MEM_INFO_RESERVE_COUNT(context, &self->code_memory, len, wy_u32);
+    if (last_error != WYRM_ERR_NONE) { return last_error; }
 
-    self->global_capacity = capacity;
-    self->globals = new_globals;
     return WYRM_ERR_NONE;
 }
 
-wy_error wy_module_resize_globals_f(wy_module* self, wy_uword capacity)
+/**
+ * Push code to the module buffer.
+ *
+ * Append the code to the module buffer. This will *not* attempt to reallocate
+ * if the buffer is insufficiently sized. Generally, resizing the module
+ * code buffer requires invalidating and verifying any outstanding code
+ * pointers.
+ *
+ * @param self Module target
+ * @param code_buffer Binary buffer (may be unaligned)
+ * @param len Total u32 code points to push
+ * @param out_offset Pointer to the beginning of pushed data
+ * @return WYRM_ERR_NONE on success otherwise appropriate error
+ */
+wy_error wy_module_code_push(wy_module* self, const wy_u8* code_buffer, wy_uword len, wy_uword* out_offset)
 {
-    if (capacity > self->global_capacity) { return WYRM_ERR_NOMEM; }
-    for (wy_uword idx = self->global_count; idx < capacity; idx++) {
-        self->globals[idx] = wyrm_value_Unset();
-    }
-    self->global_count = capacity;
-    return WYRM_ERR_NONE;
-}
-
-wy_error wy_module_reserve_code_f(wyrm_context* context, wy_module* self, wy_uword capacity)
-{
-    if (capacity <= self->code_capacity) { return WYRM_ERR_NONE; }
-    if (capacity == 0 || context == WYRM_NULL) { return WYRM_ERR_INVAL; }
-
-    wy_u32* new_code = (wy_u32*) wyrm_context_gc_realloc(context, self->code, sizeof(wy_u32) * capacity);
-    if (new_code == NULL) { return WYRM_ERR_NOMEM; }
-
-    self->code_capacity = capacity;
-    self->code = new_code;
-    return WYRM_ERR_NONE;
-}
-
-wy_error wy_module_code_push(wy_module* self, const wy_u32* code_buffer, wy_uword code_size, wy_uword* out_offset)
-{
-    wy_uword new_size = self->code_size + code_size;
-    wy_uword orig = self->code_size;
-    if (new_size <= self->code_capacity) {
-        wyrm_memcpy(self->code + self->code_size, code_buffer, sizeof(wy_u32) * code_size);
-        self->code_size = new_size;
+    wy_uword new_len = self->code_count + len;
+    wy_uword orig = self->code_count;
+    if (new_len <= WY_MEM_INFO_COUNT(wy_u32, &self->code_memory)) {
+        wyrm_memcpy(WY_MEM_INFO_BEGIN_PTR(wy_u32, &self->code_memory) + orig,
+            code_buffer,
+            sizeof(wy_u32) * len);
+        self->code_count = new_len;
         if (out_offset != WYRM_NULL) { *out_offset = orig; }
         return WYRM_ERR_NONE;
     }
     return WYRM_ERR_NOMEM;
 }
 
-void finalize(wyrm_context* context, wyrm_object* self_s)
+static void finalize(wyrm_context* context, wyrm_object* self_s)
 {
     wy_module* self = (wy_module*) self_s;
-    wyrm_context_gc_free(context, self->globals);
-    self->globals = NULL;
+
+    wy_context_mem_release_f(context, &self->code_memory); self->code_count = 0;
+    wy_context_mem_release_f(context, &self->global_memory); self->global_count = 0;
 }
 
 
-wyrm_error children_iter_start(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa)
+static wyrm_error children_iter_start(wyrm_state* state, wyrm_object* self, wyrm_work_area* wa)
 {
     WYRM_UNUSED(state); WYRM_UNUSED(self);
     wyrm_memset(wa, 0, sizeof(wyrm_work_area));
@@ -187,15 +183,18 @@ wyrm_error children_iter_start(wyrm_state* state, wyrm_object* self, wyrm_work_a
     return WYRM_ERR_NONE;
 }
 
-wyrm_error children_iter_next(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa, const wyrm_object** child)
+static wyrm_error children_iter_next(wyrm_state* state, wyrm_object* object, wyrm_work_area* wa, const wyrm_object** child)
 {
     WYRM_UNUSED(state);
-    wy_module* self = (wy_module*) object;
 
-    for (wy_uword idx = wa->data[0].word; idx < self->global_count; idx++) {
-        if (wy_type_is_object(self->globals[idx].type)) {
-            wa->data[0].uword = idx;
-            *child = self->globals[idx].data.gc_object;
+    wy_module* self = (wy_module*) object;
+    wy_value* globals = WY_MEM_INFO_BEGIN_PTR(wy_value, &self->global_memory);
+
+    for (wy_uword cur = wa->data[0].uword; cur < self->global_count; cur = wa->data[0].uword) {
+        wa->data[0].uword++;
+
+        if (wy_type_is_object(globals[cur].type)) {
+            *child = globals[cur].data.gc_object;
             return WYRM_ERR_NONE;
         }
     }
@@ -206,7 +205,7 @@ wyrm_error children_iter_next(wyrm_state* state, wyrm_object* object, wyrm_work_
 
 const wyrm_object_type wy_module_type = {
     .object = WYRM_OBJECT_TYPE_OBJECT_INIT,
-    .gc_type = WYRM_TYPE_TAG_CLASS,
+    .gc_type = WYRM_TYPE_TAG_MODULE,
 
     .children_iter_start = children_iter_start,
     .children_iter_next = children_iter_next,

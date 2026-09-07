@@ -11,18 +11,22 @@
 
 WYRM_BEGIN_DECLS
 
-struct wyrm_context
+struct wy_context
 {
     wyrm_machine* parent;
     wyrm_fiber* current_fiber;
+    wy_module* root_module;
     wyrm_main_loop* main_loop;
-    wyrm_dict* root;
     wyrm_primitive wakeable_source;
     wyrm_gc_arena arena;
 };
 
-wyrm_error wyrm_context_init_s(wyrm_context* self);
+void wyrm_context_init_s(wyrm_context* self);
 void wyrm_context_finalize_f(wyrm_context* self);
+
+wyrm_error wy_context_set_root(wyrm_context* context, wy_module* module);
+
+
 
 wyrm_error wyrm_context_attach_loop(wyrm_context* context, wyrm_main_loop* loop);
 void wyrm_context_detach_loop(wyrm_context* context);
@@ -32,8 +36,6 @@ wyrm_error wyrm_context_attach_fiber(wyrm_context* self, wyrm_fiber* fiber);
 
 void wy_ctx_object_init_header_static_f(wyrm_context* context, wyrm_object* object, const wyrm_object_type* dtype);
 
-WYRM_INLINE wyrm_dict* wyrm_context_get_root_f(wyrm_context* context);
-WYRM_INLINE wyrm_error wyrm_context_set_root_f(wyrm_context* context, wyrm_dict* root);
 WYRM_INLINE wyrm_machine* wyrm_context_get_machine(wyrm_context* self);
 
 void wyrm_context_object_init_header_f(wyrm_context* context, wyrm_object* object, const wyrm_object_type* dtype);
@@ -61,33 +63,6 @@ WYRM_INLINE wy_error wy_context_mem_reserve_count_f(wy_context* context, wy_mem_
     return wy_context_mem_reserve_f(context, mem_info, mem_sz);
 }
 
-
-/**
- * Get the root scope for the context
- *
- * @param context Context to access
- * @return Table associated with the root scope
- */
-WYRM_INLINE wyrm_dict* wyrm_context_get_root_f(wyrm_context* context)
-{
-    WYRM_ASSERT(context != WYRM_NULL);
-    return context->root;
-}
-
-/**
- * Set the root scope for the context
- *
- * @param context Context to access
- * @param root Table to use as root scope
- * @return WYRM_ERR_BUSY if already set, WYRM_ERR_NONE on success
- */
-WYRM_INLINE wyrm_error wyrm_context_set_root_f(wyrm_context* context, wyrm_dict* root)
-{
-    WYRM_ASSERT(context != WYRM_NULL);
-    if (context->root != WYRM_NULL) { return WYRM_ERR_BUSY; }
-    context->root = root;
-    return WYRM_ERR_NONE;
-}
 
 /**
  * Gab machine associated with context

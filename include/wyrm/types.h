@@ -33,26 +33,6 @@ struct wyrm_allocator {
 
 
 // ----------------------------------------------------------------------------
-// Wyrm GC Info
-// ----------------------------------------------------------------------------
-
-enum
-{
-    WYRM_GC_STATIC          = 0x001,
-    WYRM_GC_FLAG_MARKED     = 0x004,
-    WYRM_GC_FLAG_FINALIZED  = 0x008,
-    WYRM_GC_FLAG_RO         = 0x010,
-};
-
-
-extern const wyrm_object_type wyrm_type_type;
-extern const wyrm_object_type wyrm_type_object;
-
-#define WYRM_OBJECT_STATIC_INITIALIZER(DTYPE)   { .dtype = DTYPE, .next = WYRM_NULL, .flags = (WYRM_GC_STATIC | WYRM_GC_FLAG_RO)  }
-#define WYRM_OBJECT_TYPE_OBJECT_INIT WYRM_OBJECT_STATIC_INITIALIZER(&wyrm_type_type)
-
-
-// ----------------------------------------------------------------------------
 // Prototype & Scope
 // ----------------------------------------------------------------------------
 
@@ -223,15 +203,6 @@ typedef struct wyrm_main_loop
 // Wyrm Machine
 // ----------------------------------------------------------------------------
 
-struct wyrm_machine_symtab;
-
-struct wyrm_machine
-{
-    wyrm_allocator* allocator;
-    wyrm_context* context;
-
-    struct wyrm_machine_symtab* symtab;
-};
 
 
 // ----------------------------------------------------------------------------

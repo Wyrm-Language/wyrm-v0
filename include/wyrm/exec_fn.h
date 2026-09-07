@@ -2,10 +2,9 @@
 #define WYRM_EXEC_FN_H
 
 #include <wyrm/sys/toolchain.h>
+#include <wyrm/fwd.h>
 
 WYRM_BEGIN_DECLS
-
-typedef struct wyrm_state wyrm_state;
 
 /**
  * @brief Result states for a wyrm callable invoked via wyrm_exec_fn.

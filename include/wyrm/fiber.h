@@ -28,7 +28,7 @@ typedef struct wy_fiber_frame
 /**
  * Fiber / stack
  */
-struct wyrm_fiber
+struct wy_fiber
 {
     wyrm_object object;
     wyrm_context* parent;

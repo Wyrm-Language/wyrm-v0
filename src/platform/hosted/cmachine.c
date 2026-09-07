@@ -30,14 +30,13 @@ void wy_cmachine_destroy(wy_machine* machine)
 wy_context* wy_cmachine_context_new(wy_machine* machine)
 {
     if (machine == WYRM_NULL) { return WYRM_NULL; }
+    if (machine->context != WYRM_NULL) { return WYRM_NULL; }
 
     wy_context* ctx = wyrm_allocator_alloc(machine->allocator, sizeof(wy_context));
     if (ctx == WYRM_NULL) { return WYRM_NULL; }
 
-    wy_error last_error = wyrm_context_init_s(ctx);
-    if (last_error != WYRM_ERR_NONE) { return WYRM_NULL; }
-
-    last_error = wyrm_machine_attach_context(machine, ctx);
+    wyrm_context_init_s(ctx);
+    wy_error last_error = wyrm_machine_attach_context(machine, ctx);
     if (last_error != WYRM_ERR_NONE) {
         wyrm_context_finalize_f(ctx);
         wyrm_allocator_free(machine->allocator, ctx);

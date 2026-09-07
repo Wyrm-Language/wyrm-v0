@@ -7,7 +7,7 @@
 constexpr bool operator==(const wyrm_value& lhs, const wyrm_value& rhs)
 {
     if (lhs.type != rhs.type) { return false; }
-    if (wyrm_type_tag_is_gc(lhs.type)) { return lhs.data.gc_object == rhs.data.gc_object; }
+    if (wy_type_is_object(lhs.type)) { return lhs.data.gc_object == rhs.data.gc_object; }
 
     switch (lhs.type) {
     case WYRM_TYPE_TAG_NIL:

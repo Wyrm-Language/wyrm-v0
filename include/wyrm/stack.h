@@ -23,9 +23,6 @@ struct wy_stack
     wyrm_value* top;
 };
 
-typedef struct wy_stack wyrm_stack;
-typedef struct wy_stack wy_stack;
-
 WYRM_INLINE wyrm_error wyrm_stack_pop_discard_f(wyrm_stack* self, wyrm_uword count);
 
 /**
