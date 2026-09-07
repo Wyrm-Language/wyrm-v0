@@ -1,7 +1,7 @@
 #ifndef WYRM_UTIL_H_
 #define WYRM_UTIL_H_
 
-#include <wyrm/core.h>
+#include <wyrm/sys/toolchain.h>
 
 // default values recommended by http://isthe.com/chongo/tech/comp/fnv/
 #define FNV1A_PRIME  0x01000193
@@ -63,6 +63,16 @@ WY_INLINE wy_uword wy_util_rehash(wy_uintptr w)
 {
     return wy_util_fnv1a_buffer(&w, sizeof(wy_uintptr));
 }
+
+/**
+ * Get the next array size given current capacity and initial capacity
+ */
+WY_INLINE wy_uword wy_next_array_capacity(wy_uword current_capacity, wy_uword initial)
+{
+    if (current_capacity >= WY_UWORD_HALF) return WY_UWORD_MAX;
+    return current_capacity == 0 ? initial : current_capacity * 2;
+}
+
 
 
 WY_END_DECLS

@@ -1,7 +1,8 @@
 #ifndef WYRM_WPAIR_H_
 #define WYRM_WPAIR_H_
 
-#include <wyrm/core.h>
+#include <wyrm/object.h>
+#include <wyrm/value.h>
 #include <wyrm/context.h>
 
 WY_BEGIN_DECLS

@@ -13,7 +13,6 @@ cwyrm_lib_inc = include_directories('.', '../include')
 cwyrm_sources = files(
     'bson.c',
     'context.c',
-    'cwyrm.c',
     'fiber.c',
     'gc.c',
     'machine.c',

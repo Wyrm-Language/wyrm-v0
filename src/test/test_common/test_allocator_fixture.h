@@ -4,7 +4,6 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
-#include <wyrm/types.h>
 #include <list>
 #include <cstdlib>
 #include <stdexcept>

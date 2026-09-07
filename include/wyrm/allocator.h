@@ -1,9 +1,29 @@
 #ifndef WYRM_ALLOCATOR_H_
 #define WYRM_ALLOCATOR_H_
 
-#include <wyrm/types.h>
+#include <wyrm/sys/toolchain.h>
+#include <wyrm/fwd.h>
 
 WY_BEGIN_DECLS
+
+/**
+ * @brief Virtual table for allocator
+ */
+typedef struct wy_allocator_vt {
+    void* (*alloc)(wy_allocator* self, wy_uword len);
+    void* (*realloc)(wy_allocator* self, void* buffer, wy_uword new_sz);
+    void (*free)(wy_allocator* self, void* buffer);
+    wy_uword (*estimate_heap_size)(wy_allocator* self);
+} wy_allocator_vt;
+
+
+/**
+ * @brief Allocator data structure
+ */
+struct wy_allocator {
+    const wy_allocator_vt* clz;
+};
+
 
 /**
  * Allocates memory of the specified length using the provided allocator.

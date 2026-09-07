@@ -1,6 +1,6 @@
 #include <wyrm/gc.h>
 #include <wyrm.h>
-
+#include <wyrm/work_area.h>
 
 void wy_gc_init_f(wy_gc_arena* self, wy_allocator* allocator)
 {

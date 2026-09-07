@@ -1,5 +1,8 @@
 #include <wyrm.h>
-
+#include <wyrm/dict.h>
+#include <wyrm/op.h>
+#include <wyrm/util.h>
+#include <wyrm/work_area.h>
 
 static void table_init_s(wy_dict* self,
     wy_context* context,
@@ -124,7 +127,7 @@ static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_a
     while (idx < self->count) {
         if (subidx == 0) {
             subidx++;
-            if (wy_type_tag_is_gc(self->dense[idx].key.type)) {
+            if (wy_type_is_object(self->dense[idx].key.type)) {
                 wa->data[0].uword = idx;
                 wa->data[1].uword = subidx;
                 *child = self->dense[idx].key.data.gc_object;
@@ -133,7 +136,7 @@ static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_a
         } else {
             wy_word cur_idx = idx;
             subidx = 0; idx++;
-            if (wy_type_tag_is_gc(self->dense[cur_idx].value.type)) {
+            if (wy_type_is_object(self->dense[cur_idx].value.type)) {
                 wa->data[0].uword = idx;
                 wa->data[1].uword = subidx;
                 *child = self->dense[cur_idx].value.data.gc_object;

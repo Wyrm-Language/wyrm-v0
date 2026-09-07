@@ -1,7 +1,7 @@
 #ifndef WYRM_WOPCODE_H
 #define WYRM_WOPCODE_H
 
-#include <wyrm/core.h>
+#include <wyrm/sys/toolchain.h>
 
 WY_BEGIN_DECLS
 

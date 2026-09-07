@@ -1,4 +1,5 @@
 #include <wyrm.h>
+#include <wyrm/work_area.h>
 
 #define SLOT_COUNT 256
 

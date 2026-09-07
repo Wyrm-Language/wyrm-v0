@@ -1,9 +1,8 @@
 #ifndef WYRM_WBOX_H_
 #define WYRM_WBOX_H_
 
-#include <wyrm/core.h>
-#include <wyrm/types.h>
 #include <wyrm/object.h>
+#include <wyrm/value.h>
 
 #ifdef __cplusplus
 extern "C" {

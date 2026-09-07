@@ -1,10 +1,12 @@
 #ifndef WYRM_SLOT_DICT_H_
 #define WYRM_SLOT_DICT_H_
 
-#include <wyrm/core.h>
+#include <wyrm/sys/errors.h>
+#include <wyrm/symtab_entry.h>
 #include <wyrm/allocator.h>
 #include <wyrm/util.h>
 
+#define WY_SLOT_INVALID WY_UWORD_MAX
 
 WY_BEGIN_DECLS
 

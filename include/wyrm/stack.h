@@ -1,7 +1,7 @@
 #ifndef WYRM_STACK_INL_H_
 #define WYRM_STACK_INL_H_
 
-#include <wyrm/types.h>
+#include <wyrm/fwd.h>
 #include <wyrm/sys/string.h>
 #include <wyrm/value.h>
 

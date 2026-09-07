@@ -1,4 +1,5 @@
 #include <wyrm.h>
+#include <wyrm/box.h>
 #include <wyrm/work_area.h>
 
 /**
@@ -34,7 +35,7 @@ static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_a
 
     if (wa->data[0].word == 0) {
         wa->data[0].word = 1;
-        if (wy_type_tag_is_gc(box->value.type) && box->value.data.gc_object != WY_NULL) {
+        if (wy_type_is_object(box->value.type) && box->value.data.gc_object != WY_NULL) {
             *child = box->value.data.gc_object;
             return WY_ERR_NONE;
         }

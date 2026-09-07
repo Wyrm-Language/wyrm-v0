@@ -1,5 +1,6 @@
 #include <wyrm/platform/hosted/cmachine.h>
 #include <wyrm/platform/hosted/allocator_cmem.h>
+#include <wyrm/context.h>
 
 wy_machine* wy_cmachine_new(void)
 {

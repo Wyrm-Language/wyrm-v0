@@ -1,8 +1,9 @@
 #ifndef WYRM_MODULE_H_
 #define WYRM_MODULE_H_
 
-#include <wyrm/core.h>
 #include <wyrm/mem_info.h>
+#include <wyrm/object.h>
+#include <wyrm/value.h>
 
 WY_BEGIN_DECLS
 

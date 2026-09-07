@@ -1,7 +1,7 @@
 #ifndef WYRM_VM_H_
 #define WYRM_VM_H_
 
-#include <wyrm/core.h>
+#include <wyrm/context.h>
 
 WY_BEGIN_DECLS
 

@@ -1,5 +1,6 @@
 #include <wyrm/pair.h>
 #include <wyrm/sys/string.h>
+#include <wyrm/work_area.h>
 
 static wy_error start_children_iter(wy_state* state, wy_object* object, wy_work_area* wa)
 {
@@ -19,14 +20,14 @@ static wy_error next_children_iter(wy_state* state, wy_object* object, wy_work_a
     switch (wa->data[0].word) {
     case 0:
         wa->data[0].word++;
-        if (wy_type_tag_is_gc(pair->car.type) && pair->car.data.gc_object != WY_NULL) {
+        if (wy_type_is_object(pair->car.type) && pair->car.data.gc_object != WY_NULL) {
             *child = pair->car.data.gc_object;
             return WY_ERR_NONE;
         }
         /* intentional fall through */
     case 1:
         wa->data[0].word++;
-        if (wy_type_tag_is_gc(pair->cdr.type) && pair->cdr.data.gc_object != WY_NULL) {
+        if (wy_type_is_object(pair->cdr.type) && pair->cdr.data.gc_object != WY_NULL) {
             *child = pair->cdr.data.gc_object;
             return WY_ERR_NONE;
         }

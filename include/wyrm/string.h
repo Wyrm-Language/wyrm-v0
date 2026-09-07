@@ -1,8 +1,6 @@
 #ifndef WYRM_STRING_H_
 #define WYRM_STRING_H_
 
-#include <wyrm/core.h>
-#include <wyrm/types.h>
 #include <wyrm/object.h>
 #include <wyrm/sys/string.h>
 

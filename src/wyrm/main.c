@@ -56,7 +56,16 @@ char* get_file_content(const char* path, wy_uword* out_file_size)
     rewind(fp);
 
     char* data = malloc(file_size + 1);
-    fread(data, file_size, 1, fp);
+    if (!data) {
+        fclose(fp);
+        return NULL;
+    }
+
+    if (file_size > 0 && fread(data, file_size, 1, fp) != 1) {
+        free(data);
+        fclose(fp);
+        return NULL;
+    }
     data[file_size] = '\0';
     *out_file_size = file_size;
 

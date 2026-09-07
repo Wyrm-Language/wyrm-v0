@@ -3,9 +3,10 @@
 #include <wyrm/context.h>
 #include <wyrm/sys/string.h>
 #include <wyrm/bson.h>
-#include "wyrm/object.h"
+#include <wyrm/object.h>
+#include <wyrm/value.h>
+#include <wyrm/work_area.h>
 
-#include <stdio.h>
 
 static wy_error module_handle_code_section_f(wy_context* context, wy_module* self, const wy_u8* section_ptr, wy_u8 section_type, wy_uword section_size);
 

@@ -1,6 +1,7 @@
 #include <wyrm.h>
 #include <wyrm/fiber.h>
 #include <wyrm/stack.h>
+#include <wyrm/work_area.h>
 
 static void finalize_f(wy_context* context, wy_object* object);
 static wy_error start_children_iter(wy_state* state, wy_object* object, wy_work_area* wa);

@@ -1,11 +1,39 @@
 #ifndef WYRM_WPROTOTYPE_H_
 #define WYRM_WPROTOTYPE_H_
 
-#include <wyrm/core.h>
+#include <wyrm/context.h>
+#include <wyrm/symtab_entry.h>
+#include <wyrm/value.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define WY_BAD_SLOT WY_UWORD_MAX
+#define WY_SLOT_DEFAULTS 0
+
+enum
+{
+    WY_PROTOTYPE_SLOT_FLAG_BOXED  = 0x0001,  ///< Slot is boxed, may escape
+    WY_PROTOTYPE_SLOT_FLAG_STATIC = 0x0002,  ///< Slot is statically allocated
+};
+
+typedef struct wy_prototype_slot
+{
+    wy_uword flags;
+    wy_symtab_entry symtab_entry;
+    wy_value default_value;
+} wy_prototype_slot;
+
+
+struct wy_prototype
+{
+    wy_object object;
+    wy_prototype_slot* slots;
+    wy_uword slot_capacity;
+    wy_uword slot_count;
+};
+
 
 /**
  * @brief Get slot count

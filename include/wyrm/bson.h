@@ -1,8 +1,9 @@
 #ifndef WYRM_BSON_H_
 #define WYRM_BSON_H_
 
-#include <wyrm/core.h>
 #include <wyrm/sys/string.h>
+#include <wyrm/sys/toolchain.h>
+#include <wyrm/sys/errors.h>
 
 WY_BEGIN_DECLS
 

@@ -1,7 +1,7 @@
 #ifndef WYRM_CONTEXT_H_
 #define WYRM_CONTEXT_H_
 
-#include <wyrm/types.h>
+#include <wyrm/fwd.h>
 #include <wyrm/gc.h>
 #include <wyrm/mem_info.h>
 

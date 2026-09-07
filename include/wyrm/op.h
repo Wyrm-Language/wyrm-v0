@@ -1,12 +1,17 @@
-#ifndef WYRM_INL_OP_INL_H_
-#define WYRM_INL_OP_INL_H_
+#ifndef WYRM_OP_H_
+#define WYRM_OP_H_
 
-#include <wyrm/types.h>
-#include <wyrm.h>
+#include <wyrm/primitive.h>
+#include <wyrm/string.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define WY_HASH_INVALID WY_UWORD_MAX
+
+WY_INLINE bool wy_op_eq(wy_state* state, wy_type_tag lhst, wy_primitive lhs, wy_type_tag rhst, wy_primitive rhs);
+WY_INLINE wy_uword wy_op_hash(wy_state* state, wy_type_tag vt, wy_primitive v);
 
 
 WY_INLINE bool wy_op_eq(wy_state* state, wy_type_tag lhst, wy_primitive lhs, wy_type_tag rhst, wy_primitive rhs)

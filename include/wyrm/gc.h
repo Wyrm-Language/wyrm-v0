@@ -1,8 +1,7 @@
 #ifndef WYRM_WGC_H_
 #define WYRM_WGC_H_
 
-#include <wyrm/core.h>
-#include <wyrm/types.h>
+#include <wyrm/fwd.h>
 #include <wyrm/object.h>
 
 WY_BEGIN_DECLS

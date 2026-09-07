@@ -1,7 +1,7 @@
 #ifndef WYRM_PLATFORM_HOSTED_CMACHINE_H
 #define WYRM_PLATFORM_HOSTED_CMACHINE_H
 
-#include <wyrm/core.h>
+#include <wyrm/machine.h>
 
 WY_BEGIN_DECLS
 

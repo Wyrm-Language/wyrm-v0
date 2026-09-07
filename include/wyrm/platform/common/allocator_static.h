@@ -1,8 +1,7 @@
 #ifndef WYRM_PLATFORM_COMMON_ALLOCATOR_STATIC_H_
 #define WYRM_PLATFORM_COMMON_ALLOCATOR_STATIC_H_
 
-#include <wyrm/types.h>
-#include <wyrm.h>
+#include <wyrm/allocator.h>
 
 #ifdef __cplusplus
 extern "C" {

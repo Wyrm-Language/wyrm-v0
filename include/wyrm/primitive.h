@@ -12,6 +12,10 @@
 
 WY_BEGIN_DECLS
 
+#define WY_PRIMITIVE_PTR(dtype, v) ((dtype*) (v).ptr)
+
+
+
 /**
  * @brief Primitive Types
  */
@@ -39,6 +43,8 @@ typedef enum wy_type_tag
 
     WY_TYPE_TAG_TABLE
 } wy_type_tag;
+
+
 
 /**
  * Test whether a tag denotes a garbage collected object reference
@@ -83,6 +89,12 @@ union wy_primitive {
     wy_string* str;
     wy_class* cls;
 };
+
+WY_INLINE wy_primitive wy_primitive_int(wy_word value) { const wy_primitive v = {.word = value}; return v; }
+WY_INLINE wy_primitive wy_primitive_ptr(void* value) { const wy_primitive v = {.ptr = value}; return v; }
+
+
+
 
 WY_END_DECLS
 

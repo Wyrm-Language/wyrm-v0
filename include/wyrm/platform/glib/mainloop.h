@@ -1,7 +1,7 @@
 #ifndef WYRM_PLATFORM_GLIB_MAINLOOP_H_
 #define WYRM_PLATFORM_GLIB_MAINLOOP_H_
 
-#include <wyrm/types.h>
+#include <wyrm/main_loop.h>
 
 #ifdef __cplusplus
 extern "C" {

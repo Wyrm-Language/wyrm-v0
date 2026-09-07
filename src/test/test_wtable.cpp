@@ -1,6 +1,8 @@
 #include <doctest/doctest.h>
 
 #include <wyrm.h>
+#include <wyrm/dict.h>
+#include <wyrm/string.h>
 #include <test_common/test_allocator_fixture.h>
 #include <test_common/test_main_loop_fixture.h>
 #include <test_common/test_machine_fixture.h>

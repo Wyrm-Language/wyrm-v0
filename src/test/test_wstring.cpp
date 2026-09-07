@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <wyrm.h>
+#include <wyrm/string.h>
 #include <test_common/test_context_fixture.h>
 
 TEST_SUITE("wstring") {

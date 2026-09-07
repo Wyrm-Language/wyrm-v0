@@ -1,7 +1,7 @@
 #ifndef WYRM_FIBER_H_
 #define WYRM_FIBER_H_
 
-#include <wyrm/core.h>
+#include <wyrm/fwd.h>
 #include <wyrm/mem_info.h>
 #include <wyrm/stack.h>
 
