@@ -6,14 +6,18 @@
 #include <wyrm/builtins.h>
 #include <wyrm/bytes.h>
 #include <wyrm/coroutine.h>
+#include <wyrm/dict.h>
 #include <wyrm/error.h>
 #include <wyrm/function.h>
+#include <wyrm/list.h>
 #include <wyrm/module.h>
 #include <wyrm/native.h>
 #include <wyrm/op.h>
 #include <wyrm/opcode.h>
+#include <wyrm/pair.h>
 #include <wyrm/slot.h>
 #include <wyrm/string.h>
+#include <wyrm/tuple.h>
 #include <wyrm/value.h>
 #include <wyrm/vm.h>
 
@@ -276,6 +280,85 @@ TEST_SUITE("builtins") {
         CHECK(g_output.empty());
     }
 
+    TEST_CASE("len counts elements of every collection type, matching Python len") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(ctx, &builtins), WY_ERR_NONE);
+        ctx->builtins = builtins;
+        wy_native* len_native = find_native(builtins, ctx, "len");
+        CHECK_EQ(len_native->kind, WY_NATIVE_LEAF);
+
+        auto check_len = [&](wy_value v, wy_word expected) {
+            wy_value out;
+            REQUIRE_EQ(wy_vm_call_leaf_f(ctx, len_native, &v, 1, &out, 1), WY_ERR_NONE);
+            REQUIRE_EQ(out.type, WY_TYPE_TAG_WORD);
+            CHECK_EQ(out.data.word, expected);
+        };
+
+        // list/tuple: item count (empty counts 0).
+        wy_list* lst = WY_NULL;
+        REQUIRE_EQ(wy_list_new(ctx, 0, &lst), WY_ERR_NONE);
+        REQUIRE_EQ(wy_list_push(ctx, lst, wy_value_word(1)), WY_ERR_NONE);
+        REQUIRE_EQ(wy_list_push(ctx, lst, wy_value_word(2)), WY_ERR_NONE);
+        REQUIRE_EQ(wy_list_push(ctx, lst, wy_value_word(3)), WY_ERR_NONE);
+        check_len(wy_value_object(WY_TYPE_TAG_LIST, (wy_object*) lst), 3);
+
+        wy_list* empty = WY_NULL;
+        REQUIRE_EQ(wy_list_new(ctx, 0, &empty), WY_ERR_NONE);
+        check_len(wy_value_object(WY_TYPE_TAG_LIST, (wy_object*) empty), 0);
+
+        wy_value tup_items[2] = { wy_value_word(7), wy_value_word(8) };
+        wy_tuple* tup = WY_NULL;
+        REQUIRE_EQ(wy_tuple_new(ctx, tup_items, 2, &tup), WY_ERR_NONE);
+        check_len(wy_value_object(WY_TYPE_TAG_TUPLE, (wy_object*) tup), 2);
+
+        // dict: entry count.
+        wy_dict* dict = WY_NULL;
+        REQUIRE_EQ(wy_dict_new(ctx, &dict), WY_ERR_NONE);
+        wy_string* key_a = WY_NULL;
+        wy_string* key_b = WY_NULL;
+        REQUIRE_EQ(wy_string_new(ctx, "a", 1, &key_a), WY_ERR_NONE);
+        REQUIRE_EQ(wy_string_new(ctx, "b", 1, &key_b), WY_ERR_NONE);
+        wy_primitive key_a_p = { .str = key_a };
+        wy_primitive key_b_p = { .str = key_b };
+        REQUIRE_EQ(wy_dict_set(ctx, dict, WY_TYPE_TAG_STR, key_a_p,
+            WY_TYPE_TAG_WORD, { .word = 1 }), WY_ERR_NONE);
+        REQUIRE_EQ(wy_dict_set(ctx, dict, WY_TYPE_TAG_STR, key_b_p,
+            WY_TYPE_TAG_WORD, { .word = 2 }), WY_ERR_NONE);
+        check_len(wy_value_object(WY_TYPE_TAG_TABLE, (wy_object*) dict), 2);
+
+        // bytes: byte count (epic 7's documented gap).
+        wy_bytes* b = WY_NULL;
+        REQUIRE_EQ(wy_bytes_new(ctx, (const wy_u8*) "hi!", 3, &b), WY_ERR_NONE);
+        check_len(wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) b), 3);
+
+        // str: Unicode codepoints, not UTF-8 bytes.
+        wy_string* s = WY_NULL;
+        REQUIRE_EQ(wy_string_new(ctx, "héllo", 6, &s), WY_ERR_NONE);  // 5 codepoints, 6 bytes
+        check_len(wy_value_object(WY_TYPE_TAG_STR, (wy_object*) s), 5);
+
+        // nil and nil-terminated pair chains; '() alone is 0.
+        check_len(wy_value_nil(), 0);
+        wy_pair* eleven = wy_pair_cons_f(ctx, wy_value_word(11), wy_value_nil());
+        wy_pair* twentytwo = wy_pair_cons_f(ctx, wy_value_word(22), wy_value_object(WY_TYPE_TAG_PAIR, (wy_object*) eleven));
+        wy_pair* thritythree = wy_pair_cons_f(ctx, wy_value_word(33), wy_value_object(WY_TYPE_TAG_PAIR, (wy_object*) twentytwo));
+        REQUIRE_NE(eleven, WY_NULL);
+        REQUIRE_NE(twentytwo, WY_NULL);
+        REQUIRE_NE(thritythree, WY_NULL);
+        check_len(wy_value_object(WY_TYPE_TAG_PAIR, (wy_object*) thritythree), 3);
+
+        // Non-collections and improper lists are faults, like Python's TypeError.
+        wy_value not_a_collection = wy_value_word(5);
+        wy_value out;
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, len_native, &not_a_collection, 1, &out, 1), WY_ERR_BAD_TYPE);
+
+        wy_pair* improper = wy_pair_cons_f(ctx, wy_value_word(1), wy_value_word(2));
+        REQUIRE_NE(improper, WY_NULL);
+        wy_value improper_v = wy_value_object(WY_TYPE_TAG_PAIR, (wy_object*) improper);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, len_native, &improper_v, 1, &out, 1), WY_ERR_BAD_TYPE);
+    }
+
     TEST_CASE("range(begin, end) is a bare-name coroutine needing no import (epic 5 M4)") {
         // Hand-packed the same way test_coroutine.cpp does (no compiler in
         // this repo): L0 <- call range(0, 3); then next(L0) three times
@@ -389,6 +472,89 @@ TEST_SUITE("builtins") {
         CHECK_EQ(b->data[1], 0x01);
         CHECK_EQ(b->data[2], 0x00);
         CHECK_EQ(b->data[3], 0x00);
+    }
+
+    TEST_CASE("str!substr reaches the native overload through the builtins fallback") {
+        // Same real-opcode path as the bytes!pack_u32 case above: `module`
+        // never reg_msg's "substr", so the WY_OP_MSG resolution must fall back
+        // onto ctx->builtins's message_table and land on the PTYPE(STR)
+        // overload install_native_messages_ registers. Uses codepoint offsets,
+        // not bytes: "h\xC3\xA9llo" ! substr(1, 3) is "\xC3\xA9ll", so a
+        // byte-indexed implementation would fail this.
+        static const char hello_utf8[] = "h\xC3\xA9llo";
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(ctx, &builtins), WY_ERR_NONE);
+        ctx->builtins = builtins;
+
+        wy_string* s = WY_NULL;
+        REQUIRE_EQ(wy_string_new(ctx, hello_utf8, sizeof(hello_utf8) - 1, &s), WY_ERR_NONE);
+
+        const wy_u32 code[] = {
+            enc1(WY_OP_GGET, 0, 0),              // L0 <- G0 (str receiver)
+            enc1(WY_OP_I8, 1, 1),                // L1 <- 1 (start)
+            enc1(WY_OP_I8, 3, 2),                // L2 <- 3 (count)
+            enc2a(WY_OP_MSG, 2, 0), enc2b(0, 1), // L0 <- L0!substr(L1, L2), msg 0, nres=1
+            enc1(WY_OP_RETURN, 1, 0),            // return L0 (f=count, a0=base)
+        };
+
+        wy_module* module = make_code_module(ctx, code, std::size(code), { proto_at(0, 3, 0) }, 1);
+        module->globals[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) s);
+
+        wy_symbol substr_sym = WY_NULL;
+        REQUIRE_EQ(wy_context_intern(ctx, "substr", std::strlen("substr"), &substr_sym), WY_ERR_NONE);
+        module->symbols = (wy_symbol*) wy_context_gc_alloc(ctx, sizeof(wy_symbol));
+        module->symbols[0] = substr_sym;
+        module->symbol_count = 1;
+        module->messages = (wy_message_ref*) wy_context_gc_alloc(ctx, sizeof(wy_message_ref));
+        module->messages[0].path_len = 1;
+        module->messages[0].path = (wy_u16*) wy_context_gc_alloc(ctx, sizeof(wy_u16));
+        module->messages[0].path[0] = 0;
+        module->messages[0].bound = WY_NULL;
+        module->message_count = 1;
+
+        REQUIRE_EQ(wy_context_module_register(ctx, module, nullptr), WY_ERR_NONE);
+        wy_function* fn0 = WY_NULL;
+        REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
+
+        wy_value out[1];
+        wy_error err = wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+            WY_NULL, 0, out, 1);
+        REQUIRE_EQ(err, WY_ERR_NONE);
+        REQUIRE_EQ(out[0].type, WY_TYPE_TAG_STR);
+        wy_string* sub = out[0].data.str;
+        CHECK_EQ(std::string(sub->str, sub->len), "\xC3\xA9ll");
+    }
+
+    TEST_CASE("error_message answers the message text of an error value, nil otherwise") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(ctx, &builtins), WY_ERR_NONE);
+        wy_native* error_message = find_native(builtins, ctx, "error_message");
+
+        wy_string* what = WY_NULL;
+        REQUIRE_EQ(wy_string_new(ctx, "boom", 4, &what), WY_ERR_NONE);
+        wy_error_obj* err = WY_NULL;
+        REQUIRE_EQ(wy_error_obj_new(ctx, WY_NULL, what, wy_value_nil(), &err), WY_ERR_NONE);
+        wy_value err_v = wy_value_object(WY_TYPE_TAG_ERROR, (wy_object*) err);
+        wy_value out;
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, error_message, &err_v, 1, &out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(out.type, WY_TYPE_TAG_STR);
+        CHECK_EQ(std::string(out.data.str->str, out.data.str->len), "boom");
+
+        // Non-error arguments answer nil.
+        wy_value not_err = wy_value_word(7);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, error_message, &not_err, 1, &out, 1), WY_ERR_NONE);
+        CHECK_EQ(out.type, WY_TYPE_TAG_NIL);
+
+        // str(error) renders the same message (compiler_main's REFUSED text relies on it).
+        wy_native* str_native = find_native(builtins, ctx, "str");
+        wy_value str_out[1];
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str_native, &err_v, 1, str_out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(str_out[0].type, WY_TYPE_TAG_STR);
+        CHECK_EQ(std::string(str_out[0].data.str->str, str_out[0].data.str->len), "boom");
     }
 
     TEST_CASE("epic 7: bytes construction, indexing, equality, and str rendering") {

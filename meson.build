@@ -19,3 +19,18 @@ run_wy_tests = find_program('scripts/run_wy_tests.py', required: false)
 if run_wy_tests.found()
     test('wy-tests', run_wy_tests, suite: 'wy')
 endif
+
+# Epic 10 M7: the ported compiler, run on the C VM. The corpus sweep compiles
+# every corpus fixture through it and diffs the runs against .out; the
+# self-compile drives the fixed point (gen1 == gen2 byte-for-byte over the
+# 22 decorator-free modules, with a pypoc-built parser.wyc - see the script
+# header; the true 23-module fixed point is epic 10a M5). Both skip when
+# pypoc/.venv is absent.
+run_corpus_sweep = find_program('scripts/run_corpus_sweep.py', required: false)
+if run_corpus_sweep.found()
+    test('corpus-sweep', run_corpus_sweep, suite: 'compiler', timeout: 900, workdir: meson.project_source_root())
+endif
+run_selfcompile = find_program('scripts/run_selfcompile.py', required: false)
+if run_selfcompile.found()
+    test('selfcompile', run_selfcompile, suite: 'compiler', timeout: 1800, workdir: meson.project_source_root())
+endif

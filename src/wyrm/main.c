@@ -116,14 +116,7 @@ static wy_error make_args_list(wy_context* context, char** argv, int argc, wy_va
  */
 static wy_error seed_global(wy_context* context, wy_module* module, const char* name, wy_value value)
 {
-    wy_symbol sym = WY_NULL;
-    wy_error err = wy_context_intern(context, name, wy_strlen_f(name), &sym);
-    if (err != WY_ERR_NONE) { return err; }
-    wy_uword slot = wy_slot_dict_get(&module->free_names, sym);
-    if (slot == WY_SLOT_INVALID) { return WY_ERR_NONE; }
-    module->globals[slot] = value;
-    if (module->fill_layer != WY_NULL) { module->fill_layer[slot] &= WY_LINK_LAYER_MASK; }
-    return WY_ERR_NONE;
+    return wy_link_seed_global(context, module, name, value);
 }
 
 static wy_error seed_dunder_name_(wy_context* context, wy_module* module)

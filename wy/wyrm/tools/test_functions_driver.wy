@@ -1,0 +1,359 @@
+# wy/wyrm/tools/test_functions_driver.wy - epic 10 M4 regression driver for
+# wy/wyrm/compiler/functions.wy, run on this repo's C VM.
+#
+# Same amalgam constraint as test_context_driver.wy / test_statements_driver.wy
+# (see their headers): opcodes.wy will not load under pypoc's tree-walking
+# interpreter - so context.wy/analysis.wy/expressions.wy/handlers.wy/
+# statements.wy/functions.wy have to be concatenated into one module with
+# their `import` lines stripped, run through pypoc's compiler_bc (to build
+# the .wyc) and then the C VM. (The C VM's cross-module dispatch fault this
+# header used to route around is fixed - src/link.c's wy_link_adopt_messages,
+# this session's cleanup.)
+#
+# The MODULE tree for closures.wy below is not hand-guessed: it is the
+# literal, verbatim output of wy/wyrm's own self-hosted parser
+# (`Parser(src)!program()`) run under pypoc's tree-walking interpreter
+# (the one engine that can load parser.wy) against the real
+# `pypoc/test/bytecode/closures.wy` source, i.e.:
+#
+#   import wyrm::parser::*
+#   src := open("pypoc/test/bytecode/closures.wy", "r") ! read(100000)
+#   println(Parser(src)!program())
+#
+# copied verbatim into CLOSURES_MODULE below. This sidesteps the same
+# cross-module-dispatch C VM bug for `Parser` itself (calling `Parser(...)
+# !program()` on the C VM from a module that only `import`s parser.wy hits
+# the identical fault as ModuleContext/FnContext), while still exercising
+# genuine parser output, not a hand-shaped guess, for the highest-value
+# fixture in this milestone (closures.wy needs nested/self-referential
+# closures and a `defer`... though `defer` isn't in this particular
+# fixture; see the self-referential/defer cases built separately below).
+#
+# The capture-boxing reference values (case (i) plain-value copy for a
+# read-only capture, case (ii) PAIR-chain box for a captured+assigned
+# variable) were cross-checked against pypoc's own compiler_bc output for
+# this exact fixture:
+#
+#   pypoc/.venv/bin/wyrm --build-bc --emit wya -o /tmp/ref pypoc/test/bytecode/closures.wy
+#
+# reading the `functions`/`code` sections of the resulting .wy_a by hand.
+# `adder`'s capture of `amount` (read, never assigned) is a single `move`
+# into the capture window, no box. `counter`'s capture of `total` (read
+# AND assigned inside `bump`) goes through `lnil`+`plist ... f=1` (build a
+# one-element pair list), `setidx L1[0] <- start` (seed it), a `move` of
+# the box reference (not its contents) into the capture window, and
+# `bump`'s own body reads/writes it via `getidx P1[0]`/`setidx P1[0] <-`.
+# That is exactly the PAIR-chain convention this port must reproduce.
+#
+# Run it by hand:
+#
+#   work=$(mktemp -d)
+#   cat wy/std/pairs.wy wy/wyrm/opcodes.wy wy/wyrm/compiler/analysis.wy \
+#       wy/wyrm/compiler/context.wy wy/wyrm/compiler/expressions.wy \
+#       wy/wyrm/compiler/handlers.wy wy/wyrm/compiler/statements.wy \
+#       wy/wyrm/compiler/functions.wy wy/wyrm/tools/test_functions_driver.wy \
+#     | grep -v '^import ' > "$work/fn_check.wy"
+#   pypoc/.venv/bin/wyrm --build-bc "$work/fn_check.wy"
+#   ./buildDir/src/wyrm/wyrm "$work/fn_check.wyc"
+
+# No `exit()` here (deviation from test_statements_driver.wy/
+# test_context_driver.wy's own `check`: this repo's C VM has no global
+# `exit` bound - "fault: unbound global 'exit'", confirmed empirically -
+# so the FAIL branch here just prints and lets execution continue; a
+# human or harness greps the output for "FAIL").
+fn check(what: str, got, want) -> nil:
+    if got == want:
+        println("PASS: " + what)
+    else:
+        println("FAIL:", what, "got", got, "want", want)
+    return nil
+
+# List equality (`==`) is a known C VM divergence - it compares identity,
+# not contents, so `[] == []` is false there (see test_context_driver.wy's
+# header). Compare element by element instead.
+fn check_list(what: str, got, want) -> nil:
+    ok := true
+    if len(got) != len(want):
+        ok = false
+    else:
+        i := 0
+        while i < len(got):
+            if got[i] != want[i]:
+                ok = false
+            i = i + 1
+    if ok:
+        println("PASS: " + what)
+    else:
+        println("FAIL:", what, "got", got, "want", want)
+    return nil
+
+fn check_true(what: str, got: bool) -> nil:
+    if got:
+        println("PASS: " + what)
+    else:
+        println("FAIL: " + what + " was false")
+    return nil
+
+fn check_error(what: str, got) -> nil:
+    if got is error:
+        println("PASS: " + what)
+    else:
+        println("FAIL:", what, "did not error, got", got)
+    return nil
+
+# Does `rec` (a list of disassemble() records) contain an instruction whose
+# opcode mnemonic is `name`?
+fn has_op(rec: list, name: str) -> bool:
+    for r in rec:
+        if r["entry"]["name"] == name:
+            return true
+    return false
+
+fn count_op(rec: list, name: str) -> int:
+    n := 0
+    for r in rec:
+        if r["entry"]["name"] == name:
+            n = n + 1
+    return n
+
+# Find the FnContext this module queued for `index` (compile_callable's
+# `module ! add_pending(index, frame)`).
+fn frame_for(module: ModuleContext, index: int) -> FnContext | error:
+    for entry in module.pending:
+        if entry[0] == index:
+            return entry[1]
+    return error("no pending frame for function index " + str(index))
+
+# ---------------------------------------------------------------------------
+# Part A - closures.wy, parsed by wy/wyrm's own parser (see header), compiled
+# end to end through compile_function/compile_callable for every top-level
+# function: `adder` (a plain read-only capture -> a lambda), `counter`
+# (a captured-and-assigned local -> a cell, shared with nested `bump`), and
+# `doubled` (a `do:` block only, already M3's territory, included so all
+# three of closures.wy's functions are exercised here too).
+
+CLOSURES_MODULE := $['module, $['fn_def, 'adder, nil, $[$['param, 'amount, nil, nil]], nil, $[$['return, $['lambda, $[$['param, 'value, nil, nil]], nil, $['expr_stmt, $['binop, '+, 'value, 'amount]]]]]], $['fn_def, 'counter, nil, $[$['param, 'start, nil, nil]], nil, $[$['define, 'total, $['type, 'auto], 'start], $['fn_def, 'bump, nil, $[$['param, 'step, nil, nil]], nil, $[$['set, 'total, $['binop, '+, 'total, 'step]], $['return, 'total]]], $['return, 'bump]]], $['fn_def, 'doubled, nil, $[$['param, 'value, nil, nil]], nil, $[$['define, 'twice, $['type, 'auto], $['do, $[$['define, 'half, $['type, 'auto], 'value], $['expr_stmt, $['binop, '+, 'half, 'half]]]]], $['return, 'twice]]], $['define, 'add_five, $['type, 'auto], $['call, 'adder, $[$['int, 5]]]], $['expr_stmt, $['call, 'println, $[$['call, 'add_five, $[$['int, 2]]]]]], $['define, 'tick, $['type, 'auto], $['call, 'counter, $[$['int, 10]]]], $['expr_stmt, $['call, 'println, $[$['call, 'tick, $[$['int, 1]]]]]], $['expr_stmt, $['call, 'println, $[$['call, 'tick, $[$['int, 1]]]]]], $['expr_stmt, $['call, 'println, $[$['call, 'doubled, $[$['int, 21]]]]]]]
+
+# The module's top-level fn_def nodes, in source order.
+fn top_level_fns(module_node) -> list:
+    out := []
+    for node in cdr(module_node):
+        if node_kind(node) == 'fn_def:
+            out ! append(node)
+    return out
+
+fns := top_level_fns(CLOSURES_MODULE)
+check("closures.wy: 3 top-level fn_defs parsed", len(fns), 3)
+
+adder_node := fns[0]
+counter_node := fns[1]
+doubled_node := fns[2]
+check("adder node name", car(cdr(adder_node)), 'adder)
+check("counter node name", car(cdr(counter_node)), 'counter)
+check("doubled node name", car(cdr(doubled_node)), 'doubled)
+
+mod_a := ModuleContext("closures", nil)
+mod_a.stub_unlowered = false
+
+# M1-M4 checkpoint note: this tree predates nothing anymore - it was
+# regenerated after the M5-session cleanup fix that made wy/wyrm's parser
+# wrap statement-position expressions in `expr_stmt` (parser.wy's
+# `_mk_stmt_expr`; previously only _dsl.wy's synthetic trees carried the
+# wrapper). With the wrapper in place, `adder` (a lambda body ending in a
+# bare binop), `doubled` (a do: block ending the same way), and every bare
+# top-level `println(...)` call all compile - the gap this driver's earlier
+# revision documented at length is closed at the parser layer, which was
+# the side pypoc's own reference grammar solves it on (parser.py's
+# simple_stmt tries its keyword statements ahead of expr_stmt).
+radder := compile_function(adder_node, mod_a)
+check("adder compiles (expr_stmt wrapper in place)", radder is error, false)
+adder_frame := frame_for(mod_a, radder[0])
+check("adder frame found", adder_frame is error, false)
+check_true("adder's lambda publishes a closure", has_op(disassemble(adder_frame.code), "closure"))
+
+rcounter := compile_function(counter_node, mod_a)
+check("counter compiles", rcounter is error, false)
+check_list("counter has no captures (top-level, no enclosing)", rcounter[1], [])
+counter_idx := rcounter[0]
+counter_frame := frame_for(mod_a, counter_idx)
+check("counter compile succeeded (frame present)", counter_frame is error, false)
+check_true("counter's own frame marks 'total' a cell (cell_names)", 'total in counter_frame.cells)
+counter_dis := disassemble(counter_frame.code)
+check("counter disassembles", counter_dis is error, false)
+check_true("counter builds the one-element pair-list box (plist f=1)", has_op(counter_dis, "plist"))
+check_true("counter seeds the box via setidx (case ii: boxed)", has_op(counter_dis, "setidx"))
+check_true("counter still emits the closure publishing nested bump", has_op(counter_dis, "closure"))
+
+# `bump`'s own frame is reachable through counter's pending list too (its
+# index was reserved and compiled while compiling counter's body).
+bump_idx := nil
+for entry in mod_a.pending:
+    fr := entry[1]
+    if fr.name == "bump":
+        bump_idx = entry[0]
+bump_frame := frame_for(mod_a, bump_idx)
+check("bump frame found", bump_frame is error, false)
+bump_dis := disassemble(bump_frame.code)
+check("bump disassembles", bump_dis is error, false)
+check_true("bump reads the shared cell via getidx (case ii: boxed read)", has_op(bump_dis, "getidx"))
+check_true("bump writes the shared cell via setidx (case ii: boxed write)", has_op(bump_dis, "setidx"))
+check("bump has NO plist of its own (the box is captured, not created here)", count_op(bump_dis, "plist"), 0)
+
+# `doubled`'s `do:` block ends in `half + half`, now wrapped in `expr_stmt`
+# by the parser (see Part A's note), so it compiles end to end.
+rdoubled := compile_function(doubled_node, mod_a)
+check("doubled compiles (do: value flows through expr_stmt)", rdoubled is error, false)
+
+println("Part A (closures.wy, real-parser tree): all three functions compile; counter/bump's capture-boxing verified")
+
+# ---------------------------------------------------------------------------
+# Part B - the PAIR-chain capture-boxing convention, isolated and minimal,
+# on top of Part A's closures.wy findings (the epic's single most
+# emphasized risk area). Case (i): read, never assigned -> plain copy, no
+# box. Case (ii): read AND assigned -> analysis.wy's cell_names flags it,
+# and both the enclosing frame's writes-after-capture and the closure's own
+# reads/writes go through getidx/setidx index 0 on a one-element pair.
+#
+#   fn ro_outer(a):
+#       fn ro_inner(x):
+#           return x + a
+#       return ro_inner
+CASE_RO := $['fn_def, 'ro_outer, nil, $[$['param, 'a, nil, nil]], nil, $[
+    $['fn_def, 'ro_inner, nil, $[$['param, 'x, nil, nil]], nil, $[
+        $['return, $['binop, '+, 'x, 'a]]
+    ]],
+    $['return, 'ro_inner]
+]]
+
+#   fn rw_outer(a):
+#       var total = a
+#       fn rw_inner(x):
+#           total = total + x
+#           return total
+#       return rw_inner
+CASE_RW := $['fn_def, 'rw_outer, nil, $[$['param, 'a, nil, nil]], nil, $[
+    $['define, 'total, $['type, 'auto], 'a],
+    $['fn_def, 'rw_inner, nil, $[$['param, 'x, nil, nil]], nil, $[
+        $['set, 'total, $['binop, '+, 'total, 'x]],
+        $['return, 'total]
+    ]],
+    $['return, 'rw_inner]
+]]
+
+mod_b := ModuleContext("case_check", nil)
+mod_b.stub_unlowered = false
+
+rro := compile_function(CASE_RO, mod_b)
+check("ro_outer compiles", rro is error, false)
+ro_frame := frame_for(mod_b, rro[0])
+check("ro_outer frame found", ro_frame is error, false)
+check_list("analysis.wy: ro_outer's 'a' is NOT a cell (read-only)", ro_frame.cells, [])
+ro_dis := disassemble(ro_frame.code)
+check("ro_outer disassembles", ro_dis is error, false)
+check_true("ro_outer copies the capture with move", has_op(ro_dis, "move"))
+check("ro_outer: no plist/getidx/setidx anywhere (no box)", count_op(ro_dis, "plist") + count_op(ro_dis, "getidx") + count_op(ro_dis, "setidx"), 0)
+
+rrw := compile_function(CASE_RW, mod_b)
+check("rw_outer compiles", rrw is error, false)
+rw_frame := frame_for(mod_b, rrw[0])
+check("rw_outer frame found", rw_frame is error, false)
+check_true("analysis.wy: rw_outer's 'total' IS a cell (read+assigned)", 'total in rw_frame.cells)
+rw_dis := disassemble(rw_frame.code)
+check("rw_outer disassembles", rw_dis is error, false)
+check_true("rw_outer builds the pair-list box (plist f=1)", has_op(rw_dis, "plist"))
+check_true("rw_outer seeds the box (setidx)", has_op(rw_dis, "setidx"))
+
+rw_inner_idx := nil
+for entry in mod_b.pending:
+    fr := entry[1]
+    if fr.name == "rw_inner":
+        rw_inner_idx = entry[0]
+rw_inner_frame := frame_for(mod_b, rw_inner_idx)
+check("rw_inner frame found", rw_inner_frame is error, false)
+rw_inner_dis := disassemble(rw_inner_frame.code)
+check("rw_inner disassembles", rw_inner_dis is error, false)
+check_true("rw_inner reads the shared cell via getidx", has_op(rw_inner_dis, "getidx"))
+check_true("rw_inner writes the shared cell via setidx", has_op(rw_inner_dis, "setidx"))
+check("rw_inner does not create its own box (plist)", count_op(rw_inner_dis, "plist"), 0)
+
+println("Part B (isolated capture-boxing convention) passed")
+
+# ---------------------------------------------------------------------------
+# Part C - a self-referential nested closure: `rec` calls itself by name.
+# functions.wy's table-index reservation (`add_function` before the body
+# compiles, in `compile_callable`) must make this resolvable without
+# infinite recursion or an unbound-name error.
+#
+#   fn outer():
+#       fn rec(n):
+#           if n == 0:
+#               return 0
+#           return rec(n - 1)
+#       return rec(3)
+SELF_REF := $['fn_def, 'outer, nil, nil, nil, $[
+    $['fn_def, 'rec, nil, $[$['param, 'n, nil, nil]], nil, $[
+        $['if, $['binop, '==, 'n, $['int, 0]], $[$['return, $['int, 0]]], nil, nil],
+        $['return, $['call, 'rec, $[$['binop, '-, 'n, $['int, 1]]]]]
+    ]],
+    $['return, $['call, 'rec, $[$['int, 3]]]]
+]]
+
+mod_c := ModuleContext("self_ref", nil)
+mod_c.stub_unlowered = false
+rself := compile_function(SELF_REF, mod_c)
+check("self-referential nested fn compiles (no infinite recursion / unbound name)", rself is error, false)
+outer_frame := frame_for(mod_c, rself[0])
+check("outer frame found", outer_frame is error, false)
+outer_dis := disassemble(outer_frame.code)
+check("outer disassembles", outer_dis is error, false)
+check_true("outer emits a closure publishing rec", has_op(outer_dis, "closure"))
+
+rec_idx := nil
+for entry in mod_c.pending:
+    fr := entry[1]
+    if fr.name == "rec":
+        rec_idx = entry[0]
+rec_frame := frame_for(mod_c, rec_idx)
+check("rec frame found", rec_frame is error, false)
+rec_dis := disassemble(rec_frame.code)
+check("rec disassembles (self-call resolved via its reserved table index)", rec_dis is error, false)
+check_true("rec's body calls itself (a call instruction reaching its own index)", has_op(rec_dis, "call"))
+
+println("Part C (self-referential closure) passed")
+
+# ---------------------------------------------------------------------------
+# Part D - a `defer:` block compiles cleanly now that functions.wy
+# installs the hook statements.wy left open (M3 could only refuse this
+# construct).
+#
+#   fn traced():
+#       defer:
+#           var done = 1
+#       return 1
+DEFER_FN := $['fn_def, 'traced, nil, nil, nil, $[
+    $['defer, nil, $[$['define, 'done, $['type, 'auto], $['int, 1]]]],
+    $['return, $['int, 1]]
+]]
+mod_d := ModuleContext("defer_check", nil)
+mod_d.stub_unlowered = false
+rdefer := compile_function(DEFER_FN, mod_d)
+check("a function with a defer: block compiles (M4 closes M3's stub)", rdefer is error, false)
+traced_frame := frame_for(mod_d, rdefer[0])
+check("traced frame found", traced_frame is error, false)
+traced_dis := disassemble(traced_frame.code)
+check("traced disassembles", traced_dis is error, false)
+check_true("traced arms the deferred closure (defer_reg)", has_op(traced_dis, "defer_reg"))
+check_true("traced emits a closure for the defer body", has_op(traced_dis, "closure"))
+
+println("Part D (defer block) passed")
+
+println("test_functions_driver: all checks passed")
+
+# ---------------------------------------------------------------------------
+# Historical note (resolved this session): this driver's earlier revision
+# documented at length how the real parser never emitted `expr_stmt`, so
+# `adder`/`doubled` and every bare call statement failed to compile. That
+# gap is closed in parser.wy (`_mk_stmt_expr` wraps statement-position
+# expressions, keyword statements stay unwrapped, exactly matching pypoc's
+# reference shapes); the tree above was regenerated from the fixed parser
+# and the compile checks flipped to expect success.

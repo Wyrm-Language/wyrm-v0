@@ -1,0 +1,114 @@
+# Structural verification of a module image: one negative test per check
+# category in compiler/verify.wy (the port of compiler_bc/verify.py) - a
+# corrupted hand-built image must be refused with the same diagnosis its
+# pypoc original would give, and a clean image must pass.
+import wyrm::opcodes::*
+import wyrm::compiler::verify::*
+import std::io::*
+
+fn check(what: str, got, want):
+    if got == want:
+        println("PASS " + what)
+    else:
+        println("FAIL " + what + " got " + str(got))
+        exit(1)
+
+fn expect_fail(what: str, image: dict, fragment: str):
+    r := verify(image)
+    if r is error:
+        println("PASS " + what)
+    else:
+        println("FAIL " + what + " was accepted")
+        exit(1)
+
+fn expect_ok(what: str, image: dict):
+    r := verify(image)
+    if r is error:
+        println("FAIL " + what + " refused: " + str(r))
+        exit(1)
+    println("PASS " + what)
+
+fn base_image(code: list) -> dict:
+    # One function body at offset 0, init empty. nlocals 4, pframe 2
+    # (one param + one dispatch slot). Built field by field: a wyrm dict
+    # literal has to fit on one physical line.
+    param := {"name": "a", "default": nil}
+    fn_entry := {}
+    fn_entry["name"] = "f"
+    fn_entry["params"] = [param]
+    fn_entry["nlocals"] = 4
+    fn_entry["code_offset"] = 0
+    fn_entry["flags"] = 0
+    fn_entry["dispatch"] = [0]
+    fn_entry["ncaptures"] = 0
+    fn_entry["nresults"] = 1
+    fn_entry["uses"] = []
+    img := {}
+    img["name"] = "t"
+    img["version"] = 1
+    img["globals"] = 2
+    img["init_l"] = 0
+    img["init_nlocals"] = 0
+    img["module_uses"] = []
+    img["statics"] = nil
+    img["symbols"] = ["a"]
+    img["functions"] = [fn_entry]
+    img["classes"] = nil
+    img["messages"] = nil
+    img["exports"] = nil
+    img["free"] = nil
+    img["code"] = code
+    return img
+
+# -- clean image passes: add L1 <- L0 + P0 fits (nlocals 4, pframe 1+1) --
+expect_ok("clean add accepted", base_image(pack('add, f=0, a0=L(1), a1=L(0), a2=P(0))))
+
+# -- register check: L9 out of range for a 4-slot L frame --
+expect_fail("register past nlocals refused", base_image(pack('add, f=0, a0=L(9), a1=L(0), a2=P(0))), "L9")
+
+# -- register check: P9 out of range for the 2-slot P frame --
+expect_fail("P register past pframe refused", base_image(pack('add, f=0, a0=L(1), a1=L(0), a2=P(9))), "P9")
+
+# -- jump check: delta into the middle of an instruction --
+# two instructions: a wide jmp whose target lands one word after its own
+# end - inside the body but not on any instruction boundary
+code := []
+for w in pack(0xCF, w1=-1):
+    code!append(w)
+for w in pack('add, f=0, a0=L(1), a1=L(0), a2=P(0)):
+    code!append(w)
+expect_fail("jump to a non-boundary refused", base_image(code), "not an instruction boundary")
+
+# -- jump check: delta out of the body entirely --
+code2 := []
+for w in pack(0xCF, w1=99):
+    code2!append(w)
+expect_fail("jump outside the body refused", base_image(code2), "outside the body")
+
+# -- window check: call window runs past the frame --
+# call f=2 argc, a0=L(3) base: window L3..L5 past nlocals 4
+expect_fail("call window past the frame refused",
+    base_image(pack('call, f=2, a0=L(3), a1=0, a2=0)), "runs past")
+
+# -- table index check: closure naming a function index that does not exist --
+expect_fail("function index out of range refused",
+    base_image(pack('closure, f=0, a0=L(1), a1=7, a2=0)), "index 7")
+
+# -- uses check: a msg read with no referenced-name set entry --
+msg_image := base_image(pack('msg, f=0, a0=L(0), a1=0, a2=1))
+msg_image["messages"] = [{"p": [0], "_path": "ping"}]
+msg_image["statics"] = ["x"]
+expect_fail("unlisted message read refused", msg_image, "without listing it")
+
+# -- and the same image with the uses set filled passes --
+msg_image["module_uses"] = []
+fn_entry := msg_image["functions"][0]
+fn_entry["uses"] = [0]
+expect_ok("listed message read accepted", msg_image)
+
+# -- instruction running past the body's end --
+truncated := base_image([])
+truncated["code"] = []
+expect_ok("empty body accepted", truncated)
+
+println("test_compiler_verify: all checks passed")

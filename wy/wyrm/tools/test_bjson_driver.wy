@@ -23,10 +23,8 @@
 import bjson::*
 
 # --------------------------------------------------------------------------
-# a small hex dumper for diagnostics (bytes has no generic length query we
-# can rely on here - see bjson.wy's header comment on the missing `len()`
-# builtin - but we always know the length of what *we* just built, so a
-# plain loop with a passed-in count is enough)
+# a small hex dumper for diagnostics (the caller always knows the length of
+# what it just built, so a plain loop with a passed-in count is enough)
 
 fn _div16(v: int) -> int:
     # `/` is always true division (float, per doc/stdlib.md) and there is

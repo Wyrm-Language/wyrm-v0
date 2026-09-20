@@ -27,14 +27,7 @@
 #     general VM/builtin gaps, out of scope here, and are called out in the
 #     M1 report for whoever picks them up):
 #
-#   1. `len(x)` (doc/stdlib.md's "Builtin Functions") is not registered as
-#      a callable global on this repo's C VM - `src/builtin/builtins.c`'s
-#      `leaf_builtins_` table (the exhaustive list of bare-global builtins)
-#      has no "len" entry, confirmed by running a compiled script that
-#      calls it: `wyrm: fault: unbound global 'len'`. Worked around here
-#      with `_bytes_len`, a linear length probe using `catch` (see #3).
-#
-#   2. `x is bytes` is accepted by the compiler (bsonlite's own primitive
+#   1. `x is bytes` is accepted by the compiler (bsonlite's own primitive
 #      type-name table in pypoc includes "bytes") but rejected at runtime
 #      on the C VM: `src/vm_ops.c`'s `wy_vm_is_f` has no "bytes" branch in
 #      its primitive-type-name dispatch, so it hits the `else` case and
@@ -50,13 +43,12 @@
 #      case. M3 (image.wy) should either keep using this same elimination
 #      order, or get `is bytes` fixed on the C VM first.
 #
-#   3. Out-of-range indexing (`b[i]`) is a *catchable* error (`catch`
+#   2. Out-of-range indexing (`b[i]`) is a *catchable* error (`catch`
 #      intercepts it fine), not an uncatchable fault, despite doc/stdlib.md
 #      calling pack_*/unpack_* range violations "faults" - verified with
-#      `bytes(3)[100] catch -1` -> `-1`. This is what makes the `_bytes_len`
-#      linear-probe workaround for gap #1 possible at all.
+#      `bytes(3)[100] catch -1` -> `-1`.
 #
-#   4. `nil == nil` (and `!= `) is FALSE on this repo's C VM:
+#   3. `nil == nil` (and `!= `) is FALSE on this repo's C VM:
 #      `src/vm_ops.c`'s `compare_f` has no TAG_NIL branch, so nil hits the
 #      "not comparable" path, and `WY_OP_EQ` on non-comparable operands is
 #      hard-coded to `false`. Verified: `println(nil == nil)` -> `false`.
@@ -71,9 +63,8 @@
 # encode(value), decode_document(data: bytes), decode_array(data: bytes),
 # decode(data: bytes). The internal `_read_*` helpers gain an extra
 # `data_len` parameter versus bsonlite.py, threading the whole buffer's
-# length down from a single `_bytes_len` probe at the top-level decode
-# entry points (gap #1) rather than the my having each recursive call
-# re-derive it.
+# length down from a single `len()` call at the top-level decode entry
+# points rather than having each recursive call re-derive it.
 
 TAG_DOUBLE := 0x01
 TAG_STRING := 0x02
@@ -89,20 +80,6 @@ PERMITTED_TAGS := [TAG_DOUBLE, TAG_STRING, TAG_DOCUMENT, TAG_ARRAY, TAG_BINARY,
 
 INT32_MIN := -(2 ** 31)
 INT32_MAX := (2 ** 31) - 1
-
-
-# --------------------------------------------------------------------------
-# small helper: bytes length probe (gap #1 above)
-
-
-fn _bytes_len(b) -> int:
-    n := 0
-    while true:
-        v := b[n] catch nil
-        if v is nil:
-            break
-        n = n + 1
-    return n
 
 
 # --------------------------------------------------------------------------
@@ -143,7 +120,7 @@ fn _frame(elements: list) -> bytes:
     body := bytes(0)
     for el in elements:
         body!append(el)
-    total := _bytes_len(body) + 5
+    total := len(body) + 5
     result := bytes(4)
     result!pack_i32(0, total)
     result!append(body)
@@ -199,7 +176,7 @@ fn _value(value) -> tuple | error:
     if value is str:
         encoded := bytes(value)
         encoded!append(0)
-        n := _bytes_len(encoded)
+        n := len(encoded)
         payload := bytes(4)
         payload!pack_i32(0, n)
         payload!append(encoded)
@@ -219,7 +196,7 @@ fn _value(value) -> tuple | error:
         return result
     # Last resort: treat as a `bytes` binary payload (gap #2: `is bytes`
     # itself is not usable here).
-    n := _bytes_len(value)
+    n := len(value)
     payload := bytes(4)
     payload!pack_i32(0, n)
     payload!append(0)
@@ -242,7 +219,7 @@ fn _cstring(text: str) -> bytes | error:
 
 
 fn decode_document(data: bytes) -> dict | error:
-    data_len := _bytes_len(data)
+    data_len := len(data)
     r := _read_document(data, 0, data_len)
     if r is error:
         return r

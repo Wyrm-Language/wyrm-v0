@@ -1,0 +1,133 @@
+# wy/wyrm/tools/compiler_main.wy - epic 10 M7: the ported compiler's own
+# command-line face, run on the C VM.
+#
+# Two ways to run it:
+#
+# - As the TAIL of the compiler-driver amalgam (scripts/run_corpus_sweep.py
+#   builds and drives it): concatenated with the front end and compiler
+#   modules, imports stripped, compiled by pypoc's compiler_bc. Then:
+#
+#     ./buildDir/src/wyrm/wyrm wyrm_compiler.wyc <out-dir> <fixture.wy>...
+#
+# - As the STANDALONE entry point of the self-compiled compiler tree
+#   (scripts/run_selfcompile.py, generation 2): the mirror-mode import
+#   below resolves against the compiled module tree it sits in, and
+#
+#     ./buildDir/src/wyrm/wyrm -I<tree> <tree>/wyrm/compiler_main.wyc \
+#         --mirror <src-root> <out-dir> <rel-path>.wy ...
+#
+#   writes <out-dir>/<dir(rel-path)>/<stem>.wyc - the mirror layout the
+#   next generation's imports need.
+#
+# For each fixture: read it, parse it with wy/wyrm's own parser, compile it
+# with compile_module (verify on, stubs off), and write the .wyc. Compile
+# failures print REFUSED and keep going - a refused fixture is a corpus
+# fact, not a crash. Output directories must already exist.
+
+import std::io
+import wyrm::bjson::*
+import wyrm::opcodes::*
+import wyrm::image::*
+import wyrm::parser::*
+import wyrm::compiler::analysis::*
+import wyrm::compiler::context::*
+import wyrm::compiler::expressions::*
+import wyrm::compiler::handlers::*
+import wyrm::compiler::statements::*
+import wyrm::compiler::functions::*
+import wyrm::compiler::classes::*
+import wyrm::compiler::verify::*
+import wyrm::compiler::module::*
+
+fn basename(path: str) -> str:
+    last := 0
+    i := 0
+    n := len(path)
+    while i < n:
+        if path[i] == 47:  # '/'
+            last = i + 1
+        i = i + 1
+    return substr(path, last, n - last)
+
+fn stem(name: str) -> str:
+    n := len(name)
+    if (n > 3) and (substr(name, n - 3, 3) == ".wy"):
+        return substr(name, 0, n - 3)
+    return name
+
+fn compile_one(out_dir: str, path: str) -> bool:
+    name := stem(basename(path))
+    h := std::io::open(path, "r")
+    src := std::io::read(h, 1000000)
+    std::io::close(h)
+    if src is error:
+        println("REFUSED " + name + " (unreadable)")
+        return false
+    tree := Parser(src)!program()
+    if tree is error:
+        println("REFUSED " + name + " (parse)")
+        return false
+    # stub_unlowered=true (pypoc's default): a body that will not lower
+    # becomes a trapping stub with the reason recorded, so modules whose
+    # never-called `::$ast` templates use `this` (wy/wyrm/_dsl.wy) still
+    # compile. Genuine refusals outside function bodies still refuse.
+    img := compile_module(tree, name, path, true, false, false, true)
+    if img is error:
+        println("REFUSED " + name + " (compile: " + str(error_message(img)) + ")")
+        return false
+    # Stub report (epic 10 M7 / 10a scan item 1): every body that would
+    # not lower and became a trapping stub, with the lowering refusal as
+    # the reason. compile_module records these on the image's "unlowered"
+    # key (never serialized); printing them here is what makes gen 1's
+    # trap-stub functions visible instead of silent.
+    stubs := img["unlowered"] catch nil
+    if stubs is nil:
+        stubs = []
+    for entry in stubs:
+        println("STUB " + name + "::" + str(entry[0]) + " (" + str(entry[1]) + ")")
+    blob := to_wyc(img)
+    if blob is error:
+        println("REFUSED " + name + " (serialize)")
+        return false
+    out := out_dir + "/" + name + ".wyc"
+    h2 := std::io::open(out, "wb")
+    std::io::write(h2, blob)
+    std::io::close(h2)
+    println("OK " + name)
+    return true
+
+# Mirror mode: `--mirror <src-root> <out-dir> <rel.wy>...` writes each
+# compiled image to <out-dir>/<dir(rel)>/<stem>.wyc, reproducing the
+# source tree's package structure so the next generation's imports
+# resolve.
+fn compile_one_mirror(src_root: str, out_dir: str, rel: str) -> bool:
+    out_rel := out_dir
+    last := 0
+    i := 0
+    n := len(rel)
+    while i < n:
+        if rel[i] == 47:  # '/'
+            seg := substr(rel, last, i - last)
+            out_rel = out_rel + "/" + seg
+            last = i + 1
+        i = i + 1
+    return compile_one(out_rel, src_root + "/" + rel)
+
+args := __ARGS
+if len(args) < 1:
+    println("usage: wyrm_compiler.wyc [--mirror <src-root>] <out-dir> <fixture.wy>...")
+else:
+    i := 0
+    mirror_root := ""
+    if args[0] == "--mirror":
+        mirror_root = args[1]
+        i = 2
+    out_dir := args[i]
+    i = i + 1
+    while i < len(args):
+        if mirror_root == "":
+            compile_one(out_dir, args[i])
+        else:
+            compile_one_mirror(mirror_root, out_dir, args[i])
+        i = i + 1
+    println("compiler_main: done")

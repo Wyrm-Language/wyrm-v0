@@ -1,0 +1,11 @@
+# The importing half: every method call here crosses the module boundary -
+# square ! describe() resolves through the adopted message table, exercising
+# inherited dispatch (Square answers describe/corners through Shape) and an
+# own-class override (area) in one file.
+import shapes
+
+square := shapes::Square(3)
+println(square ! describe(), square ! corners(), square ! area())
+
+plain := shapes::Shape("blob", 7)
+println(plain ! describe(), plain ! corners())

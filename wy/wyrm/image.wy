@@ -1,15 +1,23 @@
-# image.wy - epic 9 M3
+# image.wy - epic 9 M3 (sections/container) and M4 (listings/C container)
 #
 # Wyrm port of pypoc/wypoc/compiler_bc/image.py's section-building and
-# `.wyc` serialization (ModuleImage.sections()/code_bytes()/to_wyc()). Like
-# wy/wyrm/bjson.wy (M1) and wy/wyrm/opcodes.wy (M2), this file is compiled
-# by pypoc's compiler_bc and run on this repo's C VM (`wyrm`), never on
-# pypoc's tree-walking interpreter - see vm_plan/epic_9.md.
+# `.wyc` serialization (ModuleImage.sections()/code_bytes()/to_wyc()) plus
+# M4's `to_wya()` (the ASCII listing, spec 5.1) and `to_c()` (the C-array
+# container, spec 5.2). Like wy/wyrm/bjson.wy (M1) and wy/wyrm/opcodes.wy
+# (M2), this file is compiled by pypoc's compiler_bc and run on this repo's
+# C VM (`wyrm`), never on pypoc's tree-walking interpreter - see
+# vm_plan/epic_9.md.
 #
-# Only section builders and the binary container are in scope here (per
-# epic 9 M3). `to_wya()`/`to_c()`/`assemble_wya()` are M4's job, on the same
-# file - this module leaves room for that by not claiming anything M4 would
-# need to touch.
+# `assemble_wya()` is deliberately not ported here: epic 10 compares listings
+# against this output but never reassembles one, and nothing else consumes a
+# `.wy_a`, so the assembler is YAGNI until something actually needs it.
+#
+# The listing writers call `opcodes!disassemble` for code text (image-free);
+# the image-dependent `(note)` hints are added here by `_annotate`, which
+# reads each record's `fields`/`operands` and this module's own pools. The C
+# VM's builtins message table registers no `str` methods, so `s ! substr(...)`
+# faults - every string operation here goes through `s[i]` (a codepoint int)
+# and `opcodes!`'s `_char_from_cp` instead.
 #
 # --------------------------------------------------------------------------
 # Data shape: a "module image" is a plain `dict` (no wyrm dataclasses exist
@@ -38,13 +46,9 @@
 # (section entirely absent) or a real, non-empty list/dict (section present).
 # A caller must never store an empty-but-present list/dict in one of these
 # fields - if there is nothing to put there, leave it `nil`. This sidesteps
-# needing a generic "is this collection empty" probe, which would otherwise
-# hit the same missing-`len()`-builtin gap bjson.wy's header comment
-# documents (gap #1) with the added wrinkle that a list may legitimately
-# contain `nil` elements, making the `catch`-based length-probe trick
-# ambiguous for arbitrary payloads (it is only safe for `bytes`, whose
-# elements are always 0-255, never nil - see `_bytes_len` below, which is
-# used ONLY on `bytes` values for exactly that reason).
+# `sections()` having to distinguish "present but empty" from "absent" for
+# the optional sections; only the non-optional ones (e.g. "code") are ever
+# emitted as legitimately empty.
 #
 # `classes`/`messages` are intentionally left as "already-shaped BSON
 # dicts/lists" rather than given full builder helpers - hello has neither,
@@ -60,6 +64,7 @@
 # optional fields exactly.)
 
 import bjson::*
+import opcodes::*
 
 SEC_HEADER := 1
 SEC_STATICS := 2
@@ -88,14 +93,35 @@ ALL_SECTION_IDS := [SEC_HEADER, SEC_STATICS, SEC_SLOT_DEFAULTS, SEC_SYMBOLS,
                      SEC_EXPORTS, SEC_FREE]
 
 # --------------------------------------------------------------------------
+# listing constants (M4)
+
+WYA_MAGIC := "WYA 1"
+
+# Section id -> the name used in a `.wy_a` `SECTION` line (image.py's
+# SECTION_NAMES). SEC_DEBUG is included for completeness even though this
+# writer never emits a debug section.
+SECTION_NAMES := {SEC_HEADER: "header", SEC_STATICS: "statics", SEC_SLOT_DEFAULTS: "slot_defaults", SEC_SYMBOLS: "symbols", SEC_FUNCTIONS: "functions", SEC_CLASSES: "classes", SEC_MESSAGES: "messages", SEC_CODE: "code", SEC_EXPORTS: "exports", SEC_FREE: "free"}
+
+# Section id -> the `wy_module_image.sections` designator in `to_c()`.
+# Spelled out rather than upper-casing the name at runtime (wyrm has no
+# case-conversion builtin).
+SEC_MACRO := {SEC_HEADER: "WY_SEC_HEADER", SEC_STATICS: "WY_SEC_STATICS", SEC_SLOT_DEFAULTS: "WY_SEC_SLOT_DEFAULTS", SEC_SYMBOLS: "WY_SEC_SYMBOLS", SEC_FUNCTIONS: "WY_SEC_FUNCTIONS", SEC_CLASSES: "WY_SEC_CLASSES", SEC_MESSAGES: "WY_SEC_MESSAGES", SEC_CODE: "WY_SEC_CODE", SEC_EXPORTS: "WY_SEC_EXPORTS", SEC_FREE: "WY_SEC_FREE"}
+
+COMMENT_COLUMN := 54
+
+# --------------------------------------------------------------------------
 # constructors
 
 fn make_image(name: str, version: int, globals_count: int, init_l: int) -> dict:
     return {"name": name, "version": version, "globals": globals_count, "init_l": init_l, "statics": nil, "slot_defaults": nil, "symbols": nil, "functions": nil, "classes": nil, "messages": nil, "exports": nil, "free": nil, "code": []}
 
 fn make_param(name: str, default: int | nil = nil) -> dict:
-    return {"n": name, "d": default}
+    return {"name": name, "default": default}
 
+# Function entries use the compiler-facing long-key shape everywhere
+# internal (context.wy's add_function, and these constructors); the wire
+# doc with the short keys of wyc-format.md 8.5 is built at encode time by
+# `_function_doc`, exactly as pypoc's image.py does for its dataclasses.
 fn make_function(name: str, params: list | nil = nil, nlocals: int = 0,
                   code_offset: int = 0, flags: int = 0,
                   dispatch: list | nil = nil, ncaptures: int | nil = nil,
@@ -105,25 +131,7 @@ fn make_function(name: str, params: list | nil = nil, nlocals: int = 0,
         p = []
     else:
         p = params
-    return {"n": name, "p": p, "l": nlocals, "c": code_offset, "f": flags, "t": dispatch, "k": ncaptures, "r": nresults}
-
-# --------------------------------------------------------------------------
-# small helper: bytes length probe (same trick as bjson.wy's `_bytes_len`,
-# duplicated here rather than exported/imported since it is a tiny,
-# file-local piece of plumbing around the same missing-`len()` VM gap -
-# bjson.wy's own header comment documents the gap once; this is just
-# another site that needs the same workaround). Safe ONLY on `bytes`
-# values (elements are always 0-255, never nil) - see the module header
-# comment on why this trick is not generalized to lists/dicts.
-
-fn _bytes_len(b: bytes) -> int:
-    n := 0
-    while true:
-        v := b[n] catch nil
-        if v is nil:
-            break
-        n = n + 1
-    return n
+    return {"name": name, "params": p, "nlocals": nlocals, "code_offset": code_offset, "flags": flags, "dispatch": dispatch, "ncaptures": ncaptures, "nresults": nresults}
 
 # --------------------------------------------------------------------------
 # section document builders
@@ -133,30 +141,87 @@ fn _header_doc(image: dict) -> dict:
 
 fn _function_doc(func: dict) -> dict:
     doc := {}
-    doc["n"] = func["n"]
+    doc["n"] = func["name"]
     params := []
-    for p in func["p"]:
+    for p in func["params"]:
         entry := {}
-        entry["n"] = p["n"]
-        if p["d"] is not nil:
-            entry["d"] = p["d"]
+        entry["n"] = p["name"]
+        if p["default"] is not nil:
+            entry["d"] = p["default"]
         params!append(entry)
     doc["p"] = params
-    doc["l"] = func["l"]
-    doc["c"] = func["c"]
-    doc["f"] = func["f"]
-    if func["t"] is not nil:
-        doc["t"] = func["t"]
-    if func["k"] is not nil:
-        doc["k"] = func["k"]
-    if func["r"] is not nil:
-        doc["r"] = func["r"]
+    doc["l"] = func["nlocals"]
+    doc["c"] = func["code_offset"]
+    doc["f"] = func["flags"]
+    # t/k/r are optional on the wire and omitted when empty/zero/1 - the
+    # same falsy omission pypoc's image.py does.
+    if func["dispatch"] is not nil:
+        if len(func["dispatch"]) > 0:
+            doc["t"] = func["dispatch"]
+    if func["ncaptures"] is not nil:
+        if func["ncaptures"] > 0:
+            doc["k"] = func["ncaptures"]
+    if func["nresults"] is not nil:
+        if func["nresults"] != 1:
+            doc["r"] = func["nresults"]
     return doc
 
 fn _function_docs(image: dict) -> list:
     docs := []
     for func in image["functions"]:
         docs!append(_function_doc(func))
+    return docs
+
+# A classes-section entry (wyc-format.md 8.6). `add_class` (context.wy)
+# stores the reader-friendly long-key shape; this is where it becomes the
+# wire doc - the same long-key-internal/wire-at-encode split `_function_doc`
+# does for functions. `s`/`i` and a slot's `d`/`g`/`s` are optional (absent
+# key = none, D7); `sl`/`m`/`st` are always present, possibly empty.
+fn _slot_doc(sl: dict) -> dict:
+    doc := {}
+    doc["n"] = sl["name"]
+    if sl["default"] is not nil:
+        doc["d"] = sl["default"]
+    if sl["getter"] is not nil:
+        doc["g"] = sl["getter"]
+    if sl["setter"] is not nil:
+        doc["s"] = sl["setter"]
+    return doc
+
+fn _class_doc(cls: dict) -> dict:
+    doc := {}
+    doc["n"] = cls["name"]
+    if cls["superclass"] is not nil:
+        doc["s"] = cls["superclass"]
+    slots := []
+    for entry in cls["slots"]:
+        slots!append(_slot_doc(entry))
+    doc["sl"] = slots
+    if cls["init"] is not nil:
+        doc["i"] = cls["init"]
+    msgs := []
+    for m in cls["messages"]:
+        msgs!append({"y": m[0], "f": m[1]})
+    doc["m"] = msgs
+    statics := []
+    for st in cls["statics"]:
+        statics!append({"n": st[0], "g": st[1]})
+    doc["st"] = statics
+    return doc
+
+fn _class_docs(image: dict) -> list:
+    docs := []
+    for cls in image["classes"]:
+        docs!append(_class_doc(cls))
+    return docs
+
+# A messages-section entry is one identity's symbol path; `add_message`
+# (context.wy) keeps a listing-only "_path" alongside it, stripped here
+# rather than carried onto the wire (image.py strips it the same way).
+fn _message_docs(image: dict) -> list:
+    docs := []
+    for msg in image["messages"]:
+        docs!append({"p": msg["p"]})
     return docs
 
 # --------------------------------------------------------------------------
@@ -203,13 +268,13 @@ fn sections(image: dict) -> dict | error:
         out[SEC_FUNCTIONS] = r
 
     if image["classes"] is not nil:
-        r := encode_array(image["classes"])
+        r := encode_array(_class_docs(image))
         if r is error:
             return r
         out[SEC_CLASSES] = r
 
     if image["messages"] is not nil:
-        r := encode_array(image["messages"])
+        r := encode_array(_message_docs(image))
         if r is error:
             return r
         out[SEC_MESSAGES] = r
@@ -267,8 +332,8 @@ fn to_wyc(image: dict) -> bytes | error:
     directory := bytes(0)
     for id in ids:
         payload := secs[id]
-        plen := _bytes_len(payload)
-        running := _bytes_len(payloads)
+        plen := len(payload)
+        running := len(payloads)
         offset := directory_end + running
 
         entry := bytes(12)
@@ -281,7 +346,7 @@ fn to_wyc(image: dict) -> bytes | error:
         directory!append(entry)
 
         payloads!append(payload)
-        total := _bytes_len(payloads)
+        total := len(payloads)
         pad := (4 - (total % 4)) % 4
         i := 0
         while i < pad:
@@ -293,3 +358,437 @@ fn to_wyc(image: dict) -> bytes | error:
     result!append(directory)
     result!append(payloads)
     return result
+
+# --------------------------------------------------------------------------
+# listing helpers (image.py's _listing helpers)
+
+fn _join(parts: list, sep: str) -> str:
+    out := ""
+    i := 0
+    for part in parts:
+        if i > 0:
+            out = out + sep
+        out = out + part
+        i = i + 1
+    return out
+
+fn _pad_to(text: str, width: int) -> str:
+    while len(text) < width:
+        text = text + " "
+    return text
+
+# `_hex2` and `_char_from_cp` come from opcodes.wy (imported above); these
+# two are listing-specific widths.
+fn _hex4(value: int) -> str:
+    return _hex_digits(value, 4)
+
+fn _hex8(value: int) -> str:
+    return _hex_digits(value, 8)
+
+# A length-prefixed BSON element is the element bytes plus the document
+# frame: an int32 total length and a trailing NUL (bjson.wy's `_frame`).
+fn _element_len(key: str, value) -> int | error:
+    doc := {}
+    doc[key] = value
+    encoded := encode_document(doc)
+    if encoded is error:
+        return encoded
+    return len(encoded) - 5
+
+# `_static_kind`/`_static_repr`/`_doc_value_repr`: how a pool value reads in
+# a listing comment (image.py's module-level helpers). `bytes` is the
+# last-resort case - `x is bytes` does not work on the C VM.
+fn _static_kind(value) -> str:
+    if value is nil:
+        return "nil"
+    if value is bool:
+        return "bool"
+    if value is int:
+        return "int"
+    if value is float:
+        return "f64"
+    if value is str:
+        return "str"
+    return "bin"
+
+fn _escape_str(value: str) -> str:
+    out := ""
+    i := 0
+    n := len(value)
+    while i < n:
+        c := value[i]
+        if c == 92:
+            out = out + _char_from_cp(92) + _char_from_cp(92)
+        elif c == 34:
+            out = out + _char_from_cp(92) + _char_from_cp(34)
+        elif c == 10:
+            out = out + _char_from_cp(92) + "n"
+        elif c == 13:
+            out = out + _char_from_cp(92) + "r"
+        elif c == 9:
+            out = out + _char_from_cp(92) + "t"
+        else:
+            out = out + _char_from_cp(c)
+        i = i + 1
+    return out
+
+fn _static_repr(value) -> str | error:
+    if value is str:
+        quote := _char_from_cp(34)
+        return quote + _escape_str(value) + quote
+    if value is nil:
+        return "nil"
+    if value is bool:
+        if value:
+            return "true"
+        return "false"
+    if value is float:
+        return str(value)
+    if value is int:
+        return str(value)
+    return str(len(value)) + " bytes"
+
+fn _doc_value_repr(value) -> str | error:
+    if value is list:
+        parts := []
+        for item in value:
+            parts!append(str(item))
+        return "[" + _join(parts, ", ") + "]"
+    return _static_repr(value)
+
+fn _function_note(i: int, doc: dict) -> str:
+    params := []
+    for p in doc["params"]:
+        params!append(p["name"])
+    return "[" + str(i) + "] " + doc["name"] + "  p:[" + _join(params, ", ") + "]  l:" + str(doc["nlocals"]) + "  c:" + str(doc["code_offset"]) + "  f:" + str(doc["flags"])
+
+fn _message_note(i: int, doc: dict) -> str:
+    return "[" + str(i) + "] " + _join(doc["_path"], "::")
+
+fn _array_note(kind: str, i: int, item, image: dict) -> str | error:
+    if kind == "statics":
+        repr_s := _static_repr(item)
+        if repr_s is error:
+            return repr_s
+        return "[" + str(i) + "] " + _static_kind(item) + " " + repr_s
+    if kind == "symbols":
+        quote := _char_from_cp(34)
+        return "[" + str(i) + "] " + quote + item + quote
+    if kind == "functions":
+        return _function_note(i, item)
+    if kind == "classes":
+        return "[" + str(i) + "] class " + item["name"]
+    if kind == "messages":
+        return _message_note(i, item)
+    return ""
+
+# `{byte offset of each array element: note}` within its encoded BSON array.
+fn _array_annotations(items: list, kind: str, image: dict) -> dict | error:
+    annotations := {}
+    offset := 4
+    i := 0
+    for item in items:
+        note := _array_note(kind, i, item, image)
+        if note is error:
+            return note
+        annotations[offset] = note
+        length := _element_len(str(i), item)
+        if length is error:
+            return length
+        offset = offset + length
+        i = i + 1
+    return annotations
+
+fn _document_annotations(document: dict) -> dict | error:
+    annotations := {}
+    offset := 4
+    for key in document:
+        value := document[key]
+        repr_s := _doc_value_repr(value)
+        if repr_s is error:
+            return repr_s
+        annotations[offset] = key + ": " + repr_s
+        length := _element_len(key, value)
+        if length is error:
+            return length
+        offset = offset + length
+    return annotations
+
+fn _section_annotations(image: dict, name: str) -> dict | error:
+    if name == "header":
+        return _document_annotations(_header_doc(image))
+    if name == "slot_defaults":
+        return _document_annotations(image["slot_defaults"])
+    if name == "exports":
+        return _document_annotations(image["exports"])
+    if name == "free":
+        return _document_annotations(image["free"])
+    if name == "statics":
+        return _array_annotations(image["statics"], "statics", image)
+    if name == "symbols":
+        return _array_annotations(image["symbols"], "symbols", image)
+    if name == "functions":
+        return _array_annotations(_function_docs(image), "functions", image)
+    if name == "classes":
+        return _array_annotations(image["classes"], "classes", image)
+    if name == "messages":
+        return _array_annotations(image["messages"], "messages", image)
+    return {}
+
+fn _hex_listing(payload: bytes, annotations: dict) -> list:
+    lines := []
+    plen := len(payload)
+    start := 0
+    while start < plen:
+        chunk_len := plen - start
+        if chunk_len > 16:
+            chunk_len = 16
+        data := _hex4(start) + ":"
+        i := 0
+        while i < chunk_len:
+            data = data + " " + _hex2(payload[start + i])
+            i = i + 1
+        comment := ""
+        for offset in annotations:
+            if offset >= start and offset < start + 16:
+                if comment != "":
+                    comment = comment + "; "
+                comment = comment + annotations[offset]
+        if comment == "":
+            lines!append(data)
+        else:
+            lines!append(_pad_to(data, COMMENT_COLUMN) + "; " + comment)
+        start = start + 16
+    return lines
+
+# `{global slot index: name}` for the `describe` hints. image.py keeps the
+# whole globals list in memory; the image dict only carries the exported and
+# free name->slot maps, and their union is every named global a `gget`/`gset`
+# in the code can reference.
+fn _global_names(image: dict) -> dict:
+    names := {}
+    if image["exports"] is not nil:
+        for name in image["exports"]:
+            names[image["exports"][name]] = name
+    if image["free"] is not nil:
+        for name in image["free"]:
+            names[image["free"][name]] = name
+    return names
+
+fn _describe(image: dict, kind: str, index: int, global_names: dict) -> str | nil:
+    if kind == "static":
+        statics := image["statics"]
+        if statics is nil:
+            return nil
+        value := statics[index] catch nil
+        if value is nil:
+            return nil
+        return _static_repr(value)
+    if kind == "symbol":
+        symbols := image["symbols"]
+        if symbols is nil:
+            return nil
+        value := symbols[index] catch nil
+        if value is nil:
+            return nil
+        quote := _char_from_cp(34)
+        return quote + value + quote
+    if kind == "message":
+        messages := image["messages"]
+        if messages is nil:
+            return nil
+        entry := messages[index] catch nil
+        if entry is nil:
+            return nil
+        return _join(entry["_path"], "::")
+    if kind == "global":
+        return global_names[index] catch nil
+    return nil
+
+fn _annotate(rec: dict, image: dict, global_names: dict) -> str:
+    notes := []
+    for label in rec["operands"]:
+        e := rec["operands"][label]
+        note := _describe(image, e[1], rec["fields"][e[0]], global_names)
+        if note is not nil:
+            notes!append(note)
+    if len(notes) > 0:
+        return "(" + _join(notes, ", ") + ")"
+    return ""
+
+fn _code_listing(image: dict) -> list | error:
+    starts := {}
+    starts[0] = "module init"
+    functions := image["functions"]
+    if functions is not nil:
+        for func in functions:
+            starts[func["code_offset"]] = "fn " + func["name"] + " (word offset " + str(func["code_offset"]) + ")"
+    records := disassemble(image["code"], 0)
+    if records is error:
+        return records
+    global_names := _global_names(image)
+    lines := []
+    for rec in records:
+        offset := rec["offset"]
+        banner := starts[offset] catch nil
+        if banner is not nil:
+            lines!append("; " + banner)
+        payload := ""
+        i := 0
+        while i < rec["nwords"]:
+            w := image["code"][offset + i]
+            if i > 0:
+                payload = payload + " "
+            payload = payload + _hex2(w & 0xFF) + " " + _hex2((w >> 8) & 0xFF) + " " + _hex2((w >> 16) & 0xFF) + " " + _hex2((w >> 24) & 0xFF)
+            i = i + 1
+        text := rec["text"]
+        note := _annotate(rec, image, global_names)
+        if note != "":
+            text = text + "   " + note
+        data := _hex4(offset * 4) + ": " + payload
+        lines!append(_pad_to(data, COMMENT_COLUMN) + "; " + text)
+    return lines
+
+# --------------------------------------------------------------------------
+# to_wya() / to_c() (spec 5.1 / 5.2)
+
+fn to_wya(image: dict) -> str | error:
+    secs := sections(image)
+    if secs is error:
+        return secs
+    lines := [WYA_MAGIC + " " + image["name"], ""]
+    for id in ALL_SECTION_IDS:
+        payload := secs[id] catch nil
+        if payload is nil:
+            continue
+        name := SECTION_NAMES[id]
+        lines!append("SECTION " + name)
+        if name == "code":
+            code_lines := _code_listing(image)
+            if code_lines is error:
+                return code_lines
+            for line in code_lines:
+                lines!append(line)
+        else:
+            annotations := _section_annotations(image, name)
+            if annotations is error:
+                return annotations
+            for line in _hex_listing(payload, annotations):
+                lines!append(line)
+        lines!append("")
+    return _join(lines, "\n")
+
+fn _is_identifier(text: str) -> bool:
+    n := len(text)
+    if n == 0:
+        return false
+    c := text[0]
+    if not ((c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95):
+        return false
+    i := 1
+    while i < n:
+        c = text[i]
+        if not ((c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95):
+            return false
+        i = i + 1
+    return true
+
+fn _replace_all(text: str, needle: str, replacement: str) -> str:
+    out := ""
+    i := 0
+    n := len(text)
+    nn := len(needle)
+    while i < n:
+        matched := true
+        j := 0
+        while j < nn:
+            if i + j >= n or text[i + j] != needle[j]:
+                matched = false
+                break
+            j = j + 1
+        if matched:
+            out = out + replacement
+            i = i + nn
+        else:
+            out = out + _char_from_cp(text[i])
+            i = i + 1
+    return out
+
+fn to_c(image: dict, header_include: str = "wyrm/image.h") -> str | error:
+    symbol := _replace_all(image["name"], "::", "__")
+    if not _is_identifier(symbol):
+        return error("module name " + image["name"] + " does not encode to a valid C identifier")
+    secs := sections(image)
+    if secs is error:
+        return secs
+    quote := _char_from_cp(34)
+    out := []
+    out!append("/* Generated from " + image["name"] + " by wypoc's bytecode compiler. */")
+    out!append("")
+    out!append("#include <stdint.h>")
+    out!append("#include " + quote + header_include + quote)
+    out!append("")
+    for id in ALL_SECTION_IDS:
+        payload := secs[id] catch nil
+        if payload is nil:
+            continue
+        name := SECTION_NAMES[id]
+        if name == "code":
+            continue
+        out!append("static const uint8_t " + symbol + "_" + name + "[] = {")
+        plen := len(payload)
+        start := 0
+        while start < plen:
+            chunk_len := plen - start
+            if chunk_len > 12:
+                chunk_len = 12
+            line := "    "
+            i := 0
+            while i < chunk_len:
+                if i > 0:
+                    line = line + " "
+                line = line + "0x" + _hex2(payload[start + i]) + ","
+                i = i + 1
+            out!append(line)
+            start = start + 12
+        out!append("};")
+        out!append("")
+    out!append("static const uint32_t " + symbol + "_code[] = {")
+    records := disassemble(image["code"], 0)
+    if records is error:
+        return records
+    global_names := _global_names(image)
+    for rec in records:
+        offset := rec["offset"]
+        body := ""
+        i := 0
+        while i < rec["nwords"]:
+            w := image["code"][offset + i]
+            if i > 0:
+                body = body + " "
+            body = body + "0x" + _hex8(w) + ","
+            i = i + 1
+        text := rec["text"]
+        note := _annotate(rec, image, global_names)
+        if note != "":
+            text = text + "   " + note
+        out!append("    " + _pad_to(body, 26) + " /* " + _hex4(offset) + "  " + text + " */")
+    out!append("};")
+    out!append("")
+    out!append("const wy_module_image " + symbol + "_image = {")
+    out!append("    .name = " + quote + image["name"] + quote + ",")
+    out!append("    .sections = {")
+    for id in ALL_SECTION_IDS:
+        payload := secs[id] catch nil
+        if payload is nil:
+            continue
+        name := SECTION_NAMES[id]
+        macro := SEC_MACRO[id]
+        if name == "code":
+            out!append("        [" + macro + "] = { (const uint8_t*) " + symbol + "_code, sizeof " + symbol + "_code },")
+        else:
+            out!append("        [" + macro + "] = { " + symbol + "_" + name + ", sizeof " + symbol + "_" + name + " },")
+    out!append("    },")
+    out!append("};")
+    out!append("")
+    return _join(out, "\n")

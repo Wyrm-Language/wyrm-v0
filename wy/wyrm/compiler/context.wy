@@ -1,0 +1,1275 @@
+# wy/wyrm/compiler/context.wy - epic 10 M1
+#
+# Wyrm port of pypoc/wypoc/compiler_bc/context.py: compile-time state, the
+# module being built and one frame per function.
+#
+# `ModuleContext` owns the image and everything module-wide - the global
+# slots by name, the builtin namespace, and the pending function bodies
+# waiting to be laid out after module init.  `FnContext` owns one function's
+# frame: its named local slots, the expression temp stack above them, the
+# emit buffer, its labels, and the set of message identities its body
+# references (the `u` list the VM resolves at the function's first call,
+# spec 6.2).
+#
+# Register allocation is deliberately simple and deterministic (spec 8.3):
+# named locals take fixed L slots in declaration order, and expression
+# temporaries are a stack pushed above them.  `high` is the nlocals
+# high-water mark.
+#
+# ---------------------------------------------------------------------------
+# Four deliberate differences from context.py, each forced by the port
+#
+# 1. `ModuleImage` lives here too.  context.py reaches through
+#    `self.module.image` into `compiler_bc/image.py`'s `ModuleImage`, whose
+#    pools (statics/symbols/messages/globals/functions/classes/code) are
+#    mutable compile-time state.  Epic 9 ported only image.py's *writers*
+#    (`wy/wyrm/image.wy`: `sections()`/`to_wyc()`/`to_wya()`/`to_c()` over a
+#    plain image `dict`), not the pools, so the pools have nowhere else to
+#    live and are a class here - `add_static`/`add_symbol`/`add_message`/
+#    `add_global`/`add_free_global`/`add_shadow_global`/`add_function`/
+#    `add_class`/`here`/`emit`, ported straight from image.py. M6's
+#    `module.wy` is what turns a finished `ModuleImage` into the dict
+#    `wy/wyrm/image.wy` writes; nothing here imports image.wy.
+#
+# 2. `pack_pairable` lives here too, for the same reason: `wy/wyrm/opcodes.wy`
+#    is GENERATED (pypoc/tools/generate_opcode_wy.py) and epic 9 left
+#    `pack_pairable` out of the generator ("epic 9's hand assembly already
+#    knows which form each instruction uses"). `emit_jump`/`emit_return` need
+#    it. It belongs in the generator's output; see the epic report.
+#
+# 3. `builtins` is a fixed list, not an interpreter query. context.py asks
+#    `wypoc.completion.interpreter_names()` what the builtin namespace holds;
+#    a wyrm program cannot introspect a Python interpreter, so BUILTIN_NAMES
+#    below is that list, frozen. Regenerate it with:
+#      pypoc/.venv/bin/python -c "from wypoc.completion import interpreter_names as n; print(sorted(n()[0]))"
+#
+# 4. Only `init` lives inside each class body; every other method is a
+#    top-level `fn [ClassName] name(...)` (wy/wyrm/parser.wy's idiom).  A
+#    class body may hold at most 16 methods - the `classes` section's
+#    message map is 16 entries wide (doc/wyc-format.md 8.6) and pypoc's
+#    compiler refuses the 17th ("class FnContext defines 26 methods, over
+#    the 16-entry message map limit") - while FnContext has 26 and
+#    ModuleImage 13.  A dispatched top-level `fn [T]` is a module message
+#    with no such cap, and is called exactly the same way: `obj ! name(...)`.
+#
+# One more, smaller: block-scope owners are matched structurally
+# (`analysis.wy`'s `same_node` - `==` on aggregates is pointer identity on
+# this repo's C VM, so it cannot match two crossings of the same tree) -
+# see `push_block`. And `storage()`/`declare_block()`/
+# `frame_storage()` answer a 2-element `list`, `["reg", r]` / `["slot", i]` /
+# `["global", i]`, where context.py answers a tuple of the same shape.
+
+import std::pairs::*
+import wyrm::opcodes::*
+import wyrm::compiler::analysis::*
+
+# Pool/table limit, image.py's TABLE_LIMIT (statics, symbols, functions,
+# classes, globals).
+TABLE_LIMIT := 65535
+
+# The widest frame a compact register reference can name (spec 2.1).
+MAX_LOCALS := 32767
+
+# `s[i]` answers a codepoint int on both engines (pypoc's interpreter and
+# this repo's C VM agree here), so a character compare is a compare against
+# a codepoint, not against a one-character string.
+COLON_CP := 58
+
+# A u32 mask. Spelled as an expression, not as the literal `0xFFFFFFFF`:
+# pypoc's bytecode compiler refuses an integer literal that does not fit in
+# an i32 ("integer literal 4294967295 does not fit in an i32"), so every
+# 32-bit mask in this file is computed instead of written out.
+U32_MASK := (0xFFFF << 16) | 0xFFFF
+U32_HIGH_MASK := 0xFFFF << 16
+
+# Names the *host* seeds into an entry script's scope rather than
+# populate_globals: the command line packs `__ARGS`.  They are part of the
+# runtime's global namespace, so a compiled module reaches them by name like
+# any other builtin.
+HOST_GLOBALS := ["__ARGS"]
+
+# The names resolution falls through to (spec 6.2 step 2) - see note 3 in
+# the header comment. `wypoc.completion.interpreter_names()` on the pypoc
+# checked out beside this repo, plus HOST_GLOBALS.
+BUILTIN_NAMES := ["$set_car", "$set_cdr", "OSError", "OutOfMemory",
+    "RuntimeError", "StopIteration", "TreeBase", "__STDERR", "__STDIN",
+    "__STDOUT", "__argv", "__close", "__dbus_connect_session",
+    "__dbus_connected", "__dbus_register_class", "__dbus_register_object",
+    "__dbus_request_name", "__dbus_run", "__dbus_stop", "__dup2",
+    "__dynamic__", "__environ", "__flush", "__lseek", "__name__",
+    "__nng_close", "__nng_dial", "__nng_listen", "__nng_open", "__nng_recv",
+    "__nng_send", "__nng_subscribe", "__open", "__read", "__sock_accept",
+    "__sock_bind", "__sock_close", "__sock_connect", "__sock_create",
+    "__sock_listen", "__sock_recv", "__sock_recvfrom", "__sock_send",
+    "__sock_sendto", "__term_isatty", "__term_raw_disable",
+    "__term_raw_enable", "__term_read_key", "__term_size", "__write",
+    "bool", "bytes", "car", "cdr", "cons", "copy", "end", "error", "exit",
+    "float", "help", "int", "len", "macroexpand", "next", "nil", "nreverse",
+    "pair", "parse", "print", "println", "range", "resolve", "reverse",
+    "send", "sexpr", "str", "sym", "tuple", "__ARGS"]
+
+# ---------------------------------------------------------------------------
+# pack_pairable (opcodes.py's, see note 2 in the header comment)
+
+# Encode a pairable op, choosing the compact form when the operands fit.
+#
+# What `primary`/`secondary` mean follows the op's shape (spec 3.2):
+#   `inv`   - primary = table index, secondary = register reference
+#   `reg`   - primary = destination register, secondary = source register
+#   `imm`   - primary = destination register, secondary = integer immediate
+#   `jcond` - primary = condition register, secondary = jump offset
+#   `jmp`   - secondary = jump offset (primary unused)
+fn pack_pairable(op, primary: int = 0, secondary: int = 0) -> list | error:
+    entry := lookup(op)
+    if entry is error:
+        return entry
+    if entry["form"] != PAIRABLE:
+        return error(entry["name"] + " is not a pairable op")
+    wide := entry["wide_value"]
+    shape := entry["shape"]
+    if (shape == "inv") or (shape == "reg"):
+        byte := to_reg8(secondary)
+        if byte is nil:
+            return pack(wide, a0=primary, a1=secondary)
+        return pack(entry["value"], a0=primary, f=byte)
+    if shape == "imm":
+        if fits_i8(secondary):
+            return pack(entry["value"], a0=primary, f=(secondary & 0xFF))
+        return pack(wide, a0=primary, w1=(secondary & U32_MASK))
+    if shape == "jcond":
+        byte := to_reg8(primary)
+        if (byte is nil) or (not fits_i16(secondary)):
+            return pack(wide, a0=primary, w1=(secondary & U32_MASK))
+        return pack(entry["value"], a0=(secondary & 0xFFFF), f=byte)
+    if shape == "jmp":
+        if fits_i16(secondary):
+            return pack(entry["value"], a0=(secondary & 0xFFFF))
+        return pack(wide, w1=(secondary & U32_MASK))
+    return error(entry["name"] + ": unknown pairable shape " + str(shape))
+
+# ---------------------------------------------------------------------------
+# the mutable image pools (image.py's ModuleImage, see note 1)
+
+# A static pool entry's dedup key.  Dedup is type-aware: `1`, `1.0` and
+# `true` are three different constants even where the language compares
+# them equal (image.py's `_static_kind` + the `(kind, value)` key).
+fn _pool_kind(value) -> str:
+    if value is nil:
+        return "nil"
+    if value is bool:
+        return "bool"
+    if value is int:
+        return "int"
+    if value is float:
+        return "float"
+    if value is str:
+        return "str"
+    if value is sym:
+        return "sym"
+    if value is bytes:
+        return "bytes"
+    return "other"
+
+fn _static_key(value) -> str:
+    return _pool_kind(value) + ":" + str(value)
+
+# A module global slot.  image.py's GlobalSlot dataclass, as a dict:
+# `name` is for listings only (the image records just the count),
+# `has_default`/`default` stand in for its NO_DEFAULT sentinel, `exported`
+# is false for a slot that is storage rather than a module member, and
+# `free` marks a name this module references but never defines.
+fn make_global_slot(name: str, exported: bool, free: bool) -> dict:
+    return {"name": name, "has_default": false, "default": nil, "exported": exported, "free": free}
+
+class ModuleImage:
+    slot module_name: str
+    slot statics: list
+    slot symbols: list
+    slot messages: list
+    slot globals: list
+    slot functions: list
+    slot classes: list
+    slot code: list
+    slot init_nlocals: int
+    # The messages init sends. Compiler-side only, never serialized.
+    slot module_uses: list
+    slot debug
+    # (function name, reason) for every body that would not lower and became
+    # a trapping stub. Not part of the image format.
+    slot unlowered: list
+    slot _static_index: dict
+    slot _symbol_index: dict
+    slot _message_index: dict
+    slot _global_index: dict
+    slot _free_index: dict
+
+    fn init(module_name: str):
+        this.module_name = module_name
+        this.statics = []
+        this.symbols = []
+        this.messages = []
+        this.globals = []
+        this.functions = []
+        this.classes = []
+        this.code = []
+        this.init_nlocals = 0
+        this.module_uses = []
+        this.debug = nil
+        this.unlowered = []
+        this._static_index = {}
+        this._symbol_index = {}
+        this._message_index = {}
+        this._global_index = {}
+        this._free_index = {}
+
+# ---------------------------------------------------------------------------
+# ModuleImage's methods.
+#
+# Outside the class body, as `fn [ModuleImage] name(...)` (wy/wyrm/
+# parser.wy's idiom for the same reason): a class body may hold at most 16
+# methods - the `classes` section's message map is 16 entries wide
+# (doc/wyc-format.md 8.6) - and ModuleImage has more. A dispatched
+# top-level `fn [T]` is a module message instead, with no such limit, and
+# is called exactly the same way: `obj ! name(...)`.
+
+
+fn [ModuleImage] _next_index(pool: list, limit_name: str) -> int | error:
+    if len(pool) >= TABLE_LIMIT:
+        return error("module exceeds the limit of " + str(TABLE_LIMIT) + " " + limit_name)
+    return len(pool)
+
+
+# -- pools ------------------------------------------------------------
+
+# Intern a constant into the static pool, returning its index.
+fn [ModuleImage] add_static(value) -> int | error:
+    key := _static_key(value)
+    existing := (this._static_index[key] catch nil)
+    if not (existing is nil):
+        return existing
+    index := this ! _next_index(this.statics, "static pool entries")
+    if index is error:
+        return index
+    (this.statics) ! append(value)
+    this._static_index[key] = index
+    return index
+
+
+# Reserve a slot for a name this module references but never defines.
+#
+# Keyed by the name as written, so `palette::mix` and a bare `mix` are
+# different slots. Deliberately a separate index from `add_global`: a
+# free name must not collide with a module member of the same name.
+fn [ModuleImage] add_free_global(name: str) -> int | error:
+    existing := (this._free_index[name] catch nil)
+    if not (existing is nil):
+        return existing
+    index := this ! _next_index(this.globals, "module globals")
+    if index is error:
+        return index
+    (this.globals) ! append(make_global_slot(name, false, true))
+    this._free_index[name] = index
+    return index
+
+
+# Reserve a global slot that is *not* interned under `name`: a `var`
+# inside a top-level `do:`/`if`/loop body needs storage, but it is not a
+# module member, so it stays out of the exports table.
+fn [ModuleImage] add_shadow_global(name: str) -> int | error:
+    index := this ! _next_index(this.globals, "module globals")
+    if index is error:
+        return index
+    (this.globals) ! append(make_global_slot(name, false, false))
+    return index
+
+
+fn [ModuleImage] add_symbol(name: str) -> int | error:
+    existing := (this._symbol_index[name] catch nil)
+    if not (existing is nil):
+        return existing
+    index := this ! _next_index(this.symbols, "symbols per module")
+    if index is error:
+        return index
+    (this.symbols) ! append(name)
+    this._symbol_index[name] = index
+    return index
+
+
+# Add (or reuse) a `messages` entry, returning its index.
+#
+# `path` is a list of name components (or a "::"-joined string); the
+# entry stores them as symbol indices. Identical paths share one index -
+# one message name is one identity, which is the whole point of the
+# table.
+fn [ModuleImage] add_message(path) -> int | error:
+    parts := _path_parts(path)
+    if len(parts) == 0:
+        return error("a message needs at least one path component")
+    key := _join_parts(parts)
+    existing := (this._message_index[key] catch nil)
+    if not (existing is nil):
+        return existing
+    index := this ! _next_index(this.messages, "messages per module")
+    if index is error:
+        return index
+    syms := []
+    for part in parts:
+        symbol := this ! add_symbol(part)
+        if symbol is error:
+            return symbol
+        syms ! append(symbol)
+    # "_path" is for listings only and is stripped before encoding, as
+    # in image.py. (Bound through a local rather than a line-initial
+    # `(this.messages)`: a statement starting with `(` right after a
+    # block-form `for` glues onto the for-expression as a postfix call
+    # in wy/wyrm's packrat parser - a front-end quirk, see the epic
+    # report - and add_message is compiled by the self-compile pass.)
+    msgs := this.messages
+    msgs ! append({"p": syms, "_path": key})
+    this._message_index[key] = index
+    return index
+
+
+# Reserve a module global slot. Names are for listings; the image
+# records only the slot count and the constant defaults.
+fn [ModuleImage] add_global(name: str) -> int | error:
+    existing := (this._global_index[name] catch nil)
+    if not (existing is nil):
+        return existing
+    index := this ! _next_index(this.globals, "module globals")
+    if index is error:
+        return index
+    (this.globals) ! append(make_global_slot(name, true, false))
+    this._global_index[name] = index
+    return index
+
+
+# `add_global(name, default=...)`: wyrm has no NO_DEFAULT-style sentinel
+# default for a parameter (a default must be a literal constant), so the
+# defaulted form is its own method.
+fn [ModuleImage] add_global_default(name: str, default) -> int | error:
+    index := this ! add_global(name)
+    if index is error:
+        return index
+    entry := this.globals[index]
+    entry["has_default"] = true
+    entry["default"] = default
+    return index
+
+
+fn [ModuleImage] global_index(name: str) -> int | error:
+    index := (this._global_index[name] catch nil)
+    if index is nil:
+        return error("no module global named '" + name + "'")
+    return index
+
+
+# -- tables -----------------------------------------------------------
+
+# image.py's `add_function`. `params` is a list of param dicts (see
+# `make_fn_param`), `dispatch`/`uses` lists of indices.
+fn [ModuleImage] add_function(name: str, params: list | nil = nil, nlocals: int = 0,
+                code_offset: int = 0, flags: int = 0,
+                dispatch: list | nil = nil, ncaptures: int = 0,
+                nresults: int = 1, uses: list | nil = nil) -> int | error:
+    index := this ! _next_index(this.functions, "functions per module")
+    if index is error:
+        return index
+    entry := {"name": name, "params": _or_empty(params), "nlocals": nlocals}
+    entry["code_offset"] = code_offset
+    entry["flags"] = flags
+    entry["dispatch"] = _or_empty(dispatch)
+    entry["ncaptures"] = ncaptures
+    entry["nresults"] = nresults
+    entry["uses"] = _or_empty(uses)
+    (this.functions) ! append(entry)
+    return index
+
+
+fn [ModuleImage] add_class(name: str, superclass = nil, slots: list | nil = nil,
+             initializer = nil, messages: list | nil = nil,
+             statics: list | nil = nil) -> int | error:
+    index := this ! _next_index(this.classes, "classes per module")
+    if index is error:
+        return index
+    message_list := _or_empty(messages)
+    if len(message_list) > 16:
+        return error("class " + name + " has " + str(len(message_list)) + " messages, over the 16-entry message map limit")
+    entry := {"name": name, "superclass": superclass, "slots": _or_empty(slots)}
+    # `init` rather than `initializer` on the wire; the parameter is
+    # renamed only because `init` is a class's own constructor name here.
+    entry["init"] = initializer
+    entry["messages"] = message_list
+    entry["statics"] = _or_empty(statics)
+    (this.classes) ! append(entry)
+    return index
+
+
+# -- code -------------------------------------------------------------
+
+# The word offset the next emitted instruction will land at.
+fn [ModuleImage] here() -> int:
+    return len(this.code)
+
+
+# Append encoded instruction words; answers the offset they start at.
+#
+# image.py calls this `emit`; `emit` is a reserved word in pypoc's
+# tokenizer (the signal/emit mechanism), so it cannot name a method here.
+fn [ModuleImage] emit_words(words: list) -> int | error:
+    offset := len(this.code)
+    for word in words:
+        if (word < 0) or (word > U32_MASK):
+            return error("code word " + str(word) + " is not a u32")
+        (this.code) ! append(word)
+    return offset
+
+
+# image.py's `Param`: a function table entry's parameter.
+fn make_fn_param(name: str, default = nil) -> dict:
+    return {"name": name, "default": default}
+
+# image.py's `Slot`: a class table entry's slot.
+# (`getter`/`setter` are reserved words in pypoc's tokenizer, hence the
+# `_fn` suffixes on the parameters; the dict keys keep image.py's spelling.)
+fn make_class_slot(name: str, default = nil, getter_fn = nil, setter_fn = nil) -> dict:
+    return {"name": name, "default": default, "getter": getter_fn, "setter": setter_fn}
+
+fn _or_empty(value) -> list:
+    if value is nil:
+        return []
+    return value
+
+# One character of `text` as a `str` (`text[i]` is a codepoint int, so
+# indexing alone cannot rebuild a substring). `substr` takes a start and a
+# *count*, verified on both engines.
+fn _path_char(text: str, index: int) -> str:
+    return text ! substr(index, 1)
+
+# A message path as a list of `str` components: `"a::b"` or `["a", "b"]` or
+# a pair list of syms all answer `["a", "b"]`.
+fn _path_parts(path) -> list:
+    out := []
+    if path is str:
+        current := ""
+        i := 0
+        n := len(path)
+        while i < n:
+            ch := path[i]
+            if (ch == COLON_CP) and ((i + 1) < n) and (path[i + 1] == COLON_CP):
+                out ! append(current)
+                current = ""
+                i = i + 2
+            else:
+                current = current + _path_char(path, i)
+                i = i + 1
+        out ! append(current)
+        return out
+    if path is sym:
+        out ! append(str(path))
+        return out
+    if path is pair:
+        p := path
+        while p is pair:
+            out ! append(str(car(p)))
+            p = cdr(p)
+        return out
+    if path is list:
+        for part in path:
+            out ! append(str(part))
+        return out
+    return out
+
+fn _join_parts(parts: list) -> str:
+    out := ""
+    first := true
+    for part in parts:
+        if not first:
+            out = out + "::"
+        out = out + part
+        first = false
+    return out
+
+# ---------------------------------------------------------------------------
+# labels
+
+# A jump target, patched once its address is known (spec 2.2).
+class Label:
+    # word offset within the owning function's buffer
+    slot target
+    # each site is [after, word_index, half]: the word offset just past the
+    # jump instruction, the word to patch, and which half of it ("a0", "a2"
+    # or the whole second word, "w1").
+    slot sites: list
+
+    fn init():
+        this.target = nil
+        this.sites = []
+
+# ---------------------------------------------------------------------------
+# one function's frame and emit buffer
+
+class FnContext:
+    slot module
+    slot name: str
+    # Module init is a function like any other, except that the names it
+    # declares are module globals rather than frame locals (spec 7.2).
+    slot is_module_init: bool
+    # [continue label, break label] per enclosing loop
+    slot loops: list
+    # the widest `return` in this body, the `r` field
+    slot max_results: int
+    # Names whose register holds a one-element cell rather than the value
+    # itself, because a nested scope both captures and assigns them
+    # (spec 8.3). Reads and writes go through the cell; a capture copies the
+    # cell, so both frames see the same box.
+    slot cells: list
+    # register holding the constant 0 cell index
+    slot _zero
+    slot code: list
+    # message indices this body references, in first-use order
+    slot uses: list
+    slot labels: list
+    # source line the next instruction belongs to
+    slot line
+    # word offset within this body -> source line
+    slot lines: dict
+    slot _emitted_line
+    # name -> L slot
+    slot locals: dict
+    # named locals occupy L0 .. L(nnamed-1)
+    slot nnamed: int
+    # next free temp slot
+    slot top: int
+    # nlocals high-water mark
+    slot high: int
+    # P frame layout is fixed at compile time: this values, then declared
+    # parameters, then captures (spec 1).
+    slot params: dict
+    slot captures: dict
+    slot this_count: int
+    # A message's receiver arrives in P0 (spec 1); a plain function has no
+    # `this` at all.
+    slot this_reg
+    # The class this method belongs to, when it is one - what the
+    # getslot/setslot check needs to know whose slots `this` has.
+    slot this_class
+    slot is_coroutine: bool
+    # `static` names in this body: module globals, not frame slots.
+    slot statics: dict
+    # Nested block scopes (spec: an inner declaration shadows an outer name
+    # for the duration of its block). `block_slots` is filled by the
+    # declaration pass, `scopes` is the stack the emitter pushes as it
+    # enters each one. Both hold `storage()`-shaped bindings.
+    slot block_slots: list
+    slot scopes: list
+    slot scope_stack: list
+    slot top_body
+
+    fn init(module, name: str, params: list | nil = nil,
+            captures: list | nil = nil, this_count: int = 0,
+            is_module_init: bool = false, this_class = nil):
+        this.module = module
+        this.name = name
+        this.is_module_init = is_module_init
+        this.loops = []
+        this.max_results = 1
+        this.cells = []
+        this._zero = nil
+        this.code = []
+        this.uses = []
+        this.labels = []
+        this.line = nil
+        this.lines = {}
+        this._emitted_line = nil
+        this.locals = {}
+        this.nnamed = 0
+        this.top = 0
+        this.high = 0
+        this.params = {}
+        this.captures = {}
+        this.this_count = this_count
+        if this_count > 0:
+            this.this_reg = P(0)
+        else:
+            this.this_reg = nil
+        this.this_class = this_class
+        this.is_coroutine = false
+        this.statics = {}
+        this.block_slots = []
+        this.scopes = []
+        this.scope_stack = []
+        this.top_body = nil
+        declared := _or_empty(params)
+        captured := _or_empty(captures)
+        offset := 0
+        for param_name in declared:
+            this.params[param_name] = P(this_count + offset)
+            offset = offset + 1
+        offset = 0
+        for capture_name in captured:
+            this.captures[capture_name] = P(this_count + len(declared) + offset)
+            offset = offset + 1
+
+# ---------------------------------------------------------------------------
+# FnContext's methods.
+#
+# Outside the class body, as `fn [FnContext] name(...)` (wy/wyrm/
+# parser.wy's idiom for the same reason): a class body may hold at most 16
+# methods - the `classes` section's message map is 16 entries wide
+# (doc/wyc-format.md 8.6) - and FnContext has more. A dispatched
+# top-level `fn [T]` is a module message instead, with no such limit, and
+# is called exactly the same way: `obj ! name(...)`.
+
+
+# -- named locals -----------------------------------------------------
+
+# Introduce a name in this scope: a module global at the top level, a
+# frame local anywhere else.
+fn [FnContext] declare(name) -> int | error:
+    if this.is_module_init:
+        return (this.module) ! declare_global(name)
+    return this ! declare_local(name)
+
+
+# Storage for a name declared inside a nested block: a slot of its own,
+# so that it shadows an outer name of the same spelling for the block's
+# duration rather than writing through to it.
+fn [FnContext] declare_block(name) -> list | error:
+    if this.is_module_init:
+        index := (this.module) ! declare_shadow_global(name)
+        if index is error:
+            return index
+        return ["global", index]
+    reserved := this ! reserve_local(name)
+    if reserved is error:
+        return reserved
+    return ["reg", L(reserved)]
+
+
+# The frame-level binding for `name`, declared if it has none yet.
+#
+# The one case a block-scoped name falls back to: a captured-and-
+# assigned variable lives in a cell, and there is exactly one cell per
+# name per frame (spec 8.3), so it cannot also have a per-block slot.
+fn [FnContext] frame_storage(name) -> list | error:
+    if this.is_module_init:
+        index := (this.module) ! declare_global(name)
+        if index is error:
+            return index
+        return ["global", index]
+    existing := (this.locals[name] catch nil)
+    if existing is nil:
+        existing = this ! declare_local(name)
+        if existing is error:
+            return existing
+    return ["reg", L(existing)]
+
+
+# Give every nested block scope in `body` its own storage.
+#
+# Part of the declaration pass, not the emission: slots have to be
+# allotted before the first instruction, because temps live directly
+# above the named ones. So each scope's bindings are worked out here and
+# parked in `block_slots`, and `push_block` installs them when the
+# emitter reaches that scope.
+#
+# `visible` is what an enclosing scope already binds, which is only
+# needed to tell a shadowing declaration from a plain one: a captured-
+# and-assigned name lives in one cell per frame (spec 8.3) and so cannot
+# take a per-block slot, which is fine while it shadows nothing and a
+# refusal when it does - wrong bytes being the alternative.
+fn [FnContext] allocate_block_scopes(body, visible: list | nil = nil) -> nil | error:
+    for scope in block_scopes(body, _or_empty(visible)):
+        owner := scope[0]
+        names := scope[1]
+        enclosing := scope[2]
+        bindings := {}
+        for name in names:
+            if name in this.cells:
+                if name in enclosing:
+                    return error("'" + str(name) + "' is declared in a nested block, shadows an enclosing '" + str(name) + "', and is captured by a closure: one cell per name per frame cannot hold both (spec 8.3)")
+                binding := this ! frame_storage(name)
+                if binding is error:
+                    return binding
+                bindings[name] = binding
+            else:
+                binding := this ! declare_block(name)
+                if binding is error:
+                    return binding
+                bindings[name] = binding
+        (this.block_slots) ! append([owner, bindings, false])
+    return nil
+
+
+# Enter the scope `owner` names. Answers whether a scope was actually
+# pushed, which is what pop_block needs.
+#
+# context.py keys `block_slots` by `id(owner)`; wyrm has no object-identity
+# primitive, so this matches structurally (`analysis.wy`'s `same_node`):
+# the owner recorded by `block_scopes` and the body arriving at the emitter
+# are the same tree by construction, and structural equality is what makes
+# that "same" checkable. (`==` on aggregates is pointer identity on this
+# repo's C VM, so it cannot do this job - not even `x == x` holds for a
+# pair across a `cadr` round-trip.)
+#
+# Only unconsumed entries are eligible, so two structurally identical
+# sibling blocks still come out right: the first push takes the first
+# entry, the second push takes the second. A `for` owner is the loop node
+# itself (unique per loop), so it never collides with a body either.
+#
+# `block_bodies` hands out each node's raw body field (not a normalized
+# copy) precisely so this match is over the very tree recorded.
+# The active-scope stack: indexes into `block_slots`, appended by
+# push_block and truncated by pop_block. (An earlier revision appended the
+# bindings dicts themselves; under the tree-walking interpreter the dicts
+# on this stack read back empty while the very same entries in
+# `block_slots` kept their contents, so the stack now holds plain integer
+# indexes and every binding read goes through `block_slots`.)
+fn [FnContext] push_block(owner) -> bool:
+    # The frame's own top-level body has no scope of its own (compile_body
+    # pushes it anyway); without this guard its push would match the first
+    # nested scope's entry when the two are structurally equal (a one-
+    # statement body whose statement is itself a block), shifting every
+    # later push by one - block-scoped locals then resolve to nothing.
+    if not (this.top_body is nil):
+        if same_node(this.top_body, owner):
+            return false
+    i := 0
+    n := len(this.block_slots)
+    while i < n:
+        entry := this.block_slots[i]
+        if (entry[2] == false) and same_node(entry[0], owner):
+            entry[2] = true
+            (this.scope_stack) ! append(i)
+            return true
+        i = i + 1
+    return false
+
+
+fn [FnContext] pop_block() -> nil:
+    # there is no list pop; truncating by one is the same thing
+    (this.scope_stack) ! resize(len(this.scope_stack) - 1)
+    return nil
+
+
+# `name`'s binding from the innermost block scope that has one.
+fn [FnContext] block_binding(name):
+    i := len(this.scope_stack) - 1
+    while i >= 0:
+        entry := this.block_slots[this.scope_stack[i]]
+        binding := (entry[1][name] catch nil)
+        if not (binding is nil):
+            return binding
+        i = i - 1
+    return nil
+
+
+# Where `name` lives: `["reg", reg]` for a local, parameter or capture,
+# `["slot", symbol index]` for a slot of `this`, `["global", index]` for
+# a module global, or nil when it is not this module's.
+#
+# Inside a method a bare name may be a slot - `radius` means
+# `this.radius` - and the interpreter seeds slots into the method's scope
+# beneath its parameters, so that is where they sit here too: after
+# locals and parameters, ahead of module globals.
+#
+# A class whose chain leaves this module has slots the compiler cannot
+# enumerate, so inside *its* methods an otherwise-unresolvable name is
+# taken to be one of them rather than refused - that is the only reading
+# left, and refusing would make an inherited slot unusable.
+fn [FnContext] storage(name):
+    binding := this ! block_binding(name)
+    if not (binding is nil):
+        return binding
+    reg := this ! lookup(name)
+    if not (reg is nil):
+        return ["reg", reg]
+    own_static := (this.statics[name] catch nil)
+    if not (own_static is nil):
+        return ["global", own_static]
+    if not (this.this_class is nil):
+        if (this.module) ! is_own_slot(this.this_class, name):
+            return ["slot", (this.module.image) ! add_symbol(str(name))]
+        # A class static is a module global, and its bare name is
+        # visible inside the class's own methods (spec 4.7).
+        class_static := (this.module) ! class_static_index(this.this_class, name)
+        if not (class_static is nil):
+            return ["global", class_static]
+    index := (this.module) ! global_index(name)
+    if not (index is nil):
+        return ["global", index]
+    if not (this.this_class is nil):
+        if not ((this.module) ! is_builtin(name)):
+            if (this.module) ! chain_reaches_outside(this.this_class):
+                return ["slot", (this.module.image) ! add_symbol(str(name))]
+    return nil
+
+
+# Reserve an L slot for a named local and bind `name` to it.
+#
+# Every local is declared before any expression is compiled - the
+# two-pass shape (collect, then emit) - because temps live directly
+# above the named locals and a late declaration would land on one.
+fn [FnContext] declare_local(name) -> int | error:
+    slot_index := this ! reserve_local(name)
+    if slot_index is error:
+        return slot_index
+    this.locals[name] = slot_index
+    return slot_index
+
+
+# An L slot with no frame-level binding attached.
+#
+# What a nested block's declaration takes: it gets a slot of its own -
+# shadowing never reuses the shadowed slot - but binding the name here
+# would make the *outer* name resolve to it once the block is over, which
+# is the write-through this whole mechanism exists to stop. The binding
+# lives in the block's own scope instead (see push_block).
+fn [FnContext] reserve_local(name) -> int | error:
+    if this.top > this.nnamed:
+        return error("internal: local '" + str(name) + "' declared after temps were allocated")
+    slot_index := this.nnamed
+    this.nnamed = this.nnamed + 1
+    this.top = this.nnamed
+    raised := this ! _raise_high()
+    if raised is error:
+        return raised
+    return slot_index
+
+
+# -- the temp stack ---------------------------------------------------
+
+# The current top of the temp stack, to release back to later.
+fn [FnContext] mark() -> int:
+    return this.top
+
+
+# Allocate the next temp slot and answer it as an L register ref.
+fn [FnContext] push() -> int | error:
+    slot_index := this.top
+    this.top = this.top + 1
+    raised := this ! _raise_high()
+    if raised is error:
+        return raised
+    return L(slot_index)
+
+
+# Release temps down to `mark` (which a caller got from `mark()`).
+fn [FnContext] free_to(mark: int) -> nil | error:
+    if mark > this.top:
+        return error("internal: temp stack rewound forward in " + this.name)
+    this.top = mark
+    return nil
+
+
+fn [FnContext] _raise_high() -> nil | error:
+    if this.top > this.high:
+        this.high = this.top
+        if this.high > MAX_LOCALS:
+            return error(this.name + " needs " + str(this.high) + " locals, over the " + str(MAX_LOCALS) + "-local frame limit")
+    return nil
+
+
+# Reserve the slot holding the constant 0 that indexes into cells.
+#
+# `getidx`/`setidx` take their index in a register, and every cell access
+# uses the same one, so it is loaded once at function entry rather than
+# before each access.
+fn [FnContext] reserve_zero() -> int | error:
+    if this._zero is nil:
+        # Named exactly as context.py names it. Every other name in
+        # `locals` is a `sym`, so a `str` key cannot be reached by any
+        # lookup - which is the point: like pypoc's "<cell index>", this
+        # local must be unspellable by the program being compiled. (A
+        # symbol was tried first and did not survive the front end:
+        # wy/wyrm/parser.wy rejects `'$name` outright, and accepts
+        # `'name$` everywhere except as a call argument - two real parser
+        # bugs, see the epic report.)
+        slot_index := this ! declare_local("<cell index>")
+        if slot_index is error:
+            return slot_index
+        this._zero = L(slot_index)
+    return this._zero
+
+
+fn [FnContext] zero() -> int | error:
+    if this._zero is nil:
+        return error("internal: " + this.name + " has no cell index register")
+    return this._zero
+
+
+# -- name lookup ------------------------------------------------------
+
+# The register holding `name` in this frame, or nil if it is not one of
+# its locals, parameters or captures.
+#
+# An enclosing block scope wins over the frame's own binding: that is
+# what makes an inner declaration shadow rather than overwrite.
+fn [FnContext] lookup(name):
+    binding := this ! block_binding(name)
+    if not (binding is nil):
+        if binding[0] == "reg":
+            return binding[1]
+        return nil
+    slot_index := (this.locals[name] catch nil)
+    if not (slot_index is nil):
+        return L(slot_index)
+    reg := (this.params[name] catch nil)
+    if not (reg is nil):
+        return reg
+    return (this.captures[name] catch nil)
+
+
+# -- emitting ---------------------------------------------------------
+
+fn [FnContext] here() -> int:
+    return len(this.code)
+
+
+# context.py calls this `emit`; see ModuleImage.emit_words for why the
+# name had to change.
+fn [FnContext] emit_words(words: list) -> int:
+    offset := len(this.code)
+    # One entry per run of instructions on the same line, not per
+    # instruction: the table is a lookup, not a log.
+    if not (this.line is nil):
+        if (this.line) != this._emitted_line:
+            this.lines[offset] = this.line
+            this._emitted_line = this.line
+    for word in words:
+        (this.code) ! append(word)
+    return offset
+
+
+# Emit `return`, keeping the value window in the L frame.
+#
+# `return` reads its values from consecutive L slots (spec 3.1), so a
+# single value that happens to live in a parameter or capture register is
+# copied down into a temp first.
+fn [FnContext] emit_return(reg: int, count: int = 1) -> nil | error:
+    source := reg
+    if (count == 1) and is_p(source):
+        out := this ! push()
+        if out is error:
+            return out
+        words := pack_pairable('move, out, source)
+        if words is error:
+            return words
+        this ! emit_words(words)
+        source = out
+    tail := pack('return, a0=source, f=count)
+    if tail is error:
+        return tail
+    this ! emit_words(tail)
+    return nil
+
+
+# Add (or reuse) a `messages` entry and record it in this scope's use
+# set.
+#
+# Only messages reach here. Every *name* a body reads is a global slot,
+# and the import instructions carry their own path.
+fn [FnContext] reference(path) -> int | error:
+    index := (this.module.image) ! add_message(path)
+    if index is error:
+        return index
+    if not (index in this.uses):
+        (this.uses) ! append(index)
+    return index
+
+
+# -- labels -----------------------------------------------------------
+
+fn [FnContext] new_label() -> Label:
+    label := Label()
+    (this.labels) ! append(label)
+    return label
+
+
+fn [FnContext] mark_label(label: Label) -> nil | error:
+    if not (label.target is nil):
+        return error("internal: label marked twice in " + this.name)
+    label.target = len(this.code)
+    return nil
+
+
+# Resolve every jump site once the whole body is emitted.
+#
+# Offsets are signed word counts relative to the address of the next
+# instruction (spec 2.2), so the site records where its own instruction
+# ends.
+fn [FnContext] patch_labels() -> nil | error:
+    for label in this.labels:
+        if label.target is nil:
+            return error("internal: unmarked label in " + this.name)
+        for site in label.sites:
+            after := site[0]
+            word_index := site[1]
+            half := site[2]
+            delta := label.target - after
+            if half == "w1":
+                this.code[word_index] = (delta & U32_MASK)
+            else:
+                if not fits_i16(delta):
+                    return error("jump in " + this.name + " spans " + str(delta) + " words, over the +/-32K reach of a compact jump")
+                if half == "a0":
+                    this.code[word_index] = (this.code[word_index] & 0x0000FFFF) | ((delta & 0xFFFF) << 16)
+                else:
+                    # "a2": the low half of the second word
+                    this.code[word_index] = (this.code[word_index] & U32_HIGH_MASK) | (delta & 0xFFFF)
+    return nil
+
+
+# Emit a jump to `label`, recording the site for later patching.
+#
+# The offset is not known yet, so the encoding has to be chosen now: the
+# compact form is used, and a body that outgrows its +/-32K reach is an
+# error at patch time rather than a silently wrong jump.
+fn [FnContext] emit_jump(op, label: Label, cond = nil) -> nil | error:
+    primary := 0
+    if not (cond is nil):
+        primary = cond
+    words := pack_pairable(op, primary, 0)
+    if words is error:
+        return words
+    offset := this ! emit_words(words)
+    this ! patch_site(label, offset + len(words), offset, "a0")
+    return nil
+
+
+# Record a jump offset to fill in once `label`'s address is known.
+fn [FnContext] patch_site(label: Label, after: int, word_index: int, half: str) -> nil:
+    (label.sites) ! append([after, word_index, half])
+    return nil
+
+
+# ---------------------------------------------------------------------------
+# the module being compiled: its image, globals, and pending functions
+
+class ModuleContext:
+    slot image: ModuleImage
+    slot source_file
+    # name -> global slot index
+    slot globals: dict
+    # class name -> class table index, for this module
+    slot classes: dict
+    # "Class::name" -> global index
+    slot class_statics: dict
+    # class name -> its own slot names, in order
+    slot slot_names: dict
+    # class name -> base class name, or nil
+    slot superclasses: dict
+    # spec 7.1: `getslot`/`setslot` is an optimization the compiler may only
+    # make when the receiver's whole inheritance chain is module-local. The
+    # check is implemented; emitting it is off until a VM exists to run it
+    # against.
+    slot slot_optimization: bool
+    # names bound by `import static`
+    slot static_imports: list
+    # [global index, initializer, position] for every `static` a body
+    # declared, run in init where its owner is created (spec 7.2).
+    slot pending_statics: list
+    slot has_wildcard_import: bool
+    slot emit_debug: bool
+    # Every fn/co/class this module defines, by name - what `foo::$ast`
+    # reads. Built before lowering, from the tree decorators left behind.
+    slot definitions: dict
+    # name -> list of arities: every arity at which this module defines a
+    # typed `fn [T, ...] name(...)` sharing a name with a plain top-level
+    # `fn name(...)` - message promotion.
+    slot promoted_arities: dict
+    # Whether a function body that will not lower becomes a trapping stub
+    # rather than failing the whole module.
+    slot stub_unlowered: bool
+    # context.py calls this `init`; a wyrm class's own constructor owns that
+    # name, so the module-init frame is `init_ctx` here.
+    slot init_ctx: FnContext
+    # [function index, FnContext] laid out after init
+    slot pending: list
+
+    fn init(module_name: str, source_file = nil):
+        this.image = ModuleImage(module_name)
+        this.source_file = source_file
+        this.globals = {}
+        this.classes = {}
+        this.class_statics = {}
+        this.slot_names = {}
+        this.superclasses = {}
+        this.slot_optimization = false
+        this.static_imports = []
+        this.pending_statics = []
+        this.has_wildcard_import = false
+        this.emit_debug = true
+        this.definitions = {}
+        this.promoted_arities = {}
+        this.stub_unlowered = true
+        this.init_ctx = FnContext(this, "<init>", nil, nil, 0, true, nil)
+        this.pending = []
+
+# ---------------------------------------------------------------------------
+# ModuleContext's methods.
+#
+# Outside the class body, as `fn [ModuleContext] name(...)` (wy/wyrm/
+# parser.wy's idiom for the same reason): a class body may hold at most 16
+# methods - the `classes` section's message map is 16 entries wide
+# (doc/wyc-format.md 8.6) - and ModuleContext has more. A dispatched
+# top-level `fn [T]` is a module message instead, with no such limit, and
+# is called exactly the same way: `obj ! name(...)`.
+
+
+# -- module globals ---------------------------------------------------
+
+fn [ModuleContext] declare_global(name) -> int | error:
+    key := str(name)
+    index := (this.globals[key] catch nil)
+    if index is nil:
+        index = (this.image) ! add_global(key)
+        if index is error:
+            return index
+        this.globals[key] = index
+    return index
+
+
+# A global slot for a top-level *block*'s declaration.
+#
+# It is storage, not a module member: the name it shadows is the one
+# `mod::name` and the exports table answer with, and the block's own
+# binding disappears with the block. So the slot is anonymous - never
+# interned by name, never exported.
+fn [ModuleContext] declare_shadow_global(name) -> int | error:
+    return (this.image) ! add_shadow_global(str(name))
+
+
+# A slot for a name this module references but does not define.
+#
+# Reached only after `storage` has failed and the module's own names have
+# all been claimed, so arriving here means the name has to come from
+# somewhere outside - a wildcard import, an explicit one, or the
+# builtins. Which of those it was is decided when the slot is filled.
+fn [ModuleContext] declare_free_global(name) -> int | error:
+    return (this.image) ! add_free_global(str(name))
+
+
+# The global slot a bare name reads, whoever defines it: this module's
+# own if it declares one, and a free slot otherwise.
+#
+# Name arguments arrive both as `sym` (bare-symbol nodes straight from the
+# tree) and as `str` (callers that built the name themselves); every
+# ModuleContext name-keyed dict is str-keyed, so each lookup normalizes at
+# the boundary. A sym key never matches a str key in a wy dict - verified,
+# and the reason a top-level `x := 5` could not compile before this
+# normalization.
+fn [ModuleContext] name_slot(name) -> int | error:
+    index := (this.globals[str(name)] catch nil)
+    if not (index is nil):
+        return index
+    return (this.image) ! add_free_global(str(name))
+
+
+# This module's own global slot for `name`, or nil.
+fn [ModuleContext] global_index(name):
+    return (this.globals[str(name)] catch nil)
+
+
+fn [ModuleContext] is_local_class(name) -> bool:
+    return str(name) in this.classes
+
+
+# True when `attr` is a slot declared by `class_name` or by one of its
+# module-local ancestors.
+fn [ModuleContext] is_own_slot(class_name, attr) -> bool:
+    name := str(class_name)
+    attribute := str(attr)
+    while name in this.slot_names:
+        if attribute in this.slot_names[name]:
+            return true
+        name = (this.superclasses[name] catch nil)
+    return false
+
+
+# True when some class in `class_name`'s chain is not this module's, so
+# the compiler cannot know the full slot set.
+fn [ModuleContext] chain_reaches_outside(class_name) -> bool:
+    name := str(class_name)
+    while not (name is nil):
+        if not (name in this.slot_names):
+            return true
+        name = (this.superclasses[name] catch nil)
+    return false
+
+
+# The fixed slot number of `attr` on `class_name`, or nil.
+#
+# nil means the optimization does not apply: some class in the chain
+# comes from another module, so its slot layout is that module's to
+# decide at run time and no offset here would survive (spec 7.1). Slots
+# are numbered base-first, which is the order an instance lays them out.
+fn [ModuleContext] slot_index(class_name, attr):
+    attribute := str(attr)
+    chain := []
+    name := str(class_name)
+    while not (name is nil):
+        if not (name in this.slot_names):
+            return nil
+        chain ! append(name)
+        name = (this.superclasses[name] catch nil)
+    index := 0
+    i := len(chain) - 1
+    while i >= 0:
+        for own in this.slot_names[chain[i]]:
+            if own == attribute:
+                return index
+            index = index + 1
+        i = i - 1
+    return nil
+
+
+# The key `class_statics` holds `Class::name` under.
+fn [ModuleContext] class_static_key(class_name, static_name) -> str:
+    return str(class_name) + "::" + str(static_name)
+
+
+fn [ModuleContext] class_static_index(class_name, static_name):
+    return (this.class_statics[this ! class_static_key(class_name, static_name)] catch nil)
+
+
+# The module global holding `Class::name`, when `Class` is one of this
+# module's own (spec 4.7). `parts` is a 2-element name path.
+fn [ModuleContext] class_static(parts):
+    names := _path_parts(parts)
+    if len(names) != 2:
+        return nil
+    return (this.class_statics[names[0] + "::" + names[1]] catch nil)
+
+
+# -- the builtin namespace --------------------------------------------
+
+# Whether `name` is one of the names resolution falls through to
+# (spec 6.2 step 2). context.py answers this with a `frozenset` property
+# built by asking the interpreter; see note 3 in the header comment.
+fn [ModuleContext] is_builtin(name) -> bool:
+    return str(name) in BUILTIN_NAMES
+
+
+fn [ModuleContext] builtins() -> list:
+    return BUILTIN_NAMES
+
+
+# -- functions ---------------------------------------------------------
+
+fn [ModuleContext] add_pending(index: int, fn_ctx: FnContext) -> nil:
+    (this.pending) ! append([index, fn_ctx])
+    return nil
+
+
+# A module-init-level message reference.
+#
+# context.py also carries a `ModuleContext.emit_return`, a copy of
+# FnContext's that calls `self.push()`/`self.emit()` - neither of which
+# ModuleContext has. It is dead code that would raise AttributeError if
+# anything called it, and is deliberately not ported; init code emits
+# through `ctx.init_ctx` like any other frame.
+fn [ModuleContext] reference(path) -> int | error:
+    return (this.init_ctx) ! reference(path)
+

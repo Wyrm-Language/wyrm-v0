@@ -1,5 +1,22 @@
 # Epic 10 — Compiler port
 
+> **Status and supersessions (2026-09-18; read before the rest of this file).** M1-M6 landed;
+> M7 is in progress. Where this file disagrees with the list below, the list wins.
+> 1. **Bar is functional, not byte-identical** (user decision): "compiles and runs correctly",
+>    matching pypoc's tree-walking interpreter semantics where the pypoc bytecode VM differs.
+>    Every "byte-identical to pypoc" in this file is downgraded to "shape-identical where cheap,
+>    functionally equal always"; deltas are documented in the report.
+> 2. **Decorators are epic 10a's job.** The ported compiler does not expand them. Do not
+>    extend `_dsl.wy` or hack expansion into this epic (see `epic_10a.md`).
+> 3. **No CLI yet.** The exit-criterion commands below (`wyrm ... --build-bc --emit wyc`) are
+>    epic 11's CLI. Until then the port is driven by `wy/wyrm/tools/compiler_main.wy` (see its
+>    header) via `scripts/run_corpus_sweep.py` and `scripts/run_selfcompile.py`.
+> 4. **Output extension:** the wyrm-hosted compiler's images are `.wyd`, not `.wyc` (epic 11's
+>    contract section). This epic's tools still write `.wyc`; epic 11 M1 renames them. Do not
+>    rename now.
+> 5. **M7 is re-cut** (see M7's note): 20-module fixed point with pypoc-built `parser.wyc` as an
+>    interim; the true 21-module fixed point is epic 10a M5.
+
 ## Goal
 
 Port `pypoc/wypoc/compiler_bc/{context,analysis,expressions,statements,functions,classes,
@@ -111,6 +128,8 @@ specific sections when diagnosing a mismatch, never dump a whole listing into co
 - Decorator expansion (needed for `classes.py`/`functions.py`'s ports, since wypoc
   decorators rewrite one sexpr into another before lowering) can reuse `_dsl.wy`'s
   existing template machinery rather than needing new infrastructure. *(verify in scan)*
+  **Refuted by M7 (2026-09-18):** `_dsl.wy` supplies decorator *bodies*, but running them needs
+  compile-time evaluation infrastructure; that is `epic_10a.md`.
 - The C VM (epic 6) is complete enough to run arbitrarily deep bytecode-compiled wyrm
   programs, including whatever the compiler itself becomes once ported: pypoc-compiled
   compiler on the C VM compiling wyrm source is not meaningfully different from any other
@@ -266,6 +285,39 @@ whatever epic 1-6 built for `.out` checks), a self-compile driver, a `meson test
 
 **Acceptance.** Full corpus green; fixed point holds (`diff -r` on the two generations'
 image outputs is empty).
+
+> **Re-cut 2026-09-18 (see `epic_10a.md`).** The ported compiler cannot expand decorators,
+> and `parser.wy` has 86 `@accept` sites, so the full 21-module fixed point is not reachable
+> in this epic. M7 closes with: corpus sweep 19/20 (the `decorators/decorated` refusal stays),
+> and a fixed point over the **20 decorator-free modules only**, with `parser.wyc` built by
+> pypoc as an explicitly interim, recorded provenance delta (`run_selfcompile.py` takes
+> `parser.wyc` from pypoc and drops `parser.wy` from `SELF_SOURCES`). The true 21-module fixed
+> point and the removal of that arrangement move to epic 10a M5. Real decorator expansion is
+> an eval primitive in the C API plus a Lisp-style expansion pass (`epic_10a.md`), not an
+> extension of `_dsl.wy`. Landed while investigating (commits `44508a3`, `bd6039f`): failing
+> natives are named in faults, `str(error)` works, imported modules get `__name__`.
+> **M7 rescoped 2026-09-18 (final; supersedes the "remaining items" list that stood here).**
+> M7 closes this epic; it does NOT chase decorators or templates. Remaining work, in order:
+> 1. **Stub reporting.** Make gen 1 print every stubbed function with its recorded reason
+>    (`compiler_main.wy`, with a small hook in `compile_module`). Classify each stub:
+>    *expected-deferred* = a `_dsl.wy` template (`$`-prefixed `fn`s plus `_tmpl_bool`/
+>    `_tmpl_opt`; they use `this` and are quoted, never called) or a `'decorated` node in
+>    `parser.wy` awaiting expansion; *unexpected* = anything else, which is a real bug to fix
+>    here. Keep the list of expected names in the script so a new stub fails the run.
+> 2. **20-module fixed point.** Drop `wyrm/parser.wy` from `SELF_SOURCES` and put a pypoc-built
+>    `parser.wyc` (built in a scratch copy, never in `wy/`) into each generation's tree.
+>    Interim provenance delta, recorded loudly in the script header and report; removed by
+>    10a M5. Goal: gen2 == gen3 byte-identical (gen1 == gen2 only recorded if free).
+> 3. **Do NOT add `@template` markers** to `_dsl.wy` or anything else. pypoc accepts
+>    `@template` now (pass-through, pypoc `eae6cc8`), but the port cannot yet handle it; the
+>    markers, the `'template` node and strict lowering are **10a M0**.
+> 4. **Do not change stub semantics.** `compiler_main` keeps `stub_unlowered=true`; making
+>    lowering strict is 10a M0.
+> 5. Cheap regression tests from the report (the 9-line repro of the old `str(error)` fault in
+>    `test/wy/`; a doctest for `str(error)`), then wire `run_corpus_sweep.py` and
+>    `run_selfcompile.py` into `meson test` (skip without `pypoc/.venv`) or explicitly defer
+>    the wiring to 10a M5, recorded in the report.
+> 6. Final `epic_10_report.md`, commit, `meson test` green.
 
 **Model.** Sonnet for the runner/driver scripts; escalate to Opus only if the fixed point
 fails to converge and the cause is a genuine architectural gap, not a fixable bug.

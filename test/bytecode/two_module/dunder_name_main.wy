@@ -1,0 +1,4 @@
+# The entry module reads "__main__"; the imported module reads its own import path.
+import dunder_name
+println(__name__)
+println(dunder_name::who())

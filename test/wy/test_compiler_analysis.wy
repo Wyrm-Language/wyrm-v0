@@ -1,0 +1,162 @@
+# test/wy/test_compiler_analysis.wy - epic 10 M1 acceptance driver for
+# wy/wyrm/compiler/analysis.wy.
+#
+# Every expected answer below was taken from pypoc's own
+# `wypoc/compiler_bc/analysis.py` run over the *same* source text, via
+#
+#   pypoc/.venv/bin/python -c "
+#   from wypoc.parse import parse as P
+#   from wypoc.compiler_bc import analysis as A
+#   ...  A.free_names(A._param_names(fn.params), fn.body) ..."
+#
+# so a mismatch here means the wyrm port and pypoc disagree, not that a
+# hand-written expectation drifted. The sources are parsed with wy/wyrm's
+# own self-hosted parser (not hand-built trees), so the dispatch this
+# exercises is the one M2+ will really see.
+#
+# Run by scripts/run_wy_tests.py (meson's `wy-tests`), i.e. under pypoc's
+# tree-walking interpreter: `pypoc/.venv/bin/wyrm -Iwy test/wy/test_compiler_analysis.wy`.
+
+import wyrm::parser::*
+import wyrm::compiler::analysis::*
+import std::pairs::*
+
+failures := 0
+
+fn check(what: str, got, want) -> nil:
+    if got == want:
+        println("PASS " + what)
+    else:
+        println("FAIL " + what + " got " + str(got) + " want " + str(want))
+        exit(1)
+    return nil
+
+fn parse_module(src: str) -> pair:
+    return Parser(src)!program()
+
+# The first top-level `fn` of a parsed module.
+fn first_fn(src: str) -> pair:
+    return field(parse_module(src), 1)
+
+# The first nested scope boundary inside `fn_node`'s body (the closure /
+# defer whose free names are the interesting answer).
+fn first_nested(fn_node: pair):
+    for node in walk_body(boundary_body(fn_node)):
+        kind := node_kind(node)
+        if (kind in FN_LIKE) or (kind == 'defer):
+            return node
+    return nil
+
+fn fn_free(fn_node) -> list:
+    return free_names(param_names(boundary_params(fn_node)), boundary_body(fn_node))
+
+fn fn_cells(fn_node) -> list:
+    return cell_names(param_names(boundary_params(fn_node)), boundary_body(fn_node))
+
+# ---------------------------------------------------------------------------
+# case 1: a closure over an ASSIGNED variable - `total` needs a cell,
+# `ro` (read-only) does not.
+
+SRC_ASSIGNED := "fn outer(a):\n    total := 0\n    ro := 5\n    fn inner(x):\n        total = total + x + ro\n        return total\n    return total\n"
+
+outer_1 := first_fn(SRC_ASSIGNED)
+check("assigned: outer params", param_names(boundary_params(outer_1)), ['a])
+check("assigned: outer declared", declared_names(boundary_body(outer_1)), ['total, 'ro, 'inner])
+check("assigned: outer own_declared", own_declared_names(boundary_body(outer_1)), ['total, 'ro, 'inner])
+check("assigned: outer free", fn_free(outer_1), [])
+check("assigned: outer assigned", assigned_names(boundary_body(outer_1)), ['total])
+check("assigned: outer cells", fn_cells(outer_1), ['total])
+check("assigned: inner free", fn_free(first_nested(outer_1)), ['total, 'ro])
+
+# ---------------------------------------------------------------------------
+# case 2: a closure over a READ-ONLY variable - captured, never assigned,
+# so no cell at all.
+
+SRC_READONLY := "fn outer(a):\n    ro := 5\n    fn inner(x):\n        return ro + x\n    return inner\n"
+
+outer_2 := first_fn(SRC_READONLY)
+check("readonly: outer declared", declared_names(boundary_body(outer_2)), ['ro, 'inner])
+check("readonly: outer assigned", assigned_names(boundary_body(outer_2)), [])
+check("readonly: outer cells", fn_cells(outer_2), [])
+check("readonly: inner free", fn_free(first_nested(outer_2)), ['ro])
+
+# ---------------------------------------------------------------------------
+# case 3: a `defer` block assigning an enclosing variable - a boundary
+# like any closure (analysis.py's SCOPE_BOUNDARIES includes Defer).
+
+SRC_DEFER := "fn outer():\n    n := 0\n    defer:\n        n = n + 1\n    return n\n"
+
+outer_3 := first_fn(SRC_DEFER)
+check("defer: outer declared", declared_names(boundary_body(outer_3)), ['n])
+check("defer: outer assigned", assigned_names(boundary_body(outer_3)), ['n])
+check("defer: outer cells", fn_cells(outer_3), ['n])
+check("defer: defer free", free_names([], boundary_body(first_nested(outer_3))), ['n])
+
+# ---------------------------------------------------------------------------
+# case 4: two levels down - a doubly-nested closure's free name passes
+# through the frame in between.
+
+SRC_NESTED := "fn outer():\n    v := 1\n    fn mid():\n        fn deep():\n            v = v + 1\n        return deep\n    return mid\n"
+
+outer_4 := first_fn(SRC_NESTED)
+check("nested: outer declared", declared_names(boundary_body(outer_4)), ['v, 'mid])
+check("nested: outer assigned", assigned_names(boundary_body(outer_4)), ['v])
+check("nested: outer cells", fn_cells(outer_4), ['v])
+check("nested: mid free", fn_free(first_nested(outer_4)), ['v])
+
+# ---------------------------------------------------------------------------
+# case 5: loops and nested block scopes - `declared_names` sees the loop
+# variable and every block's declarations, `own_declared_names` sees
+# neither, and `block_scopes` hands out one scope per block.
+#
+# The `['e]` answers are not a typo: they reproduce analysis.py's own
+# `walk_block` behavior, which attributes an `elif` arm's declarations to
+# the enclosing block (see analysis.wy's `block_children` comment). pypoc
+# answers `own_declared_names(for body) == ['e']` for this same source.
+
+SRC_BLOCKS := "fn outer(seq):\n    tally := 0\n    for i in seq:\n        if i:\n            inner := i\n        elif i:\n            e := i\n        else:\n            o := i\n    return tally\n"
+
+outer_5 := first_fn(SRC_BLOCKS)
+body_5 := boundary_body(outer_5)
+check("blocks: declared", declared_names(body_5), ['tally, 'i, 'inner, 'e, 'o])
+check("blocks: own_declared", own_declared_names(body_5), ['tally])
+check("blocks: no cells", fn_cells(outer_5), [])
+
+scopes_5 := block_scopes(body_5, [])
+check("blocks: scope count", len(scopes_5), 5)
+check("blocks: for owns its variable", scopes_5[0][1], ['i])
+check("blocks: for-body own names", scopes_5[1][1], ['e])
+check("blocks: for-body enclosing", scopes_5[1][2], ['i])
+check("blocks: then arm", scopes_5[2][1], ['inner])
+check("blocks: elif arm", scopes_5[3][1], ['e])
+check("blocks: else arm", scopes_5[4][1], ['o])
+check("blocks: arm enclosing", scopes_5[2][2], ['i, 'e])
+
+# ---------------------------------------------------------------------------
+# case 6: hand-built trees, so the shape dispatch is pinned independently
+# of whatever the parser does today.
+
+HAND := $['fn_def, 'h, nil, $[$['param, 'p, nil, nil]], nil,
+           $[$['define, 'boxed, $['type, 'auto], $['int, 0]],
+             $['lambda, $[$['param, 'q, nil, nil]], nil,
+                $[$['set, 'boxed, $['binop, '+, 'boxed, 'q]],
+                  $['set, $['attr, 'obj, 'f], 'p]]],
+             $['return, 'boxed]]]
+
+check("hand: declared", declared_names(boundary_body(HAND)), ['boxed])
+check("hand: params", param_names(boundary_params(HAND)), ['p])
+check("hand: lambda free", fn_free(first_nested(HAND)), ['boxed, 'obj, 'p])
+check("hand: assigned", assigned_names(boundary_body(HAND)), ['boxed])
+check("hand: cells", fn_cells(HAND), ['boxed])
+
+# a literal-heavy tree: nothing in it is a name reference
+LITERALS := $['fn_def, 'lits, nil, nil, nil,
+              $[$['define, 'd, $['type, 'auto], $['dict, $["k", $['int, 1]]]],
+                $['define, 'a, $['type, 'auto], $['array, $['str, "s"], $['sym, 'tag]]],
+                $['return, 'nil]]]
+
+check("literals: declared", declared_names(boundary_body(LITERALS)), ['d, 'a])
+check("literals: free", fn_free(LITERALS), [])
+check("literals: cells", fn_cells(LITERALS), [])
+
+println("test_compiler_analysis: all checks passed")

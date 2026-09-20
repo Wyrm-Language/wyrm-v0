@@ -1,6 +1,6 @@
 # vm_plan — C bytecode VM, `bytes` type, self-hosted compiler
 
-Plan written 2026-09-15. Eleven epics in three phases. Each epic is a self-contained brief
+Plan written 2026-09-15. Eleven epics in three phases, plus epic 10a (added 2026-09-18) and epic 12. Each epic is a self-contained brief
 for a fresh agent session; `design_c_vm.md` is the shared architecture for epics 2–6.
 
 ## Goal
@@ -24,6 +24,8 @@ for a fresh agent session; `design_c_vm.md` is the shared architecture for epics
 - Format contract: `pypoc/doc/wyc-format.md` is normative. `opcode.h` and `image.h` are
   copied verbatim from `pypoc/wypoc/compiler_bc/include/wyrm/` and drift is a test failure.
 - The binary type is named `bytes` (the spec's existing name). No `buffer` type.
+- `.wyc` = pypoc-built image, `.wyd` = wyrm-hosted-compiler-built image (same format); the
+  built-in module table is searched last; cache rules are in `epic_11.md`'s contract section.
 - `pypoc/` is a nested git checkout, gitignored. Tooling uses `pypoc/.venv/bin/wyrm`.
 - Test bytecode (`.wyc`, `.wy_a`, `.out`, `manifest.txt`) is committed under
   `test/bytecode/` so `meson test` never needs Python. Note `.gitignore` currently ignores
@@ -49,7 +51,8 @@ for a fresh agent session; `design_c_vm.md` is the shared architecture for epics
 | 8 | Front-end cleanup and verification | parser goldens pass on both engines | 6 |
 | 9 | bjson + image writer in wyrm | `hello.wyc` written from wyrm, byte-identical | 7, 8 |
 | 10 | Compiler port | corpus compiled by wyrm; self-compile fixed point | 9 |
-| 11 | Bootstrap integration | `wyrm script.wy` with no Python | 10 |
+| 10a | Eval context + macro expansion (decorators) | `parser.wy` and decorated code compile with the port; true fixed point | 10 (M1-M6) |
+| 11 | Bootstrap integration (builtin module table, `.wyd`, cache) | `wyrm script.wy` with no Python | 10a |
 | 12 | Dispatch performance: inline cache, slot dict | measured method-call speedup over epic 6's baseline | 11 |
 
 Epic 7 can start any time after epic 3 on the C side and after epic 1 on the pypoc side;
@@ -80,7 +83,7 @@ Every epic runs as: **scan → execute → report**.
 | Work | Model | Why |
 |---|---|---|
 | Scan, milestone re-cutting, report | Opus | judgement across many files; delegates reading to Explore subagents |
-| Design-heavy milestones: E2 frame model + loop, E4 dispatch and `super`, E5 coroutines + linking, E10 compiler architecture, E12 inline cache | Opus | first-of-kind decisions with no reference implementation |
+| Design-heavy milestones: E2 frame model + loop, E4 dispatch and `super`, E5 coroutines + linking, E10 compiler architecture, E10a exec-native eval + expansion pass, E12 inline cache | Opus | first-of-kind decisions with no reference implementation |
 | Spec-driven work: loader sections, BSON strictness, opcode handlers once the loop exists, builtins, corpus script, doctests, `bytes` methods, bjson port, docs, parser fixes | Sonnet | the contract is written down; correctness is checked by running the corpus |
 | Fan-out inside a milestone: opcode groups, builtin families, one fixture per agent, one sample per agent | Sonnet subagents, 2–3 at once, disjoint files, each with its own acceptance command | independent and testable in isolation |
 
@@ -132,5 +135,5 @@ Session dates: … · Models used: … · Commits: <first>..<last>
 - `README.md` — this file.
 - `design_c_vm.md` — C VM architecture (frames, loop, coroutines, values, linking,
   symbols, classes, GC, testing, milestone table M0–M8). Epics 2–6 cite its sections.
-- `epic_1.md` … `epic_11.md` — one brief per epic, same seven sections each.
+- `epic_1.md` … `epic_11.md`, `epic_10a.md`, `epic_12.md` — one brief per epic, same seven sections each.
 - `epic_N_report.md` — written by the executing session at the end of epic N.

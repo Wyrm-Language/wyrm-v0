@@ -1,0 +1,186 @@
+# wy/wyrm/tools/test_context_driver.wy - epic 10 M1 regression driver for
+# wy/wyrm/compiler/context.wy, run on this repo's C VM.
+#
+# Every expected value below was read off pypoc's own
+# `wypoc/compiler_bc/context.py` performing the same calls in the same
+# order (`pypoc/.venv/bin/python -c "from wypoc.compiler_bc.context import
+# ModuleContext, FnContext; ..."`), so a FAIL here is a real disagreement
+# between the port and the reference, not a hand-written guess.
+#
+# ---------------------------------------------------------------------------
+# How to run it (and why it is an amalgam, not an import)
+#
+# This driver has NO `import` line on purpose: it is concatenated with its
+# dependencies into one module. Two engine bugs make that the only way to
+# exercise context.wy today (both recorded in vm_plan/epic_10_report.md):
+#
+#   * on the C VM, ANY message call on a class instance whose class comes
+#     from another module fails with "no overload of '<name>' matches 1
+#     receiver(s)" - in-body methods and `fn [T]` methods alike - so
+#     `import context::*` then `ctx ! declare_global(...)` cannot work yet;
+#   * under pypoc's tree-walking interpreter, `wy/wyrm/opcodes.wy` will not
+#     even load (`BY_NAME, BY_VALUE := _build_index()` - the interpreter
+#     does not destructure a returned tuple into two targets), and
+#     context.wy imports it, so the interpreter is not an option either.
+#
+# Concatenating puts every method call back inside one module, which both
+# engines handle:
+#
+#   work=$(mktemp -d)
+#   cat wy/std/pairs.wy wy/wyrm/opcodes.wy wy/wyrm/compiler/analysis.wy \
+#       wy/wyrm/compiler/context.wy wy/wyrm/tools/test_context_driver.wy \
+#     | grep -v '^import ' > "$work/context_check.wy"
+#   pypoc/.venv/bin/wyrm --build-bc "$work/context_check.wy"
+#   ./buildDir/src/wyrm/wyrm "$work/context_check.wyc"
+#
+# Once the cross-module dispatch bug is fixed this file can become an
+# ordinary `import context::*` driver and the amalgam step can go away.
+
+# Two more C VM divergences shape these helpers (both recorded in the
+# report): `str(aggregate)` faults there ("native call failed") though
+# `println(aggregate)` is fine, and `list == list` is false even for equal
+# contents (pypoc's interpreter compares structurally). So a failure prints
+# through println rather than str, and every aggregate answer is compared
+# element by element.
+
+fn check(what: str, got, want) -> nil:
+    if got == want:
+        println("PASS: " + what)
+    else:
+        println("FAIL:", what, "got", got, "want", want)
+        exit(1)
+    return nil
+
+fn check_list(what: str, got, want) -> nil:
+    ok := true
+    if len(got) != len(want):
+        ok = false
+    else:
+        i := 0
+        while i < len(got):
+            if got[i] != want[i]:
+                ok = false
+            i = i + 1
+    if ok:
+        println("PASS: " + what)
+    else:
+        println("FAIL:", what, "got", got, "want", want)
+        exit(1)
+    return nil
+
+ctx := ModuleContext("demo", nil)
+
+# -- the module-init frame --------------------------------------------------
+check("init frame name", ctx.init_ctx.name, "<init>")
+check("init frame is module init", ctx.init_ctx.is_module_init, true)
+
+# -- module globals (dedup, in declaration order) --------------------------
+check("declare_global a", ctx ! declare_global('a), 0)
+check("declare_global a again", ctx ! declare_global('a), 0)
+check("declare_global b", ctx ! declare_global('b), 1)
+
+# -- one frame: params, captures, locals, temps ----------------------------
+f := FnContext(ctx, "outer", ['a], ['cap], 0, false, nil)
+check("param reg is P0", f.params['a], P(0))
+check("capture reg is P1", f.captures['cap], P(1))
+check("declare_local x", f ! declare_local('x), 0)
+check("lookup x", f ! lookup('x), L(0))
+
+check_list("storage local", f ! storage('x), ["reg", L(0)])
+check_list("storage param", f ! storage('a), ["reg", P(0)])
+check_list("storage module global", f ! storage('b), ["global", 1])
+check("storage unknown name", f ! storage('zzz), nil)
+
+check("push first temp", f ! push(), L(1))
+check("push second temp", f ! push(), L(2))
+check("high water mark", f.high, 3)
+check("free_to", f ! free_to(1), nil)
+check("top after free_to", f.top, 1)
+
+# -- pools -----------------------------------------------------------------
+# type-aware dedup: 1, 1.0 and "1" are three different constants
+check("static 1", (ctx.image) ! add_static(1), 0)
+check("static 1.0", (ctx.image) ! add_static(1.0), 1)
+check("static 1 again", (ctx.image) ! add_static(1), 0)
+check("static \"1\"", (ctx.image) ! add_static("1"), 2)
+check("symbol go", (ctx.image) ! add_symbol("go"), 0)
+check("symbol go again", (ctx.image) ! add_symbol("go"), 0)
+
+# -- messages: one identity per path, recorded in the frame's use set ------
+check("reference path", f ! reference("std::io::write"), 0)
+check_list("frame use set", f.uses, [0])
+check("reference list form dedups", f ! reference(["std", "io", "write"]), 0)
+check_list("message entry symbols", (ctx.image).messages[0]["p"], [1, 2, 3])
+
+# -- the cell-index register -----------------------------------------------
+check("reserve_zero", f ! reserve_zero(), L(1))
+check("zero", f ! zero(), L(1))
+
+# -- emitting --------------------------------------------------------------
+check_list("pack_pairable move", pack_pairable('move, L(1), P(0)), [98369])
+check("emit_return", f ! emit_return(P(0), 1), nil)
+# a single value living in P is copied down into a temp first (spec 3.1)
+check_list("emit_return words", f.code, [163905, 131330])
+
+label := f ! new_label()
+check("emit_jump", f ! emit_jump('jmp, label, nil), nil)
+check("mark_label", f ! mark_label(label), nil)
+check("patch_labels", f ! patch_labels(), nil)
+check_list("patched jump", f.code, [163905, 131330, 79])
+
+# -- free globals ----------------------------------------------------------
+check("declare_free_global", ctx ! declare_free_global('println), 2)
+check("name_slot for own name", ctx ! name_slot('a), 0)
+check("name_slot for a free name", ctx ! name_slot('zz), 3)
+
+# -- nested block scopes ---------------------------------------------------
+# A hand-built body (no parser needed here):
+#     a := 0
+#     if a:
+#         b := 1
+# `b` belongs to the `if` arm, so it gets a slot of its own that is only
+# bound while the emitter is inside that arm. pypoc answers the same:
+# declare_local("a") == 0, then allocate_block_scopes gives `b` ("reg", L1).
+
+THEN_BODY := $[$['define, 'b, $['type, 'auto], $['int, 1]]]
+BLOCK_BODY := $[$['define, 'a, $['type, 'auto], $['int, 0]],
+                $['if, 'a, THEN_BODY, nil, nil]]
+
+g := FnContext(ctx, "blocks", nil, nil, 0, false, nil)
+check("block frame declares a", g ! declare_local('a), 0)
+check("allocate_block_scopes", g ! allocate_block_scopes(BLOCK_BODY, []), nil)
+check("one block scope recorded", len(g.block_slots), 1)
+check("b has no binding before the block", g ! block_binding('b), nil)
+check("push_block", g ! push_block(THEN_BODY), true)
+check_list("b is block-scoped", g ! block_binding('b), ["reg", L(1)])
+check_list("storage agrees", g ! storage('b), ["reg", L(1)])
+check("pop_block", g ! pop_block(), nil)
+check("b unbound again", g ! block_binding('b), nil)
+# the slot stays reserved even though the name is not bound any more
+check("block slot is not reused", g.nnamed, 2)
+
+# -- analysis.wy's two headline answers, on this engine too ----------------
+# test/wy/test_compiler_analysis.wy checks analysis.wy thoroughly, but under
+# pypoc's interpreter (it needs wy/wyrm/parser.wy). These two hand-built
+# trees repeat its central case here, on the C VM: a closure over an
+# ASSIGNED variable needs a cell, one over a READ-ONLY variable does not.
+# pypoc's analysis.py answers the same for the equivalent source.
+
+ASSIGNED := $['fn_def, 'outer, nil, $[$['param, 'a, nil, nil]], nil,
+              $[$['define, 'total, $['type, 'auto], $['int, 0]],
+                $['define, 'ro, $['type, 'auto], $['int, 5]],
+                $['fn_def, 'inner, nil, $[$['param, 'x, nil, nil]], nil,
+                   $[$['set, 'total, $['binop, '+, 'total, 'ro]]]],
+                $['return, 'total]]]
+
+READONLY := $['fn_def, 'outer, nil, nil, nil,
+              $[$['define, 'ro, $['type, 'auto], $['int, 5]],
+                $['fn_def, 'inner, nil, nil, nil, $[$['return, 'ro]]],
+                $['return, 'inner]]]
+
+check_list("declared names", declared_names(boundary_body(ASSIGNED)), ['total, 'ro, 'inner])
+check_list("assigned names", assigned_names(boundary_body(ASSIGNED)), ['total])
+check_list("cells: assigned capture", cell_names(['a], boundary_body(ASSIGNED)), ['total])
+check_list("cells: read-only capture", cell_names([], boundary_body(READONLY)), [])
+
+println("test_context_driver: all checks passed")

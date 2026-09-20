@@ -1,0 +1,258 @@
+# wy/wyrm/tools/test_statements_driver.wy - epic 10 M3 regression driver for
+# wy/wyrm/compiler/{handlers,statements}.wy, run on this repo's C VM.
+#
+# Every "reference:" code-word list below was read off pypoc's own
+# `wypoc.compiler_bc.statements.compile_body`, run over the *same* source
+# text through pypoc's real parser and a freshly built `ModuleContext`/
+# `FnContext`, with the declaration pass driven by hand (`analysis.py`'s
+# `own_declared_names` + `FnContext.declare` + `FnContext.allocate_block_scopes`)
+# the way M4's function prologue will drive it once it exists - see
+# statements.wy's deviation 1. So a FAIL here is a real disagreement between
+# the port and the reference, not a hand-written guess, for every fixture
+# tagged "reference:". The trees below are hand-built (no parser dependency)
+# but shaped exactly the way wy/wyrm/ast.wy documents for each snippet.
+#
+# Covers pypoc/test/bytecode/collections.wy (build/read/write/swap, all four
+# reference-checked) and pypoc/test/bytecode/errors.wy (checked/defaulted,
+# reference-checked; early, structural only - see its own comment below).
+# pypoc/test/bytecode/closures.wy is NOT reachable yet: every one of its
+# functions needs a nested `fn`/lambda (M4), except `doubled`, which needs
+# only `do:` - covered here structurally, since pypoc's compiler has no
+# `do:` construct to diff against (wy/wyrm-only, per expressions.wy's
+# deviation 5 discussion of 'do'). `traced` in errors.wy needs `defer` (M4)
+# and is not attempted.
+#
+# ---------------------------------------------------------------------------
+# Why this is an amalgam, not an `import` - see test_context_driver.wy's
+# header for the two C-VM/interpreter engine bugs that force it (opcodes.wy
+# will not load under pypoc's interpreter; cross-module instance methods
+# fault on the C VM). Run with:
+#
+#   work=$(mktemp -d)
+#   cat wy/std/pairs.wy wy/wyrm/opcodes.wy wy/wyrm/compiler/analysis.wy \
+#       wy/wyrm/compiler/context.wy wy/wyrm/compiler/expressions.wy \
+#       wy/wyrm/compiler/handlers.wy wy/wyrm/compiler/statements.wy \
+#       wy/wyrm/tools/test_statements_driver.wy \
+#     | grep -v '^import ' > "$work/stmt_check.wy"
+#   pypoc/.venv/bin/wyrm --build-bc "$work/stmt_check.wy"
+#   ./buildDir/src/wyrm/wyrm "$work/stmt_check.wyc"
+
+fn check(what: str, got, want) -> nil:
+    if got == want:
+        println("PASS: " + what)
+    else:
+        println("FAIL:", what, "got", got, "want", want)
+        exit(1)
+    return nil
+
+fn check_list(what: str, got, want) -> nil:
+    ok := true
+    if len(got) != len(want):
+        ok = false
+    else:
+        i := 0
+        while i < len(got):
+            if got[i] != want[i]:
+                ok = false
+            i = i + 1
+    if ok:
+        println("PASS: " + what)
+    else:
+        println("FAIL:", what, "got", got, "want", want)
+        exit(1)
+    return nil
+
+fn check_error(what: str, got) -> nil:
+    if got is error:
+        println("PASS: " + what)
+    else:
+        println("FAIL:", what, "did not error, got", got)
+        exit(1)
+    return nil
+
+# Stand-in for M4's function prologue / M6's module-init walk (statements.wy
+# deviation 1): declare every name the body introduces before compiling it,
+# the same two calls a real prologue would make.
+fn compile_fn_body(name: str, params: list | nil, body) -> FnContext | error:
+    mc := ModuleContext("demo", nil)
+    fr := FnContext(mc, name, params, nil, 0, false, nil)
+    for n in own_declared_names(body):
+        d := fr ! declare(n)
+        if d is error:
+            return d
+    a := fr ! allocate_block_scopes(body, [])
+    if a is error:
+        return a
+    e := compile_body(body, fr, nil)
+    if e is error:
+        return e
+    p := fr ! patch_labels()
+    if p is error:
+        return p
+    return fr
+
+# ---------------------------------------------------------------------------
+# collections.wy - all four reference-checked against pypoc's compile_body
+
+BUILD_BODY := $[
+    $['define, 'numbers, $['type, 'auto], $['array, $['int, 1], $['int, 2], $['int, 3]]],
+    $['define, 'point, $['type, 'auto], $['tuple, $['int, 4], $['int, 5]]],
+    $['define, 'lookup, $['type, 'auto], $['dict, $[$['str, "one"], $['int, 1]], $[$['str, "two"], $['int, 2]]]],
+    $['define, 'pairs, $['type, 'auto], $['list, $['int, 6], $['int, 7]]],
+    $['return, $['tuple, 'numbers, 'point, 'lookup, 'pairs]]
+]
+fbuild := compile_fn_body("build", nil, BUILD_BODY)
+check("build compiles", fbuild is error, false)
+check_list("build code", fbuild.code, [262464, 328256, 394048, 898, 262144, 263232, 329024, 66177, 262144, 1094, 328000, 67142, 459328, 131715, 262144, 263744, 329536, 197252, 262144, 262209, 328001, 393793, 459585, 263170])
+check("build nnamed", fbuild.nnamed, 4)
+check("build high", fbuild.high, 8)
+
+READ_BODY := $[$['return, $['tuple, $['index, 'items, $['int, 0]], $['index, 'table, 'key]]]]
+fread := compile_fn_body("read", ['items, 'table, 'key], READ_BODY)
+check("read compiles", fread is error, false)
+check_list("read code", fread.code, [64, 65688, ((32768 << 16) | 0), 321, 65688, ((32769 << 16) | 32770), 514])
+check("read high", fread.high, 2)
+
+WRITE_BODY := $[
+    $['set, $['target, 'items, $['index]], $['int, 99]],
+    $['return, 'items]
+]
+fwrite := compile_fn_body("write", ['items, 'index], WRITE_BODY)
+check("write compiles", fwrite is error, false)
+check_list("write code", fwrite.code, [25408, ((32768 << 16) | 153), ((32769 << 16) | 0), 32833, 258])
+check("write high", fwrite.high, 1)
+
+SWAP_BODY := $[
+    $['set_values, $['a, 'b], $['tuple, 'b, 'a]],
+    $['return, $['tuple, 'a, 'b]]
+]
+fswap := compile_fn_body("swap", ['a, 'b], SWAP_BODY)
+check("swap compiles", fswap is error, false)
+check_list("swap code", fswap.code, [33089, 98369, ((32768 << 16) | 65), ((32769 << 16) | 321), 32833, 98625, 514])
+check("swap high", fswap.high, 2)
+
+# ---------------------------------------------------------------------------
+# errors.wy - checked/defaulted reference-checked; early is a structural
+# smoke test of expressions.wy's pre-existing `_catch` (M2, `catch return`),
+# not statements.wy's own code - included because `$['define, ...]` (M3's
+# `_define`) is what routes its initializer into `compile_expr` at all.
+
+CHECKED_BODY := $[
+    $['define, 'found, $['type, 'auto], $['try, $['index, 'table, 'key]]],
+    $['return, 'found]
+]
+fchecked := compile_fn_body("checked", ['table, 'key], CHECKED_BODY)
+check("checked compiles", fchecked is error, false)
+check_list("checked code", fchecked.code, [152, ((32768 << 16) | 32769), 65614, 258, 258])
+check("checked nnamed", fchecked.nnamed, 1)
+
+DEFAULTED_BODY := $[$['return, $['catch, $['index, 'table, 'key], $['str, "missing"]]]]
+fdefaulted := compile_fn_body("defaulted", ['table, 'key], DEFAULTED_BODY)
+check("defaulted compiles", fdefaulted is error, false)
+check_list("defaulted code", fdefaulted.code, [152, ((32768 << 16) | 32769), 65614, 70, 258])
+
+EARLY_BODY := $[
+    $['define, 'value, $['type, 'auto], $['catch, $['index, 'table, 'key], $['return, $['str, "gave up"]]]],
+    $['return, 'value]
+]
+fearly := compile_fn_body("early", ['table, 'key], EARLY_BODY)
+check("early compiles", fearly is error, false)
+disasm_early := disassemble(fearly.code)
+check("early disassembles", disasm_early is error, false)
+
+# ---------------------------------------------------------------------------
+# control flow - structural only (no pypoc-bytecode-VM comparison recorded
+# for these three; verified instead by disassembling cleanly and by the
+# register/high-water-mark discipline the reference vectors above already
+# pin down for the same handler code).
+
+ABSLIKE_BODY := $[
+    $['if, $['binop, '<, 'x, $['int, 0]], $[$['return, $['binop, '-, $['int, 0], 'x]]], nil, nil],
+    $['return, 'x]
+]
+fabs := compile_fn_body("abslike", ['x], ABSLIKE_BODY)
+check("abslike compiles", fabs is error, false)
+check_list("abslike code", fabs.code, [64, 65681, ((32768 << 16) | 0), 262475, 64, 65670, 32768, 65794, 32833, 258])
+
+COUNTDOWN_BODY := $[
+    $['define, 'total, $['type, 'auto], $['int, 0]],
+    $['while, $['binop, '>, 'n, $['int, 0]], $[
+        $['set, 'total, $['binop, '+, 'total, 'n]],
+        $['set, 'n, $['binop, '-, 'n, $['int, 1]]]
+    ]],
+    $['return, 'total]
+]
+fcountdown := compile_fn_body("countdown", ['n], COUNTDOWN_BODY)
+check("countdown compiles", fcountdown is error, false)
+check_list("countdown code", fcountdown.code, [64, 65600, 131219, ((32768 << 16) | 1), 393803, 133, 32768, 65856, ((32768 << 16) | 134), ((32768 << 16) | 1), ((65526 << 16) | 79), 258])
+
+SUMLOOP_BODY := $[
+    $['define, 'total, $['type, 'auto], $['int, 0]],
+    $['for, 'item, 'items, $[
+        $['if, $['binop, '==, 'item, $['int, 0]], $['continue], nil, nil],
+        $['if, $['binop, '<, 'item, $['int, 0]], $['break], nil, nil],
+        $['set, 'total, $['binop, '+, 'total, 'item]]
+    ], nil],
+    $['return, 'total]
+]
+fsum := compile_fn_body("sumloop", ['items], SUMLOOP_BODY)
+check("sumloop compiles", fsum is error, false)
+check_list("sumloop code", fsum.code, [64, 131246, ((32768 << 16) | 0), 65711, 131085, 196672, 262287, 65539, 66635, ((65529 << 16) | 79), 196672, 262289, 65539, 66635, 196687, 133, 1, ((65521 << 16) | 79), 258])
+
+# ---------------------------------------------------------------------------
+# `do:` blocks (deviation 6): closures.wy's `doubled`, the one function in
+# that fixture that needs nothing from M4. No pypoc-bytecode-VM comparison
+# is possible ('do' is wy/wyrm-only), so this is checked structurally: one
+# `half + half` add inside the block, landing in the outer `twice`'s slot.
+#
+#   fn doubled(value):
+#       var twice = do:
+#           var half = value
+#           half + half
+#       return twice
+DOUBLED_BODY := $[
+    $['define, 'twice, $['type, 'auto], $['do, $[
+        $['define, 'half, $['type, 'auto], 'value],
+        $['expr_stmt, $['binop, '+, 'half, 'half]]
+    ]]],
+    $['return, 'twice]
+]
+fdoubled := compile_fn_body("doubled", ['value], DOUBLED_BODY)
+check("doubled compiles (do: wired to compile_body)", fdoubled is error, false)
+disasm_doubled := disassemble(fdoubled.code)
+check("doubled disassembles", disasm_doubled is error, false)
+# `twice` (the outer named local) plus `half` (the do:'s own block-scoped
+# name, which still reserves a real L slot - `reserve_local` via
+# `declare_block`, the same as any nested-block name; see
+# test_context_driver.wy's "block slot is not reused" check for the same
+# shape). `value` itself is a parameter (P0), not a named local, so it does
+# not add to nnamed.
+check("doubled nnamed", fdoubled.nnamed, 2)
+
+# ---------------------------------------------------------------------------
+# deliberate stubs (M4): nested fn/co and defer refuse clearly rather than
+# silently doing nothing or crashing.
+
+NESTED_FN_BODY := $[$['fn_def, 'inner, nil, nil, nil, $[$['return, $['int, 1]]]]]
+fnested := compile_fn_body("has_nested", nil, NESTED_FN_BODY)
+check_error("nested fn/co stub refuses", fnested)
+
+DEFER_BODY := $[$['defer, nil, $[$['pass]]]]
+fdefer := compile_fn_body("has_defer", nil, DEFER_BODY)
+check_error("defer stub refuses", fdefer)
+
+# `static` outside a function/class body (frame.statics never populated by
+# this driver's stand-in prologue) refuses, matching pypoc.
+STATIC_BODY := $[$['static, 'count, $['type, 'auto], $['int, 0]]]
+fstatic := compile_fn_body("has_static", nil, STATIC_BODY)
+check_error("static outside a function/class body refuses", fstatic)
+
+# ---------------------------------------------------------------------------
+# unsupported construct: handlers.wy's fail-loud contract, not a silent
+# fallback.
+
+BOGUS_BODY := $[$['slot_def, 'x, $['type, 'auto], nil, nil]]
+fbogus := compile_fn_body("has_bogus", nil, BOGUS_BODY)
+check_error("an unregistered statement kind is a named refusal, not a crash", fbogus)
+
+println("test_statements_driver: all checks passed")

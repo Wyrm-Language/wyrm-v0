@@ -1,0 +1,5 @@
+# Provides `__name__` to importers: the importing module sees its import path.
+fn who():
+    return __name__
+
+println(__name__)

@@ -1,0 +1,119 @@
+# wy/wyrm/tools/test_expressions_driver.wy - epic 10 M2 regression driver for
+# wy/wyrm/compiler/expressions.wy, run on this repo's C VM.
+#
+# Every expected code-word list below was read off pypoc's own
+# `wypoc.compiler_bc.expressions.compile_expr`, run over the *same* source
+# text through pypoc's real parser and a freshly built `ModuleContext`/
+# `FnContext` (see the epic report for the exact harness), so a FAIL here is
+# a real disagreement between the port and the reference, not a hand-written
+# guess. The trees below are hand-built (no parser dependency) but shaped
+# exactly the way wy/wyrm/parser.wy documents (wy/wyrm/ast.wy's node-kind
+# table) for each source snippet in its comment.
+#
+# ---------------------------------------------------------------------------
+# Why this is an amalgam, not an `import` - see test_context_driver.wy's
+# header for the two C-VM/interpreter engine bugs that force it. Run with:
+#
+#   work=$(mktemp -d)
+#   cat wy/std/pairs.wy wy/wyrm/opcodes.wy wy/wyrm/compiler/analysis.wy \
+#       wy/wyrm/compiler/context.wy wy/wyrm/compiler/expressions.wy \
+#       wy/wyrm/tools/test_expressions_driver.wy \
+#     | grep -v '^import ' > "$work/expr_check.wy"
+#   pypoc/.venv/bin/wyrm --build-bc "$work/expr_check.wy"
+#   ./buildDir/src/wyrm/wyrm "$work/expr_check.wyc"
+
+fn check(what: str, got, want) -> nil:
+    if got == want:
+        println("PASS: " + what)
+    else:
+        println("FAIL:", what, "got", got, "want", want)
+        exit(1)
+    return nil
+
+fn check_list(what: str, got, want) -> nil:
+    ok := true
+    if len(got) != len(want):
+        ok = false
+    else:
+        i := 0
+        while i < len(got):
+            if got[i] != want[i]:
+                ok = false
+            i = i + 1
+    if ok:
+        println("PASS: " + what)
+    else:
+        println("FAIL:", what, "got", got, "want", want)
+        exit(1)
+    return nil
+
+fn new_fn(params: list | nil) -> FnContext:
+    mc := ModuleContext("demo", nil)
+    return FnContext(mc, "f", params, nil, 0, false, nil)
+
+# -- "Hello " + name --------------------------------------------------------
+# reference: reg 0x1 (L1), code [70, 65669, 32768]
+f1 := new_fn(['name])
+node1 := $['binop, '+, $['str, "Hello "], 'name]
+reg1 := compile_expr(node1, f1, nil)
+check("concat reg", reg1, L(1))
+check_list("concat code", f1.code, [70, 65669, 32768])
+
+# -- 1 + 2 --------------------------------------------------------------
+# reference: reg 0x2 (L2), code [320, 66112, 131205, 1]
+f2 := new_fn(nil)
+node2 := $['binop, '+, $['int, 1], $['int, 2]]
+reg2 := compile_expr(node2, f2, nil)
+check("arith reg", reg2, L(2))
+check_list("arith code", f2.code, [320, 66112, 131205, 1])
+
+# -- greet("World") -----------------------------------------------------
+# reference: reg 0x0 (L0), code [32833, 326, 416, 65536]
+f3 := new_fn(['greet])
+node3 := $['call, 'greet, $[$['str, "World"]]]
+reg3 := compile_expr(node3, f3, nil)
+check("call reg", reg3, L(0))
+check_list("call code", f3.code, [32833, 326, 416, 65536])
+
+# -- [1, 2, 3] ------------------------------------------------------------
+# reference: reg 0x3 (L3), code [320, 66112, 131904, 197506, 0]
+f4 := new_fn(nil)
+node4 := $['array, $['int, 1], $['int, 2], $['int, 3]]
+reg4 := compile_expr(node4, f4, nil)
+check("array reg", reg4, L(3))
+check_list("array code", f4.code, [320, 66112, 131904, 197506, 0])
+
+# -- obj.x ----------------------------------------------------------------
+# reference: reg 0x0 (P0, the "obj" param itself - no code emitted for the
+# object operand, only the getattr), code [154, (P(0) << 16)]
+f5 := new_fn(['obj])
+node5 := $['attr, 'obj, 'x]
+reg5 := compile_expr(node5, f5, nil)
+check("attr reg", reg5, L(0))
+check_list("attr code", f5.code, [154, (P(0) << 16)])
+
+# -- arr[0] -----------------------------------------------------------------
+# reference: reg 0x1 (L1), code [64, 65688, (P(0) << 16)]
+f6 := new_fn(['arr])
+node6 := $['index, 'arr, $['int, 0]]
+reg6 := compile_expr(node6, f6, nil)
+check("index reg", reg6, L(1))
+check_list("index code", f6.code, [64, 65688, (P(0) << 16)])
+
+# -- receiver ! name(1) - a message send with a literal argument ----------
+# No pypoc-bytecode-VM comparison here (message identity indices are
+# allocated by ModuleImage.add_message/add_symbol, which never runs on the
+# pypoc side of this harness without a full ModuleContext walk) - checked
+# structurally instead: a receiver move into the window, one argument
+# copied in above it, then `msg` - three instructions, register discipline
+# base -> receiver, base+1 -> arg.
+f7 := new_fn(['recv])
+node7 := $['message, 'recv, 'go, $[$['int, 1]]]
+reg7 := compile_expr(node7, f7, nil)
+check("message reg is window base", reg7, L(0))
+check("message uses one identity", len(f7.uses), 1)
+check("message identity is 0", f7.uses[0], 0)
+disasm7 := disassemble(f7.code)
+check("message disassembles to 3 instructions", len(disasm7), 3)
+
+println("test_expressions_driver: all checks passed")

@@ -4,10 +4,9 @@
 # exactly, and write it to a file. Compared byte-for-byte against
 # bsonlite.encode_document({"n": "hello", "v": 1, "g": 2, "l": 3}).
 #
-# Field lengths are hand-computed, not looked up via len(bytes) - the
-# bytes type has no len() support in either engine yet (a documented gap,
-# see the epic 7 report), and this fixture's schema is fixed, so a
-# constant is exact and simpler than adding that support here.
+# Field lengths are hand-computed because this fixture's schema is fixed, so
+# a constant is exact and simpler than the len(bytes) call both engines now
+# support.
 import std::io
 
 TAG_STRING := 2

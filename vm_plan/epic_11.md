@@ -23,8 +23,79 @@ expected: prints `Hello World` (or whatever `hello.wy`'s actual output is), with
 the meson end-to-end test's shape (see M6), run against a stripped `PATH` to prove the
 binary is genuinely self-sufficient rather than accidentally shelling out.
 
+## Module resolution, provenance and cache contract (added 2026-09-18, user decisions)
+
+These rules are fixed; milestones below implement them.
+
+**Extensions = provenance.** `.wyc` is a compiled image produced by the Python POC (pypoc).
+`.wyd` is the same container format (`pypoc/doc/wyc-format.md` is still normative) produced
+by the wyrm-hosted compiler (the epic 10/10a port running on the C VM). Loaders accept both;
+the extension only records who built it. The `wyrm` compiler writes `.wyd`, never `.wyc`.
+(`.wyd` is unused anywhere in the repo as of this date.) The epic 10/10a tools
+(`compiler_main.wy`, `run_corpus_sweep.py`, `run_selfcompile.py`) still write `.wyc`; M1
+renames their output to `.wyd` and makes their comparisons extension-agnostic. Committed
+golden fixtures under `test/bytecode/` stay `.wyc` (they are pypoc output).
+
+**Import search order** for `import a::b`, first hit wins:
+1. each `-I` root, in order (then any default roots): `a/b.wy` source (compiled through the
+   cache below), or a precompiled `a/b.wyd` / `a/b.wyc` sitting beside it;
+2. **the built-in module table, last.** A module present in step 1 overrides the built-in
+   one, so a developer can shadow `wyrm::parser` or `std::io` from disk.
+
+**Built-in modules (fixed form).** Each built-in is a **`wy_c` image**: the static
+`wy_module_image` C source that `to_c()` emits (`wy/wyrm/image.wy`'s writer; pypoc's
+`image.py::to_c()` for the bootstrap seed), exactly the form `test/bytecode/embedded/range_1.c`
+already has. These `.c` files are **checked in as source** and compiled directly into the
+binary through `cwyrm_sources` (as `range_1.c` is in `src/builtin/meson.build`); the build
+never needs a compiler, Python, or a built `wyrm` to produce them. Loading is
+`wy_module_load_image` on the static image, no parsing of bytes. A generated **builtin
+table** source lists `{virtual path, &image}` rows, e.g. `{"wyrm::compiler::module", &...}`. A
+maintainer script (`scripts/regen_builtins.*`) regenerates the `.c` files and the table from
+`wy/`; a meson check fails if they are stale relative to `wy/`.
+
+Two tiers, one table:
+- **Compiler tier** (`wy/wyrm/compiler/*.wy`, the front end `tokenizer`/`parser`/`ast`/
+  `decode`/`_dsl`, `bjson`/`opcodes`/`image`, `std::eval` support, and whatever of `wy/std`
+  they import). These must be loaded before anything can be compiled, so they are loaded
+  **directly from the table at startup/first use, never through source lookup, cache or
+  JIT** - that path would need the compiler to compile itself. This is the table's primary
+  purpose.
+- **Library tier** (the rest of `wy/std` and `wy/wyrm`). Treat these as **a given**: `import
+  std::...` / `import wyrm::...` is assumed to resolve, from the table unless a disk module
+  overrides it. Not finding one is an internal packaging error, not a normal "module not
+  found".
+
+A table hit (either tier) goes through the same link path as any module once loaded.
+
+**Cache.** Same rules and directory structure as pypoc's (`cache.py`): for source
+`/dir/foo.wy` the cache file is `/dir/__wycache__/foo.wyd`; valid iff it is not older than the
+source (mtime); any I/O failure is silently skipped (best-effort, never fatal). Cache lookups
+consider **only `.wyd`**: a Python-produced `__wycache__/foo.wyc` is ignored, so the two
+toolchains never consume each other's caches. (An explicit `.wyc`/`.wyd` argument, or one
+found beside a source under a `-I` root, still loads; that is precompiled distribution, not
+cache.)
+
+**Cache directory override (`--cache-dir DIR`, absolute).** Replaces the `__wycache__`
+directory with a *prefix*: the source's absolute directory is appended to `DIR`.
+`/home/andrew/foo.wy` caches to `DIR/home/andrew/foo.wyd` (`DIR=/tmp/cache` gives
+`/tmp/cache/home/andrew/foo.wyd`) instead of `/home/andrew/__wycache__/foo.wyd`. No
+`__wycache__` component under the prefix; intermediate directories are created on write.
+Relative source paths are made absolute first. Meant for compile-only runs (`--check`,
+`--build-bc`) but accepted in every mode, and used for reads as well as writes (otherwise
+it could never hit). Distinct from the deferred `global_cache` hash scheme.
+
+**Verbose loading (`-v` / `--verbose`).** Extra diagnostics on stderr, one line per module
+resolution naming where it came from and why: `cache <path>.wyd`, `jit <source>.wy (cache
+absent|stale|unwritable)`, `precompiled <path>.wyc|.wyd`, or `builtin <virtual path>`, plus
+`cache write <path>` / `cache write skipped (<reason>)`. Implemented in the hosted import
+layer so the same lines cover the entry script and every transitive import.
+
 ## Inputs
 
+- `vm_plan/epic_10a_report.md`: how decorator expansion landed (`std::eval`, `expand.wy`).
+  **Epic 11 depends on 10a, not only 10:** M2's in-process compile of a user `.wy` must run
+  decorator expansion, so the embedded image set must include `std::eval`'s natives and the
+  expansion pass, and the embedded `parser` is the one 10a M5 compiled (true self-hosted).
 - `vm_plan/epic_10_report.md`: which fixtures are byte-identical vs. semantic-diff, the
   self-compile fixed point's actual convergence status, the final shape/entry point of
   `wy/wyrm/compiler/module.wy` (or wherever `compiler.wy`'s replacement landed), and any
@@ -99,16 +170,10 @@ only if M4 needs to replicate the recursion, not just the single-file check); an
 - `src/wyrm/main.c` by epic 11's start already has a working `-I` flag and `.wyc` loading
   path from epic 5/6's CLI work, so this epic extends rather than builds a CLI from
   scratch. *(verify in scan)*
-- The embedding mechanism is a meson `custom_target` that invokes the *already-built*
-  in-repo `wyrm` binary (bootstrapped by pypoc once, or by a previous build's `wyrm`,
-  per a chicken-and-egg resolution decided in M1) to produce `.c` arrays via
-  `wy/wyrm/image.wy`'s `to_c()`, which are then compiled into the final `wyrm` binary
-  in a second build pass. **This is the plan-time default choice; M1 must explicitly
-  decide between this and simply checking in pre-generated `.c` files (regenerated by a
-  maintainer script, not by the build), and justify whichever is chosen.**
-  *(verify in scan: check whether meson's build model in this repo already has any
-  precedent for a two-pass "build a tool, then use it to generate sources" pattern before
-  assuming custom_target is the natural fit)*
+- **Decided (user, 2026-09-18):** the embedded modules are checked-in `wy_c` image `.c` files
+  compiled directly in (precedent: `range_1.c` in `src/builtin/meson.build`); no
+  `custom_target`, no build-time compile step. *(verify in scan that `to_c()`/`image.wy`'s
+  writer output still matches `wy_module_image` in `include/wyrm/image.h`)*
 - `__wycache__/*.wyc` mtime-check semantics mirror pypoc's `cache.py`: compare the
   source file's mtime against a stored value, skip the cache silently on any read/write
   failure (read-only filesystem, permissions), never raise into the caller.
@@ -122,33 +187,36 @@ only if M4 needs to replicate the recursion, not just the single-file check); an
 
 ### M1 — Embed compiler + `wy/std` + `wy/wyrm` images into the binary
 
-**Scope.** Decide and implement the embedding mechanism (see Assumptions: meson
-`custom_target` running the already-built binary vs. checked-in generated `.c`). Produce
+**Scope.** Implement the embedding mechanism fixed by the contract (checked-in `wy_c`
+image `.c` files). Produce
 `.c` arrays (via `wy/wyrm/image.wy`'s `to_c()`) for every module the runtime needs before
 it can compile anything itself: the compiler's own modules
 (`wy/wyrm/compiler/*.wy`), the front end (`tokenizer.wy`, `parser.wy`, `ast.wy`,
 `decode.wy`, `_dsl.wy`), `bjson.wy`/`image.wy`/`opcodes.wy` from epic 9, and `wy/std`.
-Link the resulting `.c` files into `libcwyrm` or a new `wyrm_embedded` static lib, and
-register each embedded module with `wy_context_module_register` (per Appendix A §5 of
-`vm_plan/design_c_vm.md`, "Existing C assets to reuse") so `import` resolves them without
-touching the filesystem.
+Produce a checked-in `wy_c` image `.c` per module (the fixed form in the contract, precedent
+`range_1.c`; no raw-byte alternative) plus the builtin table, compiled into `libcwyrm` or a
+new `wyrm_embedded` static lib through the normal meson source list. Wire it into the hosted import hook as the **last** resolution step (contract
+above): filesystem hits, including cache, override it; a table hit loads through the
+ordinary load/link path. Also switch the epic 10/10a tools' output to `.wyd` and record which
+table modules were built by pypoc (bootstrap seed, `.wyc` provenance) vs. by the wyrm-hosted
+compiler (`.wyd`); the steady state is all `.wyd`.
 
-**Files.** New: a meson `custom_target` (or a `scripts/` generator script) plus its
-output `.c` files, likely under a new `src/wyrm/embedded/` directory. Edit:
-`src/wyrm/meson.build` (or wherever the `wyrm` executable target is defined) to add the
-new sources and the two-pass dependency if `custom_target` is chosen.
+**Files.** New: the checked-in image `.c` files and builtin table (likely under a new
+`src/wyrm/embedded/`), `scripts/regen_builtins.*`, and the staleness meson check. Edit:
+`src/wyrm/meson.build` (or `src/builtin/meson.build`) to add the sources to `cwyrm_sources`.
 
 **Acceptance.** The build produces a `wyrm` binary with the embedded images linked in;
 a small doctest (C++ bindings, per `AGENTS.md`'s testing convention) confirms
-`wy_context_module_register` finds `wyrm::compiler` (or whatever the embedded compiler's
-module name is) without any file on disk.
+`import wyrm::compiler::module` (or whatever the embedded compiler's module name is)
+resolves from the builtin table with no file on disk, **and** that a same-named module in a
+`-I` root takes precedence over it.
 
 **Model.** Opus. This is a first-of-kind build-system and bootstrapping decision (the
 chicken-and-egg of "the tool that compiles the images is the tool being built") with no
 reference implementation in this repo to copy.
 
 **Fan-out.** None; the embedding mechanism has to be one coherent decision, not several
-agents each picking a different answer to the custom_target-vs-checked-in question.
+agents each making their own choices about the table's shape and the two tiers.
 
 ### M2 — `wyrm script.wy`: compile in-process, then run
 
@@ -170,14 +238,18 @@ design).
 
 **Fan-out.** None.
 
-### M3 — `__wycache__/*.wyc` with mtime check
+### M3 — `__wycache__/*.wyd` cache, `--cache-dir`, `-v`
 
-**Scope.** Port `cache.py`'s `.wyc`-caching half to C: before compiling a `.wy` file,
-check `<script_dir>/__wycache__/<name>.wyc` (or the `global_cache` directory equivalent,
-if this epic decides to support it, plan-time choice, may be deferred, note in report)
+**Scope.** Port `cache.py`'s image-caching half to C, per the contract above: before
+compiling a `.wy` file, check `<script_dir>/__wycache__/<name>.wyd` (or, with `--cache-dir`,
+the prefix-mapped path; `global_cache` stays deferred)
 against the source file's mtime; on a hit, load the cached bytes directly; on a miss,
 compile and write the cache; any I/O failure anywhere in this path is silently skipped
 (cache is best-effort, never fatal), matching pypoc's stated policy exactly.
+Also implement `--cache-dir DIR` (prefix mapping, read and write) and `-v`/`--verbose` (one
+stderr line per resolution naming its source). The resolver and cache-path logic live in one
+module (`src/wyrm/cache.c`/`.h` or the hosted import layer) so the entry script and every
+transitive import share it.
 
 **Files.** Edit: `src/wyrm/main.c`, or a new `src/wyrm/cache.c`/`.h` if the logic is
 substantial enough to warrant its own module (consistent with `AGENTS.md`'s module
@@ -185,8 +257,12 @@ layout convention).
 
 **Acceptance.** Running `wyrm -Iwy test/bytecode/hello.wy` twice: the second run is
 measurably faster (or, more robustly, instrumented to confirm the compile step was
-skipped) and `__wycache__/hello.wyc` exists after the first run. Touching `hello.wy`
-(updating its mtime) forces a recompile on the next run.
+skipped) and `__wycache__/hello.wyd` exists after the first run. Touching `hello.wy`
+(updating its mtime) forces a recompile on the next run. With `--cache-dir /tmp/cache` the
+file appears at `/tmp/cache/<abs dir of hello.wy>/hello.wyd` and no `__wycache__` is created;
+a Python-written `__wycache__/hello.wyc` is ignored; `-v` prints `cache ...wyd` on the second
+run and `jit ...` on the first and after the touch; a `-I` shadow of a builtin module wins
+over the table (checked via `-v`).
 
 **Model.** Sonnet.
 
@@ -201,7 +277,8 @@ recursive-import-following semantics if that is judged worth porting, otherwise
 single-file only, noted as a scope reduction), `--build-bc [-o dir] [--emit wya,wyc,c]
 [--strip]` (compile to one or more containers via `wy/wyrm/image.wy`'s writers from epic
 9/10, without running), `-m mod::sub` (resolve via the same search-path logic as
-`import`), and an exit-code contract matching pypoc's (per the Assumptions item on exit
+`import`), `--cache-dir DIR` and `-v`/`--verbose` (implemented in M3, surfaced and tested
+here with the rest of the flags), `--build-bc` writing `.wyd`, and an exit-code contract matching pypoc's (per the Assumptions item on exit
 codes, confirmed in scan).
 
 **Files.** Edit: `src/wyrm/main.c` (flag parsing), possibly split into
@@ -269,6 +346,7 @@ whoever last touched M1-M5 with full context of what actually landed, not delega
 
 ## Out of scope / deferred
 
+- (`--cache-dir` is in scope; it is a plain path prefix. The hashed per-user cache below is not.)
 - The `global_cache` variant of `__wycache__` (per-user cache keyed by a hash of the
   absolute path), pypoc's opt-in via `~/.wyrm/config`; its config parsing is a separate
   concern from the mtime-cache mechanism, deferred unless M3's owner finds it trivial.
@@ -282,12 +360,12 @@ whoever last touched M1-M5 with full context of what actually landed, not delega
 
 ## Risks
 
-- **Chicken-and-egg build dependency.** Embedding the compiler into `wyrm` requires
-  compiling the compiler first, which requires a compiler. Mitigation: M1 must state
-  explicitly how this is broken (a bootstrap binary built once via pypoc and checked in
-  as generated `.c`, regenerated by a maintainer script; or a two-stage meson build where
-  stage one produces a bootstrap `wyrm` from pypoc-compiled images and stage two
-  re-embeds using it). Document the choice prominently; every later milestone depends on it.
+- **Bootstrap / staleness of checked-in images.** The compiler tier cannot be produced by the
+  build itself (it would need itself), so the checked-in `.c` files can drift from `wy/`.
+  Mitigation: the regen script is the only way they change, a meson check fails when they are
+  stale relative to `wy/`, and the first table is seeded from pypoc-built images (`.wyc`
+  provenance) then regenerated by the wyrm-hosted compiler once it can self-compile (epic
+  10a M5). Document the seed/regen procedure prominently; later milestones depend on it.
 - **`meson test` needing network/filesystem access to `pypoc/.venv`** would silently
   reintroduce a Python dependency through the back door. Mitigation: M5's acceptance
   explicitly tests with `pypoc/` unavailable, not just "assume it's fine."
@@ -306,12 +384,20 @@ whoever last touched M1-M5 with full context of what actually landed, not delega
   Python is actually gone, rather than silently passing because Python happened to be
   reachable anyway and just wasn't needed).
 
+- **Stale builtin table vs. disk.** A forgotten copy of `wyrm::parser` in a `-I` root silently
+  shadows the built-in one, or the reverse (`wy/` edited, binary still uses the built-in
+  copy). Mitigation: `-v` names the source of every resolution, and a meson check rebuilds
+  the table from `wy/` and fails if the generated table is out of date.
+- **Two toolchains, one cache directory.** Mitigation: the `.wyd`-only cache rule; an M3
+  test places a `.wyc` cache file and asserts it is ignored.
+
 ## Report
 
 Write `vm_plan/epic_11_report.md` per `vm_plan/README.md`'s template. Beyond the standard
 sections, record explicitly:
-- The exact embedding mechanism chosen in M1 (custom_target vs. checked-in `.c`) and why,
-  since this is the plan-time choice most likely to be revisited later.
+- The builtin table's format, and how bootstrap provenance (`.wyc` seed vs `.wyd`) was resolved.
+- Confirmation the table is checked-in `wy_c` `.c`, the regen/staleness procedure, and which
+  modules are compiler-tier vs library-tier.
 - The final exit-code table implemented, for anything downstream that scripts against it.
 - Whether `--check`'s recursive-import-following was ported or scoped down to single-file.
 - Confirmation (with the actual command run) that the stripped-`PATH` end-to-end test

@@ -1,0 +1,584 @@
+# wy/wyrm/compiler/module.wy - epic 10 M6
+#
+# Wyrm port of pypoc/wypoc/compiler_bc/module.py: the module pipeline that
+# turns a parsed program into a finished image - declare pass, hoisted
+# imports, the top-level walk (init code), per-item static flushes, and the
+# layout pass that places init at offset 0 and every function body after it.
+# This is where the compiler becomes end-to-end runnable: `compile_module`
+# answers the image dict `image.wy`'s `to_wyc()` serializes, and (with
+# `check`) `verify.wy` has already blessed.
+#
+# Init code emits in the order spec 6.2 fixes: hoisted imports first, then
+# top-level statements in source order, then a zero-value return. Function
+# bodies are laid out after init once sizes are known (assemble).
+#
+# ---------------------------------------------------------------------------
+# Deviations from module.py, each forced by the port
+#
+# 1. No decorator expansion. module.py's `_expand_decorators` runs real
+#    wyrm code over the sexpr tree before lowering (see the prereport's
+#    item 6: not `_dsl.wy`'s machinery, a `wyrm_eval_parse_tree`-equivalent
+#    is new infrastructure). A `decorated` node reaching the top-level walk
+#    here is refused with `unsupported` - same as every other construct
+#    this port has no lowering for; `decorators.wy` is already REFUSED in
+#    test/bytecode/manifest.txt, so the deferral is precedented.
+#
+# 2. No message promotion. module.py's `_collect_promotions`/`_emit_promotion`
+#    register a plain top-level `fn name` as the wildcard overload of a
+#    same-named message, once per arity a typed overload uses
+#    (llm-bytecode.md 9). No corpus fixture exercises it (`messages.wy` has
+#    only dispatched fns), and promotion recompiles the body - doubling any
+#    `static` in it, a caveat pypoc documents and defers itself. The hook is
+#    where `_fn_def` left it: plain fns compile exactly as pypoc's
+#    unpromoted path does.
+#
+# 3. No debug section. `emit_debug` is accepted and ignored: image.wy
+#    deliberately never emits SEC_DEBUG (epic 9's deferral), and no wy/wyrm
+#    node carries a source position to put in it anyway (see handlers.wy's
+#    deviation 3). Compare with `--strip` semantically: the images here are
+#    the stripped shape already.
+#
+# 4. Import shapes are wyrm's, not pypoc's flat Import dataclass (ast.wy's
+#    module section): an `import`/`import_static` node holds one narrowing
+#    body - a bare qualified_name, `import_as`, `import_items`, or
+#    `import_all` (the wildcard). `import static` lowers exactly like
+#    `import`, as in pypoc: `static` restricts usage by prose convention
+#    this compiler does not enforce.
+#
+# 5. The image is the dict `image.wy` consumes (what its `sections()`/
+#    `to_wyc()` encode), assembled here - init's words, then each pending
+#    body at its code offset, then the exports/free documents derived from
+#    the global slots' flags. Three non-serialized keys ride along:
+#    "module_uses" (init's own message references), "init_nlocals" (the
+#    init region's frame size, same value as the header's "l"), and
+#    "unlowered" (the stub report: [function name, reason] per body that
+#    would not lower and became a trapping stub - compiler-side only,
+#    never serialized, read by compiler_main.wy's STUB lines and epic
+#    10a's scan).
+
+import wyrm::opcodes::*
+import wyrm::compiler::context::*
+import wyrm::compiler::analysis::*
+import wyrm::compiler::expressions::*
+import wyrm::compiler::statements::*
+import wyrm::compiler::functions::*
+import wyrm::compiler::classes::*
+import wyrm::compiler::handlers::*
+import wyrm::compiler::verify::*
+
+# ---------------------------------------------------------------------------
+# small local helpers - copied rather than imported; see analysis.wy's
+# header for why (no cross-module access to a leading-underscore name).
+
+fn _tail(node, count: int):
+    cur := node
+    i := 0
+    while i < count:
+        if not (cur is pair):
+            return error("index out of range")
+        cur = cdr(cur)
+        i = i + 1
+    return cur
+
+fn _field(node, index: int):
+    rest := _tail(node, index)
+    if rest is error:
+        return rest
+    return car(rest)
+
+fn _emit_pack(frame: FnContext, op, f: int = 0, a0: int = 0, a1: int = 0, a2: int = 0, w1: int | nil = nil) -> nil | error:
+    words := pack(op, f=f, a0=a0, a1=a1, a2=a2, w1=w1)
+    if words is error:
+        return words
+    frame ! emit_words(words)
+    return nil
+
+fn _emit_pairable(frame: FnContext, op, primary: int = 0, secondary: int = 0) -> nil | error:
+    words := pack_pairable(op, primary, secondary)
+    if words is error:
+        return words
+    frame ! emit_words(words)
+    return nil
+
+# `a::b::c` from a list of name parts (context.wy's _join_parts, which this
+# file needs for import paths and free-name spellings).
+fn _join_path(parts) -> str:
+    out := ""
+    i := 0
+    n := len(parts)
+    while i < n:
+        if i > 0:
+            out = out + "::"
+        out = out + str(parts[i])
+        i = i + 1
+    return out
+
+# The first `n` parts of an import path (wy has no list slices).
+fn _prefix(parts, n: int) -> list:
+    out := []
+    i := 0
+    while i < n:
+        out ! append(parts[i])
+        i = i + 1
+    return out
+
+# The name parts of an import path: a bare sym (`import_items`/`import_all`
+# keep single-component paths bare) or a `qualified_name` node (whose SPECS
+# entry lists no sub-nodes - the parts ride as plain fields).
+fn _path_parts_of(path) -> list | error:
+    parts := []
+    if path is sym:
+        parts ! append(str(path))
+        return parts
+    if node_kind(path) == 'qualified_name:
+        rest := _tail(path, 1)
+        while rest is pair:
+            parts ! append(str(car(rest)))
+            rest = cdr(rest)
+        return parts
+    return error("an import path is a name or a qualified name")
+
+# One import statement's shape, normalized to what the hoist below emits:
+# [path_parts, alias_or_nil, items_or_nil, wildcard, excepts_or_nil].
+# `items` is a list of [name, binding] pairs. The narrowing body is one of
+# a bare sym (single-component paths: `import geometry`),
+# `qualified_name`, `import_as`, `import_items`, or `import_all`.
+fn _import_shape(node) -> list | error:
+    body := (_field(node, 1) catch nil)
+    if body is nil:
+        return error("an import needs a body")
+    narrowing := car(body)
+    if narrowing is sym:
+        return [[str(narrowing)], nil, nil, false, nil]
+    kind := node_kind(narrowing)
+    if kind == 'qualified_name:
+        parts := _path_parts_of(narrowing)
+        if parts is error:
+            return parts
+        return [parts, nil, nil, false, nil]
+    if kind == 'import_as:
+        parts := _path_parts_of((_field(narrowing, 1) catch nil))
+        if parts is error:
+            return parts
+        return [parts, str((_field(narrowing, 2) catch nil)), nil, false, nil]
+    if kind == 'import_items:
+        parts := _path_parts_of((_field(narrowing, 1) catch nil))
+        if parts is error:
+            return parts
+        items := []
+        p := (_field(narrowing, 2) catch nil)
+        while p is pair:
+            item := car(p)
+            name := (_field(item, 1) catch nil)
+            alias := (_field(item, 2) catch nil)
+            if alias is nil:
+                items ! append([str(name), str(name)])
+            else:
+                items ! append([str(name), str(alias)])
+            p = cdr(p)
+        return [parts, nil, items, false, nil]
+    if kind == 'import_all:
+        parts := _path_parts_of((_field(narrowing, 1) catch nil))
+        if parts is error:
+            return parts
+        excepts := (_field(narrowing, 2) catch nil)
+        return [parts, nil, nil, true, excepts]
+    return error("an import body is a qualified name, import_as, import_items or import_all")
+
+# ---------------------------------------------------------------------------
+# the declare pass (module.py's _declare_module_names, over wyrm shapes)
+
+fn _declare_module_names(body, module: ModuleContext) -> nil | error:
+    # fn/co names are declared up front too - the docstring intent of
+    # module.py's _declare_module_names ("`fn` definitions included"),
+    # which its own code does not actually do. Without this, a recursive
+    # top-level fn (`replace` in std::pairs) or a forward reference
+    # (`field` calling the later-defined `list_tail`) compiles its body's
+    # self/name read as a never-filled free global, faulting at run time.
+    for node in body:
+        kind := node_kind(node)
+        if (kind == 'import) or (kind == 'import_static):
+            shape := _import_shape(node)
+            if shape is error:
+                return shape
+            parts := shape[0]
+            index := module ! declare_global(parts[0])
+            if index is error:
+                return index
+            if not shape[3]:
+                # A wildcard binds no leaf name; every other form binds
+                # root and leaf (or alias), plus each item's binding.
+                leaf := shape[1]
+                if leaf is nil:
+                    leaf = parts[len(parts) - 1]
+                index2 := module ! declare_global(leaf)
+                if index2 is error:
+                    return index2
+                if not (shape[2] is nil):
+                    for item in shape[2]:
+                        index3 := module ! declare_global(item[1])
+                        if index3 is error:
+                            return index3
+        elif kind == 'class_def:
+            index4 := module ! declare_global((_field(node, 1) catch nil))
+            if index4 is error:
+                return index4
+        elif (kind == 'fn_def) or (kind == 'co_def):
+            # A dispatched `fn [T] name` is not a module global (it is
+            # reached by sending `name`); its plain siblings are.
+            if (_field(node, 2) catch nil) is nil:
+                index6 := module ! declare_global((_field(node, 1) catch nil))
+                if index6 is error:
+                    return index6
+    for name in own_declared_names(body):
+        index5 := module ! declare_global(name)
+        if index5 is error:
+            return index5
+    return nil
+
+# ---------------------------------------------------------------------------
+# imports (module.py's _hoist_imports and friends)
+
+# `import a::b::c`: load each prefix in turn, then bind the root package
+# and the leaf (or its alias) to module globals. The path is a constant
+# string, not a table entry: the instruction reads it, splits it, and hands
+# it to the loader.
+fn _import_module(parts, alias, bind_leaf: bool, module: ModuleContext) -> nil | error:
+    init := module.init_ctx
+    mark := init ! mark()
+    reg := init ! push()
+    if reg is error:
+        return reg
+    depth := 1
+    n := len(parts)
+    while depth <= n:
+        idx := (module.image) ! add_static(_join_path(_prefix(parts, depth)))
+        if idx is error:
+            return idx
+        e := _emit_pairable(init, 'import, idx, reg)
+        if e is error:
+            return e
+        if (depth == 1) and ((n > 1) or (not bind_leaf)):
+            gidx := module ! global_index(parts[0])
+            if gidx is error:
+                return gidx
+            e2 := _emit_pairable(init, 'gset, gidx, reg)
+            if e2 is error:
+                return e2
+        depth = depth + 1
+    if bind_leaf:
+        leaf := alias
+        if leaf is nil:
+            leaf = parts[n - 1]
+        gidx2 := module ! global_index(leaf)
+        if gidx2 is error:
+            return gidx2
+        e3 := _emit_pairable(init, 'gset, gidx2, reg)
+        if e3 is error:
+            return e3
+    return init ! free_to(mark)
+
+# `import a::b::*`: load the module, then register its namespace for the
+# resolution search. The except list is a window of interned symbols the
+# instruction reads the way `tuple` reads its items.
+fn _import_star(parts, excepts, module: ModuleContext) -> nil | error:
+    init := module.init_ctx
+    e0 := _import_module(parts, nil, false, module)
+    if e0 is error:
+        return e0
+    idx := (module.image) ! add_static(_join_path(parts))
+    if idx is error:
+        return idx
+    mark := init ! mark()
+    names := []
+    if not (excepts is nil):
+        p := excepts
+        while p is pair:
+            names ! append(str(car(p)))
+            p = cdr(p)
+    for name in names:
+        sym := (module.image) ! add_symbol(name)
+        if sym is error:
+            return sym
+        reg := init ! push()
+        if reg is error:
+            return reg
+        e1 := _emit_pairable(init, 'lsym, sym, reg)
+        if e1 is error:
+            return e1
+    base := init ! mark()
+    e2 := _emit_pack(init, 'import_star, f=len(names), a0=idx, a1=L(base))
+    if e2 is error:
+        return e2
+    module.has_wildcard_import = true
+    return init ! free_to(mark)
+
+# Emit every import ahead of the resolve point; answer the item bindings
+# (`import a::(x, y as z)`) that wait until the walk's own statements can
+# have run - each is a reference into the dependency, read once into the
+# global it was given, right after the hoisted block.
+fn _hoist_imports(body, module: ModuleContext) -> list | error:
+    pending := []
+    for node in body:
+        kind := node_kind(node)
+        if (kind != 'import) and (kind != 'import_static):
+            continue
+        shape := _import_shape(node)
+        if shape is error:
+            return shape
+        parts := shape[0]
+        alias := shape[1]
+        items := shape[2]
+        wildcard := shape[3]
+        excepts := shape[4]
+        if wildcard:
+            e := _import_star(parts, excepts, module)
+            if e is error:
+                return e
+            continue
+        e2 := _import_module(parts, alias, true, module)
+        if e2 is error:
+            return e2
+        if not (items is nil):
+            for item in items:
+                pending ! append([parts, item[0], item[1]])
+    return pending
+
+# `import a::(x, y as z)`: a free slot named by the whole path - filled by
+# the `import` above it that made the path reachable - copied into the
+# global the statement binds. Two slots rather than one because the two are
+# different names: `a::x` is what was read, `y` is what it became.
+fn _bind_imported_names(pending: list, module: ModuleContext) -> nil | error:
+    init := module.init_ctx
+    for entry in pending:
+        parts := entry[0]
+        path_names := []
+        for part in parts:
+            path_names ! append(part)
+        path_names ! append(entry[1])
+        source := module ! declare_free_global(_join_path(path_names))
+        if source is error:
+            return source
+        gidx := module ! global_index(entry[2])
+        if gidx is error:
+            return gidx
+        mark := init ! mark()
+        reg := init ! push()
+        if reg is error:
+            return reg
+        e := _emit_pairable(init, 'gget, source, reg)
+        if e is error:
+            return e
+        e2 := _emit_pairable(init, 'gset, gidx, reg)
+        if e2 is error:
+            return e2
+        e3 := init ! free_to(mark)
+        if e3 is error:
+            return e3
+    return nil
+
+# ---------------------------------------------------------------------------
+# the top-level handlers (module.py's @toplevel registry, keyed by kind)
+
+# A plain top-level `fn`/`co`: a function entry plus, in init, a closure
+# over it stored into the module global of its name. The promotion half of
+# pypoc's `_fn_def` is not ported (deviation 2).
+fn _plain_fn_toplevel(node, module: ModuleContext) -> nil | error:
+    r := compile_function(node, module)
+    if r is error:
+        return r
+    index := r[0]
+    gidx := module ! declare_global((_field(node, 1) catch nil))
+    if gidx is error:
+        return gidx
+    init := module.init_ctx
+    reg := init ! push()
+    if reg is error:
+        return reg
+    e := _emit_pack(init, 'closure, a0=reg, a1=index, a2=0, f=0)
+    if e is error:
+        return e
+    return _emit_pairable(init, 'gset, gidx, reg)
+
+# `fn $name(...)`: the DSL's TreeBase-method shorthand (parser.wy's
+# `@accept`-generated matchers call them as `this ! $name(...)`). The
+# parser produces a plain fn_def whose name carries the `$`; the tree
+# below retargets it as a dispatched fn on TreeBase so `this` and the
+# message registration work exactly like an explicit `fn [TreeBase]`.
+fn _treebase_fn_toplevel(node, module: ModuleContext) -> nil | error:
+    fn_name := (_field(node, 1) catch nil)
+    dispatched := $['fn_def, fn_name, $['TreeBase], (_field(node, 3) catch nil),
+                    (_field(node, 4) catch nil), (_field(node, 5) catch nil)]
+    return compile_dispatched_fn_toplevel(dispatched, module)
+
+fn _fn_toplevel(node, module: ModuleContext, extra) -> nil | error:
+    if (_field(node, 2) catch nil) is nil:
+        fn_name := (_field(node, 1) catch nil)
+        if (fn_name is sym) and (str(fn_name)[0] == 36):
+            return _treebase_fn_toplevel(node, module)
+        return _plain_fn_toplevel(node, module)
+    return compile_dispatched_fn_toplevel(node, module)
+
+# Imports were hoisted and emitted before the walk; nothing is left to do
+# where the statement actually appears.
+fn _import_toplevel(node, module: ModuleContext, extra) -> nil | error:
+    return nil
+
+# dispatch calls every handler with (node, frame, extra); the class entry
+# point's two-parameter shape gets the wrapper it needs.
+fn _class_toplevel(node, module: ModuleContext, extra) -> nil | error:
+    return compile_class_toplevel(node, module)
+
+register_toplevel(['class_def], _class_toplevel)
+register_toplevel(['fn_def, 'co_def], _fn_toplevel)
+register_toplevel(['import, 'import_static], _import_toplevel)
+
+# ---------------------------------------------------------------------------
+# statics (module.py's _flush_statics)
+
+# Run the `static` initializers the item just compiled declared: bound once
+# where the owner is created (spec 7.2), in init, right after the closure
+# that publishes it - never on every call.
+fn _flush_statics(module: ModuleContext) -> nil | error:
+    init := module.init_ctx
+    pending := module.pending_statics
+    module.pending_statics = []
+    for entry in pending:
+        index := entry[0]
+        value_node := entry[1]
+        mark := init ! mark()
+        reg := init ! push()
+        if reg is error:
+            return reg
+        r := compile_expr(value_node, init, reg)
+        if r is error:
+            return r
+        e := _emit_pairable(init, 'gset, index, reg)
+        if e is error:
+            return e
+        e2 := init ! free_to(mark)
+        if e2 is error:
+            return e2
+    return nil
+
+# ---------------------------------------------------------------------------
+# assemble (module.py's _assemble, into the dict image.wy consumes)
+
+fn _assemble(module: ModuleContext) -> dict | error:
+    image := module.image
+    init := module.init_ctx
+    code := []
+    for w in init.code:
+        code ! append(w)
+    for entry in module.pending:
+        fn_entry := image.functions[entry[0]]
+        fn_entry["code_offset"] = len(code)
+        for w in entry[1].code:
+            code ! append(w)
+    exports := {}
+    free := {}
+    i := 0
+    while i < len(image.globals):
+        gslot := image.globals[i]
+        if gslot["exported"]:
+            exports[gslot["name"]] = i
+        if gslot["free"]:
+            free[gslot["name"]] = i
+        i = i + 1
+    uses := []
+    for u in init.uses:
+        uses ! append(u)
+    stubs := []
+    for s in image.unlowered:
+        stubs ! append(s)
+    img := {}
+    img["name"] = image.module_name
+    img["version"] = 1
+    img["globals"] = len(image.globals)
+    img["init_l"] = init.high
+    img["init_nlocals"] = init.high
+    img["module_uses"] = uses
+    img["unlowered"] = stubs
+    img["statics"] = image.statics
+    img["slot_defaults"] = nil
+    img["symbols"] = image.symbols
+    img["functions"] = image.functions
+    img["classes"] = image.classes
+    img["messages"] = image.messages
+    if len(exports) > 0:
+        img["exports"] = exports
+    if len(free) > 0:
+        img["free"] = free
+    img["code"] = code
+    return img
+
+# ---------------------------------------------------------------------------
+# the entry point
+
+# Compile a parsed program into a finished module image (the dict
+# `image.wy`'s `to_wyc` serializes), verifying it first unless `check` is
+# false. `stub_unlowered` decides what happens to a function body that will
+# not lower: with it on (the default) the body becomes a trapping stub and
+# the module still compiles, with the reason recorded on the image; with it
+# off the whole module is refused. Anything outside a function body is a
+# refusal either way.
+fn compile_module(program_node, module_name: str, source_file = nil, check: bool = true,
+                  slot_optimization: bool = false, emit_debug: bool = false,
+                  stub_unlowered: bool = true) -> dict | error:
+    module := ModuleContext(module_name, source_file)
+    module.slot_optimization = slot_optimization
+    module.stub_unlowered = stub_unlowered
+    body := cdr(program_node)
+    if node_kind(program_node) != 'module:
+        return error("compile_module needs a 'module node")
+
+    d := _declare_module_names(body, module)
+    if d is error:
+        return d
+    pending := _hoist_imports(body, module)
+    if pending is error:
+        return pending
+    b := _bind_imported_names(pending, module)
+    if b is error:
+        return b
+
+    init := module.init_ctx
+    visible := []
+    for name in module.globals:
+        visible ! append(name)
+    scopes := init ! allocate_block_scopes(body, visible)
+    if scopes is error:
+        return scopes
+
+    for node in body:
+        mark := init ! mark()
+        var r: nil | error
+        if supported(TOPLEVEL_HANDLERS, node):
+            r = dispatch(TOPLEVEL_HANDLERS, node, module, nil)
+        else:
+            r = compile_statement(node, init)
+        if r is error:
+            return r
+        f := _flush_statics(module)
+        if f is error:
+            return f
+        fr := init ! free_to(mark)
+        if fr is error:
+            return fr
+
+    # Module init returns no values: the loader calls it for its effects.
+    e := _emit_pack(init, 'return, a0=0, f=0)
+    if e is error:
+        return e
+    p := init ! patch_labels()
+    if p is error:
+        return p
+
+    img := _assemble(module)
+    if img is error:
+        return img
+    if check:
+        v := verify(img)
+        if v is error:
+            return v
+    return img

@@ -36,6 +36,15 @@ static wy_value fault_value_f(wy_context* ctx, const char* message)
     return wy_value_object(WY_TYPE_TAG_ERROR, (wy_object*) obj);
 }
 
+/* Fault text for a failed native call: names the native and the wy_error
+ * code so a bare "native call failed" is diagnosable. */
+static void native_fail_msg_f(char* buf, size_t size, const wy_native* native, wy_error err)
+{
+    if (err == WY_ERR_ARITY) { snprintf(buf, size, "wrong argument count"); return; }
+    snprintf(buf, size, "native call failed: %s (error %d)",
+             (native != WY_NULL && native->name != WY_NULL) ? native->name : "?", (int) err);
+}
+
 /**
  * `error("msg")`: the base error type's construction. The reference
  * (wyrm_builtins.py install()) binds `error` to a real Class and
@@ -522,7 +531,7 @@ static wy_error dispatch_native_body_f(wy_context* ctx, wy_native* native, const
 
     wy_error err = wy_vm_call_leaf_f(ctx, native, merged, n + argc, out, nres);
     if (err != WY_ERR_NONE) {
-        snprintf(fault_msg, fault_msg_size, "%s", err == WY_ERR_ARITY ? "wrong argument count" : "native call failed");
+        native_fail_msg_f(fault_msg, fault_msg_size, native, err);
         return err;
     }
     return WY_ERR_NONE;
@@ -875,6 +884,7 @@ reload:;
                     err = wy_context_intern(ctx, path->str, path->len, &spelling);
                     if (err == WY_ERR_NONE) { err = wy_link_fill_from_import(ctx, mod, spelling, dep); }
                 }
+                if (err == WY_ERR_NONE) { err = wy_link_adopt_messages(ctx, mod, dep); }
                 if (err != WY_ERR_NONE) { fault_v = fault_value_f(ctx, "import: fill failed"); goto do_fault; }
                 if (!star) { *dst = wy_value_object(WY_TYPE_TAG_MODULE, (wy_object*) dep); }
                 ip = next_ip;
@@ -1548,7 +1558,9 @@ reload:;
                         wy_exec_fn_create(exec_native_call_resume_f, wy_primitive_null()),
                         native, &L[base + 1], argc, nres);
                     if (err != WY_ERR_NONE) {
-                        fault_v = fault_value_f(ctx, "native call failed");
+                        char fail_msg[128];
+                        native_fail_msg_f(fail_msg, sizeof fail_msg, native, err);
+                        fault_v = fault_value_f(ctx, fail_msg);
                         goto do_fault;
                     }
                     return WY_EXEC_CONTINUE;
@@ -1556,8 +1568,9 @@ reload:;
                 wy_error err = wy_vm_call_leaf_f(ctx, native, &L[base + 1], argc, &L[base], nres);
                 if (err != WY_ERR_NONE) {
                     fr->ip = next_ip;
-                    fault_v = fault_value_f(ctx,
-                        err == WY_ERR_ARITY ? "wrong argument count" : "native call failed");
+                    char fail_msg[128];
+                    native_fail_msg_f(fail_msg, sizeof fail_msg, native, err);
+                    fault_v = fault_value_f(ctx, fail_msg);
                     goto do_fault;
                 }
                 /* Backfill nil past whatever the leaf actually wrote, same
@@ -1688,8 +1701,9 @@ reload:;
                 wy_error err = wy_vm_call_leaf_f(ctx, native, args, tup->count, &L[base], nres);
                 if (err != WY_ERR_NONE) {
                     fr->ip = next_ip;
-                    fault_v = fault_value_f(ctx,
-                        err == WY_ERR_ARITY ? "wrong argument count" : "native call failed");
+                    char fail_msg[128];
+                    native_fail_msg_f(fail_msg, sizeof fail_msg, native, err);
+                    fault_v = fault_value_f(ctx, fail_msg);
                     goto do_fault;
                 }
                 ip = next_ip;
@@ -2113,6 +2127,7 @@ do_return: {
             err = wy_context_intern(ctx, fr->aux.data.str->str, fr->aux.data.str->len, &path);
             if (err == WY_ERR_NONE) { err = wy_link_fill_from_import(ctx, importer, path, mod); }
         }
+        if (err == WY_ERR_NONE) { err = wy_link_adopt_messages(ctx, importer, mod); }
         if (err != WY_ERR_NONE) { fault_v = fault_value_f(ctx, "import: fill failed"); goto do_fault; }
         mod->state = WY_MODULE_READY;
         if (fr->ret_kind == WY_RET_IMPORT) { *fr->ret_dst = wy_value_object(WY_TYPE_TAG_MODULE, (wy_object*) mod); }

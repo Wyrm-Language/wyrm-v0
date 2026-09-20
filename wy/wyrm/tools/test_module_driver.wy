@@ -1,0 +1,63 @@
+# wy/wyrm/tools/test_module_driver.wy - epic 10 M6 regression driver for
+# wy/wyrm/compiler/module.wy (+ verify.wy), run on this repo's C VM.
+#
+# Same amalgam constraint as test_classes_driver.wy (see its header): the
+# compiler modules + bjson + image are concatenated with their wyrm-side
+# `import` lines stripped, compiled by pypoc's compiler_bc, then run on the
+# C VM. The fixture MODULE TREES below are the literal, verbatim output of
+# wy/wyrm's own parser (regenerated after the M5-session expr_stmt/message
+# fixes) against the real fixture sources - the pipeline under test here is
+# module.wy's (declare pass, hoisted imports, top-level walk, assemble,
+# verify), so the trees arrive pre-parsed; running the parser itself on the
+# C VM is M7's territory (it needs decorator expansion to compile
+# parser.wyc, which pypoc's compiler_bc cannot do for this port either -
+# see the epic report).
+#
+#   work=$(mktemp -d)
+#   cat wy/std/pairs.wy wy/wyrm/bjson.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
+#       wy/wyrm/compiler/analysis.wy wy/wyrm/compiler/context.wy \
+#       wy/wyrm/compiler/expressions.wy wy/wyrm/compiler/handlers.wy \
+#       wy/wyrm/compiler/statements.wy wy/wyrm/compiler/functions.wy \
+#       wy/wyrm/compiler/classes.wy wy/wyrm/compiler/verify.wy \
+#       wy/wyrm/compiler/module.wy wy/wyrm/tools/test_module_driver.wy \
+#     | grep -vE '^import (wyrm|bjson|opcodes|image|std::pairs)' \
+#     > "$work/mod_check.wy"
+#   pypoc/.venv/bin/wyrm --build-bc "$work/mod_check.wy" -o "$work"
+#   ./buildDir/src/wyrm/wyrm "$work/mod_check.wyc"
+#   ./buildDir/src/wyrm/wyrm -I/tmp/e10out /tmp/e10out/report.wyc   # vs two_module/report.out
+#   ./buildDir/src/wyrm/wyrm -I/tmp/e10out /tmp/e10out/paint.wyc    # vs wildcard/paint.out
+#   ./buildDir/src/wyrm/wyrm /tmp/e10out/coroutines.wyc             # vs coroutines.out
+
+import std::io
+
+fn compile_and_write(what: str, module_node, path: str) -> nil:
+    img := compile_module(module_node, what, nil, true, false, false, false)
+    if img is error:
+        println("FAIL: " + what + " did not compile")
+        return
+    blob := to_wyc(img)
+    if blob is error:
+        println("FAIL: " + what + " did not serialize")
+        return
+    h := std::io::open(path, "wb")
+    std::io::write(h, blob)
+    std::io::close(h)
+    println("OK " + what + " -> " + path)
+    return
+
+GEO := $['module, $['define, 'UNITS, $['type, 'auto], $['str, "cm"]], $['fn_def, 'area, nil, $[$['param, 'width, nil, nil], $['param, 'height, nil, nil]], nil, $[$['return, $['binop, '*, 'width, 'height]]]], $['fn_def, 'label, nil, $[$['param, 'value, nil, nil]], nil, $[$['return, $['binop, '+, $['call, 'str, $['value]], 'UNITS]]]]]
+
+RPT := $['module, $['import, $['geometry]], $['import, $[$['import_items, 'geometry, $[$['import_item, 'area, nil], $['import_item, 'label, 'pretty]]]]], $['fn_def, 'summary, nil, $[$['param, 'width, nil, nil], $['param, 'height, nil, nil]], nil, $[$['return, $['call, 'pretty, $[$['call, 'area, $['width, 'height]]]]]]], $['expr_stmt, $['call, 'println, $[$['call, 'summary, $[$['int, 2], $['int, 3]]]]]], $['expr_stmt, $['call, 'println, $[$['qualified_name, 'geometry, 'UNITS]]]]]
+
+PAL := $['module, $['define, 'PRIMARY, $['type, 'auto], $['str, "red"]], $['define, 'SECONDARY, $['type, 'auto], $['str, "green"]], $['fn_def, 'mix, nil, $[$['param, 'first, nil, nil], $['param, 'second, nil, nil]], nil, $[$['return, $['binop, '+, $['binop, '+, 'first, $['str, " and "]], 'second]]]]]
+
+PNT := $['module, $['import, $[$['import_all, 'palette, nil]]], $['fn_def, 'describe, nil, nil, nil, $[$['return, $['call, 'mix, $['PRIMARY, 'SECONDARY]]]]], $['expr_stmt, $['call, 'println, $[$['call, 'describe, nil]]]]]
+
+COR := $['module, $['co_def, 'counting, nil, $['co_params, nil, $[$['param, 'limit, nil, nil]]], nil, $[$['define, 'i, $['type, 'auto], $['int, 0]], $['while, $['binop, '<, 'i, 'limit], $[$['yield, 'i], $['set, 'i, $['binop, '+, 'i, $['int, 1]]]]], $['return, $['str, "done"]]]], $['co_def, 'echo, nil, nil, nil, $[$['define, 'heard, $['type, 'auto], $['yield, $['str, "ready"]]], $['yield, 'heard], $['return, $['str, "over"]]]], $['co_def, 'both, nil, nil, nil, $[$['define, 'tail, $['type, 'auto], $['yield_from, $['call, 'counting, $[$['int, 2]]]]], $['return, 'tail]]], $['define, 'numbers, $['type, 'auto], $['call, 'counting, $[$['int, 3]]]], $['expr_stmt, $['call, 'println, $[$['call, 'next, $['numbers]], $['call, 'next, $['numbers]], $['call, 'next, $['numbers]]]]], $['define, 'conversation, $['type, 'auto], $['call, 'echo, nil]], $['expr_stmt, $['call, 'println, $[$['call, 'next, $['conversation]]]]], $['expr_stmt, $['call, 'println, $[$['call, 'send, $['conversation, $['str, "heard you"]]]]]], $['define, 'delegated, $['type, 'auto], $['call, 'both, nil]], $['expr_stmt, $['call, 'println, $[$['call, 'next, $['delegated]], $['call, 'next, $['delegated]]]]]]
+
+compile_and_write("geometry", GEO, "/tmp/e10out/geometry.wyc")
+compile_and_write("report", RPT, "/tmp/e10out/report.wyc")
+compile_and_write("palette", PAL, "/tmp/e10out/palette.wyc")
+compile_and_write("paint", PNT, "/tmp/e10out/paint.wyc")
+compile_and_write("coroutines", COR, "/tmp/e10out/coroutines.wyc")
+println("test_module_driver: done")

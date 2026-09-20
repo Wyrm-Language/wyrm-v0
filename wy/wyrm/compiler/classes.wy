@@ -1,0 +1,487 @@
+# wy/wyrm/compiler/classes.wy - epic 10 M5
+#
+# Wyrm port of pypoc/wypoc/compiler_bc/classes.py: class compilation (spec
+# 7.3). A `class C(Base):` becomes one entry in the classes table - its
+# slots with their constant defaults, its virtual slots' accessor functions,
+# its `init`, its message map, and the module globals its statics were
+# allotted - plus one compiled function per method. Module init realizes it
+# with `class` (which registers the message map) and stores the class object
+# in the global named after it (compile_class_toplevel, below - pypoc keeps
+# that half in module.py's toplevel handlers; it lives here because it is
+# class knowledge, and module.wy's walk dispatches to it).
+#
+# Methods are messages: they carry FN_MESSAGE, dispatch on `[C]`, and
+# receive the instance in P0. Slot access inside them stays symbolic
+# (getattr/setattr on `this`) because an external superclass makes absolute
+# slot offsets unknowable at compile time; `getslot`/`setslot` is available
+# only when the whole inheritance chain is module-local (spec 7.1) - and
+# ships behind `module.slot_optimization`, off by default, exactly as in
+# pypoc (nothing sets it on yet; the optimization branch of _attr/_scope in
+# expressions.wy consults `module.slot_index` and refuses nothing when it
+# answers nil).
+#
+# ---------------------------------------------------------------------------
+# Deviations from classes.py, each forced by the port
+#
+# 1. Shapes. `node` here is a wy/wyrm `class_def` pair list
+#    `(name, bases, body)` (wy/wyrm/ast.wy - no pypoc kind crosses for
+#    classes), not a ClassDef dataclass; members are told apart by kind
+#    symbol (`slot_def`/`fn_def`/`co_def`/`static`/bare `pass`), and a
+#    `slot_def` is `(name, type, init, options)` with `options` a pair list
+#    of `(kind, value)` `slot_option`s, kind `'getter` or `'setter`, value
+#    a lambda node or the bare symbol `undefined`.
+#
+# 2. The lazy `[C]` dispatch. classes.py's `_LazyDispatch` defers
+#    `module.name_slot(class_name)` until the first method asks, so a class
+#    with no methods names nothing. There is no stateful object to be here
+#    (a wy list captured by a closure is the only equivalent, and a plain
+#    nil-checked holder says the same thing without one), so `_dispatch`
+#    takes the holder list as a parameter; the class's own member loop owns
+#    it, and a methodless class still never calls `name_slot`.
+#
+# 3. Bookkeeping keys. `module.classes`/`superclasses`/`slot_names`/
+#    `class_statics` are keyed by the class name as a *string* (the same
+#    convention `storage`'s `this_class` and the globals dict already use -
+#    a sym key never matches a str key in a wy dict). `slot_names`' values
+#    are lists of slot-name *strings* for the same reason: `is_own_slot`/
+#    `slot_index` normalize their `attr` argument before comparing, because
+#    bare-slot resolution inside a method passes the raw sym through.
+#
+# 4. Refusals are `error` values, not exceptions: the same shape every
+#    other compiler module answers, so the driver/runner prints them where
+#    pypoc would raise a CompileError.
+#
+# 5. No decorator expansion reaches a class body here. pypoc expands
+#    `@dec class C:` before lowering ever sees a ClassDef (module.py's
+#    `_expand_decorators` - real wyrm-code evaluation over the sexpr tree,
+#    not templates, per the prereport's item 6); that pass is M6 scope. A
+#    `decorated` node is simply not a `class_def`, so it reaches this file
+#    only if module.wy's walk sends it here, which it will not: the
+#    toplevel walk refuses `decorated` like every other unlowered kind.
+#    (`decorators.wy` is already REFUSED in test/bytecode/manifest.txt.)
+
+import wyrm::opcodes::*
+import wyrm::compiler::context::*
+import wyrm::compiler::analysis::*
+import wyrm::compiler::statements::*
+import wyrm::compiler::functions::*
+
+# image.py's function-table flag bit 1 (doc/wyc-format.md 8.4). functions.wy
+# freezes the other three bits (coroutine/varargs/kwargs) and leaves this
+# one to M5 - a message body is what bit 1 marks, and only a class method
+# or a virtual-slot accessor sets it.
+FN_MESSAGE := 2
+
+# ---------------------------------------------------------------------------
+# small local helpers - copied rather than imported; see analysis.wy's
+# header for why (no cross-module access to a leading-underscore name).
+
+fn _tail(node, count: int):
+    cur := node
+    i := 0
+    while i < count:
+        if not (cur is pair):
+            return error("index out of range")
+        cur = cdr(cur)
+        i = i + 1
+    return cur
+
+fn _field(node, index: int):
+    rest := _tail(node, index)
+    if rest is error:
+        return rest
+    return car(rest)
+
+# The static-pool value of a constant initializer, or an `error` - copied
+# from functions.wy's `_constant_value` (which backs parameter defaults)
+# for slot defaults. Non-constant slot defaults are a v1 refusal in both:
+# evaluating them at class-body time can be added later as init code,
+# without a format change (spec 7.3).
+fn _constant_value(node):
+    if node is sym:
+        if node == 'nil:
+            return nil
+        if node == 'true:
+            return true
+        if node == 'false:
+            return false
+        return error("not a constant")
+    kind := node_kind(node)
+    if (kind == 'str) or (kind == 'int) or (kind == 'float) or (kind == 'char):
+        return (_field(node, 1) catch nil)
+    return error("not a constant")
+
+# ---------------------------------------------------------------------------
+# emit helpers - pack (or pack_pairable) THEN emit, checking the error each
+# can return in one place. Copied from expressions.wy/statements.wy for the
+# same reason `_field`/`_tail` are: no cross-module access to a
+# leading-underscore name.
+
+fn _emit_pack(frame: FnContext, op, f: int = 0, a0: int = 0, a1: int = 0, a2: int = 0, w1: int | nil = nil) -> nil | error:
+    words := pack(op, f=f, a0=a0, a1=a1, a2=a2, w1=w1)
+    if words is error:
+        return words
+    frame ! emit_words(words)
+    return nil
+
+fn _emit_pairable(frame: FnContext, op, primary: int = 0, secondary: int = 0) -> nil | error:
+    words := pack_pairable(op, primary, secondary)
+    if words is error:
+        return words
+    frame ! emit_words(words)
+    return nil
+
+# ---------------------------------------------------------------------------
+# entry point
+
+# Compile a class definition, returning its index in the classes table.
+#
+# The class's own global slot is *not* allotted here (except through a
+# method's lazy `[C]`, which `name_slot` answers with a free slot if the
+# declare pass has not run yet) - the module-level declare pass owns that,
+# exactly as in pypoc, where module.py declares top-level names before any
+# lowering and `_class_def`'s `gset` reads the slot back with
+# `global_index`.
+fn compile_class(node, module: ModuleContext) -> int | error:
+    class_name := (_field(node, 1) catch nil)
+    if class_name is nil:
+        return error("a class definition needs a name")
+    key := str(class_name)
+    bases := (_field(node, 2) catch nil)
+    if (bases is pair) and (cdr(bases) is pair):
+        return error("class " + key + " has more than one base; the image format records one superclass")
+
+    superclass := _superclass_slot(bases, node, module)
+    if superclass is error:
+        return superclass
+    super_name := _superclass_name(bases)
+    if super_name is error:
+        return super_name
+
+    # Recorded before the body is walked, so that a method compiled here can
+    # already ask whether `this`'s slot layout is this module's to know
+    # (spec 7.1) - the answer must not depend on how far the walk has got.
+    # The index is the one `add_class` will answer (nothing else appends to
+    # the classes table mid-walk - methods land in the *functions* table),
+    # so this pre-write and the post-`add_class` write agree.
+    module.classes[key] = len(module.image.classes)
+    module.superclasses[key] = super_name
+    body := body_statements((_field(node, 3) catch nil))
+    names := []
+    for member in body:
+        if node_kind(member) == 'slot_def:
+            slot_name := (_field(member, 1) catch nil)
+            if slot_name is nil:
+                return error("class " + key + ": a slot_def needs a name")
+            names ! append(str(slot_name))
+    module.slot_names[key] = names
+
+    slots := []
+    messages := []
+    statics := []
+    init_fn := nil
+    dispatch := []
+
+    for member in body:
+        kind := node_kind(member)
+        if kind == 'slot_def:
+            r := _slot(member, class_name, module, dispatch)
+            if r is error:
+                return r
+            slots ! append(r)
+        elif (kind == 'fn_def) or (kind == 'co_def):
+            r2 := _method(member, class_name, module, dispatch)
+            if r2 is error:
+                return r2
+            method_name := (_field(member, 1) catch nil)
+            if method_name == 'init:
+                init_fn = r2
+            else:
+                symbol := (module.image) ! add_symbol(str(method_name))
+                if symbol is error:
+                    return symbol
+                messages ! append([symbol, r2])
+        elif kind == 'static:
+            r3 := _static(member, class_name, module)
+            if r3 is error:
+                return r3
+            statics ! append(r3)
+        elif kind == 'expr_stmt:
+            # A bare `pass` line reaches here wrapped (the parser puts
+            # statement-position expressions in expr_stmt, and `pass` is a
+            # primary); anything else an expr_stmt wraps is an expression,
+            # which has no business in a class body.
+            inner := (_field(member, 1) catch nil)
+            if node_kind(inner) == 'pass:
+                continue
+            return error("the bytecode compiler does not support " + construct_name(inner) + " in a class body yet")
+        elif kind == 'pass:
+            continue
+        elif kind is nil:
+            return error("the bytecode compiler does not support this construct in a class body yet")
+        else:
+            return error("the bytecode compiler does not support " + construct_name(member) + " in a class body yet")
+
+    index := (module.image) ! add_class(key, superclass, slots, init_fn, messages, statics)
+    if index is error:
+        return index
+    module.classes[key] = index
+    return index
+
+# Realize a compiled class in module init - pypoc module.py's `_class_def`
+# toplevel handler, minus decorator expansion: the `class` op that
+# registers the message map and builds the instance template, the `gset`
+# that stores the class object in the global of its name (already declared
+# by the module-level declare pass), and every class static's initializer
+# running in init like any other top-level effect (spec 4.7).
+fn compile_class_toplevel(node, module: ModuleContext) -> nil | error:
+    index := compile_class(node, module)
+    if index is error:
+        return index
+    class_name := (_field(node, 1) catch nil)
+    init := module.init_ctx
+    reg := init ! push()
+    if reg is error:
+        return reg
+    e := _emit_pack(init, 'class, a0=reg, a1=index)
+    if e is error:
+        return e
+    gidx := module ! global_index(class_name)
+    if gidx is error:
+        return gidx
+    e2 := _emit_pairable(init, 'gset, gidx, reg)
+    if e2 is error:
+        return e2
+    return _class_statics(node, module)
+
+# The statics a class body declared, with initializers, in source order.
+fn _class_statics(node, module: ModuleContext) -> nil | error:
+    class_name := (_field(node, 1) catch nil)
+    body := body_statements((_field(node, 3) catch nil))
+    for member in body:
+        if node_kind(member) != 'static:
+            continue
+        init := (_field(member, 3) catch nil)
+        if init is nil:
+            continue
+        name := (_field(member, 1) catch nil)
+        e := store_expr(str(class_name) + "::" + str(name), init, module.init_ctx)
+        if e is error:
+            return e
+    return nil
+
+# ---------------------------------------------------------------------------
+# members
+
+# The `[C]` a method dispatches on, materialized the first time one asks
+# (deviation 2): the global slot holding the class object, whoever declares
+# it - this module if the declare pass has run, a free slot otherwise, the
+# same name-slot rule every bare name follows.
+fn _dispatch(holder: list, class_name, module: ModuleContext) -> list | error:
+    if len(holder) == 0:
+        slot_idx := module ! name_slot(class_name)
+        if slot_idx is error:
+            return slot_idx
+        holder ! append(slot_idx)
+    return holder
+
+# The superclass's global slot - a name, never resolved at compile time
+# (spec 6.3): the base may live in another module whose interface at run
+# time is what counts. Absent bases answer nil (the format's "absent =
+# object").
+fn _superclass_slot(bases, node, module: ModuleContext) -> int | nil | error:
+    if bases is nil:
+        return nil
+    base := car(bases)
+    if not (base is sym):
+        return error("class " + str((_field(node, 1) catch nil)) + ": a base class must be a name")
+    return module ! name_slot(base)
+
+# The superclass's *name*, for the module-local slot-layout walk. nil when
+# there is no base.
+fn _superclass_name(bases) -> str | nil | error:
+    if bases is nil:
+        return nil
+    base := car(bases)
+    if not (base is sym):
+        return error("a base class must be a name")
+    return str(base)
+
+# One slot, with its constant default and any virtual accessors - a
+# `make_class_slot` dict (image.py's `Slot`).
+fn _slot(member, class_name, module: ModuleContext, dispatch: list) -> dict | error:
+    default := nil
+    default_node := (_field(member, 3) catch nil)
+    if not (default_node is nil):
+        value := _constant_value(default_node)
+        if value is error:
+            slot_name := (_field(member, 1) catch nil)
+            return error("slot " + str(slot_name) + ": a default must be a constant")
+        idx := (module.image) ! add_static(value)
+        if idx is error:
+            return idx
+        default = idx
+    get_fn := nil
+    set_fn := nil
+    options := (_field(member, 4) catch nil)
+    if not (options is nil):
+        p := options
+        while p is pair:
+            r := _accessor(car(p), member, class_name, module, dispatch)
+            if r is error:
+                return r
+            option_kind := (_field(car(p), 1) catch nil)
+            if option_kind == 'getter:
+                get_fn = r
+            else:
+                set_fn = r
+            p = cdr(p)
+    slot_name2 := (_field(member, 1) catch nil)
+    return make_class_slot(str(slot_name2), default, get_fn, set_fn)
+
+# A virtual slot's getter/setter, compiled as a message on this class.
+#
+# `undefined` means the slot has no accessor of that kind, which the format
+# says by leaving the key out (D7 - there are no sentinels). Otherwise only
+# a literal function body can become one: the format records a function
+# *index*, so a value computed at run time has nowhere to live.
+fn _accessor(option, member, class_name, module: ModuleContext, dispatch: list) -> int | nil | error:
+    value := (_field(option, 2) catch nil)
+    if value == 'undefined:
+        return nil
+    if node_kind(value) != 'lambda:
+        slot_name := (_field(member, 1) catch nil)
+        option_kind := (_field(option, 1) catch nil)
+        return error("slot " + str(slot_name) + ": a " + str(option_kind) + " must be written as a function literal")
+    params := boundary_params(value)
+    body := boundary_body(value)
+    slot_name2 := (_field(member, 1) catch nil)
+    option_kind2 := (_field(option, 1) catch nil)
+    d := _dispatch(dispatch, class_name, module)
+    if d is error:
+        return d
+    r := compile_callable(module, str(class_name) + "." + str(slot_name2) + "." + str(option_kind2),
+        params, body, nil, FN_MESSAGE, nil, d, str(class_name))
+    if r is error:
+        return r
+    return r[0]
+
+# One method: an ordinary function carrying FN_MESSAGE (and FN_COROUTINE
+# for a `co`), dispatching on `[C]`, instance in P0 - published through the
+# class's message map by the `class` op at run time, never its own
+# `reg_msg`.
+fn _method(member, class_name, module: ModuleContext, dispatch: list) -> int | error:
+    method_name := (_field(member, 1) catch nil)
+    target := (_field(member, 2) catch nil)
+    if not (target is nil):
+        return error("method " + str(method_name) + " may not also name a class target")
+    flags := FN_MESSAGE
+    if node_kind(member) == 'co_def:
+        # A `co` method is an ordinary message carrying the coroutine flag;
+        # calling it constructs the coroutine (spec 7.2).
+        flags = flags | FN_COROUTINE
+    params := (_field(member, 3) catch nil)
+    body := (_field(member, 5) catch nil)
+    d := _dispatch(dispatch, class_name, module)
+    if d is error:
+        return d
+    # The "!" suffix marks a message (spec 4.6), as in classes.py.
+    r := compile_callable(module, str(method_name) + "!", params, body, nil, flags, nil, d, str(class_name))
+    if r is error:
+        return r
+    return r[0]
+
+# A class static is a module global: module-lifetime, and `Class::name`
+# addressing resolves through the class object to the recorded slot
+# (spec 4.7). The initializer is *not* compiled here - it runs in init
+# through `_class_statics`, like any other top-level effect.
+fn _static(member, class_name, module: ModuleContext) -> list | error:
+    name := (_field(member, 1) catch nil)
+    key := str(class_name) + "::" + str(name)
+    global_index := module ! declare_global(key)
+    if global_index is error:
+        return global_index
+    module.class_statics[key] = global_index
+    return [str(name), global_index]
+
+# ---------------------------------------------------------------------------
+# `fn [T1, T2] name(...)` outside any class body (spec 7.2)
+#
+# pypoc keeps this in module.py (`_dispatched_fn`); it lives here with
+# compile_class_toplevel for the same reason - it is message-registration
+# knowledge, and module.wy's toplevel walk only dispatches to it. Not
+# ported from module.py: message *promotion* (`_emit_promotion` - a plain
+# top-level `fn name` registered as the wildcard overload of same-named
+# message, once per arity a typed overload uses; llm-bytecode.md 9). No
+# corpus fixture exercises it - `messages.wy` has only dispatched fns - and
+# it doubles every `static` in the promoted body by recompiling it (a
+# caveat pypoc documents and defers itself); recorded in the epic report.
+
+# `fn [Meters] doubled():` - a method registered for multiple dispatch
+# from outside any class body. It is not a module global: init registers it
+# against the message identity and the types it dispatches on, via
+# `reg_msg` with a closure and a tuple of the type slots' current values.
+fn compile_dispatched_fn_toplevel(node, module: ModuleContext) -> nil | error:
+    fn_name := (_field(node, 1) catch nil)
+    targets := (_field(node, 2) catch nil)
+    dispatch := []
+    names := []
+    p := targets
+    while p is pair:
+        type_name := car(p)
+        if not (type_name is sym):
+            return error("fn [" + str(fn_name) + "]: a dispatch target must be a name")
+        slot_idx := module ! name_slot(type_name)
+        if slot_idx is error:
+            return slot_idx
+        dispatch ! append(slot_idx)
+        names ! append(str(type_name))
+        p = cdr(p)
+    if len(dispatch) > 16:
+        return error(str(fn_name) + " dispatches on " + str(len(dispatch)) + " types, over the 16-value limit")
+    # With a single receiver type that this module defines, bare slot names
+    # in the body mean that class's slots, exactly as they do inside its
+    # body. Multiple dispatch has more than one `this`, so no such name is
+    # unambiguous.
+    this_class := nil
+    if len(names) == 1:
+        if module ! is_local_class(names[0]):
+            this_class = names[0]
+    flags := FN_MESSAGE
+    if node_kind(node) == 'co_def:
+        flags = flags | FN_COROUTINE
+    params := (_field(node, 3) catch nil)
+    body := (_field(node, 5) catch nil)
+    r := compile_callable(module, str(fn_name) + "!", params, body, nil, flags, nil, dispatch, this_class)
+    if r is error:
+        return r
+    index := r[0]
+    message := module ! reference([str(fn_name)])
+    if message is error:
+        return message
+    init := module.init_ctx
+    mark := init ! mark()
+    closure := init ! push()
+    if closure is error:
+        return closure
+    e := _emit_pack(init, 'closure, a0=closure, a1=index, a2=0, f=0)
+    if e is error:
+        return e
+    base := init ! mark()
+    for dslot in dispatch:
+        reg := init ! push()
+        if reg is error:
+            return reg
+        e2 := _emit_pairable(init, 'gget, dslot, reg)
+        if e2 is error:
+            return e2
+    types := init ! push()
+    if types is error:
+        return types
+    e3 := _emit_pack(init, 'tuple, f=len(dispatch), a0=types, a1=L(base))
+    if e3 is error:
+        return e3
+    e4 := _emit_pack(init, 'reg_msg, a0=message, a1=closure, a2=types)
+    if e4 is error:
+        return e4
+    return init ! free_to(mark)

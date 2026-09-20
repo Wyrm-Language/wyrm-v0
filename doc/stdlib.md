@@ -2,7 +2,12 @@
 
 ## Builtin Functions
 
-  - len(x): Return number of elements within a collection
+  - len(x): Return number of elements within a collection. For a str this counts
+    Unicode codepoints (not UTF-8 bytes), matching Python's `len`; a list/tuple
+    counts items, a dict counts entries (keys), bytes counts bytes, and a Pair
+    chain counts cons cells out to the terminating nil (`()` alone is 0). An
+    improper list (one whose final cdr isn't nil) has no well-defined length
+    and faults, as does any non-collection argument.
 
 ## Builtin Primitives
 
@@ -10,7 +15,9 @@
 
 Messages:
 
-  - substr(begin: int, end: int) -> str: Return substring start offset begin and ending at offset before end.
+  - substr(start: int, count: int) -> str: Return the count Unicode codepoints of
+    s starting at 0-based codepoint offset start, e.g. "asdf" ! substr(1, 2) gives
+    "sd". A start or count running past either end clips rather than faulting.
 
 ### bytes
 

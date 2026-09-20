@@ -2,6 +2,8 @@ import wyrm::tokenizer::*
 import wyrm::decode::*
 import wyrm::ast
 import std::io::*
+import std::pairs::*
+import wyrm::ast::*
 
 import wyrm::_dsl::*
 
@@ -133,8 +135,27 @@ fn [Parser] number_literal():
 #>
 #>  _Example_: `\a`, `\newline`
 #>
+# Character names for the `\newline`-style escapes - the same table the
+# interpreter's eval_char_literal consults (pypoc/wypoc/
+# wyrm_eval_parse_tree.py's CHAR_NAMES).
+_CHAR_NAMES := {"newline": 10, "space": 32, "tab": 9, "return": 13, "backspace": 8, "formfeed": 12, "null": 0}
+
+# A char literal's node: `$['char, codepoint]` - the u32 codepoint, the
+# same representation string indexing produces, which expressions.wy's
+# _char_lit lowers to `i8`. This transform is what the epic report's M1-M4
+# checkpoint flagged as missing (char_literal answered the raw token, so
+# no char literal could ever reach lowering).
+fn _mk_char(text):
+    body := text ! substr(1, len(text) - 1)
+    if len(body) == 1:
+        return $['char, body[0]]
+    named := (_CHAR_NAMES[body] catch nil)
+    if named is nil:
+        return error("unknown character name " + text)
+    return $['char, named]
+
 fn [Parser] char_literal():
-    @accept 'TOK_LITERAL_CHAR
+    @accept apply_if(_mk_char, text('TOK_LITERAL_CHAR))
 
 # -----------------------------------------------------------------------------
 #>  ## Program Structure
@@ -220,12 +241,36 @@ fn $_mk_stmt_line(expr):
         return stmt
     return $['decorated, decs, stmt]
 
+# Statement-position keyword constructs. wy's grammar folds `if`/`while`/
+# `for`/`return`/`yield`/`break`/`continue`/`pass` into `primary`, so they
+# reach stmt_line through the bare-expression alternative. pypoc's reference
+# grammar never wraps those in ExprStmt (parser.py's simple_stmt tries them
+# ahead of expr_stmt; wyrm_eval_parse_tree.py's eval note says yield_stmt
+# stays unwrapped), and the bytecode compiler registers statement handlers
+# under exactly these kinds. Every other expression in statement position
+# becomes `expr_stmt` (parser.py's `expr_stmt: expression`, sexpr.py's
+# ROWS ExprStmt row) - without the wrapper a bare call, a trailing do:/lambda
+# value, or any other expression-shaped statement has no statement handler
+# to dispatch to at all.
+_STMT_KEYWORD_KINDS := ['if, 'while, 'for, 'return, 'yield, 'break, 'continue, 'pass]
+
+fn $_mk_stmt_expr(expr):
+    if expr is pair:
+        head := car(expr)
+        if head in _STMT_KEYWORD_KINDS:
+            return expr
+    elif expr in _STMT_KEYWORD_KINDS:
+        # break/continue/pass arrive as bare symbols (ast.wy's
+        # bare-symbol representation), never wrapped.
+        return expr
+    return $['expr_stmt, expr]
+
 fn [Parser] stmt_line():
     r := @accept apply_if($_mk_stmt_line,
         many(decorator),
         $[ var_stmt
          | assignment_stmt
-         | expression
+         | apply_if($_mk_stmt_expr, expression)
          | static_stmt
          | import_stmt
          | defer_stmt
@@ -370,7 +415,12 @@ fn $_mk_return(expr):
 #>    return_stmt     ::= "return" , [ expression ] ;
 #>  ```
 fn [Parser] return_stmt():
-    @accept apply_if($_mk_return, ~'TOK_KW_RETURN, opt(expression))
+    # tuple_expression, not expression: `return a, b` is a comma list - the
+    # one place the bare statement form needs the comma tier (pypoc's
+    # expression is an expr_list for the same reason). `$_mk_values` wraps
+    # multi-element lists in 'tuple, which statements.wy's _return lowers
+    # as a multi-value return; a single element passes through unwrapped.
+    @accept apply_if($_mk_return, ~'TOK_KW_RETURN, opt(tuple_expression))
 
 fn $_mk_yield_from(expr):
     return $['yield_from, expr]
@@ -897,6 +947,21 @@ fn $_mk_tuple(expr):
 fn [Parser] tuple_expression():
     @accept apply_if($_mk_values, list_expression)
 
+# A parenthesized expression list. Unlike tuple_expression, a trailing comma
+# is significant here: `(x,)` is a one-element tuple, `(x)` is just x
+# (list_expression discards the trailing comma, which is right for the
+# bare `return a, b` form but wrong inside parens).
+fn $_mk_paren(expr):
+    items := car(expr)
+    if (cdr(items) != nil) or (cadr(expr) != nil):
+        return cons('tuple, items)
+    return car(items)
+
+fn [Parser] paren_expression():
+    @accept apply_if($_mk_paren,
+        $[cons(expression, many($[~'TOK_COMMA, expression])),
+          opt($[~'TOK_COMMA, push('trailing)])])
+
 fn $_mk_try(expr):
     return $['try, expr]
 
@@ -971,7 +1036,12 @@ fn $_mk_is(expr):
     return $['is, car(expr), caddr(expr)]
 
 fn $_mk_comparison(expr):
-    $[cadr(expr), car(expr), caddr(expr)]
+    # Comparisons fold into the documented 'binop shape (op, lhs, rhs) -
+    # they are ordinary non-associative binary ops (pypoc's own convention,
+    # and mk_binop/s_binop_lhs/s_binop_rhs's). They used to arrive here as
+    # operator-headed nodes ($['<, lhs, rhs]), which nothing downstream
+    # documented or dispatched on.
+    $['binop, cadr(expr), car(expr), caddr(expr)]
 
 fn $_mk_in(expr):
     if cadr(expr):
@@ -1001,19 +1071,50 @@ fn [Parser] comp_op():
                value('==, 'TOK_DEQUAL) |
                value('!=, 'TOK_NE) ]
 
-# Binary Op: builds a left-associative $['binop, op, lhs, rhs] chain from the
-# flat (operand op operand op ...) sequence binary_expr()'s grammar rule
+# Binary Op: builds the $['binop, op, lhs, rhs] tree from the flat
+# (operand op operand op ...) sequence binary_expr()'s grammar rule
 # produces, matching mk_binop/s_binop_lhs/s_binop_rhs's assumed shape
-# (ast.wy) - previously this just returned the flat sequence untagged.
+# (ast.wy). The rule itself is flat, so precedence is applied here, tightest
+# last (wyrm.gram's bitwise_or / xor / and / shift / additive / mult tiers);
+# every tier is left-associative.
+fn _binop_prec(op) -> int:
+    if op == '|:
+        return 1
+    if op == '^:
+        return 2
+    if op == '&:
+        return 3
+    if (op == '<<) or (op == '>>):
+        return 4
+    if (op == '+) or (op == '-):
+        return 5
+    return 6
+
+# Pop the innermost operator and its two operands, push the binop node.
+fn _reduce_binop(operands, ops):
+    n := len(ops)
+    m := len(operands)
+    node := $['binop, ops[n - 1], operands[m - 2], operands[m - 1]]
+    ops ! resize(n - 1)
+    operands ! resize(m - 2)
+    operands ! append(node)
+
 fn $_binary_expr(expr):
-    lhs := car(expr)
     rest := cdr(expr)
+    if rest == nil:
+        return car(expr)
+    operands := [car(expr)]
+    ops := []
     while rest != nil:
         op := car(rest)
-        rhs := cadr(rest)
-        lhs = $['binop, op, lhs, rhs]
+        while (len(ops) > 0) and (_binop_prec(ops[len(ops) - 1]) >= _binop_prec(op)):
+            _reduce_binop(operands, ops)
+        ops ! append(op)
+        operands ! append(cadr(rest))
         rest = cddr(rest)
-    return lhs
+    while len(ops) > 0:
+        _reduce_binop(operands, ops)
+    return operands[0]
 
 #>  ```ebnf
 #>    binary_expr     ::= unary_expr , { binary_op , unary_expr } ;
@@ -1089,7 +1190,18 @@ fn $_mk_postfix(expr):
         elif op_kind == 'attr_op:
             current = $['attr, current, cadr(op)]
         elif op_kind == 'message_op:
-            current = $['message, current, cadr(op), cddr(op)]
+            # cddr(op) is $[args_or_nil, marker]: the parens sequence
+            # captures the argument list (nil for `recv ! name()`) and the
+            # form marker. The fifth message field records which form the
+            # source wrote, because pair lists cannot distinguish "empty"
+            # from "absent" the way pypoc's grammar distinguishes `[]`
+            # from None (wyrm.gram's message alternatives) - and dispatch
+            # versus binding is exactly that distinction.
+            parts := cddr(op)
+            if cadr(parts) == 'send:
+                current = $['message, current, cadr(op), car(parts), 'send]
+            else:
+                current = $['message, current, cadr(op), nil, 'bound]
         else:
             # Unknown postfix op, return original
             return expr
@@ -1109,8 +1221,20 @@ fn $_mk_postfix(expr):
 #>    message_op      ::= "!" , identifier , [ "(" , [ arg_list ] , ")" ] ;
 #>  ```
 
+# `if`/`while`/`for` are block-form primaries: they end at a DEDENT, and no
+# NEWLINE token follows it. Letting postfix ops chain onto them would glue a
+# next line that starts with `(` or `[` onto the block as a call/index
+# (`for ...: <block>` then `(this.x) ! append(v)` parsed as one expression).
+# A block-form primary therefore takes no postfix ops; parenthesize it to
+# chain (`(if a: b else: c).x`).
+fn [Parser] block_primary():
+    @accept $[if_stmt | while_stmt | for_stmt]
+
 fn [Parser] postfix_expr():
-    @accept apply_if($_mk_postfix, cons(primary, many(postfix_op)))
+    @accept $[
+        block_primary
+      | apply_if($_mk_postfix, cons(primary, many(postfix_op)))
+    ]
 
 fn [Parser] postfix_op():
     @accept $[call_op | index_op | attr_op | message_op]
@@ -1124,8 +1248,15 @@ fn [Parser] index_op():
 fn [Parser] attr_op():
     @accept $[~'TOK_DOT, push('attr_op), xid]
 
+fn $_mk_message_bound(expr):
+    # expr is the bare selector name: `recv ! name`.
+    return $['message_op, expr, nil, 'bound]
+
 fn [Parser] message_op():
-    @accept $[~'TOK_BANG, cons(push('message_op), cons(xid, opt($[~'TOK_LPAREN, opt(arg_list), ~'TOK_RPAREN])))]
+    @accept $[
+        $[~'TOK_BANG, cons(push('message_op), cons(xid, $[~'TOK_LPAREN, opt(arg_list), ~'TOK_RPAREN, push('send)]))]
+      | apply_if($_mk_message_bound, $[~'TOK_BANG, xid])
+    ]
 
 #>  ```ebnf
 #>    arg_list        ::= argument , { "," , argument } ;
@@ -1199,7 +1330,7 @@ fn [Parser] primary():
     @accept $[ literal
              | decorated_expr
              | qualified_name
-             | $[~'TOK_LPAREN, tuple_expression, ~'TOK_RPAREN]
+             | $[~'TOK_LPAREN, paren_expression, ~'TOK_RPAREN]
              | array_literal
              | pair_literal
              | dict_literal

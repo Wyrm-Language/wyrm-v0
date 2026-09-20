@@ -582,6 +582,59 @@ static wy_error builtin_remove_(wy_context* context, wy_value* args, wy_uword ar
     return WY_ERR_NONE;
 }
 
+/*
+ * `len(x)`: the number of elements in a collection, matching Python's
+ * `len` and the pypoc reference's `length` (wyrm_builtins.py): a str counts
+ * Unicode codepoints (not UTF-8 bytes - same rule `car`/`substr` use), a
+ * list/tuple counts items, a dict counts entries, bytes counts bytes (epic
+ * 7's documented gap, doc/stdlib.md's `len(b)`), and a Pair chain is the
+ * number of cons cells walked out to a terminating nil (`()` alone is 0).
+ * An improper list (whose final cdr isn't nil) has no well-defined length,
+ * same as Scheme's `length`; any other value type faults - like every
+ * native here except car/cdr, an argument error is a VM fault
+ * (WY_ERR_BAD_TYPE), mirroring the reference's host TypeError.
+ */
+static wy_error builtin_len_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    wy_value x = args[0];
+    wy_uword n = 0;
+    switch (x.type) {
+    case WY_TYPE_TAG_NIL:
+        n = 0;
+        break;
+    case WY_TYPE_TAG_STR:
+        n = wy_utf8_codepoint_count_f(x.data.str->str, x.data.str->len);
+        break;
+    case WY_TYPE_TAG_LIST:
+        n = ((wy_list*) x.data.gc_object)->count;
+        break;
+    case WY_TYPE_TAG_TUPLE:
+        n = ((wy_tuple*) x.data.gc_object)->count;
+        break;
+    case WY_TYPE_TAG_TABLE:
+        n = ((wy_dict*) x.data.gc_object)->count;
+        break;
+    case WY_TYPE_TAG_BYTES:
+        n = ((wy_bytes*) x.data.gc_object)->len;
+        break;
+    case WY_TYPE_TAG_PAIR: {
+        wy_value node = x;
+        while (node.type == WY_TYPE_TAG_PAIR) {
+            n++;
+            node = ((wy_pair*) node.data.gc_object)->cdr;
+        }
+        if (node.type != WY_TYPE_TAG_NIL) { return WY_ERR_BAD_TYPE; }
+        break;
+    }
+    default:
+        return WY_ERR_BAD_TYPE;
+    }
+    out[0] = wy_value_word((wy_word) n);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
 /* -------------------------------------------------------------------------
  * `bytes` natives (epic 7, doc/stdlib.md's `### bytes`). Registered both
  * as a bare global (`bytes` construction only) and as native message
@@ -1027,7 +1080,7 @@ static wy_exec_state builtin_send_exec_(wy_context* context, wy_primitive c_data
  * Module assembly
  * ------------------------------------------------------------------------- */
 
-enum { WY_BUILTINS_LEAF_COUNT = 19, WY_BUILTINS_EXEC_COUNT = 2, WY_BUILTINS_CLASS_COUNT = 5,
+enum { WY_BUILTINS_LEAF_COUNT = 24, WY_BUILTINS_EXEC_COUNT = 2, WY_BUILTINS_CLASS_COUNT = 5,
     /* +1 for the bare `nil` slot, +1 for the `range` prelude coroutine (M4),
      * +1 for the bare `TreeBase` class (M5: decorators fixture registers
      * messages typed on it, wyrm_builtins.py's TREE_BASE_CLASS). */
@@ -1083,6 +1136,14 @@ static wy_error builtin_str_(wy_context* context, wy_value* args, wy_uword argc,
         len = (wy_uword) snprintf(buffer, sizeof(buffer), "%llu bytes",
             (unsigned long long) ((wy_bytes*) value.data.gc_object)->len);
         break;
+    case WY_TYPE_TAG_ERROR: {
+        /* An error value renders as its message (Unset - a null object - as "unset"). */
+        wy_error_obj* eobj = (wy_error_obj*) value.data.gc_object;
+        if (eobj == WY_NULL) { text = "unset"; len = 5; }
+        else if (eobj->what == WY_NULL) { text = "error"; len = 5; }
+        else { text = eobj->what->str; len = eobj->what->len; }
+        break;
+    }
     default: return WY_ERR_BAD_TYPE;
     }
     wy_string* result = WY_NULL;
@@ -1091,10 +1152,123 @@ static wy_error builtin_str_(wy_context* context, wy_value* args, wy_uword argc,
     return err;
 }
 
+/* `sym(text)` - intern a string as a symbol. The inverse of `str` on a
+ * symbol value; what pypoc's runtime provides as a plain builtin and every
+ * front-end module (decode.wy, parser.wy, the compiler's own scope reads)
+ * takes for granted. A symbol argument answers itself, like `str` does. */
+static wy_error builtin_sym_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (nres == 0) { return WY_ERR_NONE; }
+    wy_value value = args[0];
+    if (value.type == WY_TYPE_TAG_SYMBOL) { out[0] = value; return WY_ERR_NONE; }
+    if (value.type != WY_TYPE_TAG_STR) { return WY_ERR_BAD_TYPE; }
+    wy_string* text = (wy_string*) value.data.gc_object;
+    wy_symbol sym;
+    wy_error err = wy_context_intern(context, text->str, text->len, &sym);
+    if (err != WY_ERR_NONE) { return err; }
+    out[0] = wy_value_symbol(sym);
+    return WY_ERR_NONE;
+}
+
+/* `int(text)` - the numeric cast: a string parsed with C strtol-style base
+ * auto-detection (0x/0o/0b prefixes, like pypoc's `int(value, 0)`; a bare
+ * leading 0 reads octal - a delta from Python's stricter int(x, 0),
+ * documented in the epic report), a float truncated toward zero, an
+ * integer answering itself. What decode.wy's `decode_int` and every
+ * numeric-literal transform take for granted on the front-end side. */
+static wy_error builtin_int_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (nres == 0) { return WY_ERR_NONE; }
+    wy_value value = args[0];
+    if (value.type == WY_TYPE_TAG_WORD) { out[0] = value; return WY_ERR_NONE; }
+    if (value.type == WY_TYPE_TAG_FLOAT) {
+        out[0] = wy_value_word((wy_word) value.data.fp);
+        return WY_ERR_NONE;
+    }
+    if (value.type == WY_TYPE_TAG_STR) {
+        wy_string* text = (wy_string*) value.data.gc_object;
+        char buffer[64];
+        wy_uword len = text->len;
+        if (len == 0 || len >= sizeof(buffer)) { return WY_ERR_RANGE; }
+        wy_memcpy(buffer, text->str, len);
+        buffer[len] = '\0';
+        char* end = WY_NULL;
+        long long parsed = strtoll(buffer, &end, 0);
+        if (end == buffer) { return WY_ERR_BAD_TYPE; }
+        while (*end == ' ' || *end == '\t') { end++; }
+        if (*end != '\0') { return WY_ERR_BAD_TYPE; }
+        out[0] = wy_value_word((wy_word) parsed);
+        return WY_ERR_NONE;
+    }
+    return WY_ERR_BAD_TYPE;
+}
+
+/* `float(text)` - the numeric cast into a double: a string parsed with
+ * strtod, an integer widened, a float answering itself. The float-literal
+ * transform (parser.wy's _mk_float) runs through it. */
+static wy_error builtin_float_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (nres == 0) { return WY_ERR_NONE; }
+    wy_value value = args[0];
+    if (value.type == WY_TYPE_TAG_FLOAT) { out[0] = value; return WY_ERR_NONE; }
+    if (value.type == WY_TYPE_TAG_WORD) {
+        out[0] = wy_value_float((double) value.data.word);
+        return WY_ERR_NONE;
+    }
+    if (value.type == WY_TYPE_TAG_STR) {
+        wy_string* text = (wy_string*) value.data.gc_object;
+        char buffer[64];
+        wy_uword len = text->len;
+        if (len == 0 || len >= sizeof(buffer)) { return WY_ERR_RANGE; }
+        wy_memcpy(buffer, text->str, len);
+        buffer[len] = '\0';
+        char* end = WY_NULL;
+        double parsed = strtod(buffer, &end);
+        if (end == buffer) { return WY_ERR_BAD_TYPE; }
+        while (*end == ' ' || *end == '\t') { end++; }
+        if (*end != '\0') { return WY_ERR_BAD_TYPE; }
+        out[0] = wy_value_float(parsed);
+        return WY_ERR_NONE;
+    }
+    return WY_ERR_BAD_TYPE;
+}
+
+/* `error_message(e)` - the message text of an error value, as a string.
+ * `str(e)` is not the way to get this (stringifying an error value is the
+ * one native call this VM refuses), and compilers/drivers need to print
+ * compile errors. A non-error argument answers nil. */
+static wy_error builtin_error_message_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context);
+    WY_UNUSED(argc);
+    if (nres == 0) { return WY_ERR_NONE; }
+    wy_value value = args[0];
+    if (value.type != WY_TYPE_TAG_ERROR) {
+        out[0] = wy_value_nil();
+        return WY_ERR_NONE;
+    }
+    wy_error_obj* obj = (wy_error_obj*) value.data.gc_object;
+    if (obj->what == WY_NULL) {
+        out[0] = wy_value_nil();
+        return WY_ERR_NONE;
+    }
+    wy_string* result = WY_NULL;
+    wy_error err = wy_string_new(context, obj->what->str, obj->what->len, &result);
+    if (err == WY_ERR_NONE) { out[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) result); }
+    return err;
+}
+
 static const builtin_leaf_entry_ leaf_builtins_[] = {
     { "println",   0, 255, builtin_println_ },
     { "print",     0, 255, builtin_print_ },
     { "str",       1, 1,   builtin_str_ },
+    { "sym",       1, 1,   builtin_sym_ },
+    { "int",       1, 1,   builtin_int_ },
+    { "float",     1, 1,   builtin_float_ },
+    { "error_message", 1, 1, builtin_error_message_ },
     { "cons",      2, 2,   builtin_cons_ },
     { "pair",      2, 2,   builtin_cons_ },
     { "car",       1, 1,   builtin_car_ },
@@ -1110,6 +1284,7 @@ static const builtin_leaf_entry_ leaf_builtins_[] = {
     { "resize",    2, 2,   builtin_resize_ },
     { "expand",    3, 3,   builtin_expand_ },
     { "remove",    2, 2,   builtin_remove_ },
+    { "len",       1, 1,   builtin_len_ },
     { "bytes",     1, 1,   bytes_construct_ },
 };
 
@@ -1150,6 +1325,15 @@ static const builtin_message_entry_ native_messages_[] = {
     { "expand", WY_TYPE_TAG_LIST,  builtin_expand_, 3, 3 },
     { "append", WY_TYPE_TAG_LIST,  builtin_append_, 2, 2 },
     { "remove", WY_TYPE_TAG_TABLE, builtin_remove_, 2, 2 },
+
+    /* `substr` also exists as a bare global in leaf_builtins_ above (not
+     * exposed by the pypoc front end, but reachable from hand-packed
+     * bytecode); this entry is what makes it dispatchable as the str message
+     * `s ! substr(start, count)` the corelib and doc/stdlib.md's `### str`
+     * use. `dispatch_native_body_f` merges the receiver with the explicit
+     * arguments, so the same native sees the same flat (s, start, count)
+     * either way. */
+    { "substr", WY_TYPE_TAG_STR,   builtin_substr_,       3, 3 },
 
     { "append",     WY_TYPE_TAG_BYTES, bytes_append_,      2, 2 },
     { "resize",     WY_TYPE_TAG_BYTES, bytes_resize_,      2, 2 },

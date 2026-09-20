@@ -1,0 +1,648 @@
+# wy/wyrm/compiler/functions.wy - epic 10 M4
+#
+# Wyrm port of pypoc/wypoc/compiler_bc/functions.py: parameter/capture
+# layout, a function's two-pass prologue, its body and epilogue, a nested
+# `fn`/lambda/`defer` closure, and the table-index reservation that makes a
+# self-referential or top-level-published function possible before its own
+# body is compiled.
+#
+# A function body is compiled into its own `FnContext` buffer and laid out
+# after module init (M6's `module.wy`), so its code offset is patched in at
+# assembly time. Its table index, though, is reserved *before* the body is
+# compiled - `compile_callable` below calls `ModuleImage.add_function` first
+# and compiles the body second, exactly as functions.py does, for the same
+# two reasons: module init needs the index for the `closure` that publishes
+# a top-level function, and a self-referential body needs it too.
+#
+# Nested functions are where the interesting work is. A nested `fn`, a
+# lambda and a `defer` block are all compiled the same way: work out what the
+# body reads from the enclosing frame (its captures), compile it as an
+# ordinary function whose P frame carries those captures after its
+# parameters, then emit a `closure` in the enclosing frame that copies them
+# in. A captured variable that anyone assigns is held in a cell instead, so
+# the copy shares a box rather than a value (spec 8.3) - the PAIR-chain
+# convention `context.wy`'s header and `analysis.wy`'s `cell_names` already
+# document: a one-element pair list is the box, `getidx`/`setidx` index 0
+# read and write it, and `plist ... f=1` builds one.
+#
+# ---------------------------------------------------------------------------
+# Deviations from functions.py, each forced by the port
+#
+# 1. Node field access, not attribute access. `node.class_target`,
+#    `node.params`, `node.body`, `node.name`, `node.pos` become
+#    `_field(node, n)` against wy/wyrm's node-kind table (`ast.wy`):
+#    `fn_def`/`co_def` are `(name, dispatch, params, ret_type, body)`
+#    (fields 1-5); a nested-fn/lambda/`co_lambda` body's params/body are
+#    read through `analysis.wy`'s `boundary_params`/`boundary_body`, which
+#    already knows each kind's field layout (including `co_lambda`'s
+#    `co_params` wrapper) - reused here rather than re-deriving it.
+#    `defer`'s field 1 is its `on <type>` constraint (nil for a plain
+#    `defer:`); there is no `node.pos` at all (no milestone has position
+#    tracking yet, per `handlers.wy`/`statements.wy`'s own notes), so every
+#    `pos` parameter below is threaded through as `nil` and never read.
+#
+# 2. No exceptions, so no `CompileError` "started emitting, then reraise or
+#    stub" flow. functions.py's `_compile_or_stub` runs
+#    `_allocate_slots`/`_prologue`/`_body_and_epilogue`/`patch_labels`
+#    inside a `try`, catching `CompileError` and either reraising (when
+#    `module.stub_unlowered` is false) or replacing what was emitted with a
+#    `trap` stub. This port gets the identical state machine from ordinary
+#    `is error` checks: `_try_compile` runs the same four steps, stopping at
+#    the first `error`, and `_compile_or_stub` decides whether to propagate
+#    that `error` outward (aborting the whole `compile_callable` the way an
+#    uncaught Python exception would) or swallow it into a stub, exactly
+#    mirroring the try/except's two outcomes.
+#
+# 3. `frame.captures`/`frame.cells` are `list`s here, not Python-dict-as-set /
+#    `set`. `context.wy`'s `FnContext.captures` is a `dict` (name -> P
+#    register, for `lookup`), so `set(frame.captures)` - which Python's
+#    `_allocate_slots`/`_prologue` lean on for the capture *names* - has no
+#    direct wy equivalent (no `dict.keys()` in this codebase; see
+#    `context.wy`'s own header for the general "no object-identity/no dict-
+#    keys" theme). So `_allocate_slots`/`_prologue`/`_try_compile` below
+#    thread the `captures` *name list* through as an explicit parameter
+#    instead of re-deriving it from `frame.captures`, alongside `params`
+#    (already an explicit name list in pypoc too). `frame.cells` is already a
+#    `list` in this port (`analysis.wy`'s `cell_names`/`intersect` build one
+#    directly, deliberately not a set - see that file's header), so nothing
+#    changes there.
+#
+# 4. No `sorted()`/dict-as-set difference builtin. `_prologue`'s
+#    `sorted(frame.cells - set(frame.captures))` becomes `_cells_to_seed` (a
+#    manual `list` difference by membership) piped through `_sort_names` (a
+#    small insertion sort over `str(sym)` spellings - the cell set is a
+#    handful of names per frame, so an O(n^2) sort costs nothing).
+#
+# 5. `constant_value`/`NOT_CONSTANT` are not imported from expressions.wy -
+#    they are not ported there yet (M2's scope stopped short of them; grep
+#    confirms). Rather than touch expressions.wy beyond the one hook this
+#    milestone is scoped to add, `_constant_value` is a small local copy
+#    here, in this port's own idiom: it returns the literal's value, or an
+#    `error` standing in for pypoc's `NOT_CONSTANT` sentinel (this port has
+#    no singleton-identity primitive to build a sentinel object from, and
+#    "fallible op returns error" is what every other file in this package
+#    already does for exactly this shape of question).
+#
+# 6. `make_fn_param`, not image.py's `Param` dataclass or image.wy's `n`/`d`
+#    dict shape. `context.wy`'s `ModuleImage` (note 1 in its own header) is
+#    the mutable pool this file writes into, and it already defines
+#    `make_fn_param(name: str, default=nil)`; M6's `module.wy` is what turns
+#    those into `image.wy`'s wire-shaped `{"n":.., "d":..}` dicts, not this
+#    file's job.
+#
+# 7. Closing the cycle-breaking hooks M2/M3 left open, per the epic's
+#    instructions - and adding one more of the same shape. This file needs
+#    `compile_body`/`store_reg` from statements.wy, so it imports
+#    statements.wy directly; that means statements.wy cannot import this
+#    file back (wy/wyrm's import graph must stay acyclic,
+#    pypoc/doc/addendum.md), so `_nested_fn`/`_defer` cannot call
+#    `compile_nested_fn`/`compile_defer` by importing them. All three
+#    call-ins - `expressions.wy`'s `_lambda`, `statements.wy`'s
+#    `_nested_fn` and `_defer` - are one-shot hooks instead
+#    (`set_closure_compiler`, added to expressions.wy this milestone
+#    mirroring its own `set_body_compiler`; `set_nested_fn_compiler`/
+#    `set_defer_compiler`, added to statements.wy this milestone the same
+#    way), installed once at this file's own bottom. Nothing else in either
+#    file changed.
+
+import std::pairs::*
+import wyrm::opcodes::*
+import wyrm::compiler::context::*
+import wyrm::compiler::analysis::*
+import wyrm::compiler::expressions::*
+import wyrm::compiler::statements::*
+
+# image.py's function-table flag bits (doc/wyc-format.md 8.4: bit 0
+# coroutine, bit 1 message/dispatch - not set by this file, M5's job - bit 2
+# `*args`, bit 3 `**kwargs`). Not exported by context.wy/image.wy (neither
+# ports image.py's flag constants), so frozen here the same way
+# context.wy's TABLE_LIMIT/MAX_LOCALS are.
+FN_COROUTINE := 1
+FN_VARARGS := 4
+FN_KWARGS := 8
+
+# ---------------------------------------------------------------------------
+# small local helpers - copied rather than imported; see analysis.wy's
+# header for why (no cross-module access to a leading-underscore name, and
+# std::pairs' `list_tail`/`field` walk with a `for ... in range(...)`, which
+# never iterates on this repo's C VM).
+
+fn _tail(node, count: int):
+    cur := node
+    i := 0
+    while i < count:
+        if not (cur is pair):
+            return error("index out of range")
+        cur = cdr(cur)
+        i = i + 1
+    return cur
+
+fn _field(node, index: int):
+    rest := _tail(node, index)
+    if rest is error:
+        return rest
+    return car(rest)
+
+fn _copy_list(items: list) -> list:
+    out := []
+    for item in items:
+        out ! append(item)
+    return out
+
+# ---------------------------------------------------------------------------
+# emit helpers - pack (or pack_pairable) THEN emit, checking the error each
+# can return in one place. Copied from expressions.wy/statements.wy for the
+# same reason `_field`/`_tail` are.
+
+fn _emit_pack(frame: FnContext, op, f: int = 0, a0: int = 0, a1: int = 0, a2: int = 0, w1: int | nil = nil) -> nil | error:
+    words := pack(op, f=f, a0=a0, a1=a1, a2=a2, w1=w1)
+    if words is error:
+        return words
+    frame ! emit_words(words)
+    return nil
+
+fn _emit_pairable(frame: FnContext, op, primary: int = 0, secondary: int = 0) -> nil | error:
+    words := pack_pairable(op, primary, secondary)
+    if words is error:
+        return words
+    frame ! emit_words(words)
+    return nil
+
+# ---------------------------------------------------------------------------
+# the entry point: a `fn`/`co` definition
+
+# Compile a `fn`/`co` definition, returning `[function index, capture
+# names]`. `enclosing` is the frame this definition sits in, if any; the
+# names its body reads from that frame become its captures, in
+# first-encounter order (analysis.wy's `free_names`).
+fn compile_function(node, module, name = nil, flags: int = 0, enclosing = nil) -> list | error:
+    dispatch_node := (_field(node, 2) catch nil)
+    if not (dispatch_node is nil):
+        return error("the bytecode compiler does not support dispatch on a class target (`frame [T] name`) yet")
+    f := flags
+    if node_kind(node) == 'co_def:
+        f = f | FN_COROUTINE
+    fn_name := name
+    if fn_name is nil:
+        fn_name = str((_field(node, 1) catch nil))
+    # A `co_def` carries its parameters inside a `co_params` node (its
+    # first field is the send type); boundary_params unwraps both shapes.
+    params := boundary_params(node)
+    body := (_field(node, 5) catch nil)
+    return compile_callable(module, fn_name, params, body, nil, f, enclosing, [], nil)
+
+# ---------------------------------------------------------------------------
+# parameters
+
+# `[names, entries, flags]` for a parameter list. `entries` is what the
+# functions table records - each parameter's name and, when it has one, the
+# static-pool index of its default. A `*args`/`**kwargs` parameter is an
+# ordinary P slot that arrives pre-collected; only the flag says so
+# (spec 4.6).
+fn param_spec(params, module = nil) -> list | error:
+    names := []
+    entries := []
+    flags := 0
+    seen_collector := false
+    p := params
+    while p is pair:
+        param := car(p)
+        kind := node_kind(param)
+        if kind == 'var_positional:
+            flags = flags | FN_VARARGS
+            seen_collector = true
+            name := (_field(param, 1) catch nil)
+            names ! append(name)
+            entries ! append(make_fn_param(str(name), nil))
+        elif kind == 'var_keyword:
+            flags = flags | FN_KWARGS
+            seen_collector = true
+            name2 := (_field(param, 1) catch nil)
+            names ! append(name2)
+            entries ! append(make_fn_param(str(name2), nil))
+        else:
+            name3 := (_field(param, 1) catch nil)
+            if seen_collector:
+                return error("parameter '" + str(name3) + "' follows a collecting parameter")
+            default_node := (_field(param, 3) catch nil)
+            default := nil
+            if not (default_node is nil):
+                value := _constant_value(default_node)
+                if value is error:
+                    return error("parameter '" + str(name3) + "': a default must be a constant")
+                if module is nil:
+                    return error("parameter '" + str(name3) + "': a default must be a constant")
+                idx := (module.image) ! add_static(value)
+                if idx is error:
+                    return idx
+                default = idx
+            names ! append(name3)
+            entries ! append(make_fn_param(str(name3), default))
+        p = cdr(p)
+    return [names, entries, flags]
+
+fn param_names(params, module = nil) -> list | error:
+    spec := param_spec(params, module)
+    if spec is error:
+        return spec
+    return spec[0]
+
+# The Python value of a literal, or an `error` standing in for
+# expressions.py's `NOT_CONSTANT` sentinel - see deviation 5. Used only
+# where the format can hold a constant: a parameter default.
+fn _constant_value(node):
+    if node is sym:
+        if node == 'nil:
+            return nil
+        if node == 'true:
+            return true
+        if node == 'false:
+            return false
+        return error("not a constant")
+    kind := node_kind(node)
+    if (kind == 'str) or (kind == 'int) or (kind == 'float) or (kind == 'char):
+        return (_field(node, 1) catch nil)
+    return error("not a constant")
+
+# ---------------------------------------------------------------------------
+# captures and cells (spec 8.3) - the epic's highest-risk area
+
+# The free names of `body` that the enclosing frame can actually hand over.
+# Anything else - a module global, a builtin, an external name - is reached
+# the same way it would be from any other scope, not captured.
+fn _captures(names: list, body, enclosing) -> list:
+    if enclosing is nil:
+        return []
+    out := []
+    for name in free_names(names, body):
+        if not ((enclosing ! lookup(name)) is nil):
+            out ! append(name)
+    return out
+
+# Which of this frame's names live in a cell. Two sources: names this body
+# declares that a nested scope captures and assigns (`cell_names`), and
+# captures that were already cells in the enclosing frame - the P slot
+# holds that same box, so reads and writes here go through it too.
+fn _cells(names: list, body, captures: list, enclosing) -> list:
+    cells := cell_names(names, body)
+    if not (enclosing is nil):
+        for name in captures:
+            if name in enclosing.cells:
+                note_name(cells, name)
+    return cells
+
+# ---------------------------------------------------------------------------
+# the two-pass prologue: slots first, then the cell-seeding code
+
+# Give every name in the frame its L slot, before a line is emitted.
+#
+# A parameter that needs a cell gets a local slot of its own to hold the
+# cell - the P slot still carries the incoming value, and the local shadows
+# it from then on. The frame's own level is declared here; each nested
+# block scope gets its own slots too (`allocate_block_scopes`), so an inner
+# `var` shadows an outer one for the block's duration instead of writing
+# through to it.
+fn _allocate_slots(frame: FnContext, names: list, captures: list, body) -> nil | error:
+    for name in names:
+        if name in frame.cells:
+            d := frame ! declare_local(name)
+            if d is error:
+                return d
+    if len(frame.cells) > 0:
+        z := frame ! reserve_zero()
+        if z is error:
+            return z
+    own := own_declared_names(body)
+    for name2 in own:
+        d2 := frame ! declare_local(name2)
+        if d2 is error:
+            return d2
+    visible := []
+    for p in names:
+        note_name(visible, p)
+    for c in captures:
+        note_name(visible, c)
+    for o in own:
+        note_name(visible, o)
+    return frame ! allocate_block_scopes(body, visible)
+
+# `names` minus `captures`, as a `list` (deviation 3): the cells this frame
+# itself must create, excluding a captured cell that arrived already boxed.
+fn _cells_to_seed(frame: FnContext, captures: list) -> list:
+    out := []
+    for name in frame.cells:
+        if not (name in captures):
+            out ! append(name)
+    return out
+
+# A small insertion sort over `str(sym)` spellings (deviation 4). Each
+# frame's cell set is a handful of names, so this costs nothing.
+fn _sort_names(names: list) -> list:
+    out := []
+    for name in names:
+        text := str(name)
+        out ! append(name)
+        i := len(out) - 1
+        while (i > 0) and (str(out[i - 1]) > text):
+            tmp := out[i - 1]
+            out[i - 1] = out[i]
+            out[i] = tmp
+            i = i - 1
+    return out
+
+# Set up the frame's own cells at entry.
+#
+# Every cell this frame owns is created here rather than at its
+# declaration, so that every write to a cell variable is a plain `setidx`
+# with no "has the box been made yet?" case anywhere in the lowering. A
+# *captured* cell is not this frame's to create: it arrives in a P slot
+# already holding the box the enclosing frame made.
+fn _prologue(frame: FnContext, names: list, captures: list) -> nil | error:
+    if len(frame.cells) == 0:
+        return nil
+    z := frame ! zero()
+    if z is error:
+        return z
+    e := _emit_pairable(frame, 'i8, z, 0)
+    if e is error:
+        return e
+    to_seed := _sort_names(_cells_to_seed(frame, captures))
+    for name in to_seed:
+        cell := frame ! lookup(name)
+        if cell is nil:
+            return error("internal: cell '" + str(name) + "' has no register in " + frame.name)
+        mark := frame ! mark()
+        seed := frame ! push()
+        if seed is error:
+            return seed
+        if name in names:
+            # The parameter's incoming value seeds its cell; windows live
+            # in the L frame, so it is copied down before being boxed.
+            e2 := _emit_pairable(frame, 'move, seed, frame.params[name])
+            if e2 is error:
+                return e2
+        else:
+            e3 := _emit_pack(frame, 'lnil, a0=seed)
+            if e3 is error:
+                return e3
+        # A one-element pair list is the box: `getidx`/`setidx` at index 0
+        # read and write it, and the VM needs no boxing opcode of its own.
+        e4 := _emit_pack(frame, 'plist, a0=cell, a1=seed, f=1)
+        if e4 is error:
+            return e4
+        fr := frame ! free_to(mark)
+        if fr is error:
+            return fr
+    return nil
+
+# ---------------------------------------------------------------------------
+# the body and its epilogue
+
+# Every path out of a function returns, carrying the body's value.
+#
+# A body whose last statement is already a `return` needs no epilogue.
+# Otherwise the function's value is that last statement's - which is what
+# the interpreter answers too - so the body gets a result register reserved
+# below its temps and the epilogue returns it.
+fn _body_and_epilogue(body, frame: FnContext) -> nil | error:
+    stmts := body_statements(body)
+    n := len(stmts)
+    if (n > 0) and (node_kind(stmts[n - 1]) == 'return):
+        return compile_body(body, frame)
+    result := frame ! push()
+    if result is error:
+        return result
+    cb := compile_body(body, frame, result)
+    if cb is error:
+        return cb
+    return frame ! emit_return(result)
+
+# ---------------------------------------------------------------------------
+# compile-or-stub (deviation 2)
+
+fn _try_compile(frame: FnContext, names: list, captures: list, body) -> nil | error:
+    frame.top_body = body
+    a := _allocate_slots(frame, names, captures, body)
+    if a is error:
+        return a
+    p := _prologue(frame, names, captures)
+    if p is error:
+        return p
+    b := _body_and_epilogue(body, frame)
+    if b is error:
+        return b
+    return frame ! patch_labels()
+
+# Replace whatever was emitted with a single `trap`.
+#
+# Everything the abandoned attempt left behind is dropped with it - the
+# labels it never patched, and above all its referenced-name set, which
+# would otherwise have the VM resolve names the body no longer reads.
+fn _make_stub(frame: FnContext) -> nil:
+    (frame.code) ! resize(0)
+    frame.lines = {}
+    (frame.labels) ! resize(0)
+    (frame.uses) ! resize(0)
+    (frame.loops) ! resize(0)
+    frame.top = frame.nnamed
+    frame.line = nil
+    words := pack('trap, f=0)
+    frame ! emit_words(words)
+    return nil
+
+# Compile the body, or leave a stub that traps if it will not lower.
+#
+# Some functions are templates, never called - refusing the whole module
+# over one of those would make it uncompilable for code that never runs,
+# while compiling it as if it were callable would be worse. So the
+# function keeps its table entry and its body becomes a `trap`, which is
+# exactly what calling it is: unreachable code reached.
+#
+# The reason is recorded on the image; nothing is swallowed.
+# `module.stub_unlowered = false` turns this off, propagating the `error`
+# instead - what a test suite wants so a genuine compiler gap still fails
+# loudly (see deviation 2).
+fn _compile_or_stub(frame: FnContext, names: list, captures: list, body, module) -> str | nil | error:
+    outcome := _try_compile(frame, names, captures, body)
+    if outcome is error:
+        if not module.stub_unlowered:
+            return outcome
+        _make_stub(frame)
+        return str(outcome)
+    return nil
+
+# ---------------------------------------------------------------------------
+# the shared entry point: any parameter list + body -> a function table entry
+
+# Compile any parameter list + body into a function table entry.
+#
+# Shared by `fn` definitions, lambdas, `defer` blocks and (M5's) class
+# methods - all of them a body that runs in a frame of its own over a P
+# frame of `this` values, parameters and captures, in that order (spec 1).
+fn compile_callable(module, name: str, params, body, pos, flags: int = 0, enclosing = nil, dispatch: list | nil = nil, this_class = nil) -> list | error:
+    spec := param_spec(params, module)
+    if spec is error:
+        return spec
+    names := spec[0]
+    entries := spec[1]
+    param_flags := spec[2]
+    f := flags | param_flags
+    dispatch_list := dispatch
+    if dispatch_list is nil:
+        dispatch_list = []
+    if len(names) > 128:
+        return error(name + " declares " + str(len(names)) + " parameters, over the 128-parameter limit")
+    captures := _captures(names, body, enclosing)
+    frame := FnContext(module, name, names, captures, len(dispatch_list), false, this_class)
+    frame.cells = _cells(names, body, captures, enclosing)
+    frame.is_coroutine = (f & FN_COROUTINE) != 0
+    ds := _declare_statics(frame, name, body, module)
+    if ds is error:
+        return ds
+    # Positional, not keyword, arguments: pypoc's own bytecode compiler
+    # (the one still compiling this file's *own* source, until this port
+    # replaces it) does not support a keyword argument at a message-send
+    # call site (`obj ! method(k=v)`) - confirmed by this call alone
+    # tripping "the bytecode compiler does not support Kwarg yet" where an
+    # otherwise-identical plain-call kwarg (`pack(op, f=f, ...)`,
+    # throughout expressions.wy/statements.wy) compiles fine. A real gap in
+    # the retiring compiler, not this port's to fix; noted in the epic
+    # report. `add_function`'s own parameter order (context.wy) is name,
+    # params, nlocals, code_offset, flags, dispatch, ncaptures, nresults,
+    # uses - positional through `ncaptures` covers everything this call
+    # needs, leaving `nresults`/`uses` at their defaults.
+    index := (module.image) ! add_function(name, entries, 0, 0, f, dispatch_list, len(captures))
+    if index is error:
+        return index
+    reason := _compile_or_stub(frame, names, captures, body, module)
+    if reason is error:
+        return reason
+    entry := module.image.functions[index]
+    if not (reason is nil):
+        (module.image.unlowered) ! append([name, reason])
+    entry["nlocals"] = frame.high
+    entry["nresults"] = frame.max_results
+    entry["uses"] = _copy_list(frame.uses)
+    module ! add_pending(index, frame)
+    return [index, captures]
+
+# `static x: T = e` in a function body is a module global. It is
+# module-lifetime, bound once where its owner is created rather than on
+# every call (spec 7.2), so the slot is allotted here and the initializer
+# is queued for module init.
+fn _declare_statics(frame: FnContext, name: str, body, module) -> nil | error:
+    for node in walk_body(body):
+        if node_kind(node) != 'static:
+            continue
+        static_name := (_field(node, 1) catch nil)
+        init := (_field(node, 3) catch nil)
+        index := module ! declare_global(name + "::" + str(static_name))
+        if index is error:
+            return index
+        frame.statics[static_name] = index
+        if not (init is nil):
+            (module.pending_statics) ! append([index, init, nil])
+    return nil
+
+# ---------------------------------------------------------------------------
+# closures
+
+# Emit a `closure` over function `index`, copying `captures` into it.
+#
+# The captured registers have to be contiguous, so they are copied into a
+# fresh window first. A captured *cell* is copied as the cell - that is the
+# whole point of the box: both frames end up pointing at the same one.
+fn emit_closure(frame: FnContext, index: int, captures: list, dst) -> nil | error:
+    if len(captures) == 0:
+        return _emit_pack(frame, 'closure, a0=dst, a1=index, a2=0, f=0)
+    base := frame ! mark()
+    for name in captures:
+        cap_slot := frame ! push()
+        if cap_slot is error:
+            return cap_slot
+        reg := frame ! lookup(name)
+        e := _emit_pairable(frame, 'move, cap_slot, reg)
+        if e is error:
+            return e
+    e2 := _emit_pack(frame, 'closure, a0=dst, a1=index, a2=L(base), f=len(captures))
+    if e2 is error:
+        return e2
+    return frame ! free_to(base)
+
+# Compile a nested `fn`/lambda/`co_lambda`/`co_def` in place, leaving the
+# closure in `dst`. `boundary_params`/`boundary_body` (analysis.wy) already
+# know each of those kinds' field layout, including `co_lambda`'s
+# `co_params` wrapper, so this works unmodified for all four.
+fn compile_closure_expr(node, frame: FnContext, dst, name) -> int | error:
+    params := boundary_params(node)
+    body := boundary_body(node)
+    f := 0
+    if node_kind(node) == 'co_lambda:
+        f = FN_COROUTINE
+    result := compile_callable(frame.module, str(name), params, body, nil, f, frame, [], nil)
+    if result is error:
+        return result
+    index := result[0]
+    captures := result[1]
+    e := emit_closure(frame, index, captures, dst)
+    if e is error:
+        return e
+    return dst
+
+# A nested `fn name(...)`/`co name(...)` statement: build the closure, bind
+# the name.
+fn compile_nested_fn(node, frame: FnContext, pos = nil) -> nil | error:
+    mark := frame ! mark()
+    reg := frame ! push()
+    if reg is error:
+        return reg
+    name := (_field(node, 1) catch nil)
+    e := compile_closure_expr(node, frame, reg, name)
+    if e is error:
+        return e
+    e2 := store_reg(name, reg, frame)
+    if e2 is error:
+        return e2
+    return frame ! free_to(mark)
+
+# A `defer:` block is a zero-parameter closure armed for this frame.
+#
+# v1 arms at frame granularity - the block runs when the function returns,
+# a deliberate narrowing of the language spec's "containing block" (spec
+# 7.2, Appendix C). `defer`'s field 1 is its optional `on <type>`
+# constraint; this port only distinguishes "no constraint" (mode 0, always)
+# from "some constraint" (mode 1, on error) - pypoc's own `Defer.on_error`
+# is the same plain bool, so `defer_reg`'s mode-2 ("on error or nil",
+# doc/wyc-format.md 6.3) is a POC-vs-spec gap this epic does not close
+# either (out of scope per the epic's own "already documented" carve-out).
+fn compile_defer(node, frame: FnContext) -> nil | error:
+    constraint := (_field(node, 1) catch nil)
+    body := (_field(node, 2) catch nil)
+    result := compile_callable(frame.module, "<defer>", [], body, nil, 0, frame, [], nil)
+    if result is error:
+        return result
+    index := result[0]
+    captures := result[1]
+    mark := frame ! mark()
+    reg := frame ! push()
+    if reg is error:
+        return reg
+    e := emit_closure(frame, index, captures, reg)
+    if e is error:
+        return e
+    mode := 0
+    if not (constraint is nil):
+        mode = 1
+    e2 := _emit_pack(frame, 'defer_reg, a0=reg, f=mode)
+    if e2 is error:
+        return e2
+    return frame ! free_to(mark)
+
+# ---------------------------------------------------------------------------
+# close the cycle-breaking hooks (deviation 7): expressions.wy's `_lambda`
+# and statements.wy's `_nested_fn`/`_defer` were left as one-shot hooks for
+# exactly this file to install, the same way statements.wy closes
+# expressions.wy's `_do` hook at its own bottom.
+set_closure_compiler(compile_closure_expr)
+set_nested_fn_compiler(compile_nested_fn)
+set_defer_compiler(compile_defer)

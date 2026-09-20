@@ -1,0 +1,174 @@
+# wy/wyrm/compiler/handlers.wy - epic 10 M3
+#
+# Wyrm port of pypoc/wypoc/compiler_bc/handlers.py: three dispatch
+# registries, keyed here by car-symbol (wy/wyrm node kind) instead of a
+# Python dataclass type.
+#
+# A node kind with no entry is not a gap to paper over: `dispatch` answers an
+# `error` naming the construct, which is the whole fail-loud contract this
+# package exists for (spec: milestones add handlers, they never add silent
+# fallbacks).
+#
+# ---------------------------------------------------------------------------
+# Deviations from handlers.py, each forced by the port
+#
+# 1. No decorators. handlers.py's `expression`/`statement`/`toplevel` are
+#    decorator factories applied at each handler's `def` site. wy has no
+#    decorator syntax, so registration here is an ordinary function call:
+#    `register_statement(['var_decl], _var_decl)`, made at module load time
+#    (a plain top-level statement, the same idiom `wy/wyrm/image.wy`'s
+#    SECTION_NAMES-style dict literals use for static tables, generalized to
+#    a dict of function *values* rather than of strings/ints - verified
+#    first that wy supports storing and later calling a function value
+#    through a dict, since nothing else in this codebase does that yet).
+#    `statements.wy` calls `register_statement`/`register_expression` once
+#    per handler, right after each handler's own `fn` definition.
+#
+# 2. `dispatch` takes the handler's positional arguments directly (`frame`,
+#    `dst`/`result`) as two fixed parameters, not a `*rest` forward. Every
+#    handler in this port - expression or statement - has the exact same
+#    3-argument shape, `(node, frame, dst_or_result)`, so a generic
+#    `*rest`-collect-then-spread-forward first looked like the natural fit
+#    (wy supports the *shape*: a function can declare `*rest` and hand it
+#    to another call as `f(x, *rest)`). It was dropped after hitting a real
+#    C VM bug this way: `call_va` faults ("expected a positional tuple")
+#    whenever a call site mixes a plain positional argument with a spread
+#    one - `f(x, *rest)`, not `f(*rest)` alone - confirmed with a two-line
+#    reproduction outside this port entirely (a fixed arg plus `*t` on an
+#    ordinary tuple local faults the same way; not specific to `*rest`
+#    parameters or to this file). `dispatch(registry, node, frame, extra)`
+#    below is written with two fixed trailing parameters instead, which
+#    sidesteps the bug and is exactly as expressive today, since nothing
+#    ported so far needs more than two. `TOPLEVEL_HANDLERS` is wired here
+#    for M6 to populate and use the same way; nothing in this milestone
+#    calls it. See the epic report for the C VM bug writeup.
+#
+# 3. No position tracking. pypoc's `CompileError` carries `node.pos`;
+#    wy/wyrm's parser does not attach source positions to a tree at all (no
+#    node in ast.wy's table has a position field, and `context.wy`'s
+#    `FnContext.line` - the field that would hold one - is written nowhere
+#    today, M1's own port of it included). So `unsupported` names the
+#    construct only, with no line/column to report. A real gap, not
+#    something to paper over here: fixing it is front-end work
+#    (wy/wyrm/parser.wy would need to start stamping positions), out of
+#    scope for this file.
+#
+# 4. `CONSTRUCT_NAMES` is keyed by wy/wyrm's node-kind spellings
+#    (cross-checked against `wy/wyrm/ast.wy`'s node-kind table), not
+#    pypoc's dataclass names - the two vocabularies only partly overlap
+#    (`Assign` is `set`/`if_set`/`set_values` here; `AttrTarget`/
+#    `IndexTarget` are `attr`/`target` here; `ClassDef`/`CoDef`/`Lambda`
+#    have no pypoc-side counterpart at all, so REMOVED_CONSTRUCTS and the
+#    EllipsisExpr/`with` special cases in handlers.py's `unsupported` do not
+#    port: wy/wyrm's grammar has no node kind for any of the three
+#    (`ast.wy`'s table has no `with`/`ellipsis` entry, and nothing under
+#    epic 8 M2 produces one), so there is nothing those branches could ever
+#    reach here. If wy/wyrm ever grows one, add it back the way handlers.py
+#    has it.
+
+import wyrm::compiler::analysis::*
+
+EXPR_HANDLERS := {}
+STATEMENT_HANDLERS := {}
+TOPLEVEL_HANDLERS := {}
+
+# Source-level spellings for the constructs whose node-kind symbol would not
+# tell a reader which line of their program is at fault. Kinds absent here
+# fall back to their bare kind spelling (construct_name, below).
+fn _build_construct_names() -> dict:
+    n := {}
+    n["set"] = "assignment"
+    n["set_values"] = "assignment"
+    n["if_set"] = "`?=`"
+    n["attr"] = "attribute access"
+    n["target"] = "an assignment target"
+    n["catch"] = "`catch`"
+    n["char"] = "a character literal"
+    n["class_def"] = "`class`"
+    n["class_expr"] = "an anonymous `class`"
+    n["co_def"] = "`co`"
+    n["decorated"] = "a decorator"
+    n["defer"] = "`defer`"
+    n["dict"] = "a dict literal"
+    n["for"] = "`for`"
+    n["import"] = "`import`"
+    n["import_static"] = "`import static`"
+    n["if"] = "`if`"
+    n["lambda"] = "a lambda"
+    n["co_lambda"] = "a coroutine lambda"
+    n["message"] = "message send (`!`)"
+    n["int"] = "a number literal"
+    n["float"] = "a number literal"
+    n["define"] = "`var`"
+    n["define_values"] = "`var`"
+    n["static"] = "`static`"
+    n["while"] = "`while`"
+    n["yield"] = "`yield`"
+    n["yield_from"] = "`yield from`"
+    n["slot_def"] = "a slot declaration"
+    return n
+
+CONSTRUCT_NAMES := _build_construct_names()
+
+# The human-readable name for whatever construct `node` is, for an error
+# message - handlers.py's `construct_name`.
+fn construct_name(node) -> str:
+    kind := node_kind(node)
+    if kind is nil:
+        return "expression"
+    name := (CONSTRUCT_NAMES[str(kind)] catch nil)
+    if not (name is nil):
+        return name
+    return "'" + str(kind) + "'"
+
+# The refusal for a construct with no handler, worded for its reason -
+# handlers.py's `unsupported`. See deviation 3: no position to report.
+fn unsupported(node) -> error:
+    return error("the bytecode compiler does not support " + construct_name(node) + " yet")
+
+# -- registration -------------------------------------------------------
+
+# Bind `handler` under every kind in `kinds` (a list of `sym`). A kind
+# registered twice is a module-load-time bug in this port itself, not
+# something a caller can hit by compiling a program, so it fails loudly
+# right there rather than being threaded back as an `error` value.
+fn _register(registry: dict, kinds: list, handler) -> nil:
+    for kind in kinds:
+        key := str(kind)
+        if key in registry:
+            println("FATAL: '" + key + "' is registered twice")
+            exit(1)
+        registry[key] = handler
+    return nil
+
+fn register_expression(kinds: list, handler) -> nil:
+    return _register(EXPR_HANDLERS, kinds, handler)
+
+fn register_statement(kinds: list, handler) -> nil:
+    return _register(STATEMENT_HANDLERS, kinds, handler)
+
+fn register_toplevel(kinds: list, handler) -> nil:
+    return _register(TOPLEVEL_HANDLERS, kinds, handler)
+
+# -- dispatch -------------------------------------------------------------
+
+# Look up and call the handler registered for `node`'s kind -
+# `dispatch(EXPR_HANDLERS, node, frame, dst)` /
+# `dispatch(STATEMENT_HANDLERS, node, frame, result)`. No handler
+# registered is never a silent fallback: it is `unsupported(node)`. See
+# deviation 2 for why `frame`/`extra` are two fixed parameters rather than
+# a `*rest` forward.
+fn dispatch(registry: dict, node, frame, extra = nil):
+    kind := node_kind(node)
+    if kind is nil:
+        return unsupported(node)
+    handler := (registry[str(kind)] catch nil)
+    if handler is nil:
+        return unsupported(node)
+    return handler(node, frame, extra)
+
+fn supported(registry: dict, node) -> bool:
+    kind := node_kind(node)
+    if kind is nil:
+        return false
+    return str(kind) in registry

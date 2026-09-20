@@ -1,0 +1,1498 @@
+# wy/wyrm/compiler/expressions.wy - epic 10 M2
+#
+# Wyrm port of pypoc/wypoc/compiler_bc/expressions.py: expression lowering
+# (spec 7.1).
+#
+# Every handler has the same contract:
+#
+#     compile_expr(node, frame, dst = nil) -> register reference | error
+#
+# It returns the register the value ends up in, or an `error` (this codebase
+# has no exceptions - every fallible step is checked with `is error` and
+# propagated, the same convention context.wy/analysis.wy already use). With
+# `dst` given the value *must* land there; with `dst` nil the handler is free
+# to return a register that already holds the value - a local or a parameter
+# needs no code at all - or to push a temp and evaluate into it.
+#
+# Temp discipline follows Appendix A (pypoc/doc/llm-bytecode.md, "Lowering
+# recipes"): operands are pushed, and a result is pushed *above* them rather
+# than reusing their slots, so `"Hello " + name` lands its operand in L0 and
+# its sum in L1. The whole run of temps is released at the end of the
+# enclosing statement or call window.
+#
+# ---------------------------------------------------------------------------
+# Deviations from expressions.py, each forced by the port
+#
+# 1. Literals arrive pre-decoded. wy/wyrm/parser.wy already calls
+#    decode_str/decode_int/decode_float/decode_sym at parse time (see
+#    parser.wy:110-125), so a `str`/`int`/`float`/`sym` node's field 1 is
+#    already the decoded native value - not raw token text the way
+#    expressions.py's ast.Str/ast.Num/ast.Symbol carry it. So this port
+#    never calls eval_string_literal/eval_number_literal/eval_char_literal:
+#    there is nothing left to decode, and decode.wy's own decode_str has a
+#    different (richer) escape table than the interpreter's anyway - using
+#    it here would be exactly the second-copy-of-the-escape-table problem
+#    expressions.py's docstring warns against, not a fix for it.
+#
+# 2. Char literals are unreachable. wy/wyrm/parser.wy's `char_literal()`
+#    (parser.wy:136-137) is `@accept 'TOK_LITERAL_CHAR` with no value
+#    transform - no `_mk_char` exists, so a char literal never becomes a
+#    `$['char, ...]` node (or any node at all) in the tree wy/wyrm/ast.wy
+#    documents. A `'char` handler is still provided defensively (assuming a
+#    future fix decodes into field 1 the same pre-decoded way str/int/sym
+#    do), but nothing can reach it today. Real parser gap, not this port's
+#    to fix (M2 touches expressions.wy only).
+#
+# 3. Unary `pos` (`+x`) has no VM opcode. pypoc's own UNARYOPS table has no
+#    "pos" entry either (its parser folds unary `+` away entirely); wy/wyrm's
+#    parser keeps a `'pos` node, and the interpreter's `_expr_unaryop`
+#    answers `+val` for it - which is `val` unchanged for every primitive
+#    type the language has. So `'pos` lowers as an identity passthrough
+#    (compile the operand, land it in dst): correct per the interpreter,
+#    with no opcode to spend.
+#
+# 4. `and`/`or` are flat n-ary chains in wy/wyrm (ast.wy: DIVERGES, pypoc's
+#    BinOp is strictly binary and a chain nests). `_short_circuit` here folds
+#    left to right across every operand, emitting one conditional jump to a
+#    shared `done` label before each operand after the first - the direct
+#    generalization of pypoc's binary version, and what a left-associative
+#    reading of the chain means operationally either way.
+#
+# 5. `(a, b) ! name(args)` (pypoc's ast.MessageTupleExpr, a dedicated node)
+#    has no dedicated wy/wyrm node kind: `(expr_list)` parses as an ordinary
+#    `'tuple` node (parser.wy:1202), and message_op's target is just
+#    whatever primary preceded it. So `_message` below detects a `'tuple`
+#    target itself and takes the receivers-tuple path, subsuming
+#    `_message_tuple` - matching pypoc's *tree-walking interpreter*
+#    (wyrm_eval_parse_tree.py), which the epic's approved deviation prefers
+#    over the retired bytecode VM's node-type distinction.
+#
+# 6. `super` and a qualified message name (`recv ! mod::name(...)`) are not
+#    reachable: wy/wyrm's grammar has no `super` construct at all (no
+#    `TOK_SUPER`, no rule), and `message_op`'s name is a single `xid`, never
+#    a `qualified_name` (parser.wy:1128). Neither `_super` nor a
+#    module-qualified `message_index` is implemented; both are real parser
+#    gaps, not lowering gaps, and out of scope for expressions.wy.
+#
+# 7. `do:` blocks and lambdas break a real dependency cycle, closed with a
+#    hook rather than an import. `_do` needs statements.wy's `compile_body`
+#    (M3) and `_lambda` needs functions.wy's `compile_closure_expr` (M4) -
+#    pypoc breaks this same cycle with a function-local `import` at call
+#    time (its `_lambda`/`_do` docstrings say so explicitly); wyrm has no
+#    equivalent of a deferred/lazy import, and wy/wyrm's import graph must
+#    stay acyclic besides (pypoc/doc/addendum.md), so this file cannot
+#    import statements.wy the way statements.wy imports it. As of M3, `_do`
+#    calls through `set_body_compiler`'s one-shot hook instead (see below);
+#    `_lambda` is still stubbed, for M4 to close the same way.
+#
+# 8. `foo::$ast` (`_ast_ref`) has no grammar support (`::$` is not a token
+#    wy/wyrm's tokenizer produces at all) and decorator expansion
+#    (`frame.module.definitions`, populated by module.wy's decorator pass) is
+#    out of scope before M5/M6, so no dispatch case exists for it and it is
+#    not implemented. `emit_value` - the constant-materializing primitive
+#    `_ast_ref` would call - IS implemented in full below, for M5+ to reuse,
+#    and is simpler here than in pypoc: a wy/wyrm tree node already *is* the
+#    native sexpr-shaped value (pair lists of syms/literals), so there is no
+#    `sexpr.encode()` step to run first - `emit_value` takes the node itself.
+#
+# 9. `_scope`'s free-global/class-static shortcut is checked once, against
+#    the whole flattened `qualified_name` path, then folds the remaining
+#    segments with `getscope`. pypoc's `_scope` re-derives this check at
+#    *each* nesting level (`ast.Scope` is binary and `compile_expr` recurses
+#    into `node.obj`), which only matters when an inner prefix of a 3+
+#    segment path is itself eligible for the class-static/free-global
+#    shortcut (a local class reached partway through a longer path) - not
+#    exercised by any progression fixture. Documented approximation, not
+#    silently different behavior for the 1- and 2-segment cases that matter.
+
+import std::pairs::*
+import wyrm::opcodes::*
+import wyrm::compiler::context::*
+import wyrm::compiler::analysis::*
+import wyrm::compiler::handlers::*
+
+INT32_MIN := -(2 ** 31)
+INT32_MAX := (2 ** 31) - 1
+
+# spec 3.2/3.3: the three-address op each binary operator lowers to. Keyed
+# by the operator's spelling (str), valued by the opcode mnemonic (sym) -
+# `'exp`/`'in` are their own wy/wyrm node kinds, not routed through here,
+# but "**"/"in" stay in the table since nothing else needs to change if
+# that ever stops being true.
+BINOPS := {"+": 'add, "-": 'sub, "*": 'mul, "/": 'div, "%": 'mod, "**": 'pow, "&": 'band, "|": 'bor, "^": 'bxor, "<<": 'shl, ">>": 'shr, "==": 'eq, "!=": 'ne, "<": 'lt, "<=": 'le, ">": 'gt, ">=": 'ge, "<=>": 'cmp3, "in": 'in}
+
+# `x is T`: the names the interpreter answers from its own primitive-type
+# table rather than by looking up a class (_matches_type,
+# wyrm_eval_parse_tree.py's _PRIMITIVE_TYPE_CHECKS). Frozen here for the
+# same reason context.wy's BUILTIN_NAMES is: a wyrm program cannot query a
+# Python dict at compile time.
+PRIMITIVE_TYPE_NAMES := ["nil", "bool", "int", "uint", "float", "str", "sym", "list", "tuple", "dict", "bytes", "pair", "error"]
+
+# ---------------------------------------------------------------------------
+# small local helpers
+#
+# `_field`/`_tail` are analysis.wy's private helpers, copied rather than
+# imported (wy has no cross-module access to a leading-underscore name, and
+# even if it did: std::pairs' `list_tail`/`field` are not used here for the
+# same reason analysis.wy avoids them - see its header comment). Plain
+# `for x in <pair>` IS safe on the C VM (src/iter.c handles WY_TYPE_TAG_PAIR
+# natively; the broken case is specifically `for i in range(...)`, a
+# coroutine), so this port uses it freely for iterating argument/item lists.
+
+fn _tail(node, count: int):
+    cur := node
+    i := 0
+    while i < count:
+        if not (cur is pair):
+            return error("index out of range")
+        cur = cdr(cur)
+        i = i + 1
+    return cur
+
+fn _field(node, index: int):
+    rest := _tail(node, index)
+    if rest is error:
+        return rest
+    return car(rest)
+
+fn _max2(a: int, b: int) -> int:
+    if a > b:
+        return a
+    return b
+
+fn _join_parts(parts: list) -> str:
+    out := ""
+    first := true
+    for part in parts:
+        if not first:
+            out = out + "::"
+        out = out + part
+        first = false
+    return out
+
+# `bytes!pack_f32` truncates to the machine's native (single-precision)
+# float and `unpack_u32` reads the same bits back - the wyrm-side
+# equivalent of expressions.py's `struct.unpack("<I", struct.pack("<f",
+# value))`.
+fn _f32_bits(value: float) -> int:
+    b := bytes(4)
+    b ! pack_f32(0, value)
+    return b ! unpack_u32(0)
+
+# ---------------------------------------------------------------------------
+# emit helpers: pack (or pack_pairable) THEN emit, checking the error each
+# can return in one place instead of at every call site.
+
+fn _emit_pack(frame: FnContext, op, f: int = 0, a0: int = 0, a1: int = 0, a2: int = 0, w1: int | nil = nil) -> nil | error:
+    words := pack(op, f=f, a0=a0, a1=a1, a2=a2, w1=w1)
+    if words is error:
+        return words
+    frame ! emit_words(words)
+    return nil
+
+fn _emit_pairable(frame: FnContext, op, primary: int = 0, secondary: int = 0) -> nil | error:
+    words := pack_pairable(op, primary, secondary)
+    if words is error:
+        return words
+    frame ! emit_words(words)
+    return nil
+
+# Put a value already in `reg` into `dst`, if the caller demanded one.
+fn _land(frame: FnContext, dst, reg: int) -> int | error:
+    if (dst is nil) or (dst == reg):
+        return reg
+    e := _emit_pairable(frame, 'move, dst, reg)
+    if e is error:
+        return e
+    return dst
+
+fn _target(frame: FnContext, dst) -> int | error:
+    if dst is nil:
+        return frame ! push()
+    return dst
+
+# ---------------------------------------------------------------------------
+# literals
+
+fn _string(node, frame: FnContext, dst):
+    value := (_field(node, 1) catch nil)
+    index := (frame.module.image) ! add_static(value)
+    if index is error:
+        return index
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pairable(frame, 'lconst, index, reg)
+    if e is error:
+        return e
+    return reg
+
+fn _number(node, frame: FnContext, dst):
+    value := (_field(node, 1) catch nil)
+    if value is float:
+        reg := _target(frame, dst)
+        if reg is error:
+            return reg
+        bits := _f32_bits(value)
+        e := _emit_pack(frame, 'f32, a0=reg, w1=bits)
+        if e is error:
+            return e
+        return reg
+    if (value < INT32_MIN) or (value > INT32_MAX):
+        return error("integer literal " + str(value) + " does not fit in an i32")
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pairable(frame, 'i8, reg, value)
+    if e is error:
+        return e
+    return reg
+
+# Defensive only - see deviation 2: no `'char` node reaches this today.
+fn _char_lit(node, frame: FnContext, dst):
+    value := (_field(node, 1) catch nil)
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pairable(frame, 'i8, reg, value)
+    if e is error:
+        return e
+    return reg
+
+fn _symbol_lit(node, frame: FnContext, dst):
+    value := (_field(node, 1) catch nil)
+    index := (frame.module.image) ! add_symbol(str(value))
+    if index is error:
+        return index
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pairable(frame, 'lsym, index, reg)
+    if e is error:
+        return e
+    return reg
+
+fn _bool_lit(flag: bool, frame: FnContext, dst):
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    f := 0
+    if flag:
+        f = 1
+    e := _emit_pack(frame, 'lbool, a0=reg, f=f)
+    if e is error:
+        return e
+    return reg
+
+# ---------------------------------------------------------------------------
+# names (the resolution ladder, spec 6.3)
+
+fn reg_of(where: list) -> int:
+    return where[1]
+
+fn _land_free(frame: FnContext, dst, slotreg: int):
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pairable(frame, 'gget, slotreg, reg)
+    if e is error:
+        return e
+    return reg
+
+# Lower a bare identifier: local, then parameter/capture, then module
+# global, then a free global slotreg (spec 6.3). Nothing is ever resolved
+# statically across a module boundary.
+fn resolve_name(name, frame: FnContext, dst):
+    where := frame ! storage(name)
+    if not (where is nil):
+        kind := where[0]
+        slotreg := where[1]
+        if kind == "reg":
+            if name in frame.cells:
+                # The register holds the box, not the value (spec 8.3).
+                out := _target(frame, dst)
+                if out is error:
+                    return out
+                z := frame ! zero()
+                if z is error:
+                    return z
+                e := _emit_pack(frame, 'getidx, a0=out, a1=reg_of(where), a2=z)
+                if e is error:
+                    return e
+                return out
+            return _land(frame, dst, slotreg)
+        reg := _target(frame, dst)
+        if reg is error:
+            return reg
+        if kind == "slot":
+            e := _emit_pack(frame, 'getattr, a0=reg, a1=frame.this_reg, a2=slotreg)
+            if e is error:
+                return e
+        else:
+            e2 := _emit_pairable(frame, 'gget, slotreg, reg)
+            if e2 is error:
+                return e2
+        return reg
+    module := frame.module
+    if (not (module ! is_builtin(name))) and (not module.has_wildcard_import):
+        return error("undefined name '" + str(name) + "'")
+    free := module ! declare_free_global(str(name))
+    if free is error:
+        return free
+    return _land_free(frame, dst, free)
+
+fn _this(frame: FnContext, dst):
+    if frame.this_reg is nil:
+        return error("`this` is only meaningful inside a method")
+    return _land(frame, dst, frame.this_reg)
+
+# `node` here is a bare symbol - either a name reference, or one of the
+# handful of keywords wy/wyrm's parser represents the same way (ast.wy's
+# "bare-symbol representation trap": nil/true/false/this all arrive
+# unwrapped). `array`/`tuple` arrive bare too - as the EMPTY literals
+# `[]`/`()` (parser.wy's `value('array, ...)` shortcuts), which is the one
+# place the shorthand collides with a name reference; the literal wins.
+fn _bare_symbol(node, frame: FnContext, dst):
+    if node == 'nil:
+        if (frame ! lookup(node)) is nil:
+            reg := _target(frame, dst)
+            if reg is error:
+                return reg
+            e := _emit_pack(frame, 'lnil, a0=reg)
+            if e is error:
+                return e
+            return reg
+        return resolve_name(node, frame, dst)
+    if node == 'true:
+        return _bool_lit(true, frame, dst)
+    if node == 'false:
+        return _bool_lit(false, frame, dst)
+    if node == 'this:
+        return _this(frame, dst)
+    if node == 'array:
+        return _array(node, frame, dst)
+    if node == 'tuple:
+        return _tuple(node, frame, dst)
+    if node == 'list:
+        # `$[]` - the empty pair literal (parser.wy's value('list, ...)).
+        return _plist(node, frame, dst)
+    if node == 'dict:
+        # `{}` - the empty dict literal.
+        return _dict(node, frame, dst)
+    if (node == 'break) or (node == 'continue) or (node == 'pass):
+        return error(str(node) + " is not an expression")
+    return resolve_name(node, frame, dst)
+
+# ---------------------------------------------------------------------------
+# operators
+
+fn _unary(node, frame: FnContext, dst, op):
+    operand := (_field(node, 1) catch nil)
+    src := compile_expr(operand, frame, nil)
+    if src is error:
+        return src
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pairable(frame, op, reg, src)
+    if e is error:
+        return e
+    return reg
+
+# See deviation 3: `+x` is an identity passthrough, no opcode to spend.
+fn _pos(node, frame: FnContext, dst):
+    operand := (_field(node, 1) catch nil)
+    src := compile_expr(operand, frame, nil)
+    if src is error:
+        return src
+    return _land(frame, dst, src)
+
+fn _binop(node, frame: FnContext, dst):
+    op_sym := (_field(node, 1) catch nil)
+    lhs_node := (_field(node, 2) catch nil)
+    rhs_node := (_field(node, 3) catch nil)
+    op := (BINOPS[str(op_sym)] catch nil)
+    if op is nil:
+        return error("the bytecode compiler does not support the '" + str(op_sym) + "' operator yet")
+    lhs := compile_expr(lhs_node, frame, nil)
+    if lhs is error:
+        return lhs
+    rhs := compile_expr(rhs_node, frame, nil)
+    if rhs is error:
+        return rhs
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pack(frame, op, a0=reg, a1=lhs, a2=rhs)
+    if e is error:
+        return e
+    return reg
+
+fn _exp(node, frame: FnContext, dst):
+    base_node := (_field(node, 1) catch nil)
+    exp_node := (_field(node, 2) catch nil)
+    lhs := compile_expr(base_node, frame, nil)
+    if lhs is error:
+        return lhs
+    rhs := compile_expr(exp_node, frame, nil)
+    if rhs is error:
+        return rhs
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pack(frame, 'pow, a0=reg, a1=lhs, a2=rhs)
+    if e is error:
+        return e
+    return reg
+
+fn _in_op(node, frame: FnContext, dst):
+    value_node := (_field(node, 1) catch nil)
+    target_node := (_field(node, 2) catch nil)
+    lhs := compile_expr(value_node, frame, nil)
+    if lhs is error:
+        return lhs
+    rhs := compile_expr(target_node, frame, nil)
+    if rhs is error:
+        return rhs
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pack(frame, 'in, a0=reg, a1=lhs, a2=rhs)
+    if e is error:
+        return e
+    return reg
+
+# `a and b and c ...`/`a or b or c ...`: the result register holds the
+# first operand, and each later one only overwrites it when the chain has
+# not already decided the answer (spec 7.1). See deviation 4.
+fn _short_circuit(node, frame: FnContext, dst, is_and: bool):
+    operands := (_tail(node, 1) catch nil)
+    if not (operands is pair):
+        return error("'and'/'or' needs at least one operand")
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    mark := frame ! mark()
+    r := compile_expr(car(operands), frame, reg)
+    if r is error:
+        return r
+    fe := frame ! free_to(mark)
+    if fe is error:
+        return fe
+    done := frame ! new_label()
+    op := 'jf
+    if not is_and:
+        op = 'jt
+    rest := cdr(operands)
+    while rest is pair:
+        e := frame ! emit_jump(op, done, reg)
+        if e is error:
+            return e
+        r2 := compile_expr(car(rest), frame, reg)
+        if r2 is error:
+            return r2
+        fe2 := frame ! free_to(mark)
+        if fe2 is error:
+            return fe2
+        rest = cdr(rest)
+    ml := frame ! mark_label(done)
+    if ml is error:
+        return ml
+    return reg
+
+# ---------------------------------------------------------------------------
+# `is` (type checks, spec 7.1)
+
+# The atoms of a `$['type, ...]` node: itself for a plain type, or each
+# nested type node for a `$['type, 'union, type1, type2, ...]`.
+fn _type_atoms(type_node) -> list | error:
+    if (not (type_node is pair)) or (car(type_node) != 'type):
+        return error("not a type expression")
+    head := (_field(type_node, 1) catch nil)
+    if head == 'union:
+        out := []
+        rest := (_tail(type_node, 2) catch nil)
+        while rest is pair:
+            out ! append(car(rest))
+            rest = cdr(rest)
+        return out
+    return [type_node]
+
+fn _type_parts(atom_node) -> list | error:
+    if (not (atom_node is pair)) or (car(atom_node) != 'type):
+        return error("not a type atom")
+    x := (_field(atom_node, 1) catch nil)
+    if x is sym:
+        return [str(x)]
+    if node_kind(x) == 'qualified_name:
+        out := []
+        rest := (_tail(x, 1) catch nil)
+        while rest is pair:
+            out ! append(str(car(rest)))
+            rest = cdr(rest)
+        return out
+    return error("unsupported type atom shape")
+
+# Load the class a type annotation names - a primitive type as its *name*
+# (a string constant, spec 6.3), anything else resolved as an ordinary name
+# or, past one segment, a free global slotreg (never resolved across a module
+# boundary at compile time).
+fn _type_value(atom_node, frame: FnContext, dst):
+    parts := _type_parts(atom_node)
+    if parts is error:
+        return parts
+    if len(parts) == 0:
+        return error("empty type expression")
+    last := parts[len(parts) - 1]
+    if last in PRIMITIVE_TYPE_NAMES:
+        index := (frame.module.image) ! add_static(last)
+        if index is error:
+            return index
+        reg := _target(frame, dst)
+        if reg is error:
+            return reg
+        e := _emit_pairable(frame, 'lconst, index, reg)
+        if e is error:
+            return e
+        return reg
+    if len(parts) == 1:
+        return resolve_name(sym(parts[0]), frame, dst)
+    free := (frame.module) ! declare_free_global(_join_parts(parts))
+    if free is error:
+        return free
+    return _land_free(frame, dst, free)
+
+fn _type_check(node, frame: FnContext, dst):
+    value_node := (_field(node, 1) catch nil)
+    type_node := (_field(node, 2) catch nil)
+    atoms := _type_atoms(type_node)
+    if atoms is error:
+        return atoms
+    value := compile_expr(value_node, frame, nil)
+    if value is error:
+        return value
+    var types_reg: int
+    if len(atoms) == 1:
+        r := _type_value(atoms[0], frame, nil)
+        if r is error:
+            return r
+        types_reg = r
+    else:
+        base := frame ! mark()
+        for atom in atoms:
+            slotreg := frame ! push()
+            if slotreg is error:
+                return slotreg
+            r2 := _type_value(atom, frame, slotreg)
+            if r2 is error:
+                return r2
+        top := frame ! push()
+        if top is error:
+            return top
+        e := _emit_pack(frame, 'tuple, a0=top, a1=L(base), f=len(atoms))
+        if e is error:
+            return e
+        types_reg = top
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e2 := _emit_pack(frame, 'is, a0=reg, a1=value, a2=types_reg)
+    if e2 is error:
+        return e2
+    return reg
+
+# ---------------------------------------------------------------------------
+# calls
+
+# Lower `node` so its value lands in the next free temp slotreg - what a call
+# window's argument slots need. A value already sitting at the top of the
+# temp stack needs no copy; anything else (a local, a parameter, a lower
+# temp) is copied up.
+fn compile_into_window(node, frame: FnContext) -> int | error:
+    slotreg := frame ! mark()
+    reg := compile_expr(node, frame, nil)
+    if reg is error:
+        return reg
+    if (reg == slotreg) and ((frame ! mark()) > slotreg):
+        return reg
+    fe := frame ! free_to(slotreg)
+    if fe is error:
+        return fe
+    target := frame ! push()
+    if target is error:
+        return target
+    e := _emit_pairable(frame, 'move, target, reg)
+    if e is error:
+        return e
+    return target
+
+fn has_spread_or_keyword(args) -> bool:
+    for arg in args:
+        kind := node_kind(arg)
+        if (kind == 'kwarg) or (kind == 'spread) or (kind == 'spread_kw):
+            return true
+    return false
+
+fn _compile_call(node, frame: FnContext, nres: int) -> int | error:
+    func_node := (_field(node, 1) catch nil)
+    args := (_field(node, 2) catch nil)
+    argc := len(args)
+    if argc > 128:
+        return error(str(argc) + " arguments, over the 128-parameter call limit")
+    if nres > 128:
+        return error(str(nres) + " results wanted, over the 128-result call limit")
+    base := frame ! mark()
+    window := frame ! push()
+    if window is error:
+        return window
+    if func_node is sym:
+        r := resolve_name(func_node, frame, window)
+        if r is error:
+            return r
+    else:
+        r2 := compile_expr(func_node, frame, window)
+        if r2 is error:
+            return r2
+    for arg in args:
+        w := compile_into_window(arg, frame)
+        if w is error:
+            return w
+    e := _emit_pack(frame, 'call, a0=window, f=argc, a1=nres)
+    if e is error:
+        return e
+    held := base + _max2(nres, 1)
+    while (frame ! mark()) < held:
+        p := frame ! push()
+        if p is error:
+            return p
+    fr := frame ! free_to(held)
+    if fr is error:
+        return fr
+    return window
+
+fn compile_call(node, frame: FnContext, nres: int) -> int | error:
+    args := (_field(node, 2) catch nil)
+    if has_spread_or_keyword(args):
+        func_node := (_field(node, 1) catch nil)
+        return compile_va(frame, nres, 'call_va, func_node, args, nil, nil)
+    return _compile_call(node, frame, nres)
+
+fn _call(node, frame: FnContext, dst):
+    r := compile_call(node, frame, 1)
+    if r is error:
+        return r
+    return _land(frame, dst, r)
+
+# ---------------------------------------------------------------------------
+# collections (spec 7.1)
+
+fn _window_of(items, frame: FnContext) -> list | error:
+    base := frame ! mark()
+    for item in items:
+        w := compile_into_window(item, frame)
+        if w is error:
+            return w
+    return [L(base), len(items)]
+
+fn _sequence(frame: FnContext, dst, op, items, limit: int | nil):
+    n := len(items)
+    if (not (limit is nil)) and (n > limit):
+        return error(str(n) + " elements, over the " + str(limit) + "-element " + str(op) + " limit")
+    win := _window_of(items, frame)
+    if win is error:
+        return win
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pack(frame, op, a0=reg, a1=win[0], f=win[1])
+    if e is error:
+        return e
+    return reg
+
+fn _array(node, frame: FnContext, dst):
+    items := (_tail(node, 1) catch nil)
+    return _sequence(frame, dst, 'list, items, nil)
+
+fn _tuple(node, frame: FnContext, dst):
+    items := (_tail(node, 1) catch nil)
+    return _sequence(frame, dst, 'tuple, items, 128)
+
+fn _plist(node, frame: FnContext, dst):
+    items := (_tail(node, 1) catch nil)
+    return _sequence(frame, dst, 'plist, items, nil)
+
+# `dict` reads a window of k, v, k, v..., so the entries are flattened into
+# one run of temps (spec 3.3). Each entry is a bare 2-element list
+# `$[key, value]` (ast.wy: no head symbol).
+fn _dict(node, frame: FnContext, dst):
+    entries := (_tail(node, 1) catch nil)
+    flattened := []
+    count := 0
+    for entry in entries:
+        key := car(entry)
+        value := car(cdr(entry))
+        flattened ! append(key)
+        flattened ! append(value)
+        count = count + 1
+    win := _window_of(flattened, frame)
+    if win is error:
+        return win
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pack(frame, 'dict, a0=reg, a1=win[0], f=count)
+    if e is error:
+        return e
+    return reg
+
+# ---------------------------------------------------------------------------
+# object access
+
+fn own_slot_index(node, frame: FnContext):
+    obj_node := (_field(node, 1) catch nil)
+    if (obj_node != 'this) or (frame.this_class is nil):
+        return nil
+    if not frame.module.slot_optimization:
+        return nil
+    name := (_field(node, 2) catch nil)
+    return (frame.module) ! slot_index(frame.this_class, name)
+
+fn _attr(node, frame: FnContext, dst):
+    slotreg := own_slot_index(node, frame)
+    obj_node := (_field(node, 1) catch nil)
+    obj := compile_expr(obj_node, frame, nil)
+    if obj is error:
+        return obj
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    if not (slotreg is nil):
+        e := _emit_pack(frame, 'getslot, a0=reg, a1=obj, a2=slotreg)
+        if e is error:
+            return e
+        return reg
+    name := (_field(node, 2) catch nil)
+    symbol := (frame.module.image) ! add_symbol(str(name))
+    if symbol is error:
+        return symbol
+    e2 := _emit_pack(frame, 'getattr, a0=reg, a1=obj, a2=symbol)
+    if e2 is error:
+        return e2
+    return reg
+
+fn _index(node, frame: FnContext, dst):
+    obj_node := (_field(node, 1) catch nil)
+    idx_node := (_field(node, 2) catch nil)
+    obj := compile_expr(obj_node, frame, nil)
+    if obj is error:
+        return obj
+    index := compile_expr(idx_node, frame, nil)
+    if index is error:
+        return index
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pack(frame, 'getidx, a0=reg, a1=obj, a2=index)
+    if e is error:
+        return e
+    return reg
+
+# ---------------------------------------------------------------------------
+# closures and inlined blocks - see deviation 7.
+#
+# `_do` is wired up as of M3, but not by an `import`: wy/wyrm's import graph
+# must stay acyclic (pypoc/doc/addendum.md, "Import cycles are illegal"), so
+# this file cannot `import wyrm::compiler::statements::*` - statements.wy
+# already imports this one. Instead this is a one-shot hook:
+# `statements.wy` calls `set_body_compiler(compile_body)` once it loads, at
+# its own module's bottom. Anything that wants `do:` blocks to lower has to
+# import `wyrm::compiler::statements` (directly or transitively) before
+# compiling, which installs the hook as a side effect of that import - the
+# same shape pypoc's function-local `import` gives `_do`/`_lambda` there,
+# adapted to wy having no lazy/deferred import of its own.
+#
+# `_lambda` is wired the same way as of M4: `functions.wy` calls
+# `set_closure_compiler(compile_closure_expr)` at its own bottom, once
+# `compile_closure_expr` exists. Anything that wants a lambda/`co_lambda`
+# to lower has to import `wyrm::compiler::functions` (directly or
+# transitively) before compiling, the same requirement `_do` already has on
+# `wyrm::compiler::statements`.
+_body_compiler := nil
+_closure_compiler := nil
+
+fn set_body_compiler(compiler) -> nil:
+    _body_compiler = compiler
+    return nil
+
+fn set_closure_compiler(compiler) -> nil:
+    _closure_compiler = compiler
+    return nil
+
+fn _lambda(node, frame: FnContext, dst):
+    if _closure_compiler is nil:
+        return error("closure lowering needs functions.wy's compile_closure_expr (M4); import wyrm::compiler::functions before compiling a module with lambdas")
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    return _closure_compiler(node, frame, reg, "<lambda>")
+
+fn _do(node, frame: FnContext, dst):
+    if _body_compiler is nil:
+        return error("'do' block lowering needs statements.wy's compile_body; import wyrm::compiler::statements before compiling a module with 'do' blocks")
+    body := (_field(node, 1) catch nil)
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _body_compiler(body, frame, reg)
+    if e is error:
+        return e
+    return reg
+
+# ---------------------------------------------------------------------------
+# error flow (spec 7.1)
+
+# `try e`: hand an error straight back to the caller, keeping the value
+# otherwise. `return` is what runs the frame's defers, so this is a real
+# return rather than a jump to the epilogue.
+fn _try(node, frame: FnContext, dst):
+    value_node := (_field(node, 1) catch nil)
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    mark := frame ! mark()
+    r := compile_expr(value_node, frame, reg)
+    if r is error:
+        return r
+    fe := frame ! free_to(mark)
+    if fe is error:
+        return fe
+    ok := frame ! new_label()
+    e := frame ! emit_jump('jnerr, ok, reg)
+    if e is error:
+        return e
+    e2 := frame ! emit_return(reg, 1)
+    if e2 is error:
+        return e2
+    e3 := frame ! mark_label(ok)
+    if e3 is error:
+        return e3
+    return reg
+
+# `e catch h` replaces an error with the handler's value; `e catch return v`
+# returns `v` from the enclosing function instead.
+fn _catch(node, frame: FnContext, dst):
+    value_node := (_field(node, 1) catch nil)
+    handler_node := (_field(node, 2) catch nil)
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    mark := frame ! mark()
+    r := compile_expr(value_node, frame, reg)
+    if r is error:
+        return r
+    fe := frame ! free_to(mark)
+    if fe is error:
+        return fe
+    done := frame ! new_label()
+    e := frame ! emit_jump('jnerr, done, reg)
+    if e is error:
+        return e
+    if node_kind(handler_node) == 'return:
+        rv_node := (_field(handler_node, 1) catch nil)
+        var out: int
+        if rv_node is nil:
+            p := frame ! push()
+            if p is error:
+                return p
+            pe := _emit_pack(frame, 'lnil, a0=p)
+            if pe is error:
+                return pe
+            out = p
+        else:
+            o := compile_expr(rv_node, frame, nil)
+            if o is error:
+                return o
+            out = o
+        er := frame ! emit_return(out, 1)
+        if er is error:
+            return er
+        fe2 := frame ! free_to(mark)
+        if fe2 is error:
+            return fe2
+    else:
+        r2 := compile_expr(handler_node, frame, reg)
+        if r2 is error:
+            return r2
+        fe3 := frame ! free_to(mark)
+        if fe3 is error:
+            return fe3
+    ml := frame ! mark_label(done)
+    if ml is error:
+        return ml
+    return reg
+
+# ---------------------------------------------------------------------------
+# messages and namespaces
+
+# The `messages` entry a message name binds through - spec 4.8: a name
+# with no prior identity creates one. See deviation 6: a qualified message
+# name has no grammar support, so `path` is always the single name.
+fn message_index(node, frame: FnContext) -> int | error:
+    name := (_field(node, 2) catch nil)
+    return frame ! reference([str(name)])
+
+# Lay out a message window and emit `msg`; returns the window base. The
+# receiver sits at the base and the arguments follow it, exactly as a
+# call's callee does.
+fn compile_message(node, frame: FnContext, nres: int, receivers: list | nil = nil) -> int | error:
+    args := (_field(node, 3) catch nil)
+    if args is nil:
+        # `recv ! name()` - a send whose argument list is empty.
+        args = []
+    if (receivers is nil) and has_spread_or_keyword(args):
+        reloc := message_index(node, frame)
+        if reloc is error:
+            return reloc
+        target_node := (_field(node, 1) catch nil)
+        return compile_va(frame, nres, 'msg_va, nil, args, reloc, target_node)
+    argc := len(args)
+    if argc > 128:
+        return error(str(argc) + " arguments, over the 128-parameter call limit")
+    reloc := message_index(node, frame)
+    if reloc is error:
+        return reloc
+    base := frame ! mark()
+    window := frame ! push()
+    if window is error:
+        return window
+    if receivers is nil:
+        target_node := (_field(node, 1) catch nil)
+        r := compile_expr(target_node, frame, window)
+        if r is error:
+            return r
+        # The receiver lands in `window`, but computing it (`a.b.c`) may
+        # have left temporaries above it; the arguments must start at
+        # window + 1. pypoc gets this for free by parsing `(a.b.c) ! m()`
+        # as a one-receiver message tuple, which frees its own temps.
+        fw := frame ! free_to(window + 1)
+        if fw is error:
+            return fw
+    else:
+        # `(a, b) ! name(...)`: the receivers are tupled first, and the
+        # tuple is the receiver the VM dispatches on (spec 7.1).
+        inner := frame ! mark()
+        for item in receivers:
+            w := compile_into_window(item, frame)
+            if w is error:
+                return w
+        e := _emit_pack(frame, 'tuple, a0=window, a1=L(inner), f=len(receivers))
+        if e is error:
+            return e
+        fi := frame ! free_to(inner)
+        if fi is error:
+            return fi
+    for arg in args:
+        w2 := compile_into_window(arg, frame)
+        if w2 is error:
+            return w2
+    e2 := _emit_pack(frame, 'msg, a0=window, f=argc, a1=reloc, a2=nres)
+    if e2 is error:
+        return e2
+    held := base + _max2(nres, 1)
+    while (frame ! mark()) < held:
+        p := frame ! push()
+        if p is error:
+            return p
+    fr := frame ! free_to(held)
+    if fr is error:
+        return fr
+    return window
+
+# See deviation 5: a `'tuple` target subsumes ast.MessageTupleExpr.
+# The tree carries a fifth field (`parser.wy`'s $_mk_postfix): 'bound for
+# the bare `recv ! name` form - the bound closure, not a dispatch - and
+# 'send for a call, whose argument list may still be empty (`recv ! name()`).
+fn _message(node, frame: FnContext, dst):
+    args := (_field(node, 3) catch nil)
+    target_node := (_field(node, 1) catch nil)
+    if (_field(node, 4) catch nil) == 'bound:
+        # `recv ! name` with no call: the bound closure, not a dispatch.
+        recv := compile_expr(target_node, frame, nil)
+        if recv is error:
+            return recv
+        reloc := message_index(node, frame)
+        if reloc is error:
+            return reloc
+        reg := _target(frame, dst)
+        if reg is error:
+            return reg
+        e := _emit_pack(frame, 'getmsg, a0=reg, a1=recv, a2=reloc)
+        if e is error:
+            return e
+        return reg
+    if node_kind(target_node) == 'tuple:
+        items := (_tail(target_node, 1) catch nil)
+        receivers := []
+        for it in items:
+            receivers ! append(it)
+        r := compile_message(node, frame, 1, receivers)
+        if r is error:
+            return r
+        return _land(frame, dst, r)
+    r2 := compile_message(node, frame, 1, nil)
+    if r2 is error:
+        return r2
+    return _land(frame, dst, r2)
+
+# `a::b::c` reads a namespace member. Three cases, in order: a runtime
+# value on the left is a dynamic lookup (`getscope`); a module-local
+# class's own static is the module global it was allotted (spec 4.7);
+# anything else is a name from outside this module and so a free global
+# slotreg, never resolved at compile time (spec 6.3). See deviation 9 for how
+# this differs from pypoc's per-level recursive check.
+fn _scope(node, frame: FnContext, dst):
+    parts := []
+    rest := (_tail(node, 1) catch nil)
+    while rest is pair:
+        parts ! append(str(car(rest)))
+        rest = cdr(rest)
+    if len(parts) == 0:
+        return error("empty qualified name")
+    first := sym(parts[0])
+    if (frame ! lookup(first)) is nil:
+        gidx := (frame.module) ! class_static(parts)
+        if not (gidx is nil):
+            reg := _target(frame, dst)
+            if reg is error:
+                return reg
+            e := _emit_pairable(frame, 'gget, gidx, reg)
+            if e is error:
+                return e
+            return reg
+        if not ((frame.module) ! is_local_class(parts[0])):
+            free := (frame.module) ! declare_free_global(_join_parts(parts))
+            if free is error:
+                return free
+            return _land_free(frame, dst, free)
+    obj := resolve_name(first, frame, nil)
+    if obj is error:
+        return obj
+    i := 1
+    n := len(parts)
+    reg := obj
+    while i < n:
+        symbol := (frame.module.image) ! add_symbol(parts[i])
+        if symbol is error:
+            return symbol
+        var target: int
+        if i == (n - 1):
+            target = _target(frame, dst)
+        else:
+            target = frame ! push()
+        if target is error:
+            return target
+        e := _emit_pack(frame, 'getscope, a0=target, a1=reg, a2=symbol)
+        if e is error:
+            return e
+        reg = target
+        i = i + 1
+    return reg
+
+# ---------------------------------------------------------------------------
+# coroutines (spec 7.1)
+
+fn compile_yield(node, frame: FnContext, dst):
+    if not frame.is_coroutine:
+        return error("`yield` is only meaningful inside a `co`")
+    value_node := (_field(node, 1) catch nil)
+    base := frame ! mark()
+    var count: int
+    if value_node is nil:
+        p := frame ! push()
+        if p is error:
+            return p
+        e := _emit_pack(frame, 'lnil, a0=p)
+        if e is error:
+            return e
+        count = 1
+    elif node_kind(value_node) == 'tuple:
+        items := (_tail(value_node, 1) catch nil)
+        for item in items:
+            w := compile_into_window(item, frame)
+            if w is error:
+                return w
+        count = len(items)
+    else:
+        w2 := compile_into_window(value_node, frame)
+        if w2 is error:
+            return w2
+        count = 1
+    if count > 128:
+        return error(str(count) + " yielded values, over the 128-result limit")
+    e2 := _emit_pack(frame, 'yield, a0=L(base), f=count)
+    if e2 is error:
+        return e2
+    fr := frame ! free_to(base + 1)
+    if fr is error:
+        return fr
+    return _land(frame, dst, L(base))
+
+fn _yield(node, frame: FnContext, dst):
+    return compile_yield(node, frame, dst)
+
+fn _yield_from(node, frame: FnContext, dst):
+    if not frame.is_coroutine:
+        return error("`yield` is only meaningful inside a `co`")
+    value_node := (_field(node, 1) catch nil)
+    sub := compile_expr(value_node, frame, nil)
+    if sub is error:
+        return sub
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pack(frame, 'yield_from, a0=reg, a1=sub)
+    if e is error:
+        return e
+    return reg
+
+# ---------------------------------------------------------------------------
+# spreads and keyword arguments (spec 7.1)
+
+# Build one `tuple`/`dict` from a run of expressions; `count` is the
+# element count for a tuple/list and the *pair* count for a dict (the
+# caller tracks it - wyrm has no floor-division operator to derive it from
+# `len(items)` here).
+fn _collection(frame: FnContext, op, items: list, count: int, dst):
+    base := frame ! mark()
+    for item in items:
+        w := compile_into_window(item, frame)
+        if w is error:
+            return w
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pack(frame, op, a0=reg, a1=L(base), f=count)
+    if e is error:
+        return e
+    return reg
+
+# Fold segments together with `add` - "runtime concat" (spec 7.1) is `add`,
+# the VM dispatches it through the `__add__` family. A single segment folds
+# to itself, so the common no-spread case emits no extra instruction.
+fn _concatenate(frame: FnContext, segments: list):
+    result := segments[0]
+    i := 1
+    n := len(segments)
+    while i < n:
+        joined := frame ! push()
+        if joined is error:
+            return joined
+        e := _emit_pack(frame, 'add, a0=joined, a1=result, a2=segments[i])
+        if e is error:
+            return e
+        result = joined
+        i = i + 1
+    return result
+
+fn _positional_argument_tuple(args, frame: FnContext):
+    segments := []
+    run := []
+    for arg in args:
+        kind := node_kind(arg)
+        if kind == 'spread:
+            if len(run) > 0:
+                c := _collection(frame, 'tuple, run, len(run), nil)
+                if c is error:
+                    return c
+                segments ! append(c)
+                run = []
+            value_node := (_field(arg, 1) catch nil)
+            v := compile_expr(value_node, frame, nil)
+            if v is error:
+                return v
+            segments ! append(v)
+        elif not ((kind == 'kwarg) or (kind == 'spread_kw)):
+            run ! append(arg)
+    if (len(run) > 0) or (len(segments) == 0):
+        c2 := _collection(frame, 'tuple, run, len(run), nil)
+        if c2 is error:
+            return c2
+        segments ! append(c2)
+    return _concatenate(frame, segments)
+
+fn _keyword_argument_dict(args, frame: FnContext):
+    segments := []
+    run := []
+    pairs := 0
+    for arg in args:
+        kind := node_kind(arg)
+        if kind == 'spread_kw:
+            if len(run) > 0:
+                c := _collection(frame, 'dict, run, pairs, nil)
+                if c is error:
+                    return c
+                segments ! append(c)
+                run = []
+                pairs = 0
+            value_node := (_field(arg, 1) catch nil)
+            v := compile_expr(value_node, frame, nil)
+            if v is error:
+                return v
+            segments ! append(v)
+        elif kind == 'kwarg:
+            name := (_field(arg, 1) catch nil)
+            value_node := (_field(arg, 2) catch nil)
+            run ! append($['str, str(name)])
+            run ! append(value_node)
+            pairs = pairs + 1
+    if (len(run) > 0) or (len(segments) == 0):
+        c2 := _collection(frame, 'dict, run, pairs, nil)
+        if c2 is error:
+            return c2
+        segments ! append(c2)
+    return _concatenate(frame, segments)
+
+# `f(*a, key=1, **k)` and its message twin. The window is fixed at three
+# registers - callee (or receiver), the positional tuple, the keyword dict
+# - so every spread shape reaches the VM the same way (spec 7.1).
+# `callee_node` is nil when `receiver_node` is given (the message form) and
+# vice versa.
+fn compile_va(frame: FnContext, nres: int, op, callee_node, args, reloc, receiver_node) -> int | error:
+    base := frame ! mark()
+    window := frame ! push()
+    if window is error:
+        return window
+    positional_slot := frame ! push()
+    if positional_slot is error:
+        return positional_slot
+    keyword_slot := frame ! push()
+    if keyword_slot is error:
+        return keyword_slot
+    if receiver_node is nil:
+        if callee_node is sym:
+            r := resolve_name(callee_node, frame, window)
+            if r is error:
+                return r
+        else:
+            r2 := compile_expr(callee_node, frame, window)
+            if r2 is error:
+                return r2
+    else:
+        r3 := compile_expr(receiver_node, frame, window)
+        if r3 is error:
+            return r3
+    scratch := frame ! mark()
+    positional := _positional_argument_tuple(args, frame)
+    if positional is error:
+        return positional
+    e1 := _emit_pairable(frame, 'move, positional_slot, positional)
+    if e1 is error:
+        return e1
+    f1 := frame ! free_to(scratch)
+    if f1 is error:
+        return f1
+    keywords := _keyword_argument_dict(args, frame)
+    if keywords is error:
+        return keywords
+    e2 := _emit_pairable(frame, 'move, keyword_slot, keywords)
+    if e2 is error:
+        return e2
+    f2 := frame ! free_to(scratch)
+    if f2 is error:
+        return f2
+    if op == 'call_va:
+        e3 := _emit_pack(frame, op, a0=window, a1=nres)
+        if e3 is error:
+            return e3
+    else:
+        e4 := _emit_pack(frame, op, a0=window, a1=reloc, a2=nres)
+        if e4 is error:
+            return e4
+    held := base + _max2(nres, 3)
+    while (frame ! mark()) < held:
+        p := frame ! push()
+        if p is error:
+            return p
+    f3 := frame ! free_to(base + _max2(nres, 1))
+    if f3 is error:
+        return f3
+    return window
+
+# ---------------------------------------------------------------------------
+# constant materialization - see deviation 8. `_ast_ref` itself is not
+# implemented (no grammar support for `::$ast` exists to dispatch to it),
+# but `emit_value` is the general primitive M5+ will want for it and for
+# slotreg/parameter constant defaults.
+
+fn _emit_sequence(items: list, frame: FnContext, dst, op) -> int | error:
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    base := frame ! mark()
+    for item in items:
+        slotreg := frame ! push()
+        if slotreg is error:
+            return slotreg
+        e := emit_value(item, frame, slotreg)
+        if e is error:
+            return e
+    a1 := reg
+    if len(items) > 0:
+        a1 = L(base)
+    e2 := _emit_pack(frame, op, a0=reg, a1=a1, f=len(items))
+    if e2 is error:
+        return e2
+    fr := frame ! free_to(base)
+    if fr is error:
+        return fr
+    return reg
+
+# Emit code building a plain wyrm data value: a wy/wyrm tree node already
+# IS this shape (symbols, strings, numbers, bools, nil, lists and proper
+# pair lists), so unlike expressions.py there is no separate `sexpr.encode`
+# step - `value` is taken as-is.
+fn emit_value(value, frame: FnContext, dst):
+    if value is sym:
+        index := (frame.module.image) ! add_symbol(str(value))
+        if index is error:
+            return index
+        reg := _target(frame, dst)
+        if reg is error:
+            return reg
+        e := _emit_pairable(frame, 'lsym, index, reg)
+        if e is error:
+            return e
+        return reg
+    if value is nil:
+        reg := _target(frame, dst)
+        if reg is error:
+            return reg
+        e := _emit_pack(frame, 'lnil, a0=reg)
+        if e is error:
+            return e
+        return reg
+    if value is bool:
+        return _bool_lit(value, frame, dst)
+    if value is int:
+        if (value < INT32_MIN) or (value > INT32_MAX):
+            return error("integer " + str(value) + " in a tree does not fit in an i32")
+        reg := _target(frame, dst)
+        if reg is error:
+            return reg
+        e := _emit_pairable(frame, 'i8, reg, value)
+        if e is error:
+            return e
+        return reg
+    if value is float:
+        reg := _target(frame, dst)
+        if reg is error:
+            return reg
+        bits := _f32_bits(value)
+        e := _emit_pack(frame, 'f32, a0=reg, w1=bits)
+        if e is error:
+            return e
+        return reg
+    if value is str:
+        index := (frame.module.image) ! add_static(value)
+        if index is error:
+            return index
+        reg := _target(frame, dst)
+        if reg is error:
+            return reg
+        e := _emit_pairable(frame, 'lconst, index, reg)
+        if e is error:
+            return e
+        return reg
+    if value is list:
+        return _emit_sequence(value, frame, dst, 'list)
+    if value is pair:
+        items := []
+        node := value
+        while node is pair:
+            items ! append(car(node))
+            node = cdr(node)
+        if not (node is nil):
+            return error("a pair with an improper tail has no bytecode form; only proper pair lists do")
+        return _emit_sequence(items, frame, dst, 'plist)
+    return error("value has no bytecode form; a tree can only hold symbols, strings, numbers, bools, nil, lists and pair lists")
+
+# ---------------------------------------------------------------------------
+# the entry point
+
+# Lower one expression, returning the register holding its value (or an
+# `error`). See the module docstring for the `dst` contract.
+fn compile_expr(node, frame: FnContext, dst = nil):
+    if node is sym:
+        return _bare_symbol(node, frame, dst)
+    if not (node is pair):
+        return error("not an expression: " + str(node))
+    kind := node_kind(node)
+    if kind is nil:
+        return error("not an expression: " + str(node))
+    ks := str(kind)
+    if ks == "str":
+        return _string(node, frame, dst)
+    elif (ks == "int") or (ks == "float"):
+        return _number(node, frame, dst)
+    elif ks == "char":
+        return _char_lit(node, frame, dst)
+    elif ks == "sym":
+        return _symbol_lit(node, frame, dst)
+    elif ks == "not":
+        return _unary(node, frame, dst, 'not)
+    elif ks == "neg":
+        return _unary(node, frame, dst, 'neg)
+    elif ks == "invert":
+        return _unary(node, frame, dst, 'inv)
+    elif ks == "pos":
+        return _pos(node, frame, dst)
+    elif ks == "exp":
+        return _exp(node, frame, dst)
+    elif ks == "and":
+        return _short_circuit(node, frame, dst, true)
+    elif ks == "or":
+        return _short_circuit(node, frame, dst, false)
+    elif ks == "in":
+        return _in_op(node, frame, dst)
+    elif ks == "is":
+        return _type_check(node, frame, dst)
+    elif ks == "binop":
+        return _binop(node, frame, dst)
+    elif ks == "call":
+        return _call(node, frame, dst)
+    elif ks == "array":
+        return _array(node, frame, dst)
+    elif ks == "tuple":
+        return _tuple(node, frame, dst)
+    elif ks == "list":
+        return _plist(node, frame, dst)
+    elif ks == "dict":
+        return _dict(node, frame, dst)
+    elif ks == "attr":
+        return _attr(node, frame, dst)
+    elif ks == "index":
+        return _index(node, frame, dst)
+    elif (ks == "lambda") or (ks == "co_lambda"):
+        return _lambda(node, frame, dst)
+    elif ks == "do":
+        return _do(node, frame, dst)
+    elif ks == "try":
+        return _try(node, frame, dst)
+    elif ks == "catch":
+        return _catch(node, frame, dst)
+    elif ks == "message":
+        return _message(node, frame, dst)
+    elif ks == "yield":
+        return _yield(node, frame, dst)
+    elif ks == "if":
+        # `if` is an expression as well as a statement (wyrm.gram's
+        # if_expr): the same node either way, lowered by the registered
+        # statement-shape handler (statements.wy's _if_expr, the same
+        # lowering with the branch values landing in `dst`).
+        return dispatch(EXPR_HANDLERS, node, frame, dst)
+    elif ks == "yield_from":
+        return _yield_from(node, frame, dst)
+    elif ks == "qualified_name":
+        return _scope(node, frame, dst)
+    else:
+        return error("the bytecode compiler does not support '" + ks + "' expressions yet")

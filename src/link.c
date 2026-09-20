@@ -1,5 +1,6 @@
 #include <wyrm.h>
 #include <wyrm/link.h>
+#include <wyrm/dict.h>
 #include <wyrm/error.h>
 #include <wyrm/function.h>
 #include <wyrm/string.h>
@@ -177,6 +178,53 @@ wy_error wy_link_register_wildcard(wy_context* ctx, wy_module* module,
     return WY_ERR_NONE;
 }
 
+wy_error wy_link_adopt_messages(wy_context* ctx, wy_module* module, wy_module* dep)
+{
+    if (ctx == WY_NULL || module == WY_NULL || dep == WY_NULL) { return WY_ERR_INVAL; }
+    if (dep == module || dep->message_table == WY_NULL) { return WY_ERR_NONE; }
+
+    const wy_dict* source = dep->message_table;
+    for (wy_uword i = 0; i < source->count; i++) {
+        const wy_key_hash_value* entry = &source->dense[i];
+        if (entry->key.type != WY_TYPE_TAG_SYMBOL || entry->value.type != WY_TYPE_TAG_MESSAGE) { continue; }
+        wy_symbol name = entry->key.data.symtab_entry;
+
+        /* The importer's own definition (or an earlier adoption) wins;
+         * adopting the same canonical message twice is a no-op. This is
+         * _merge_message's first three rules. Its _AmbiguousMessage marker
+         * for two genuinely different same-named messages has no C
+         * counterpart: first-claimed wins here, which only diverges from
+         * the walker on programs the walker itself faults at the point of
+         * use - the qualified `mod::name` send is the way out in both. */
+        wy_value* existing = module->message_table == WY_NULL ? WY_NULL :
+            wy_dict_get(ctx, module->message_table, WY_TYPE_TAG_SYMBOL,
+                (wy_primitive) { .symtab_entry = name });
+        if (existing != WY_NULL) { continue; }
+
+        if (module->message_table == WY_NULL) {
+            wy_error err = wy_dict_new(ctx, &module->message_table);
+            if (err != WY_ERR_NONE) { return err; }
+        }
+        wy_error err = wy_dict_set(ctx, module->message_table, WY_TYPE_TAG_SYMBOL,
+            (wy_primitive) { .symtab_entry = name }, WY_TYPE_TAG_MESSAGE, entry->value.data);
+        if (err != WY_ERR_NONE) { return err; }
+    }
+    return WY_ERR_NONE;
+}
+
+wy_error wy_link_seed_global(wy_context* ctx, wy_module* module, const char* name, wy_value value)
+{
+    if (ctx == WY_NULL || module == WY_NULL || name == WY_NULL) { return WY_ERR_INVAL; }
+    wy_symbol sym = WY_NULL;
+    wy_error err = wy_context_intern(ctx, name, strlen(name), &sym);
+    if (err != WY_ERR_NONE) { return err; }
+    wy_uword slot = wy_slot_dict_get(&module->free_names, sym);
+    if (slot == WY_SLOT_INVALID) { return WY_ERR_NONE; }
+    module->globals[slot] = value;
+    if (module->fill_layer != WY_NULL) { module->fill_layer[slot] &= WY_LINK_LAYER_MASK; }
+    return WY_ERR_NONE;
+}
+
 wy_error wy_link_import(wy_context* ctx, wy_string* path, wy_module** out)
 {
     if (ctx == WY_NULL || path == WY_NULL || out == WY_NULL || path->len == 0) { return WY_ERR_INVAL; }
@@ -213,6 +261,10 @@ wy_error wy_link_import(wy_context* ctx, wy_string* path, wy_module** out)
     err = wy_context_intern(ctx, path->str, path->len, &dep->name);
     if (err != WY_ERR_NONE) { return err; }
     err = wy_context_module_register(ctx, dep, WY_NULL);
+    if (err != WY_ERR_NONE) { return err; }
+    /* Python semantics: an imported module's `__name__` is its import path
+     * (the entry module's is "__main__", seeded by the host). */
+    err = wy_link_seed_global(ctx, dep, "__name__", wy_value_object(WY_TYPE_TAG_STR, (wy_object*) path));
     if (err != WY_ERR_NONE) { return err; }
     *out = dep;
     return WY_ERR_NONE;

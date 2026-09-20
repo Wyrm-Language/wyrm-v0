@@ -1,0 +1,264 @@
+# wy/wyrm/tools/test_classes_driver.wy - epic 10 M5 regression driver for
+# wy/wyrm/compiler/classes.wy, run on this repo's C VM.
+#
+# Same amalgam constraint as test_functions_driver.wy (see its header):
+# the compiler modules + bjson + image are concatenated with their wyrm-side
+# `import` lines stripped (`import std::io` is KEPT - it resolves against
+# the C VM's native io module, exactly as test/bytecode/bytes_header's
+# cvm_header.wy does), compiled by pypoc's compiler_bc, then run on the
+# C VM. This driver is the first one to close the loop end to end: it
+# compiles real fixtures (real-parser trees, regenerated under the fixed
+# parser - see test_functions_driver.wy's Part A note) into whole module
+# images, writes the .wyc files out, and the shell then runs them on the
+# C VM and diffs stdout against the corpus .out files:
+#
+#   work=$(mktemp -d)
+#   cat wy/std/pairs.wy wy/wyrm/bjson.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
+#       wy/wyrm/compiler/analysis.wy wy/wyrm/compiler/context.wy \
+#       wy/wyrm/compiler/expressions.wy wy/wyrm/compiler/handlers.wy \
+#       wy/wyrm/compiler/statements.wy wy/wyrm/compiler/functions.wy \
+#       wy/wyrm/compiler/classes.wy wy/wyrm/tools/test_classes_driver.wy \
+#     | grep -vE '^import (wyrm|bjson|opcodes|image|std::pairs)' \
+#     > "$work/cls_check.wy"
+#   pypoc/.venv/bin/wyrm --build-bc "$work/cls_check.wy" -o "$work"
+#   ./buildDir/src/wyrm/wyrm "$work/cls_check.wyc"
+#   ./buildDir/src/wyrm/wyrm /tmp/m5_classes.wyc   # -> diff vs classes.out
+#   ./buildDir/src/wyrm/wyrm /tmp/m5_messages.wyc  # -> diff vs messages.out
+#
+# The mini module walk below (declare pass, toplevel walk, assemble) is
+# exactly what M6's module.wy will own properly; it lives in this driver
+# one milestone early because M5's acceptance is the two whole fixtures.
+
+import std::io
+
+fn check(what: str, got, want) -> nil:
+    if got == want:
+        println("PASS: " + what)
+    else:
+        println("FAIL: " + what)
+    return nil
+
+fn check_true(what: str, got: bool) -> nil:
+    if got:
+        println("PASS: " + what)
+    else:
+        println("FAIL: " + what + " was false")
+    return nil
+
+fn check_error(what: str, got) -> nil:
+    if got is error:
+        println("PASS: " + what)
+    else:
+        println("FAIL: " + what + " did not error")
+    return nil
+
+fn has_op(rec: list, name: str) -> bool:
+    for r in rec:
+        if r["entry"]["name"] == name:
+            return true
+    return false
+
+fn count_op(rec: list, name: str) -> int:
+    n := 0
+    for r in rec:
+        if r["entry"]["name"] == name:
+            n = n + 1
+    return n
+
+# ---------------------------------------------------------------------------
+# the mini module walk (M6 preview)
+
+# pypoc module.py's _declare_module_names: class names up front (a class's
+# methods and the init `gset` both need its global slot to exist), then the
+# block's own `var` names. Plain fn names are declared by their walk-time
+# handler, in source order, exactly as pypoc does it.
+fn declare_pass(module_node, module: ModuleContext) -> nil:
+    for node in cdr(module_node):
+        if node_kind(node) == 'class_def:
+            module ! declare_global(_field(node, 1))
+    for name in own_declared_names(cdr(module_node)):
+        module ! declare_global(name)
+    return nil
+
+# A plain top-level `fn name(...)` - pypoc's `_fn_def` without the
+# (unported) promotion half: a function entry plus, in init, a closure over
+# it stored into the module global of its name.
+fn plain_fn_toplevel(node, module: ModuleContext) -> nil | error:
+    r := compile_function(node, module)
+    if r is error:
+        return r
+    index := r[0]
+    gidx := module ! declare_global(_field(node, 1))
+    if gidx is error:
+        return gidx
+    init := module.init_ctx
+    reg := init ! push()
+    if reg is error:
+        return reg
+    e := _emit_pack(init, 'closure, a0=reg, a1=index, a2=0, f=0)
+    if e is error:
+        return e
+    return _emit_pairable(init, 'gset, gidx, reg)
+
+fn walk_toplevel(module_node, module: ModuleContext) -> nil | error:
+    init := module.init_ctx
+    visible := []
+    for name in module.globals:
+        visible ! append(name)
+    e0 := init ! allocate_block_scopes(cdr(module_node), visible)
+    if e0 is error:
+        return e0
+    for node in cdr(module_node):
+        kind := node_kind(node)
+        var r: nil | error
+        if kind == 'class_def:
+            r = compile_class_toplevel(node, module)
+        elif kind == 'fn_def:
+            if (_field(node, 2) catch nil) is nil:
+                r = plain_fn_toplevel(node, module)
+            else:
+                r = compile_dispatched_fn_toplevel(node, module)
+        elif kind == 'co_def:
+            r = plain_fn_toplevel(node, module)
+        elif (kind == 'import) or (kind == 'import_static):
+            continue
+        else:
+            r = compile_statement(node, init)
+        if r is error:
+            return r
+    return nil
+
+# pypoc module.py's `_assemble`: init at offset 0, then each pending body;
+# then the image dict sections()/to_wyc() consume.
+fn assemble(module: ModuleContext) -> dict:
+    image := module.image
+    init := module.init_ctx
+    code := []
+    for w in init.code:
+        code ! append(w)
+    for entry in module.pending:
+        fn_entry := image.functions[entry[0]]
+        fn_entry["code_offset"] = len(code)
+        for w in entry[1].code:
+            code ! append(w)
+    exports := {}
+    free := {}
+    i := 0
+    while i < len(image.globals):
+        gslot := image.globals[i]
+        if gslot["exported"]:
+            exports[gslot["name"]] = i
+        if gslot["free"]:
+            free[gslot["name"]] = i
+        i = i + 1
+    img := {}
+    img["name"] = image.module_name
+    img["version"] = 1
+    img["globals"] = len(image.globals)
+    img["init_l"] = init.high
+    img["statics"] = image.statics
+    img["slot_defaults"] = nil
+    img["symbols"] = image.symbols
+    img["functions"] = image.functions
+    img["classes"] = image.classes
+    img["messages"] = image.messages
+    if len(exports) > 0:
+        img["exports"] = exports
+    if len(free) > 0:
+        img["free"] = free
+    img["code"] = code
+    return img
+
+fn compile_fixture(what: str, module_node, module: ModuleContext, path: str):
+    declare_pass(module_node, module)
+    r := walk_toplevel(module_node, module)
+    if r is error:
+        println("FAIL: " + what + " walk errored")
+        return
+    init := module.init_ctx
+    # Module init returns no values: the loader calls it for its effects.
+    e := _emit_pack(init, 'return, a0=0, f=0)
+    if e is error:
+        println("FAIL: " + what + " return emit errored")
+        return
+    init ! patch_labels()
+    img := assemble(module)
+    blob := to_wyc(img)
+    if blob is error:
+        println("FAIL: " + what + " to_wyc errored")
+        return
+    handle := std::io::open(path, "wb")
+    std::io::write(handle, blob)
+    std::io::close(handle)
+    println("PASS: " + what + " compiled, wrote " + path)
+    return
+
+# ---------------------------------------------------------------------------
+# Part A - pypoc/test/bytecode/classes.wy, end to end
+
+CLASSES_MODULE := $['module, $['class_def, 'Shape, nil, $[$['slot_def, 'name, $['type, 'str], $['str, "shape"], nil], $['slot_def, 'sides, $['type, 'int], $['int, 0], nil], $['fn_def, 'init, nil, $[$['param, 'label, nil, nil], $['param, 'count, nil, nil]], nil, $[$['set, $['attr, 'this, 'name], 'label], $['set, $['attr, 'this, 'sides], 'count]]], $['fn_def, 'describe, nil, nil, nil, $[$['return, $['attr, 'this, 'name]]]], $['fn_def, 'corners, nil, nil, nil, $[$['return, $['attr, 'this, 'sides]]]]]], $['class_def, 'Square, $['Shape], $[$['slot_def, 'size, $['type, 'int], $['int, 1], nil], $['fn_def, 'init, nil, $[$['param, 'edge, nil, nil]], nil, $[$['set, $['attr, 'this, 'name], $['str, "square"]], $['set, $['attr, 'this, 'sides], $['int, 4]], $['set, $['attr, 'this, 'size], 'edge]]], $['fn_def, 'area, nil, nil, nil, $[$['return, $['binop, '*, $['attr, 'this, 'size], $['attr, 'this, 'size]]]]]]], $['define, 'square, $['type, 'auto], $['call, 'Square, $[$['int, 3]]]], $['expr_stmt, $['call, 'println, $[$['message, 'square, 'describe, nil, 'send], $['message, 'square, 'corners, nil, 'send], $['message, 'square, 'area, nil, 'send]]]], $['define, 'plain, $['type, 'auto], $['call, 'Shape, $[$['str, "blob"], $['int, 7]]]], $['expr_stmt, $['call, 'println, $[$['message, 'plain, 'describe, nil, 'send], $['message, 'plain, 'corners, nil, 'send]]]]]
+
+mod_c := ModuleContext("classes", nil)
+mod_c.stub_unlowered = false
+compile_fixture("classes.wy", CLASSES_MODULE, mod_c, "/tmp/m5_classes.wyc")
+
+check("classes.wy: two classes compiled", len(mod_c.image.classes), 2)
+shape := mod_c.image.classes[0]
+square := mod_c.image.classes[1]
+check("Shape: two slots", len(shape["slots"]), 2)
+check("Shape: name default is static 0 (\"shape\" deduped first)", shape["slots"][0]["default"], 0)
+check("Shape: init is function 0", shape["init"], 0)
+check("Shape: two message-map entries (describe, corners)", len(shape["messages"]), 2)
+check("Square: superclass is Shape's global slot", square["superclass"], mod_c ! global_index("Shape"))
+check("Square: own slot after inherited ones", mod_c ! slot_index("Square", "size"), 2)
+check("Square: inherited slot resolves through the chain", mod_c ! slot_index("Square", "name"), 0)
+check("Square: area is a message-bodied function", str(mod_c.image.functions[square["messages"][0][1]]["name"]), "area!")
+check("method carries FN_MESSAGE (bit 1)", mod_c.image.functions[square["messages"][0][1]]["flags"], 2)
+
+img_c := assemble(mod_c)
+init_dis := disassemble(img_c["code"])
+check("init code disassembles", init_dis is error, false)
+check_true("init realizes both classes (two `class` ops)", count_op(init_dis, "class") == 2)
+check_true("init stores each class object (gset)", has_op(init_dis, "gset"))
+check_true("construct-on-call compiles as a plain call", has_op(init_dis, "call"))
+check_true("message sends compile to `msg`", has_op(init_dis, "msg"))
+
+# ---------------------------------------------------------------------------
+# Part B - pypoc/test/bytecode/messages.wy: `fn [T] name` outside a class
+# body, registered through reg_msg; plus a bound-message (getmsg) send.
+
+MESSAGES_MODULE := $['module, $['class_def, 'Meters, nil, $[$['slot_def, 'value, $['type, 'int], $['int, 0], nil], $['fn_def, 'init, nil, $[$['param, 'v, nil, nil]], nil, $[$['set, $['attr, 'this, 'value], 'v]]]]], $['fn_def, 'doubled, $['Meters], nil, nil, $[$['return, $['binop, '*, $['attr, 'this, 'value], $['int, 2]]]]], $['fn_def, 'scaled, $['Meters], $[$['param, 'factor, nil, nil]], nil, $[$['return, $['binop, '*, $['attr, 'this, 'value], 'factor]]]], $['define, 'one, $['type, 'auto], $['call, 'Meters, $[$['int, 21]]]], $['expr_stmt, $['call, 'println, $[$['message, 'one, 'doubled, nil, 'send]]]], $['expr_stmt, $['call, 'println, $[$['message, 'one, 'scaled, $[$['int, 3]], 'send]]]], $['define, 'bound, $['type, 'auto], $['message, 'one, 'doubled, nil, 'bound]], $['expr_stmt, $['call, 'println, $[$['call, 'bound, nil]]]]]
+
+mod_m := ModuleContext("messages", nil)
+mod_m.stub_unlowered = false
+compile_fixture("messages.wy", MESSAGES_MODULE, mod_m, "/tmp/m5_messages.wyc")
+
+check("messages.wy: one class", len(mod_m.image.classes), 1)
+check("Meters registers no in-body messages (init only)", len(mod_m.image.classes[0]["messages"]), 0)
+dispatched := 0
+for f in mod_m.image.functions:
+    if f["flags"] == 2:
+        dispatched = dispatched + 1
+check("three message-bodied fns (init, doubled!, scaled!)", dispatched, 3)
+img_m := assemble(mod_m)
+check("messages section holds two identities", len(img_m["messages"]), 2)
+msg_dis := disassemble(img_m["code"])
+check("messages.wy init disassembles", msg_dis is error, false)
+check_true("init registers both overloads (reg_msg)", count_op(msg_dis, "reg_msg") == 2)
+check_true("init builds the receiver-type tuples (tuple)", has_op(msg_dis, "tuple"))
+check_true("the bound message compiles to getmsg", has_op(msg_dis, "getmsg"))
+
+# ---------------------------------------------------------------------------
+# Part C - refusals: non-constant slot defaults, expression statements in a
+# class body, multiple bases.
+
+mod_x := ModuleContext("refusals", nil)
+mod_x.stub_unlowered = false
+BAD_DEFAULT := $['class_def, 'Bad, nil, $[$['slot_def, 'x, nil, $['binop, '+, $['int, 1], $['int, 2]], nil]]]
+check_error("non-constant slot default refused", compile_class(BAD_DEFAULT, mod_x))
+BAD_MEMBER := $['class_def, 'Bad, nil, $[$['expr_stmt, $['call, 'println, nil]]]]
+check_error("expression statement in a class body refused", compile_class(BAD_MEMBER, mod_x))
+BAD_BASES := $['class_def, 'Bad, $['A, 'B], $[$['expr_stmt, 'pass]]]
+check_error("second base class refused (one superclass on the wire)", compile_class(BAD_BASES, mod_x))
+
+println("test_classes_driver: all checks passed")

@@ -1,0 +1,788 @@
+# wy/wyrm/compiler/analysis.wy - epic 10 M1
+#
+# Wyrm port of pypoc/wypoc/compiler_bc/analysis.py: the static questions
+# asked about a body of code before any of it is lowered.
+#
+#   * what names does this scope **declare** (so slots can be assigned in
+#     one pass, before the first instruction is emitted),
+#   * what names does a nested function read that it does not declare
+#     itself - its **free** names, which become its captures,
+#   * what names are **assigned** anywhere in or below a scope, which is
+#     what decides whether a captured variable needs a cell (spec 8.3).
+#
+# The walk stops at a function boundary where scoping does: a nested
+# `fn`/`co`/lambda/class/`defer` has a scope of its own and is examined
+# separately.  A `do:` block is *not* a boundary - it is inlined into the
+# enclosing frame, so the names it declares are the enclosing frame's to
+# allocate.
+#
+# ---------------------------------------------------------------------------
+# The one structural difference from analysis.py
+#
+# analysis.py walks `wypoc.ast_nodes` dataclasses and can therefore lean on
+# a generic `Node.children()` (every field that happens to hold a Node) plus
+# `isinstance` to tell a name *reference* (`ast.Name`) from a name *spelling*
+# (`VarDecl.targets[i].name`, a plain `str`).  wyrm's parser emits neither:
+# a node is the pair list `$['kind, field, ...]` and **every unqualified
+# identifier reference is a bare symbol** (`wy/wyrm/ast.wy`'s node-kind
+# table: "a bare `sym` ... is itself a valid node").  A bare symbol is thus
+# indistinguishable from a declaration's name field unless the walk knows,
+# per kind, which fields hold sub-nodes and which hold spellings.
+#
+# So this port carries that knowledge explicitly, in `SPECS`: one row per
+# node kind, listing only the fields that are sub-nodes, with the role each
+# plays (a single node, a statement body, a pair list of nodes, ...).  Name
+# fields (`define`'s name, `for`'s loop variable, `attr`'s attribute,
+# `binop`'s operator, a `type` node's contents) are simply absent from the
+# row, which is what makes "every bare symbol the walk reaches is a name
+# reference" true - the same invariant `isinstance(node, ast.Name)` gives
+# analysis.py for free.  `RESERVED` then subtracts the bare symbols that are
+# keywords rather than names (`nil`/`true`/`false`/`break`/`continue`/`pass`,
+# and `this`, which is pypoc's `ThisRef` node and never a `Name`).
+#
+# SPECS is built from wy/wyrm/ast.wy's node-kind table (authoritative for
+# what wy/wyrm/parser.wy really emits) and not from sexpr.py's `ROWS`: the
+# two diverge in field count and spelling for `if`/`for`/`fn_def`/`param`/
+# `static`, and the whole class/lambda/coroutine family has no pypoc kind
+# at all.  Kinds absent from SPECS fall back to "every field from 1 is a
+# sub-node", which is wrong for a kind with a name field - add the kind to
+# SPECS rather than relying on the fallback.
+#
+# ---------------------------------------------------------------------------
+# Name sets are `list`s of `sym`, in first-encounter order, and membership is
+# a linear `in`: pypoc's `free_names` already promises source order (it
+# returns `list(used)` over an insertion-ordered dict) and `cell_names`
+# returns a Python set, whose iteration order is *not* something the port
+# should reproduce - a deterministic order is strictly better for the
+# byte-identity bar downstream. These sets hold a handful of names each.
+
+import std::pairs::*
+
+# ---------------------------------------------------------------------------
+# pair-list access
+#
+# `std::pairs`' `list_tail`/`field` are NOT used here: `list_tail` walks with
+# `for i in range(0, n)`, and a `for` over a `range(...)` iterates zero times
+# on this repo's C VM (range is a coroutine there and `wy_iterator_next` has
+# no coroutine case - epic 6's deferred gap, see vm_plan/epic_10_prereport.md).
+# So `field(node, n)` silently answers `car(node)` whatever `n` is, on the C
+# VM only. These two walk with a `while` instead and behave the same on both
+# engines.
+fn _tail(node, count: int):
+    cur := node
+    i := 0
+    while i < count:
+        if not (cur is pair):
+            return error("index out of range")
+        cur = cdr(cur)
+        i = i + 1
+    return cur
+
+fn _field(node, index: int):
+    rest := _tail(node, index)
+    if rest is error:
+        return rest
+    return car(rest)
+
+# Constructs that introduce a scope of their own, and so end the walk.
+# `defer` is one of them: its block is compiled as a closure, so what it
+# reads it captures, and what it assigns it assigns through a cell.
+# analysis.py's SCOPE_BOUNDARIES is (FnDef, CoDef, Lambda, ClassDef, Defer);
+# `co_lambda` and `class_expr` are wyrm kinds with no pypoc counterpart
+# (ast.wy: pypoc's `_CANNOT_CROSS` list) and belong here for the same reason
+# their named forms do.
+BOUNDARIES := ['fn_def, 'co_def, 'lambda, 'co_lambda, 'class_def, 'class_expr, 'defer]
+
+# The scope boundaries whose free names pass through to the enclosing frame
+# (analysis.py's `free_names`/`cell_names` recurse into FnDef/CoDef/Lambda
+# and Defer, and deliberately *not* into ClassDef).
+FN_LIKE := ['fn_def, 'co_def, 'lambda, 'co_lambda]
+
+# Bare symbols that are keywords, not name references - wy/wyrm/ast.wy's
+# "bare-symbol representation trap". `this` is here because pypoc spells it
+# `ThisRef`, a node of its own that `free_names` never notes.
+RESERVED := ['nil, 'true, 'false, 'break, 'continue, 'pass, 'this]
+
+# Kinds that own nested block scopes (analysis.py's `block_bodies`).
+BLOCK_OWNERS := ['if, 'while, 'do, 'for]
+
+# Field roles used by SPECS (see the header comment):
+#
+#   "node"    field i is one sub-node (or nil)
+#   "nodes"   field i is a pair list of sub-nodes (or nil)
+#   "body"    field i is a statement body - see `body_statements`
+#   "nary"    every field from i on is a sub-node
+#   "entries" fields from i on are dict entries, each a 2-element pair list
+#   "elifs"   field i is an `if`'s elif list, each entry `$[cond, body]`
+#
+# Built by a function rather than written as one dict literal because a
+# wyrm dict literal has to fit on one physical source line.
+fn _build_specs() -> dict:
+    s := {}
+    # -- literals and atoms: no sub-nodes at all ---------------------------
+    s["sym"] = []
+    s["str"] = []
+    s["int"] = []
+    s["float"] = []
+    s["nil"] = []
+    s["true"] = []
+    s["false"] = []
+    s["break"] = []
+    s["continue"] = []
+    s["pass"] = []
+    s["type"] = []
+    s["qualified_name"] = []
+    s["var_positional"] = []
+    s["var_keyword"] = []
+    s["slot_option"] = []
+    s["import"] = []
+    s["import_static"] = []
+    s["import_all"] = []
+    s["import_items"] = []
+    s["import_as"] = []
+    s["import_item"] = []
+    # -- structure ---------------------------------------------------------
+    s["module"] = [[1, "nary"]]
+    s["do"] = [[1, "body"]]
+    s["tuple"] = [[1, "nary"]]
+    s["array"] = [[1, "nary"]]
+    s["list"] = [[1, "nary"]]
+    s["dict"] = [[1, "entries"]]
+    s["expr_stmt"] = [[1, "node"]]
+    # -- expressions -------------------------------------------------------
+    s["attr"] = [[1, "node"]]
+    s["index"] = [[1, "node"], [2, "node"]]
+    s["call"] = [[1, "node"], [2, "nodes"]]
+    s["message"] = [[1, "node"], [3, "nodes"]]
+    s["not"] = [[1, "node"]]
+    s["neg"] = [[1, "node"]]
+    s["pos"] = [[1, "node"]]
+    s["invert"] = [[1, "node"]]
+    s["exp"] = [[1, "node"], [2, "node"]]
+    s["and"] = [[1, "nary"]]
+    s["or"] = [[1, "nary"]]
+    s["in"] = [[1, "node"], [2, "node"]]
+    s["is"] = [[1, "node"]]
+    s["binop"] = [[2, "node"], [3, "node"]]
+    # -- assignment and declaration ---------------------------------------
+    s["define"] = [[3, "node"]]
+    s["define_values"] = [[2, "node"]]
+    s["set"] = [[1, "node"], [2, "node"]]
+    s["if_set"] = [[1, "node"], [2, "node"]]
+    s["set_values"] = [[1, "nodes"], [2, "node"]]
+    s["target"] = [[1, "node"], [2, "nodes"]]
+    s["static"] = [[3, "node"]]
+    # -- control flow ------------------------------------------------------
+    s["if"] = [[1, "node"], [2, "body"], [3, "elifs"], [4, "body"]]
+    s["while"] = [[1, "node"], [2, "body"]]
+    s["for"] = [[2, "node"], [3, "body"], [4, "body"]]
+    s["return"] = [[1, "node"]]
+    s["yield"] = [[1, "node"]]
+    s["yield_from"] = [[1, "node"]]
+    s["try"] = [[1, "node"]]
+    s["catch"] = [[1, "node"], [2, "node"]]
+    # -- functions, coroutines, classes -----------------------------------
+    s["fn_def"] = [[3, "nodes"], [5, "body"]]
+    s["co_def"] = [[3, "nodes"], [5, "body"]]
+    s["lambda"] = [[1, "nodes"], [3, "body"]]
+    s["co_lambda"] = [[1, "node"], [3, "body"]]
+    s["co_params"] = [[2, "nodes"]]
+    s["param"] = [[3, "node"]]
+    s["class_def"] = [[3, "body"]]
+    s["class_expr"] = [[2, "body"]]
+    s["slot_def"] = [[3, "node"]]
+    # `defer`'s field 1 is its optional `on <type>` constraint, a type
+    # expression and not a name reference, so only the body is walked.
+    s["defer"] = [[2, "body"]]
+    s["decorated"] = [[1, "nodes"], [2, "node"]]
+    s["decorator"] = [[2, "nodes"]]
+    return s
+
+SPECS := _build_specs()
+
+_UNKNOWN_SPEC := [[1, "nary"]]
+
+# ---------------------------------------------------------------------------
+# node identity for scope matching
+#
+# `context.wy`'s `push_block` matches a body being compiled against the
+# scope owners `block_scopes` recorded. pypoc keys those by `id(owner)`
+# (analysis.py's `walk_block` filters nested statements by identity, and
+# context.py's `block_slots` is an id-keyed dict). wyrm has no
+# object-identity primitive, and `==` on aggregates is NOT structural on
+# this repo's C VM (pointer identity for pairs/lists/tuples/dicts, matching
+# pypoc's tree-walking interpreter `==` only for scalars) - so `==` cannot
+# match an owner against the body, not even against itself after a
+# `cadr`/field round-trip (each crossing re-anchors the same cell).
+# `same_node` is the structural substitute: same shape, recursively.
+fn same_node(a, b) -> bool:
+    if a is sym:
+        if b is sym:
+            return a == b
+        return false
+    if b is sym:
+        return false
+    if a is str:
+        if b is str:
+            return a == b
+        return false
+    if b is str:
+        return false
+    if a is pair:
+        if b is pair:
+            return same_node(car(a), car(b)) and same_node(cdr(a), cdr(b))
+        return false
+    if b is pair:
+        return false
+    if a is list:
+        if b is list:
+            if len(a) != len(b):
+                return false
+            i := 0
+            n := len(a)
+            while i < n:
+                if not same_node(a[i], b[i]):
+                    return false
+                i = i + 1
+            return true
+        return false
+    if b is list:
+        return false
+    return a == b
+
+# ---------------------------------------------------------------------------
+# small helpers over name lists
+
+fn note_name(names: list, name) -> nil:
+    if not (name is sym):
+        return nil
+    if not (name in names):
+        names ! append(name)
+    return nil
+
+fn note_all(names: list, more) -> nil:
+    for name in more:
+        note_name(names, name)
+    return nil
+
+# `a` and `b` are name lists; the result keeps `a`'s order.
+fn intersect(a: list, b: list) -> list:
+    out := []
+    for name in a:
+        if name in b:
+            note_name(out, name)
+    return out
+
+fn _copy_names(names) -> list:
+    out := []
+    if names is nil:
+        return out
+    for name in names:
+        note_name(out, name)
+    return out
+
+# ---------------------------------------------------------------------------
+# node shape
+
+fn is_known_kind(kind) -> bool:
+    if not (kind is sym):
+        return false
+    return str(kind) in SPECS
+
+# The kind of `node`, or nil when `node` is a bare-symbol *name reference*
+# rather than a node.
+fn node_kind(node) -> sym | nil:
+    if node is sym:
+        if is_known_kind(node):
+            return node
+        return nil
+    if node is pair:
+        head := car(node)
+        if head is sym:
+            return head
+    return nil
+
+# True when `node` is a bare symbol standing for a name reference (`total`,
+# `COUNT`, ...) rather than a keyword or a wrapped node.
+fn is_name_ref(node) -> bool:
+    if not (node is sym):
+        return false
+    if node in RESERVED:
+        return false
+    return true
+
+# A statement body as a flat `list` of statement nodes.
+#
+# wy/wyrm/parser.wy emits a block's body as a pair list of statements
+# (`$[stmt, stmt, ...]`) but a *single-statement* body unwrapped, as the
+# statement itself (`fn q(): 1` -> `$['fn_def, 'q, nil, nil, nil,
+# $['int, 1]]`, whose body field is the `int` node, not a one-element list
+# holding it).  The two are told apart by the head: a statement list's head
+# is itself a node, a single node's head is its kind symbol.
+#
+# Known ambiguity, deliberately left: a real statement list whose *first*
+# statement is a bare symbol that happens to spell a node kind (a body
+# starting with the expression statement `list`) reads as a single node
+# here. Every such statement is a no-op name read, so the answers this
+# module gives are unaffected in every case but a first statement of
+# `list`/`dict`/`type`/... used as a bare name reference, which no corpus
+# fixture does.
+fn body_statements(body) -> list:
+    out := []
+    if body is nil:
+        return out
+    if body is list:
+        # already normalized - `block_bodies`/`block_scopes` hand their
+        # owners around in this form.
+        return body
+    if not (body is pair):
+        # a bare-symbol single statement: `fn f(): x`
+        out ! append(body)
+        return out
+    if is_known_kind(car(body)):
+        out ! append(body)
+        return out
+    p := body
+    while p is pair:
+        out ! append(car(p))
+        p = cdr(p)
+    return out
+
+fn _spec_for(kind) -> list:
+    entry := (SPECS[str(kind)] catch nil)
+    if entry is nil:
+        return _UNKNOWN_SPEC
+    return entry
+
+fn _append_pair_list(out: list, start) -> nil:
+    p := start
+    while p is pair:
+        out ! append(car(p))
+        p = cdr(p)
+    return nil
+
+# A "nodes" field - normally a pair chain of sub-nodes, but the parser
+# builds a `$[...]`-sugared one-element list as a native `list` instead
+# (`is list` tells the shapes apart where `==` cannot). Accept either.
+#
+# NOTE the `is list` check reads strangely but is load-bearing: this exact
+# file documents (see `same_node` above) that `==` on aggregates is pointer
+# identity on the C VM, and `is list` vs `is pair` is the matching type
+# discriminator. A `$[x]` hand-literal IS a native list; a parser-built
+# single-arg call args list is a pair chain; both occur in "nodes" fields.
+fn _append_nodes(out: list, start) -> nil:
+    if start is list:
+        for item in start:
+            out ! append(item)
+        return nil
+    if start is pair:
+        return _append_pair_list(out, start)
+    return nil
+
+# Every direct sub-node of `node`, in field order - the port's answer to
+# `ast_nodes.Node.children()`, driven by SPECS instead of by reflection.
+fn children(node) -> list:
+    out := []
+    if not (node is pair):
+        return out
+    kind := car(node)
+    if not (kind is sym):
+        return out
+    for rule in _spec_for(kind):
+        index := rule[0]
+        role := rule[1]
+        if role == "nary":
+            _append_pair_list(out, (_tail(node, index) catch nil))
+        elif role == "node":
+            value := (_field(node, index) catch nil)
+            if not (value is nil):
+                out ! append(value)
+        elif role == "nodes":
+            _append_nodes(out, (_field(node, index) catch nil))
+        elif role == "body":
+            for statement in body_statements((_field(node, index) catch nil)):
+                out ! append(statement)
+        elif role == "entries":
+            entries := (_tail(node, index) catch nil)
+            p := entries
+            while p is pair:
+                entry := car(p)
+                if entry is pair:
+                    out ! append(car(entry))
+                    tail := cdr(entry)
+                    if tail is pair:
+                        out ! append(car(tail))
+                p = cdr(p)
+        elif role == "elifs":
+            clauses := (_field(node, index) catch nil)
+            p := clauses
+            while p is pair:
+                clause := car(p)
+                if clause is pair:
+                    if not (car(clause) is nil):
+                        out ! append(car(clause))
+                    for statement in body_statements((cadr(clause) catch nil)):
+                        out ! append(statement)
+                p = cdr(p)
+    return out
+
+# ---------------------------------------------------------------------------
+# the walks
+
+fn is_scope_boundary(kind) -> bool:
+    if not (kind is sym):
+        return false
+    return kind in BOUNDARIES
+
+fn _collect_scope(node, out: list) -> nil:
+    out ! append(node)
+    if not (node is pair):
+        return nil
+    if is_scope_boundary(car(node)):
+        return nil
+    for child in children(node):
+        _collect_scope(child, out)
+    return nil
+
+# `node` and every descendant in the same scope, boundaries included but
+# not entered.
+fn walk_scope(node) -> list:
+    out := []
+    _collect_scope(node, out)
+    return out
+
+fn walk_body(body) -> list:
+    out := []
+    for statement in body_statements(body):
+        _collect_scope(statement, out)
+    return out
+
+fn _collect_all(node, out: list) -> nil:
+    out ! append(node)
+    if not (node is pair):
+        return nil
+    for child in children(node):
+        _collect_all(child, out)
+    return nil
+
+# `node` and every descendant, boundaries entered - `ast_nodes.Node.walk()`.
+fn walk_all(node) -> list:
+    out := []
+    _collect_all(node, out)
+    return out
+
+fn walk_all_body(body) -> list:
+    out := []
+    for statement in body_statements(body):
+        _collect_all(statement, out)
+    return out
+
+# The statement bodies `node` opens as scopes of its own (spec: "declaring a
+# name visible from an enclosing scope ... shadows it for the duration of
+# the inner scope") - analysis.py's `block_bodies`.  Function-shaped scopes
+# are not here: they are BOUNDARIES, compiled as frames of their own.
+# Each entry is the node's own body *field*, untouched (not normalized by
+# `body_statements`), so that it is the very object the tree holds: it is
+# what identifies the scope to `FnContext.push_block`, which has only value
+# comparison to match it with (see context.wy), and a normalized copy would
+# be a fresh object every call.
+fn block_bodies(node) -> list:
+    out := []
+    kind := node_kind(node)
+    if kind == 'if:
+        out ! append((_field(node, 2) catch nil))
+        clauses := (_field(node, 3) catch nil)
+        p := clauses
+        while p is pair:
+            clause := car(p)
+            if clause is pair:
+                out ! append((cadr(clause) catch nil))
+            p = cdr(p)
+        orelse := (_field(node, 4) catch nil)
+        if not (orelse is nil):
+            out ! append(orelse)
+    elif kind == 'while:
+        out ! append((_field(node, 2) catch nil))
+    elif kind == 'do:
+        out ! append((_field(node, 1) catch nil))
+    elif kind == 'for:
+        out ! append((_field(node, 3) catch nil))
+        orelse := (_field(node, 4) catch nil)
+        if not (orelse is nil):
+            out ! append(orelse)
+    return out
+
+# The sub-nodes of `node` that are in the *same block scope* as it: like
+# `children`, minus the statements of any nested block body.
+#
+# analysis.py does this by identity (`nested = {id(stmt) for ...}`); wyrm has
+# no object-identity primitive, so the same filter is expressed structurally,
+# by dropping the body roles of the four block-owning kinds.
+#
+# analysis.py's elif quirk is reproduced deliberately: its `walk_block`
+# recurses into the `ElifClause` *node* (which is not itself one of the
+# nested statements it filtered out), and `block_bodies(ElifClause)` matches
+# nothing, so an `elif` arm's statements are walked as if they were the
+# enclosing block's. That gives an `elif`-declared name both a frame slot and
+# a block slot; harmless (the block binding wins inside the arm) but not what
+# the `if`/`else` arms get. Matching it keeps this port's slot layout equal to
+# pypoc's - see the epic report for the pypoc-side bug note.
+fn block_children(node) -> list:
+    kind := node_kind(node)
+    if not (kind in BLOCK_OWNERS):
+        return children(node)
+    out := []
+    if kind == 'if:
+        cond := (_field(node, 1) catch nil)
+        if not (cond is nil):
+            out ! append(cond)
+        clauses := (_field(node, 3) catch nil)
+        p := clauses
+        while p is pair:
+            clause := car(p)
+            if clause is pair:
+                if not (car(clause) is nil):
+                    out ! append(car(clause))
+                # An elif arm's own statements stay in the enclosing
+                # block's walk (analysis.py's deliberate behavior, pinned
+                # by test_compiler_analysis.wy's "blocks" case): their
+                # declarations attribute to the enclosing scope.
+                for statement in body_statements((cadr(clause) catch nil)):
+                    out ! append(statement)
+            p = cdr(p)
+    elif kind == 'while:
+        cond := (_field(node, 1) catch nil)
+        if not (cond is nil):
+            out ! append(cond)
+    elif kind == 'for:
+        iterable := (_field(node, 2) catch nil)
+        if not (iterable is nil):
+            out ! append(iterable)
+    return out
+
+fn _collect_block(node, out: list) -> nil:
+    out ! append(node)
+    if not (node is pair):
+        return nil
+    if is_scope_boundary(car(node)):
+        return nil
+    for child in block_children(node):
+        _collect_block(child, out)
+    return nil
+
+# `node` and every descendant in the same block scope - stopping at a
+# function boundary as `walk_scope` does, and also at any nested block body.
+fn walk_block(node) -> list:
+    out := []
+    _collect_block(node, out)
+    return out
+
+# ---------------------------------------------------------------------------
+# declarations
+
+# `fn`/`co` declares a name only when it is not dispatched: `fn [T] name`
+# registers a method, reached by sending `name` rather than by naming it
+# (spec 7.2).
+fn _note_definition(node, names: list) -> nil:
+    name := (_field(node, 1) catch nil)
+    dispatch := (_field(node, 2) catch nil)
+    if (name is sym) and (dispatch is nil):
+        note_name(names, name)
+    return nil
+
+fn _note_declared(node, names: list, with_loop_vars: bool) -> nil:
+    kind := node_kind(node)
+    if kind == 'define:
+        note_name(names, (_field(node, 1) catch nil))
+    elif kind == 'define_values:
+        p := (_field(node, 1) catch nil)
+        while p is pair:
+            target := car(p)
+            if target is pair:
+                note_name(names, car(target))
+            else:
+                note_name(names, target)
+            p = cdr(p)
+    elif kind == 'for:
+        if with_loop_vars:
+            note_name(names, (_field(node, 1) catch nil))
+    elif (kind == 'fn_def) or (kind == 'co_def):
+        _note_definition(node, names)
+    return nil
+
+# The names `body` introduces, in source order and without duplicates:
+# `var`/`:=` targets, `for` loop variables, and plain function definitions
+# (whose name binds in the scope that contains them).
+fn declared_names(body) -> list:
+    names := []
+    for node in walk_body(body):
+        _note_declared(node, names, true)
+    return names
+
+# `declared_names`, but only the names this block declares itself: a `var`
+# inside a nested `do:`/`if`/loop body belongs to that block (see
+# `block_scopes`, which allocates those separately), and a `for` variable
+# belongs to its loop rather than to the block the loop sits in.
+fn own_declared_names(body) -> list:
+    names := []
+    for node in body_statements(body):
+        for inner in walk_block(node):
+            _note_declared(inner, names, false)
+    return names
+
+# Every scope nested inside `body`, outermost first, as
+# `[owner, names, enclosing names]`.
+#
+# `owner` is the statement body the scope is - which is what identifies it
+# when that body is compiled - except for a `for`, whose owner is the loop
+# node itself: its variable is in scope for the body *and* the else clause,
+# so the loop, not either list, is what owns it.
+#
+# `enclosing` is what scopes *containing* this one bind, so a caller can tell
+# a declaration that shadows from one that merely repeats a sibling's name.
+fn block_scopes(body, enclosing) -> list:
+    scopes := []
+    outer := _copy_names(enclosing)
+    for node in body_statements(body):
+        for inner in walk_block(node):
+            loop_names := outer
+            if node_kind(inner) == 'for:
+                scopes ! append([inner, [(_field(inner, 1) catch nil)], outer])
+                loop_names = _copy_names(outer)
+                note_name(loop_names, (_field(inner, 1) catch nil))
+            for nested in block_bodies(inner):
+                names := own_declared_names(nested)
+                scopes ! append([nested, names, loop_names])
+                inner_enclosing := _copy_names(loop_names)
+                note_all(inner_enclosing, names)
+                for deeper in block_scopes(nested, inner_enclosing):
+                    scopes ! append(deeper)
+    return scopes
+
+# ---------------------------------------------------------------------------
+# free names, assigned names, cells
+
+# The declared names of a `param` list (`$[$['param, name, type, default],
+# ...]`), including `*rest`/`**kwargs`.
+fn param_names(params) -> list:
+    names := []
+    p := params
+    while p is pair:
+        entry := car(p)
+        kind := node_kind(entry)
+        if (kind == 'param) or (kind == 'var_positional) or (kind == 'var_keyword):
+            note_name(names, (_field(entry, 1) catch nil))
+        p = cdr(p)
+    return names
+
+# The `params` field of a scope boundary, as a pair list of param nodes.
+# `co_lambda`/`co_def` carry theirs inside a `co_params` node (whose first
+# field is the send type).
+fn boundary_params(node) -> pair | nil:
+    kind := node_kind(node)
+    if (kind == 'fn_def) or (kind == 'co_def):
+        params := (_field(node, 3) catch nil)
+        if (kind == 'co_def) and (node_kind(params) == 'co_params):
+            return (_field(params, 2) catch nil)
+        return params
+    if kind == 'lambda:
+        return (_field(node, 1) catch nil)
+    if kind == 'co_lambda:
+        head := (_field(node, 1) catch nil)
+        if node_kind(head) == 'co_params:
+            return (_field(head, 2) catch nil)
+        return head
+    return nil
+
+# The body of a scope boundary, as a statement body (not yet normalized).
+fn boundary_body(node):
+    kind := node_kind(node)
+    if (kind == 'fn_def) or (kind == 'co_def):
+        return (_field(node, 5) catch nil)
+    if (kind == 'lambda) or (kind == 'co_lambda):
+        return (_field(node, 3) catch nil)
+    if kind == 'defer:
+        return (_field(node, 2) catch nil)
+    if kind == 'class_def:
+        return (_field(node, 3) catch nil)
+    if kind == 'class_expr:
+        return (_field(node, 2) catch nil)
+    return nil
+
+# The names `body` reads without declaring, in first-encounter order.
+#
+# A doubly-nested function's own free names pass through: a closure two
+# levels down still has to reach its variable, and the frame in between is
+# what hands it over.
+fn free_names(params, body) -> list:
+    bound := _copy_names(params)
+    note_all(bound, declared_names(body))
+    used := []
+    for node in walk_body(body):
+        if is_name_ref(node):
+            if not (node in bound):
+                note_name(used, node)
+        else:
+            kind := node_kind(node)
+            if kind in FN_LIKE:
+                inner := free_names(param_names(boundary_params(node)),
+                                    boundary_body(node))
+                for name in inner:
+                    if not (name in bound):
+                        note_name(used, name)
+            elif kind == 'defer:
+                inner := free_names([], boundary_body(node))
+                for name in inner:
+                    if not (name in bound):
+                        note_name(used, name)
+    return used
+
+# Every name assigned anywhere in or below `body`.
+#
+# This one deliberately does enter nested functions: a `defer` block or a
+# closure writing to an enclosing variable is exactly what makes that
+# variable need a cell.  It over-approximates - an inner function that
+# declares and assigns its *own* `total` marks the outer `total` too - which
+# costs a cell that is never shared, never correctness.
+#
+# `set`/`if_set` are pypoc's one `Assign` node (its `op` field is `=` or
+# `?=`); `set_values` is the multi-target form of the same.  A `define`
+# (`:=`/`var`) is a declaration, not an assignment, exactly as in pypoc.
+fn assigned_names(body) -> list:
+    names := []
+    for node in walk_all_body(body):
+        kind := node_kind(node)
+        if (kind == 'set) or (kind == 'if_set):
+            target := (_field(node, 1) catch nil)
+            if target is sym:
+                note_name(names, target)
+        elif kind == 'set_values:
+            p := (_field(node, 1) catch nil)
+            while p is pair:
+                target := car(p)
+                if target is sym:
+                    note_name(names, target)
+                p = cdr(p)
+    return names
+
+# The names in this frame that must live in a cell (spec 8.3).
+#
+# A variable needs one when it is both captured by a nested scope and
+# assigned somewhere: the capture copies a register, so without a shared box
+# the two frames would drift apart after the first write.  The box is a
+# one-element pair list, indexed with `getidx`/`setidx` at 0 (see
+# compiler/functions.wy's prologue, once M4 lands).
+fn cell_names(params, body) -> list:
+    captured := []
+    for node in walk_body(body):
+        kind := node_kind(node)
+        if kind in FN_LIKE:
+            note_all(captured, free_names(param_names(boundary_params(node)),
+                                          boundary_body(node)))
+        elif kind == 'defer:
+            note_all(captured, free_names([], boundary_body(node)))
+    if len(captured) == 0:
+        return []
+    mine := _copy_names(params)
+    note_all(mine, declared_names(body))
+    return intersect(intersect(captured, mine), assigned_names(body))

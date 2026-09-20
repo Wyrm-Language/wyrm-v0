@@ -1,0 +1,94 @@
+# wy/wyrm/tools/test_image_m4_driver.wy - epic 9 M4 milestone-verification
+# driver for wy/wyrm/image.wy's `to_wya()` and `to_c()`.
+#
+# NOT wired into any test harness (same reason as test_image_driver.wy: it
+# compiles under pypoc's compiler_bc and runs on this repo's C VM `wyrm`, a
+# different pipeline from the tree-walker `test/wy/*` suite). Rebuilds the
+# same hand-built `hello` image as the M3 driver, then writes both M4
+# outputs to fixed paths:
+#
+#   /tmp/hello_built.wy_a   to_wya()'s ASCII listing
+#   /tmp/hello_built.c      to_c()'s C-array container
+#
+# Run it by hand:
+#
+#   work=$(mktemp -d)
+#   cp wy/wyrm/bjson.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
+#      wy/wyrm/tools/test_image_m4_driver.wy "$work/"
+#   for f in bjson opcodes image test_image_m4_driver; do
+#     pypoc/.venv/bin/wyrm -Iwy -Iwy/wyrm --build-bc "$work/$f.wy"
+#   done
+#   ./buildDir/src/wyrm/wyrm -I"$work" "$work/test_image_m4_driver.wyc"
+#
+# The real M4 acceptance gate is comparing to_wya()'s per-section hex bodies
+# against a `--strip` pypoc listing (comments ignored), and compiling the
+# to_c() output with gcc; see vm_plan/epic_9.md's M4 section.
+#
+# Output paths are hardcoded: no wy-visible argv builtin exists (see the M3
+# driver's header comment).
+
+import bjson::*
+import opcodes::*
+import image::*
+import std::io
+
+WYA_PATH := "/tmp/hello_built.wy_a"
+C_PATH := "/tmp/hello_built.c"
+
+fn build_hello_image() -> dict:
+    img := make_image("hello", 1, 2, 3)
+    img["statics"] = ["Hello ", "World"]
+    img["functions"] = [make_function("greet", [make_param("name")], 2, 11, 0)]
+    img["exports"] = {"greet": 0}
+    img["free"] = {"println": 1}
+
+    words := []
+    for w in pack("closure"):
+        words!append(w)
+    for w in pack("gset", f=0, a0=0):
+        words!append(w)
+    for w in pack("gget", f=0, a0=1):
+        words!append(w)
+    for w in pack("gget", f=1, a0=0):
+        words!append(w)
+    for w in pack("lconst", f=2, a0=1):
+        words!append(w)
+    for w in pack("call", f=1, a0=L(1), a1=1):
+        words!append(w)
+    for w in pack("call", f=1, a0=L(0), a1=1):
+        words!append(w)
+    for w in pack("return", f=0, a0=0):
+        words!append(w)
+    for w in pack("lconst", f=0, a0=0):
+        words!append(w)
+    for w in pack("add", f=0, a0=L(1), a1=L(0), a2=P(0)):
+        words!append(w)
+    for w in pack("return", f=1, a0=1):
+        words!append(w)
+
+    img["code"] = words
+    return img
+
+fn _write(path: str, text: str):
+    handle := std::io::open(path, "wb")
+    std::io::write(handle, text)
+    std::io::close(handle)
+
+fn main():
+    img := build_hello_image()
+
+    listing := to_wya(img)
+    if listing is error:
+        println("FAIL: to_wya errored: " + str(listing))
+        return
+    _write(WYA_PATH, listing)
+    println("wrote " + WYA_PATH)
+
+    c_text := to_c(img)
+    if c_text is error:
+        println("FAIL: to_c errored: " + str(c_text))
+        return
+    _write(C_PATH, c_text)
+    println("wrote " + C_PATH)
+
+main()

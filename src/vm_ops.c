@@ -213,7 +213,15 @@ wy_error wy_vm_is_f(wy_context* ctx, wy_value value, wy_value type_operand, wy_v
             match = value.type == WY_TYPE_TAG_STR;
         } else if (wy_strncmp_f(name->str, "nil", name->len) == 0 && name->len == 3) {
             match = value.type == WY_TYPE_TAG_NIL;
-        } else if (wy_strncmp_f(name->str, "symbol", name->len) == 0 && name->len == 6) {
+        } else if ((wy_strncmp_f(name->str, "sym", name->len) == 0 && name->len == 3)
+                   || (wy_strncmp_f(name->str, "symbol", name->len) == 0 && name->len == 6)) {
+            /* "sym" is the spelling the language actually uses (pypoc's
+             * PRIMITIVE_TYPES: str/int/float/bool/sym/bytes); only the
+             * longer "symbol" was listed here, so `x is sym` returned an
+             * "unknown primitive type name" error value for EVERY value,
+             * which an `if` then took as true. Found by epic 10's M1 port,
+             * whose sexpr walks ask `node is sym` constantly - the same
+             * omission epic 9 found for `bytes` just above. */
             match = value.type == WY_TYPE_TAG_SYMBOL;
         } else if (wy_strncmp_f(name->str, "error", name->len) == 0 && name->len == 5) {
             match = wy_value_is_error(value);

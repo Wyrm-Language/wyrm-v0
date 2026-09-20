@@ -175,6 +175,10 @@ TEST_SUITE("golden")
     TEST_CASE("coroutines") { check_fixture("coroutines"); }
     TEST_CASE("two_module report") { check_fixture("two_module/report"); }
     TEST_CASE("two_module geometry") { check_fixture("two_module/geometry"); }
+    TEST_CASE("two_module shapes") { check_fixture("two_module/shapes"); }
+    TEST_CASE("two_module shapes_main") { check_fixture("two_module/shapes_main"); }
+    TEST_CASE("two_module dunder_name") { check_fixture("two_module/dunder_name"); }
+    TEST_CASE("two_module dunder_name_main") { check_fixture("two_module/dunder_name_main"); }
     TEST_CASE("wildcard paint") { check_fixture("wildcard/paint"); }
     TEST_CASE("wildcard palette") { check_fixture("wildcard/palette"); }
     TEST_CASE("decorators decorated") { check_fixture("decorators/decorated"); }
@@ -211,6 +215,10 @@ TEST_SUITE("golden-gcstress")
     TEST_CASE("coroutines") { check_fixture_gcstress("coroutines"); }
     TEST_CASE("two_module report") { check_fixture_gcstress("two_module/report"); }
     TEST_CASE("two_module geometry") { check_fixture_gcstress("two_module/geometry"); }
+    TEST_CASE("two_module shapes") { check_fixture_gcstress("two_module/shapes"); }
+    TEST_CASE("two_module shapes_main") { check_fixture_gcstress("two_module/shapes_main"); }
+    TEST_CASE("two_module dunder_name") { check_fixture_gcstress("two_module/dunder_name"); }
+    TEST_CASE("two_module dunder_name_main") { check_fixture_gcstress("two_module/dunder_name_main"); }
     TEST_CASE("wildcard paint") { check_fixture_gcstress("wildcard/paint"); }
     TEST_CASE("wildcard palette") { check_fixture_gcstress("wildcard/palette"); }
     TEST_CASE("decorators decorated") { check_fixture_gcstress("decorators/decorated"); }

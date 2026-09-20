@@ -77,7 +77,10 @@ check("catch expr", Parser("a catch b catch c")!expression(),
 
 r_do := Parser("do: 5")!expression()
 check("do expr kind", car(r_do), 'do)
-check("do expr body", is_num_lit(cadr(r_do)), true)
+# A do: block's statements go through stmt_line, so a bare literal body is
+# an expr_stmt node - statement-position expressions are wrapped (see
+# _mk_stmt_expr in parser.wy).
+check("do expr body", cadr(r_do), $[ 'expr_stmt, $[ 'int, 5 ] ])
 
 check("return bare", Parser("return")!expression(), $[ 'return, nil ])
 check("return val", Parser("return a")!expression(), $[ 'return, 'a ])
@@ -87,10 +90,19 @@ check("yield from", Parser("yield from a")!expression(), $[ 'yield_from, 'a ])
 check("break", Parser("break")!expression(), 'break)
 check("continue", Parser("continue")!expression(), 'continue)
 check("pass", Parser("pass")!expression(), 'pass)
-check("if", Parser("if a: b")!expression(), $[ 'if, 'a, 'b, nil, nil ])
-check("if else", Parser("if a: b else: c")!expression(), $[ 'if, 'a, 'b, nil, 'c ])
-check("while", Parser("while a: b")!expression(), $[ 'while, 'a, 'b ])
-check("for", Parser("for x in a: b")!expression(), $[ 'for, 'x, 'a, 'b, nil ])
+check("if", Parser("if a: b")!expression(), $[ 'if, 'a, $[ 'expr_stmt, 'b ], nil, nil ])
+check("if else", Parser("if a: b else: c")!expression(), $[ 'if, 'a, $[ 'expr_stmt, 'b ], nil, $[ 'expr_stmt, 'c ] ])
+check("while", Parser("while a: b")!expression(), $[ 'while, 'a, $[ 'expr_stmt, 'b ] ])
+check("for", Parser("for x in a: b")!expression(), $[ 'for, 'x, 'a, $[ 'expr_stmt, 'b ], nil ])
+
+# Statement-position expression wrapping: an expression-shaped statement
+# becomes expr_stmt; the keyword-statement primaries (if/while/for/...)
+# keep their own kinds and single-statement bodies are wrapped the same
+# way (checked via the if/while/for expectations above).
+check("bare call is expr_stmt", Parser("f(x)")!stmt_line(), $[ 'expr_stmt, $[ 'call, 'f, $[ 'x ] ] ])
+check("bare name is expr_stmt", Parser("total")!stmt_line(), $[ 'expr_stmt, 'total ])
+check("if stmt stays unwrapped", Parser("if a: b")!stmt_line(), $[ 'if, 'a, $[ 'expr_stmt, 'b ], nil, nil ])
+check("return stmt stays unwrapped", Parser("return 5")!stmt_line(), $[ 'return, $[ 'int, 5 ] ])
 
 # var statement tests
 #
@@ -125,3 +137,30 @@ check("var multiple mixed value", is_num_lit(caddr(r_var_mixed)), true)
 
 # Test that var is not parsed as an expression
 check("var not expr", Parser("var x")!expression(), 'NO_MATCH)
+
+# A block-form primary (if/while/for) takes no postfix ops: a following
+# line that starts with `(` is a new statement, not a call on the block.
+r_glue := Parser("for a in v:\n    a\n(v) ! append(1)\n")!program()
+check("block then paren statement parses as two statements", len(cdr(r_glue)), 2)
+r_glue_if := Parser("if c:\n    a\n(v) ! append(1)\n")!program()
+check("if block then paren statement parses as two statements", len(cdr(r_glue_if)), 2)
+
+# Parenthesized tuples: a trailing comma makes a one-element tuple;
+# plain parens only group.
+check("paren single is grouping", Parser("(1)")!expression(), $[ 'int, 1 ])
+check("paren trailing comma is 1-tuple", Parser("(1,)")!expression(), $[ 'tuple, $[ 'int, 1 ] ])
+check("paren pair", Parser("(1, 2)")!expression(), $[ 'tuple, $[ 'int, 1 ], $[ 'int, 2 ] ])
+check("paren pair trailing comma", Parser("(1, 2,)")!expression(), $[ 'tuple, $[ 'int, 1 ], $[ 'int, 2 ] ])
+
+# Binary operator precedence: * / % bind tighter than + -, which bind tighter
+# than shifts, & , ^ , | (all left-associative).
+check("prec: + then *", Parser("a + b * c")!expression(),
+    $[ 'binop, '+, 'a, $[ 'binop, '*, 'b, 'c ] ])
+check("prec: * then +", Parser("a * b + c")!expression(),
+    $[ 'binop, '+, $[ 'binop, '*, 'a, 'b ], 'c ])
+check("prec: left assoc", Parser("a - b - c")!expression(),
+    $[ 'binop, '-, $[ 'binop, '-, 'a, 'b ], 'c ])
+check("prec: shift below additive", Parser("a << b + c")!expression(),
+    $[ 'binop, '<<, 'a, $[ 'binop, '+, 'b, 'c ] ])
+check("prec: and below shift, or below xor", Parser("a | b ^ c & d << e")!expression(),
+    $[ 'binop, '|, 'a, $[ 'binop, '^, 'b, $[ 'binop, '&, 'c, $[ 'binop, '<<, 'd, 'e ] ] ] ])
