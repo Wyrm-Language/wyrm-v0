@@ -35,21 +35,25 @@ Run a single doctest test case by name:
 Wyrm logic all follows the syntax defined in [language-spec.md](doc/language-spec.md)
 and grammar specified in [grammar.md](doc/grammar.md).
 
-This repository is intended to support bootstrapping .wy sources using a pre-existing
-installation or staged build. Prefer the default 'wyrm' in user `$PATH` if it is
-present -- this installation is the stable variant of the language and will avoid
-confusion caused by incomplete/experimental implementations provided here.
+The in-repo binary is self-sufficient: it compiles and runs `.wy` scripts
+with no Python and no external wyrm installation (the compiler, the `wy/`
+library modules, and the front end are embedded in the binary). Prefer it
+over any `wyrm` in user `$PATH` -- a pre-existing installation may be an
+older, divergent variant of the language. pypoc (a nested checkout) is
+optional: it regenerates golden fixtures and the compiler-suite seeds, and
+`meson test` passes without it.
 
-Scripts do expect the `wy` folder to be operative in path. To run a script:
+Scripts resolve imports through `-I` roots, then the embedded builtin
+modules. To run a script:
 
 ```sh
-wyrm -Iwy script_path.wy
+./buildDir/src/wyrm/wyrm -Iwy script_path.wy
 ```
 
 To test a script for syntax:
 
 ```sh
-wyrm -Iwy --check script_path.wy
+./buildDir/src/wyrm/wyrm -Iwy --check script_path.wy
 ```
 
 ## Debugging and Known Traps

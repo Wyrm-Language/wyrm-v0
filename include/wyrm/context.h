@@ -39,9 +39,15 @@ typedef struct wy_context_io
 
 /** The hook returns an image allocated through wy_context_gc_alloc. On
  * success ownership transfers to the loader (also on malformed-image failure).
- * On failure the hook retains responsibility for any allocation. */
+ * On failure the hook retains responsibility for any allocation.
+ *
+ * A hook may instead answer with a static image (epic 11's builtin module
+ * table): store the image pointer through `out_image` and leave `out_bytes`
+ * untouched. The loader then takes the module through wy_module_load_image,
+ * zero-copy - the image must outlive every context that loads it (static
+ * storage does). Exactly one of the two outputs must be set on success. */
 typedef wy_error (*wy_import_hook)(wy_context*, const char* path, wy_uword len,
-    wy_u8** out_bytes, wy_uword* out_len, void* ud);
+    wy_u8** out_bytes, wy_uword* out_len, const struct wy_module_image** out_image, void* ud);
 
 struct wy_context
 {

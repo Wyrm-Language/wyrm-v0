@@ -186,14 +186,21 @@ fixture's compiler-emitted `.wy_a` listing. `src/test/test_bytecode_golden.cpp`
 same check for the seven fixtures above, output captured via
 `ctx->io.write` and diffed against the corpus's committed `.out`.
 
-Practical implication: running a `.wy` script still needs `pypoc` to
-*compile* it first (`pypoc/.venv/bin/wyrm --build-bc`) — this repo has no
-front end of its own yet (that's Phase C, epics 8-11) — but once compiled,
-`wyrm file.wyc` runs it with no Python involved, for anything within epic
-2's opcode coverage above. For anything past that (closures with captures,
-classes, imports, coroutines...), embed via the C API and drive fibers
-with native `wy_exec_fn` C callables directly (see `src/test/test_wvm.cpp`'s "a bytecode
-callable resolves its module and returns" for the shape of that path).
+Practical implication (since epic 11): `wyrm` is self-sufficient. A `.wy`
+script compiles in-process — the front end, the compiler, and the `wy/`
+library modules are embedded in the binary as the builtin module table
+(`src/wyrm/embedded/`, resolution order: `-I` roots (`.wy` through the
+`.wyd` cache, then precompiled `.wyd`/`.wyc`), then the table) — and then
+runs: `./buildDir/src/wyrm/wyrm -Iwy test/bytecode/hello.wy` prints
+`Hello World` with no Python and no external wyrm on the machine.
+`--check`, `--build-bc`, `-m`, `--cache-dir`, and `-v` round out the CLI
+(exit codes: 0 ok, 1 compile/run failure, 2 usage). pypoc remains the
+second, independent implementation used to regenerate golden fixtures and
+the compiler-suite seeds; `meson test` passes without it (the compiler
+suite skips itself). For anything past the VM's opcode coverage, embed via
+the C API and drive fibers with native `wy_exec_fn` C callables directly
+(see `src/test/test_wvm.cpp`'s "a bytecode callable resolves its module and
+returns" for the shape of that path).
 
 ### Call/stack model
 

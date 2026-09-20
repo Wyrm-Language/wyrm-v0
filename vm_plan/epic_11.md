@@ -187,7 +187,57 @@ only if M4 needs to replicate the recursion, not just the single-file check); an
 
 ### M1 — Embed compiler + `wy/std` + `wy/wyrm` images into the binary
 
-**Scope.** Implement the embedding mechanism fixed by the contract (checked-in `wy_c`
+**Re-cut (2026-09-19, scan outcomes — supersedes the paragraphs below where they
+conflict).** The scan confirmed the contract and fixed its open mechanics:
+
+- **Hook signature.** The import hook returns *bytes*, but the contract fixes
+  table loading as `wy_module_load_image` on static images ("no parsing of
+  bytes"). `wy_import_hook` (include/wyrm/context.h) therefore gains a
+  `const wy_module_image** out_image` out-param; `wy_link_import` (src/link.c)
+  branches to `wy_module_load_image` when the hook sets it, else
+  `wy_module_load_bytes` as today. Callers to update: `wy_import_fs_hook`, the
+  two test hooks (test_link.cpp, test_bytecode_golden.cpp).
+- **Table placement.** The table rides `wy_import_fs_search_path`
+  (`builtins`/`builtin_count` fields) and is consulted at the hosted hook's
+  terminal miss (import_fs.c's `return WY_ERR_UNBOUND`). This makes the
+  expansion child inherit it for free (expand_native.c already copies
+  `import_hook`/`import_ud`), which is how the child finds
+  `wyrm::compiler::expand` once M1 lands. Mechanism in libcwyrm (import_fs.c);
+  the generated table + image `.c` payload compile into the `wyrm` executable
+  and `test_cwyrm` only — libcwyrm stays payload-free.
+- **Embed set = 23 images.** SELF_SOURCES minus `wyrm/__init__.wy` and
+  `wyrm/compiler.wy` (nothing imports them). `wy/std/io.wy` and the
+  `wy/std/expand.wy` stub are deliberately NOT embedded: `std::io` and
+  `std::expand` are host modules (installed by src/wyrm/main.c), and a
+  table-sourced `std::io` would silently break D10 (expansion VMs must fail on
+  host modules). Package-relative spellings get alias rows (`bjson`, `opcodes`
+  — image.wy:66-67 imports them without the `wyrm::` prefix).
+- **In-root extension order: `.wyd` before `.wyc`.** Mixed dirs hold a stale
+  pypoc artifact beside a fresh port one (build_expander recompiles ast/_dsl
+  over pypoc's copies); `.wyc`-first would load the wrong shape.
+- **Provenance: all `.wyd`, no pypoc seed.** The gen1 tree is fully
+  port-built since 10a M5, so every embedded image is wyrm-hosted-compiler
+  output; only the gen0 amalgam driver (not embedded) is pypoc-built.
+- **Regen without a build-time compiler.** `scripts/regen_builtins.py`
+  (maintainer-time, Python today — same tier as the sweep tests) rebuilds the
+  gen1 tree via the existing sweep helpers, compiles the new
+  `wy/wyrm/tools/embed_build.wy` driver with the tree's own compiler_main,
+  and runs it: embed_build compiles the embed list in-process and emits one
+  `to_c()` `.c` per module plus the table `.c` (image.wy's writer — the
+  wy-side writer, not pypoc's). `--check` diffs against `src/wyrm/embedded/`.
+  The meson staleness check is folded into the selfcompile test (which already
+  builds the tree): after the fixed point it runs embed_build from the fresh
+  tree and fails on drift. Post-M2 the check can shrink to the built binary's
+  own embedded compiler.
+- Generated sources land in `src/wyrm/embedded/`: per-module image `.c` + a
+  generated unity `embedded_images.c` + `wyrm_builtins_table.c` (so the meson
+  file lists exactly two generated files and never changes on regen), plus a
+  hand-written `builtins.h`. M1's acceptance doctest lives in test_link.cpp
+  (table hit with no filesystem roots; `-I` shadow wins; miss stays
+  WY_ERR_UNBOUND), with a tiny committed pypoc-built shadow fixture under
+  `test/bytecode/embedded/shadow/`.
+
+**Scope (original).** Implement the embedding mechanism fixed by the contract (checked-in `wy_c`
 image `.c` files). Produce
 `.c` arrays (via `wy/wyrm/image.wy`'s `to_c()`) for every module the runtime needs before
 it can compile anything itself: the compiler's own modules

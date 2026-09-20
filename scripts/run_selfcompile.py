@@ -70,10 +70,10 @@ def ensure_dirs(tree, rels):
 
 
 def root_package_alias(tree):
-    """The C VM resolves the `wyrm` package root via <root>/wyrm.wyc."""
-    src = os.path.join(tree, "wyrm", "__init__.wyc")
+    """The C VM resolves the `wyrm` package root via <root>/wyrm.wyd."""
+    src = os.path.join(tree, "wyrm", "__init__.wyd")
     if os.path.exists(src):
-        shutil.copyfile(src, os.path.join(tree, "wyrm.wyc"))
+        shutil.copyfile(src, os.path.join(tree, "wyrm.wyd"))
 
 
 def compile_tree(driver_wyc, extra_include, out_tree, src_root):
@@ -115,10 +115,20 @@ def collect_wycs(tree):
     out = {}
     for root, _dirs, files in os.walk(tree):
         for f in files:
-            if f.endswith(".wyc"):
+            # .wyd since epic 11 M1: the port writes .wyd, pypoc .wyc.
+            if f.endswith(".wyd"):
                 path = os.path.join(root, f)
                 out[os.path.relpath(path, tree)] = path
     return out
+
+
+def check_embedded_images(tree):
+    """Epic 11 M1: the checked-in builtin table sources (src/wyrm/embedded/)
+    must match what this fresh tree's compiler produces from wy/ - the meson
+    staleness check for the embedded images. Runs after the fixed point so a
+    drifted embed list fails the test, not just the build."""
+    import regen_builtins
+    return regen_builtins.check_tree(tree)
 
 
 def main():
@@ -144,7 +154,7 @@ def main():
 
         # Generation 2: generation 1's own compiler_main, on the C VM,
         # importing generation 1's module tree, compiling the same sources.
-        gen2_entry = os.path.join(out1, "wyrm", "tools", "compiler_main.wyc")
+        gen2_entry = os.path.join(out1, "wyrm", "tools", "compiler_main.wyd")
         compile_tree(gen2_entry, out1, out2, wy_root)
 
         w1 = collect_wycs(out1)
@@ -158,6 +168,8 @@ def main():
         print("generation 1: %d images, generation 2: %d images" % (len(w1), len(w2)))
         if not missing and not differing:
             print("fixed point: CONVERGED byte-for-byte (diff -r empty)")
+            if not check_embedded_images(out1):
+                return 1
             return 0
 
         for name in missing:
@@ -178,7 +190,7 @@ def main():
         # wants; byte-identity between gen1 and gen2 is the stronger,
         # incidental form of the same thing).
         out3 = os.path.join(work, "gen3")
-        gen3_entry = os.path.join(out2, "wyrm", "tools", "compiler_main.wyc")
+        gen3_entry = os.path.join(out2, "wyrm", "tools", "compiler_main.wyd")
         compile_tree(gen3_entry, out2, out3, wy_root)
         w3 = collect_wycs(out3)
         gen23_diff = [name for name in sorted(set(w2) & set(w3))
@@ -190,6 +202,8 @@ def main():
                   "provenance (amalgam vs linked module set)")
             for name in differing:
                 print("  (gen1/gen2 provenance delta: %s)" % name)
+            if not check_embedded_images(out2):
+                return 1
             return 0
         print("fixed point: FAILED (generation 2 -> 3 does not reproduce)")
         for name in gen23_diff:

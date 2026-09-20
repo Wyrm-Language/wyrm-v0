@@ -3,21 +3,56 @@
 
 #include <wyrm/allocator.h>
 #include <wyrm/context.h>
+#include <wyrm/image.h>
 
 WY_BEGIN_DECLS
 
 /**
- * A filesystem module search path (the `-I dir` roots of the CLI).
+ * One builtin module table row (epic 11): a virtual import path and the
+ * static `wy_module_image` served for it. The image must be static storage
+ * (or otherwise outlive every context that loads it): loading is
+ * wy_module_load_image, zero-copy.
+ */
+typedef struct wy_import_fs_builtin
+{
+    const char* path;              /**< virtual import path, `"a::b::c"` */
+    const wy_module_image* image;  /**< static image answered for `path` */
+} wy_import_fs_builtin;
+
+/**
+ * A filesystem module search path (the `-I dir` roots of the CLI), plus the
+ * builtin module table always consulted last (epic 11's resolution order:
+ * per root - .wy source through the cache, then .wyd, then .wyc - then the
+ * table; a disk module shadows a builtin).
  *
  * Owns its strings and its root table, both allocated through the
- * `wy_allocator` handed to wy_import_fs_add_root. Pass its address as the
- * `ud` argument to wy_import_fs_hook via `context->import_ud`.
+ * `wy_allocator` handed to wy_import_fs_add_root. The table is not owned -
+ * it points at static rows, typically the generated `wyrm_builtin_modules`
+ * (src/wyrm/embedded/). Pass its address as the `ud` argument to
+ * wy_import_fs_hook via `context->import_ud`; hosts that copy the hook into
+ * another context (the expansion VM) copy the table and cache config with
+ * it.
  */
 typedef struct wy_import_fs_search_path
 {
     const char** roots;
     wy_uword count;
     wy_uword capacity;
+    const wy_import_fs_builtin* builtins; /**< last resolution step; may be NULL */
+    wy_uword builtin_count;
+    const char* cache_dir;     /**< --cache-dir prefix; NULL = __wycache__ beside sources */
+    bool verbose;              /**< -v: one stderr line per resolution */
+    /**
+     * Compiles a .wy source to container bytes (the embedded compiler; the
+     * CLI provides it - a hook may not call back into the *requesting* VM,
+     * so the implementation runs the compiler on an independent machine).
+     * Called for a root's `<path>.wy` hit on a cache miss; NULL disables
+     * .wy source resolution entirely (the pre-M3 loader behavior).
+     */
+    wy_error (*compile)(void* ud, wy_context* requester, const char* source_path,
+        const wy_u8* source, wy_uword source_len,
+        wy_u8** out_bytes, wy_uword* out_len, const char** msg);
+    void* compile_ud;
 } wy_import_fs_search_path;
 
 /** Zero-initialize a search path before the first wy_import_fs_add_root. */
@@ -38,15 +73,30 @@ void wy_import_fs_search_path_finalize_f(wy_allocator* allocator, wy_import_fs_s
 
 /**
  * The hosted `wy_import_hook`: resolve `path` (a `::`-joined module path,
- * `len` bytes) to `<root>/<path-with-slashes>.wyc` under each root in order.
- * The first existing file wins; there is no `.wy` source-compile fallback.
+ * `len` bytes) under each root in order, first hit wins:
  *
- * On success the bytes are allocated through wy_context_gc_alloc and
+ *   1. `<root>/<path-with-slashes>.wy` - a source file, compiled through
+ *      the .wyd cache (epic 11 M3): a valid `<dir>/__wycache__/<name>.wyd`
+ *      (or `--cache-dir` prefix) is served as bytes; a miss calls the
+ *      search path's `compile` hook (if set) and stores the result
+ *      best-effort. Any cache I/O failure is silently skipped.
+ *   2. `<root>/<path-with-slashes>.wyd` - a precompiled port-built image.
+ *   3. `<root>/<path-with-slashes>.wyc` - a precompiled pypoc image.
+ *
+ * .wyd comes before .wyc so a stale pypoc artifact never shadows a fresh
+ * port build in a mixed tree. There is no further fallback. After the last
+ * root, the search path's builtin table is scanned (epic 11): a hit is
+ * answered through `out_image` as a static image, leaving `out_bytes`
+ * untouched.
+ *
+ * On the bytes path the bytes are allocated through wy_context_gc_alloc and
  * ownership transfers to the loader (also on a malformed image), matching
- * wy_link_import's contract. A missing module returns WY_ERR_UNBOUND.
+ * wy_link_import's contract. A missing module returns WY_ERR_UNBOUND; a
+ * .wy source that fails to compile returns the compile hook's error (with
+ * a diagnostic on stderr).
  */
 wy_error wy_import_fs_hook(wy_context* context, const char* path, wy_uword len,
-    wy_u8** out_bytes, wy_uword* out_len, void* ud);
+    wy_u8** out_bytes, wy_uword* out_len, const wy_module_image** out_image, void* ud);
 
 /**
  * Read a whole file into a wy_context_gc_alloc buffer (never raw malloc), so

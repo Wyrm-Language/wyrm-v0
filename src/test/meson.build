@@ -33,9 +33,12 @@ extra_test_inc += include_directories('.')
 project_root = meson.project_source_root()
 
 # The embedded-image fixtures (epic 1 M4/M5): compiled straight into
-# test_cwyrm so a test can load them with no file I/O at all.
+# test_cwyrm so a test can load them with no file I/O at all. The builtin
+# module table (epic 11 M1) rides along for the import-resolution tests.
 test_cwyrm_embedded_sources = files(
     '../../test/bytecode/embedded/hello_1.c',
+    '../wyrm/embedded/embedded_images.c',
+    '../wyrm/embedded/wyrm_builtins_table.c',
 )
 
 test_cwyrm_exe = executable('test_cwyrm',

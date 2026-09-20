@@ -320,14 +320,18 @@ fn [ModuleImage] add_message(path) -> int | error:
         if symbol is error:
             return symbol
         syms ! append(symbol)
-    # "_path" is for listings only and is stripped before encoding, as
-    # in image.py. (Bound through a local rather than a line-initial
-    # `(this.messages)`: a statement starting with `(` right after a
-    # block-form `for` glues onto the for-expression as a postfix call
-    # in wy/wyrm's packrat parser - a front-end quirk, see the epic
-    # report - and add_message is compiled by the self-compile pass.)
+    # "_path" is the LIST of name parts, for listings only and stripped
+    # before encoding, as in image.py (its consumers: image.wy's
+    # _describe/_message_note and verify.wy's message reports all
+    # _join it themselves - the joined-string shape this slot held
+    # before epic 11 broke all three). (Bound through a local rather
+    # than a line-initial `(this.messages)`: a statement starting with
+    # `(` right after a block-form `for` glues onto the for-expression
+    # as a postfix call in wy/wyrm's packrat parser - a front-end quirk,
+    # see the epic report - and add_message is compiled by the
+    # self-compile pass.)
     msgs := this.messages
-    msgs ! append({"p": syms, "_path": key})
+    msgs ! append({"p": syms, "_path": parts})
     this._message_index[key] = index
     return index
 

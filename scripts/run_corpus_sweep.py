@@ -143,16 +143,19 @@ def build_amalgam(workdir):
 
 def build_expander(workdir, driver_wyc):
     """Epic 10a M3: compile the decorator expander (wy/wyrm/compiler/expand.wy)
-    into <workdir>/wyrm/compiler/expand.wyc, where a throwaway expansion VM's
+    into <workdir>/wyrm/compiler/expand.wyd, where a throwaway expansion VM's
     import hook finds it. pypoc cannot build it (it does not know the C VM's
     tree_box/bind_message builtins), but the expander has no decorators, so
-    the decorator-free gen0 driver compiles it."""
+    the decorator-free gen0 driver compiles it. Epic 11 M1: the driver writes
+    .wyd (port provenance), and each recompiled module's stale pypoc .wyc is
+    removed - the import hook prefers .wyd, but keeping one extension per
+    module makes the tree unambiguous."""
     out = os.path.join(workdir, "wyrm", "compiler")
     os.makedirs(out, exist_ok=True)
     src = os.path.join(ROOT, "wy", "wyrm", "compiler", "expand.wy")
     r = subprocess.run([WYRM, "-I" + workdir, driver_wyc, out, src],
                        capture_output=True, text=True, timeout=300)
-    if r.returncode != 0 or not os.path.exists(os.path.join(out, "expand.wyc")):
+    if r.returncode != 0 or not os.path.exists(os.path.join(out, "expand.wyd")):
         print(r.stdout, r.stderr, file=sys.stderr)
         sys.exit("corpus sweep: the expander failed to compile")
 
@@ -168,6 +171,9 @@ def build_expander(workdir, driver_wyc):
         if r.returncode != 0 or ("OK " + os.path.basename(rel)[:-3]) not in r.stdout:
             print(r.stdout, r.stderr, file=sys.stderr)
             sys.exit("corpus sweep: %s failed to compile with the port" % rel)
+        stale = os.path.join(wyrm_out, os.path.basename(rel)[:-3] + ".wyc")
+        if os.path.exists(stale):
+            os.remove(stale)
 
 
 def manifest_rows():
@@ -259,7 +265,8 @@ def main():
         verdicts = []
         for src in sources:
             name = stem(src)
-            wyc = os.path.join(out_dir, name + ".wyc")
+            # The driver writes .wyd since epic 11 M1 (port provenance).
+            wyc = os.path.join(out_dir, name + ".wyd")
             if not os.path.exists(wyc):
                 verdict = "REFUSED"
                 note = EXPECTED_DIVERGES.get(rel_of(src), "")

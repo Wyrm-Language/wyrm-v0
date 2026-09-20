@@ -3,6 +3,7 @@
 #include <wyrm/dict.h>
 #include <wyrm/error.h>
 #include <wyrm/function.h>
+#include <wyrm/image.h>
 #include <wyrm/string.h>
 
 #include <stdio.h>
@@ -252,11 +253,18 @@ wy_error wy_link_import(wy_context* ctx, wy_string* path, wy_module** out)
     if (ctx->import_hook == WY_NULL) { return WY_ERR_UNBOUND; }
     wy_u8* bytes = WY_NULL;
     wy_uword len = 0;
-    wy_error err = ctx->import_hook(ctx, path->str, path->len, &bytes, &len, ctx->import_ud);
+    const wy_module_image* image = WY_NULL;
+    wy_error err = ctx->import_hook(ctx, path->str, path->len, &bytes, &len, &image, ctx->import_ud);
     if (err != WY_ERR_NONE) { return err; }
     wy_module* dep = WY_NULL;
-    err = wy_module_load_bytes(ctx, bytes, len, true, &dep);
-    if (err != WY_ERR_NONE) { wy_context_gc_free(ctx, bytes); return err; }
+    if (image != WY_NULL) {
+        /* Static image (builtin module table): zero-copy, nothing to free. */
+        err = wy_module_load_image(ctx, image, &dep);
+        if (err != WY_ERR_NONE) { return err; }
+    } else {
+        err = wy_module_load_bytes(ctx, bytes, len, true, &dep);
+        if (err != WY_ERR_NONE) { wy_context_gc_free(ctx, bytes); return err; }
+    }
     dep->import_path = path;
     err = wy_context_intern(ctx, path->str, path->len, &dep->name);
     if (err != WY_ERR_NONE) { return err; }

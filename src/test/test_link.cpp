@@ -14,8 +14,11 @@
 #include <wyrm/link.h>
 #include <wyrm/module.h>
 #include <wyrm/opcode.h>
+#include <wyrm/platform/hosted/import_fs.h>
 #include <wyrm/value.h>
 #include <test_common/test_fiber_fixture.h>
+
+#include "../wyrm/embedded/builtins.h"
 
 namespace {
 
@@ -401,7 +404,7 @@ TEST_SUITE("link") {
         wy_string* path;
         REQUIRE_EQ(wy_string_strdup(ctx, "missing", &path), WY_ERR_NONE);
         CHECK_EQ(wy_link_import(ctx, path, &found), WY_ERR_UNBOUND);
-        ctx->import_hook = [](wy_context* context, const char*, wy_uword, wy_u8** bytes, wy_uword* len, void*) -> wy_error {
+        ctx->import_hook = [](wy_context* context, const char*, wy_uword, wy_u8** bytes, wy_uword* len, const wy_module_image**, void*) -> wy_error {
             *len = 4;
             *bytes = static_cast<wy_u8*>(wy_context_gc_alloc(context, *len));
             std::memset(*bytes, 0, *len);
@@ -430,5 +433,83 @@ TEST_SUITE("link") {
         CHECK_EQ(modules[1]->state, WY_MODULE_FAILED);
         CHECK_EQ(modules[2]->state, WY_MODULE_FAILED);
         CHECK_EQ(modules[3]->state, WY_MODULE_LOADED);
+    }
+}
+
+TEST_SUITE("builtin_table") {
+    // Epic 11 M1: the embedded compiler + library images, consulted by the
+    // hosted import hook after every -I root misses (src/wyrm/embedded/).
+
+    static wy_import_fs_search_path table_search_path()
+    {
+        wy_import_fs_search_path search;
+        wy_import_fs_search_path_init_s(&search);
+        search.builtins = wyrm_builtin_modules;
+        search.builtin_count = wyrm_builtin_module_count;
+        return search;
+    }
+
+    TEST_CASE("wyrm::compiler::module resolves from the builtin table with no filesystem") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_import_fs_search_path search = table_search_path();  // no roots at all
+        ctx->import_hook = wy_import_fs_hook;
+        ctx->import_ud = &search;
+
+        wy_module* module = nullptr;
+        wy_string* path;
+        REQUIRE_EQ(wy_string_strdup(ctx, "wyrm::compiler::module", &path), WY_ERR_NONE);
+        REQUIRE_EQ(wy_link_import(ctx, path, &module), WY_ERR_NONE);
+        REQUIRE_NE(module, nullptr);
+        // The real compiler module, not a stub: a five-word fixture would
+        // not compile anything.
+        CHECK_GT(module->code_len, 1000u);
+        CHECK_EQ(ctx->module_count, 1u);
+
+        // The expander the std::expand child VM loads by name.
+        wy_module* expander = nullptr;
+        wy_string* expand_path;
+        REQUIRE_EQ(wy_string_strdup(ctx, "wyrm::compiler::expand", &expand_path), WY_ERR_NONE);
+        CHECK_EQ(wy_link_import(ctx, expand_path, &expander), WY_ERR_NONE);
+
+        // Package-relative spellings (image.wy imports `bjson::*`) resolve too.
+        wy_module* alias = nullptr;
+        wy_string* alias_path;
+        REQUIRE_EQ(wy_string_strdup(ctx, "bjson", &alias_path), WY_ERR_NONE);
+        CHECK_EQ(wy_link_import(ctx, alias_path, &alias), WY_ERR_NONE);
+        CHECK_NE(alias, module);
+    }
+
+    TEST_CASE("a same-named module in a -I root shadows the builtin table") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_import_fs_search_path search = table_search_path();
+        std::string shadow = std::string(WY_TEST_BYTECODE_DIR) + "/embedded/shadow";
+        REQUIRE_EQ(wy_import_fs_add_root(wy_context_get_machine(ctx)->allocator,
+            &search, shadow.c_str()), WY_ERR_NONE);
+        ctx->import_hook = wy_import_fs_hook;
+        ctx->import_ud = &search;
+
+        wy_module* module = nullptr;
+        wy_string* path;
+        REQUIRE_EQ(wy_string_strdup(ctx, "wyrm::compiler::module", &path), WY_ERR_NONE);
+        REQUIRE_EQ(wy_link_import(ctx, path, &module), WY_ERR_NONE);
+        REQUIRE_NE(module, nullptr);
+        // The shadow fixture is `x := 1` compiled by pypoc - a handful of
+        // words, not the embedded compiler module's thousand-plus.
+        CHECK_LT(module->code_len, 100u);
+    }
+
+    TEST_CASE("a module in neither a root nor the table stays WY_ERR_UNBOUND") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_import_fs_search_path search = table_search_path();
+        ctx->import_hook = wy_import_fs_hook;
+        ctx->import_ud = &search;
+
+        wy_module* module = nullptr;
+        wy_string* path;
+        REQUIRE_EQ(wy_string_strdup(ctx, "no::such::module", &path), WY_ERR_NONE);
+        CHECK_EQ(wy_link_import(ctx, path, &module), WY_ERR_UNBOUND);
     }
 }

@@ -13,14 +13,16 @@
 #   (scripts/run_selfcompile.py, generation 2): the mirror-mode import
 #   below resolves against the compiled module tree it sits in, and
 #
-#     ./buildDir/src/wyrm/wyrm -I<tree> <tree>/wyrm/compiler_main.wyc \
+#     ./buildDir/src/wyrm/wyrm -I<tree> <tree>/wyrm/tools/compiler_main.wyd \
 #         --mirror <src-root> <out-dir> <rel-path>.wy ...
 #
-#   writes <out-dir>/<dir(rel-path)>/<stem>.wyc - the mirror layout the
+#   writes <out-dir>/<dir(rel-path)>/<stem>.wyd - the mirror layout the
 #   next generation's imports need.
 #
 # For each fixture: read it, parse it with wy/wyrm's own parser, compile it
-# with compile_module (verify on, stubs off), and write the .wyc. Compile
+# with compile_module (verify on, stubs off), and write the .wyd - .wyd is
+# the wyrm-hosted compiler's extension (epic 11): pypoc writes .wyc, this
+# writes .wyd; the C VM's import hook accepts both, .wyd first. Compile
 # failures print REFUSED and keep going - a refused fixture is a corpus
 # fact, not a crash. Output directories must already exist.
 
@@ -96,7 +98,7 @@ fn compile_one(out_dir: str, path: str) -> bool:
     if blob is error:
         println("REFUSED " + name + " (serialize)")
         return false
-    out := out_dir + "/" + name + ".wyc"
+    out := out_dir + "/" + name + ".wyd"
     h2 := std::io::open(out, "wb")
     std::io::write(h2, blob)
     std::io::close(h2)

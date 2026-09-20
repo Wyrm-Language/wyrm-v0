@@ -9,7 +9,7 @@ touching `src/vm*.c`, `wy/wyrm/*.wy`, or the self-hosted compiler.
 |---|---|
 | pypoc tree-walker (`wyrm_eval_parse_tree.py`) | **Semantic reference** (stays long term). Where engines disagree, match this. |
 | pypoc bytecode compiler + VM | Being retired; bug-compatible only where cheap. |
-| This repo's C VM (`buildDir/src/wyrm/wyrm`) | Runs `.wyc` only. No `.wy` source execution. |
+| This repo's C VM (`buildDir/src/wyrm/wyrm`) | Compiles and runs `.wy` in-process (epic 11: builtin module table + `__wycache__` .wyd cache); runs `.wyc`/`.wyd` directly. Self-sufficient - no Python. |
 | Ported compiler (`wy/wyrm/compiler/*.wy`) | Runs on the C VM, compiled by pypoc (gen0) or by itself (gen1+). |
 
 - Always use `pypoc/.venv/bin/wyrm`, never `~/tools/bin/wyrm` (stale checkout).
@@ -138,9 +138,12 @@ Symptom -> usual cause seen so far:
 
 - Decorators are expanded in a **throwaway VM** (`std::expand::expand`,
   `src/platform/hosted/expand_native.c`); the expander is `wy/wyrm/compiler/expand.wy`. The child
-  uses the parent's import hook, so the expander and every decorator module must be `.wyc`
-  images on the compile's `-I` path. The scope module holds *all* of a module's imports, so
-  a module with decorators cannot import `std::io` (or any host module).
+  reuses the parent's import hook *including the builtin module table* (epic 11), so the
+  expander and the whole compiler tier resolve with no file on disk; decorator modules the
+  compiled module imports resolve from `-I` roots (`.wy` sources compile through the .wyd
+  cache on a scratch machine; `.wyc`/`.wyd` load directly). The scope module holds *all* of a
+  module's imports, so a module with decorators cannot import `std::io` (or any host module;
+  the builtin table deliberately omits `std::io`/`std::expand` so this stays true).
 - C code holding values across VM runs in ANY context must root them
   (`wy_context_root_push_f`): module init runs GC safepoints. An unrooted copied-in tree was
   freed mid-expansion (5000-element list came back length 1).

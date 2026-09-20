@@ -362,15 +362,27 @@ fn to_wyc(image: dict) -> bytes | error:
 # --------------------------------------------------------------------------
 # listing helpers (image.py's _listing helpers)
 
+# wy strings are immutable and `+` copies both sides, so the obvious
+# one-part-at-a-time loop is quadratic in the output size - it made to_c
+# stall on parser-sized images (40k+ lines, minutes of memcpy). Pairwise
+# halving copies the whole output O(log n) times instead; same result.
 fn _join(parts: list, sep: str) -> str:
-    out := ""
-    i := 0
-    for part in parts:
-        if i > 0:
-            out = out + sep
-        out = out + part
-        i = i + 1
-    return out
+    n := len(parts)
+    if n == 0:
+        return ""
+    cur := parts
+    while len(cur) > 1:
+        nxt := []
+        i := 0
+        m := len(cur)
+        while i < m:
+            if i + 1 < m:
+                nxt ! append(cur[i] + sep + cur[i + 1])
+            else:
+                nxt ! append(cur[i])
+            i = i + 2
+        cur = nxt
+    return cur[0]
 
 fn _pad_to(text: str, width: int) -> str:
     while len(text) < width:
@@ -714,6 +726,18 @@ fn _replace_all(text: str, needle: str, replacement: str) -> str:
             i = i + 1
     return out
 
+# C block comments have no escapes and end at the first "*/", so annotation
+# text that quotes a string constant containing "*/" (image.wy's own header
+# text, when image.wy compiles itself) would close the comment mid-line and
+# break the generated C. Break the sequence instead; pypoc's to_c has the
+# same latent bug (its comments are unescaped too), so this only differs
+# where pypoc would emit uncompilable output.
+fn _c_comment(text: str) -> str:
+    star := _char_from_cp(42)
+    slash := _char_from_cp(47)
+    backslash := _char_from_cp(92)
+    return _replace_all(text, star + slash, star + backslash + slash)
+
 fn to_c(image: dict, header_include: str = "wyrm/image.h") -> str | error:
     symbol := _replace_all(image["name"], "::", "__")
     if not _is_identifier(symbol):
@@ -772,7 +796,7 @@ fn to_c(image: dict, header_include: str = "wyrm/image.h") -> str | error:
         note := _annotate(rec, image, global_names)
         if note != "":
             text = text + "   " + note
-        out!append("    " + _pad_to(body, 26) + " /* " + _hex4(offset) + "  " + text + " */")
+        out!append("    " + _pad_to(body, 26) + " /* " + _hex4(offset) + "  " + _c_comment(text) + " */")
     out!append("};")
     out!append("")
     out!append("const wy_module_image " + symbol + "_image = {")

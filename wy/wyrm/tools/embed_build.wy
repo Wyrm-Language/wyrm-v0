@@ -1,0 +1,159 @@
+# wy/wyrm/tools/embed_build.wy - epic 11 M1
+#
+# Emits the builtin module table's checked-in C sources: for every module on
+# the embed list it compiles the .wy source (exactly like compiler_main does:
+# parse, compile_module strict, the decorator expander on) and writes the
+# static wy_module_image C array via wyrm::image's to_c(), plus the generated
+# table .c and the unity-include .c that meson compiles. Output goes to
+# src/wyrm/embedded/ via scripts/regen_builtins.py; the files are checked in,
+# so neither the build nor meson test ever needs a compiler or Python to
+# produce them.
+#
+# Run it against a self-compiled compiler tree (see regen_builtins.py):
+#
+#     ./buildDir/src/wyrm/wyrm -I<tree> -I<tree>/wyrm -I<tree>/wyrm/compiler \
+#         <tree-out>/wyrm/tools/embed_build.wyd <wy-src-root> <out-dir>
+#
+# Every embedded image is .wyd provenance: the wyrm-hosted compiler built it
+# (the gen0 amalgam that bootstraps the tree is pypoc's, but it is not
+# embedded). std::io and std::expand are host modules installed by
+# src/wyrm/main.c and are deliberately absent: a table-sourced std::io would
+# break the expansion VM's "no host modules" rule (epic 10a D10).
+
+import std::io
+import wyrm::parser::*
+import wyrm::compiler::module::*
+import wyrm::compiler::expansion::*
+import wyrm::image::*
+import wyrm::opcodes::*
+
+# The embed list: [path relative to wy/, virtual import path]. The order is
+# the table's row order. These are SELF_SOURCES (run_selfcompile.py) - the
+# package marker wyrm/__init__.wy and the wyrm::compiler aggregator are
+# embedded too: the import opcode resolves every path prefix in turn, so
+# `import wyrm::compiler::module` needs `wyrm` and `wyrm::compiler` rows.
+EMBED := [["std/ctype.wy", "std::ctype"], ["std/pairs.wy", "std::pairs"], ["wyrm/_dsl.wy", "wyrm::_dsl"], ["wyrm/ast.wy", "wyrm::ast"], ["wyrm/bjson.wy", "wyrm::bjson"], ["wyrm/decode.wy", "wyrm::decode"], ["wyrm/image.wy", "wyrm::image"], ["wyrm/opcodes.wy", "wyrm::opcodes"], ["wyrm/parser.wy", "wyrm::parser"], ["wyrm/tokenizer.wy", "wyrm::tokenizer"], ["wyrm/compiler/analysis.wy", "wyrm::compiler::analysis"], ["wyrm/compiler/classes.wy", "wyrm::compiler::classes"], ["wyrm/compiler/context.wy", "wyrm::compiler::context"], ["wyrm/compiler/expand.wy", "wyrm::compiler::expand"], ["wyrm/compiler/expansion.wy", "wyrm::compiler::expansion"], ["wyrm/compiler/expressions.wy", "wyrm::compiler::expressions"], ["wyrm/compiler/functions.wy", "wyrm::compiler::functions"], ["wyrm/compiler/handlers.wy", "wyrm::compiler::handlers"], ["wyrm/compiler/module.wy", "wyrm::compiler::module"], ["wyrm/compiler/predefined.wy", "wyrm::compiler::predefined"], ["wyrm/compiler/statements.wy", "wyrm::compiler::statements"], ["wyrm/compiler/verify.wy", "wyrm::compiler::verify"], ["wyrm/compiler.wy", "wyrm::compiler"], ["wyrm/tools/compile_source.wy", "wyrm::tools::compile_source"], ["wyrm/tools/compiler_main.wy", "wyrm::tools::compiler_main"], ["wyrm/__init__.wy", "wyrm"]]
+
+# Package-relative spellings (image.wy imports `bjson::*`/`opcodes::*`, not
+# wyrm::bjson): extra table rows pointing at the same images.
+ALIAS_SYMBOLS := ["bjson", "opcodes"]
+
+fn basename(path: str) -> str:
+    last := 0
+    i := 0
+    n := len(path)
+    while i < n:
+        if path[i] == 47:  # '/'
+            last = i + 1
+        i = i + 1
+    return substr(path, last, n - last)
+
+fn stem(name: str) -> str:
+    n := len(name)
+    if (n > 3) and (substr(name, n - 3, 3) == ".wy"):
+        return substr(name, 0, n - 3)
+    return name
+
+# "wyrm/compiler/module.wy" -> "wyrm_compiler_module" (the .c file stem; the
+# image symbol inside comes from to_c and is the module's own stem).
+fn c_file_stem(rel: str) -> str:
+    out := ""
+    i := 0
+    n := len(rel)
+    while i < n:
+        if rel[i] == 47:  # '/'
+            out = out + "_"
+        else:
+            if i < n - 3:  # drop the trailing ".wy" (every EMBED path ends in it)
+                out = out + substr(rel, i, 1)
+        i = i + 1
+    return out
+
+fn join_lines(lines: list) -> str:
+    out := ""
+    i := 0
+    n := len(lines)
+    while i < n:
+        if i > 0:
+            out = out + "\n"
+        out = out + lines[i]
+        i = i + 1
+    return out + "\n"
+
+fn write_text(path: str, text: str) -> bool:
+    h := std::io::open(path, "wb")
+    if h is error:
+        println("EMBED-FAIL " + path + " (open for write)")
+        return false
+    w := std::io::write(h, text)
+    std::io::close(h)
+    if w is error:
+        println("EMBED-FAIL " + path + " (write)")
+        return false
+    return true
+
+# Compile one embed-list module and write its image .c; answers the .c file
+# stem, or an error value.
+fn embed_one(src_root: str, out_dir: str, rel: str):
+    path := src_root + "/" + rel
+    name := stem(basename(rel))
+    h := std::io::open(path, "r")
+    src := std::io::read(h, 10000000)
+    std::io::close(h)
+    if src is error:
+        return error("unreadable")
+    tree := Parser(src)!program()
+    if tree is error:
+        return error("parse")
+    img := compile_module(tree, name, path, true, false, false, false, expand_decorators)
+    if img is error:
+        return error("compile: " + str(error_message(img)))
+    text := to_c(img)
+    if text is error:
+        return error("to_c: " + str(error_message(text)))
+    file_stem := c_file_stem(rel)
+    if not write_text(out_dir + "/" + file_stem + ".c", text):
+        return error("write failed")
+    return file_stem
+
+args := __ARGS
+if len(args) != 2:
+    println("usage: embed_build.wyd <wy-src-root> <out-dir>")
+else:
+    q := _char_from_cp(34)  # wy strings have no \" escape; image.wy does the same dance
+    src_root := args[0]
+    out_dir := args[1]
+    unity := ["/* Generated by wy/wyrm/tools/embed_build.wy - every embedded image", "   translation unit in one include, so meson lists exactly one file.", "   Do not edit; regenerate with scripts/regen_builtins.py. */", ""]
+    rows := []
+    failed := 0
+    for row in EMBED:
+        rel := row[0]
+        got := embed_one(src_root, out_dir, rel)
+        if got is error:
+            println("EMBED-FAIL " + rel + " (" + str(error_message(got)) + ")")
+            failed = failed + 1
+        else:
+            # row: [virtual import path, image symbol stem, .c file stem]
+            rows ! append([row[1], stem(basename(rel)), got])
+            unity ! append("#include " + q + got + ".c" + q)
+    for sym in ALIAS_SYMBOLS:
+        rows ! append([sym, sym, ""])
+    tbl := ["/* Generated by wy/wyrm/tools/embed_build.wy (scripts/regen_builtins.py) - do not edit. */", "", "#include <wyrm/platform/hosted/import_fs.h>", "", "/* Image symbols, defined in embedded_images.c's translation units: */", ""]
+    for row in rows:
+        if row[2] != "":
+            tbl ! append("extern const wy_module_image " + row[1] + "_image;")
+    tbl ! append("")
+    tbl ! append("const wy_import_fs_builtin wyrm_builtin_modules[] = {")
+    for row in rows:
+        tbl ! append("    { " + q + row[0] + q + ", &" + row[1] + "_image },")
+    tbl ! append("};")
+    tbl ! append("")
+    tbl ! append("const wy_uword wyrm_builtin_module_count = " + str(len(rows)) + ";")
+    if not write_text(out_dir + "/wyrm_builtins_table.c", join_lines(tbl)):
+        failed = failed + 1
+    if not write_text(out_dir + "/embedded_images.c", join_lines(unity)):
+        failed = failed + 1
+    if failed > 0:
+        println("embed_build: FAILED (" + str(failed) + " failures)")
+    else:
+        println("embed_build: done (" + str(len(rows)) + " table rows)")

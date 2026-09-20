@@ -54,7 +54,7 @@ void capture_write_(wy_context*, const char* bytes, wy_uword len, void* ud)
 }
 
 wy_error fixture_import(wy_context* ctx, const char* path, wy_uword len,
-    wy_u8** out, wy_uword* out_len, void* ud)
+    wy_u8** out, wy_uword* out_len, const wy_module_image**, void* ud)
 {
     auto& root = *static_cast<std::string*>(ud);
     std::string relative(path, len);

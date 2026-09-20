@@ -1,0 +1,77 @@
+# wy/wyrm/tools/compile_source.wy - epic 11 M2
+#
+# The C CLI's .wy entry path: source text in, .wyd container bytes out.
+# Lives in the builtin module table (embedded with the rest of the
+# compiler), so `wyrm script.wy` needs nothing on disk but the script and
+# no Python anywhere.
+#
+# C side: src/wyrm/main.c loads this module from the table (it must never
+# fall through to a filesystem lookup - that would need the compiler to
+# compile itself), runs its init, and calls compile_source via
+# wy_vm_call_sync with (source, name, path).
+
+import std::io
+import wyrm::parser::*
+import wyrm::compiler::module::*
+import wyrm::compiler::expansion::*
+import wyrm::image::*
+
+# Answers the .wyd container bytes for `src`, compiled as module `name`
+# and reported under `path`, or an error value. Strict lowering with the
+# decorator expander on - the same contract as compiler_main.
+fn compile_source(src: str, name: str, path: str):
+    tree := Parser(src)!program()
+    if tree is error:
+        return error("parse: " + str(error_message(tree)))
+    img := compile_module(tree, name, path, true, false, false, false, expand_decorators)
+    if img is error:
+        return error(str(error_message(img)))
+    blob := to_wyc(img)
+    if blob is error:
+        return error("serialize: " + str(error_message(blob)))
+    return blob
+
+# Epic 11 M4 --build-bc: compile once, write the requested containers into
+# `out_dir` (<name>.wyd / <name>.c - the binary container is .wyd: the wyrm
+# compiler never writes .wyc, that is pypoc's extension). `emit` holds the
+# validated container names. NOTE: the .wy_a ASCII listing is NOT supported
+# here - image.wy's to_wya annotation writer still carries pypoc-only
+# assumptions and faults on the C VM (known gap, see the epic report); use
+# `wyrm --disasm` for listings. Prints "wyrm: wrote <path>" per file like
+# pypoc's cli. Returns nil, or an error value.
+fn build_bc(src: str, name: str, path: str, out_dir: str, emit: list):
+    tree := Parser(src)!program()
+    if tree is error:
+        return error("parse: " + str(error_message(tree)))
+    img := compile_module(tree, name, path, true, false, false, false, expand_decorators)
+    if img is error:
+        return error(str(error_message(img)))
+    for kind in emit:
+        stem := out_dir + "/" + name
+        if kind == "wyd":
+            blob := to_wyc(img)
+            if blob is error:
+                return error("to_wyc: " + str(error_message(blob)))
+            w := _write_out(stem + ".wyd", blob)
+            if w is error:
+                return w
+        elif kind == "c":
+            text := to_c(img)
+            if text is error:
+                return error("to_c: " + str(error_message(text)))
+            w := _write_out(stem + ".c", text)
+            if w is error:
+                return w
+    return nil
+
+# Write one artifact and report it; answers nil or an error value.
+fn _write_out(path: str, data):
+    h := std::io::open(path, "wb")
+    if h is error:
+        return error("cannot open " + path + " for writing")
+    w := std::io::write(h, data)
+    std::io::close(h)
+    if w is error:
+        return error("cannot write " + path)
+    println("wyrm: wrote " + path)
+    return nil
