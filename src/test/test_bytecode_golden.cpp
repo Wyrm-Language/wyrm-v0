@@ -17,8 +17,9 @@
  * it against the builtins module, runs its init through the full dispatch
  * loop, and compares the captured output hook byte-for-byte against the
  * corpus's committed `.out`. One TEST_CASE per fixture in the epic 2 M5
- * target set (hello, hello_1/2/3, arith, control_flow, multiret) - every
- * other manifest row is out of scope until a later epic exercises it.
+ * target set (hello, hello_1/2/3, arith, control_flow, multiret) plus the
+ * epic 3 M1/M2 fixtures (closures, collections) - every other manifest row
+ * is out of scope until a later epic exercises it.
  */
 
 namespace {
@@ -110,6 +111,9 @@ TEST_SUITE("golden")
     TEST_CASE("arith") { check_fixture("arith"); }
     TEST_CASE("control_flow") { check_fixture("control_flow"); }
     TEST_CASE("multiret") { check_fixture("multiret"); }
+    TEST_CASE("closures") { check_fixture("closures"); }
+    TEST_CASE("collections") { check_fixture("collections"); }
+    TEST_CASE("errors") { check_fixture("errors"); }
 }
 
 TEST_SUITE("golden-gcstress")
@@ -121,4 +125,7 @@ TEST_SUITE("golden-gcstress")
     TEST_CASE("arith") { check_fixture_gcstress("arith"); }
     TEST_CASE("control_flow") { check_fixture_gcstress("control_flow"); }
     TEST_CASE("multiret") { check_fixture_gcstress("multiret"); }
+    TEST_CASE("closures") { check_fixture_gcstress("closures"); }
+    TEST_CASE("collections") { check_fixture_gcstress("collections"); }
+    TEST_CASE("errors") { check_fixture_gcstress("errors"); }
 }

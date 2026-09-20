@@ -79,6 +79,52 @@ wy_error wy_string_concat(wy_context* context, wy_string* lhs, wy_string* rhs, w
 }
 
 
+wy_uword wy_utf8_decode_f(const char* str, wy_uword len, wy_uword offset, wy_u32* out_cp)
+{
+    wy_u8 lead = (wy_u8) str[offset];
+    wy_uword remaining = len - offset;
+    wy_uword seq_len;
+    wy_u32 cp;
+
+    if ((lead & 0x80) == 0x00) { seq_len = 1; cp = lead; }
+    else if ((lead & 0xE0) == 0xC0) { seq_len = 2; cp = lead & 0x1F; }
+    else if ((lead & 0xF0) == 0xE0) { seq_len = 3; cp = lead & 0x0F; }
+    else if ((lead & 0xF8) == 0xF0) { seq_len = 4; cp = lead & 0x07; }
+    else { *out_cp = lead; return 1; }
+
+    if (seq_len > remaining) { *out_cp = lead; return 1; }
+
+    for (wy_uword i = 1; i < seq_len; i++) {
+        wy_u8 cont = (wy_u8) str[offset + i];
+        if ((cont & 0xC0) != 0x80) { *out_cp = lead; return 1; }
+        cp = (cp << 6) | (cont & 0x3F);
+    }
+
+    *out_cp = cp;
+    return seq_len;
+}
+
+
+wy_uword wy_utf8_codepoint_count_f(const char* str, wy_uword len)
+{
+    wy_uword offset = 0, n = 0;
+    for (; offset < len; n++) {
+        offset += wy_utf8_decode_f(str, len, offset, &(wy_u32){0});
+    }
+    return n;
+}
+
+
+wy_uword wy_utf8_offset_at_f(const char* str, wy_uword len, wy_uword n)
+{
+    wy_uword offset = 0, i = 0;
+    for (; offset < len && i < n; i++) {
+        offset += wy_utf8_decode_f(str, len, offset, &(wy_u32){0});
+    }
+    return offset;
+}
+
+
 bool wy_value_truthy(wy_value value)
 {
     switch (value.type) {

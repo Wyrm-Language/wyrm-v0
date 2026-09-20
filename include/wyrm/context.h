@@ -39,6 +39,7 @@ struct wy_context
     wy_fiber* current_fiber;
     wy_module* root_module;
     wy_module* builtins;       /**< the builtins module; NULL until epic 2/M5 installs it */
+    wy_class* error_class;     /**< the base `error` class; NULL until wy_builtins_new installs it */
     wy_main_loop* main_loop;
     wy_primitive wakeable_source;
     wy_gc_arena arena;

@@ -25,6 +25,20 @@ wy_error wy_string_strdup(wy_context* machine, const char* src, wy_string** out_
 /** Concatenate `lhs` and `rhs` into a freshly allocated string. */
 wy_error wy_string_concat(wy_context* context, wy_string* lhs, wy_string* rhs, wy_string** out_str);
 
+/**
+ * Decode the UTF-8 codepoint starting at `str[offset]` (offset < len). Writes
+ * the codepoint to `*out_cp` and returns its byte length (1-4). Malformed or
+ * truncated sequences decode as the raw lead byte with length 1, so indexing
+ * never reads past `len`.
+ */
+wy_uword wy_utf8_decode_f(const char* str, wy_uword len, wy_uword offset, wy_u32* out_cp);
+
+/** Number of UTF-8 codepoints in the first `len` bytes of `str`. */
+wy_uword wy_utf8_codepoint_count_f(const char* str, wy_uword len);
+
+/** Byte offset of the `n`-th codepoint (0-based) in `str`, or `len` when `n` is at or past the end. */
+wy_uword wy_utf8_offset_at_f(const char* str, wy_uword len, wy_uword n);
+
 WY_INLINE bool wy_string_eq_f(wy_string* lhs, wy_string* rhs);
 WY_INLINE wy_uword wy_string_hash_f(wy_string* str);
 WY_INLINE int wy_string_cmp_f(wy_string* lhs, wy_string* rhs);

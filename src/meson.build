@@ -21,6 +21,7 @@ cwyrm_sources = files(
     'function.c',
     'gc.c',
     'image.c',
+    'iter.c',
     'link.c',
     'list.c',
     'machine.c',

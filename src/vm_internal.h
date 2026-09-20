@@ -34,6 +34,9 @@ WY_INLINE void wy_vm_backfill_f(wy_value* dst, wy_uword nres, const wy_value* sr
 wy_error wy_vm_binop_f(wy_context* ctx, wy_u8 op, wy_value lhs, wy_value rhs, wy_value* out);
 wy_error wy_vm_is_f(wy_context* ctx, wy_value value, wy_value type_operand, wy_value* out);
 wy_error wy_vm_unary_f(wy_context* ctx, wy_u8 op, wy_value src, wy_value* out);
+wy_error wy_vm_getidx_f(wy_context* ctx, wy_value obj, wy_value idx, wy_value* out);
+wy_error wy_vm_setidx_f(wy_context* ctx, wy_value obj, wy_value idx, wy_value src);
+wy_error wy_vm_in_f(wy_context* ctx, wy_value item, wy_value container, wy_value* out);
 
 WY_END_DECLS
 

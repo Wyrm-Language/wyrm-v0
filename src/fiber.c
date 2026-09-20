@@ -153,10 +153,17 @@ static wy_error start_children_iter(wy_context* context, wy_object* object, wy_w
 {
     WY_UNUSED(context); WY_UNUSED(object);
     wy_memset(wa, 0, sizeof(wy_work_area));
-    wa->data[0].word = 0;
+    wa->data[0].word = 0;   /* value stack index */
+    wa->data[1].word = 0;   /* frame index */
+    wa->data[2].word = 0;   /* fault visited */
     return WY_ERR_NONE;
 }
 
+/**
+ * Children: the live value stack, each live frame's armed defer chain (a
+ * frame draining defers keeps the rest of its chain only here), then the
+ * fault - which must survive the defers that run while a frame unwinds.
+ */
 static wy_error next_children_iter(wy_context* context, wy_object* object, wy_work_area* wa, const wy_object** child)
 {
     WY_UNUSED(context);
@@ -172,8 +179,30 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
             return WY_ERR_NONE;
         }
     }
-
     wa->data[0].word = idx;
+
+    if (self->current_frame != WY_NULL) {
+        wy_frame* frames = WY_MEM_INFO_BEGIN_PTR(wy_frame, &self->frame_memory);
+        wy_word fidx = wa->data[1].word;
+        while (frames + fidx <= self->current_frame) {
+            wy_frame* fr = frames + fidx;
+            fidx++;
+            if (fr->defers != WY_NULL) {
+                *child = (wy_object*) fr->defers;
+                wa->data[1].word = fidx;
+                return WY_ERR_NONE;
+            }
+        }
+        wa->data[1].word = fidx;
+    }
+
+    if (wa->data[2].word == 0) {
+        wa->data[2].word = 1;
+        if (wy_value_is_gc_ref_f(self->fault)) {
+            *child = self->fault.data.gc_object;
+            return WY_ERR_NONE;
+        }
+    }
     return WY_ERR_STOP_ITERATION;
 }
 

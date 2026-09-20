@@ -3,8 +3,13 @@
 #include <math.h>
 
 #include <wyrm.h>
+#include <wyrm/dict.h>
 #include <wyrm/error.h>
+#include <wyrm/list.h>
+#include <wyrm/op.h>
+#include <wyrm/pair.h>
 #include <wyrm/string.h>
+#include <wyrm/tuple.h>
 
 /**
  * Arithmetic, comparison and `is`/`cmp3` semantics for the dispatch loop
@@ -159,38 +164,220 @@ wy_error wy_vm_binop_f(wy_context* ctx, wy_u8 op, wy_value lhs, wy_value rhs, wy
     return make_error_value_f(ctx, "unsupported operand types", out);
 }
 
+static bool is_ancestor(wy_class* cls, wy_class* target)
+{
+    while (cls) {
+        if (cls == target) return true;
+        cls = cls->super;
+    }
+    return false;
+}
+
 /**
- * `is` (wyc-format.md §6.3): `a2` names a primitive type by string (the only
- * form the epic-2/M4 target fixtures use), a class value, or a tuple of
- * either. Class/tuple forms are epic 3/4; this only resolves the primitive
- * name case, faulting (via a returned error) on the rest.
+ * `is` (wyc-format.md §6.3): `a2` names a primitive type by string, a class
+ * value, or a tuple of either.
  */
 wy_error wy_vm_is_f(wy_context* ctx, wy_value value, wy_value type_operand, wy_value* out)
 {
-    if (type_operand.type != WY_TYPE_TAG_STR) {
-        return make_error_value_f(ctx, "`is` against a class or tuple is not supported until epic 3/4", out);
+    if (type_operand.type == WY_TYPE_TAG_STR) {
+        wy_string* name = type_operand.data.str;
+        bool match = false;
+        if (wy_strncmp_f(name->str, "int", name->len) == 0 && name->len == 3) {
+            match = value.type == WY_TYPE_TAG_WORD || value.type == WY_TYPE_TAG_UWORD;
+        } else if (wy_strncmp_f(name->str, "float", name->len) == 0 && name->len == 5) {
+            match = value.type == WY_TYPE_TAG_FLOAT;
+        } else if (wy_strncmp_f(name->str, "bool", name->len) == 0 && name->len == 4) {
+            match = value.type == WY_TYPE_TAG_BOOL;
+        } else if (wy_strncmp_f(name->str, "str", name->len) == 0 && name->len == 3) {
+            match = value.type == WY_TYPE_TAG_STR;
+        } else if (wy_strncmp_f(name->str, "nil", name->len) == 0 && name->len == 3) {
+            match = value.type == WY_TYPE_TAG_NIL;
+        } else if (wy_strncmp_f(name->str, "symbol", name->len) == 0 && name->len == 6) {
+            match = value.type == WY_TYPE_TAG_SYMBOL;
+        } else if (wy_strncmp_f(name->str, "error", name->len) == 0 && name->len == 5) {
+            match = wy_value_is_error(value);
+        } else if (wy_strncmp_f(name->str, "list", name->len) == 0 && name->len == 4) {
+            match = value.type == WY_TYPE_TAG_LIST;
+        } else if (wy_strncmp_f(name->str, "tuple", name->len) == 0 && name->len == 5) {
+            match = value.type == WY_TYPE_TAG_TUPLE;
+        } else if (wy_strncmp_f(name->str, "dict", name->len) == 0 && name->len == 4) {
+            match = value.type == WY_TYPE_TAG_TABLE;
+        } else if (wy_strncmp_f(name->str, "pair", name->len) == 0 && name->len == 4) {
+            match = value.type == WY_TYPE_TAG_PAIR;
+        } else {
+            return make_error_value_f(ctx, "unknown primitive type name", out);
+        }
+        *out = wy_value_bool(match);
+        return WY_ERR_NONE;
     }
-    wy_string* name = type_operand.data.str;
-    bool match = false;
-    if (wy_strncmp_f(name->str, "int", name->len) == 0 && name->len == 3) {
-        match = value.type == WY_TYPE_TAG_WORD || value.type == WY_TYPE_TAG_UWORD;
-    } else if (wy_strncmp_f(name->str, "float", name->len) == 0 && name->len == 5) {
-        match = value.type == WY_TYPE_TAG_FLOAT;
-    } else if (wy_strncmp_f(name->str, "bool", name->len) == 0 && name->len == 4) {
-        match = value.type == WY_TYPE_TAG_BOOL;
-    } else if (wy_strncmp_f(name->str, "str", name->len) == 0 && name->len == 3) {
-        match = value.type == WY_TYPE_TAG_STR;
-    } else if (wy_strncmp_f(name->str, "nil", name->len) == 0 && name->len == 3) {
-        match = value.type == WY_TYPE_TAG_NIL;
-    } else if (wy_strncmp_f(name->str, "symbol", name->len) == 0 && name->len == 6) {
-        match = value.type == WY_TYPE_TAG_SYMBOL;
-    } else if (wy_strncmp_f(name->str, "error", name->len) == 0 && name->len == 5) {
-        match = wy_value_is_error(value);
-    } else {
-        return make_error_value_f(ctx, "unknown primitive type name", out);
+
+    if (type_operand.type == WY_TYPE_TAG_CLASS) {
+        wy_class* target = (wy_class*) type_operand.data.gc_object;
+        if (value.type == WY_TYPE_TAG_ERROR && value.data.gc_object) {
+            wy_error_obj* err = (wy_error_obj*) value.data.gc_object;
+            *out = wy_value_bool(is_ancestor(err->cls, target));
+            return WY_ERR_NONE;
+        }
+        if (value.type == WY_TYPE_TAG_INSTANCE && value.data.gc_object) {
+             /* Instances not yet defined, but header-cast is safe for future */
+             wy_class* cls = ((wy_class**) value.data.gc_object)[0]; // Placeholder
+             *out = wy_value_bool(is_ancestor(cls, target));
+             return WY_ERR_NONE;
+        }
+        *out = wy_value_bool(false);
+        return WY_ERR_NONE;
     }
-    *out = wy_value_bool(match);
-    return WY_ERR_NONE;
+
+    if (type_operand.type == WY_TYPE_TAG_TUPLE) {
+        wy_tuple* tup = (wy_tuple*) type_operand.data.gc_object;
+        for (wy_uword i = 0; i < tup->count; i++) {
+            wy_value match_val;
+            wy_error err = wy_vm_is_f(ctx, value, tup->items[i], &match_val);
+            if (err != WY_ERR_NONE) return err;
+            if (wy_value_truthy(match_val)) {
+                *out = wy_value_bool(true);
+                return WY_ERR_NONE;
+            }
+        }
+        *out = wy_value_bool(false);
+        return WY_ERR_NONE;
+    }
+
+    return make_error_value_f(ctx, "invalid type operand for `is`", out);
+}
+
+wy_error wy_vm_getidx_f(wy_context* ctx, wy_value obj, wy_value idx, wy_value* out)
+{
+    if (obj.type == WY_TYPE_TAG_LIST) {
+        if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
+            return make_error_value_f(ctx, "list index must be an integer", out);
+        }
+        wy_uword i = (wy_uword) as_word_(idx);
+        wy_value* v = wy_list_at_f((wy_list*) obj.data.gc_object, i);
+        if (!v) return make_error_value_f(ctx, "list index out of range", out);
+        *out = *v;
+        return WY_ERR_NONE;
+    }
+    if (obj.type == WY_TYPE_TAG_TUPLE) {
+        if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
+            return make_error_value_f(ctx, "tuple index must be an integer", out);
+        }
+        wy_uword i = (wy_uword) as_word_(idx);
+        wy_value* v = wy_tuple_at_f((wy_tuple*) obj.data.gc_object, i);
+        if (!v) return make_error_value_f(ctx, "tuple index out of range", out);
+        *out = *v;
+        return WY_ERR_NONE;
+    }
+    if (obj.type == WY_TYPE_TAG_TABLE) {
+        wy_value* v = wy_dict_get(ctx, (wy_dict*) obj.data.gc_object, idx.type, idx.data);
+        if (!v) return make_error_value_f(ctx, "key not found in dict", out);
+        *out = *v;
+        return WY_ERR_NONE;
+    }
+    if (obj.type == WY_TYPE_TAG_STR) {
+        if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
+            return make_error_value_f(ctx, "string index must be an integer", out);
+        }
+        wy_uword target = (wy_uword) as_word_(idx);
+        wy_string* s = obj.data.str;
+        wy_uword offset = 0, i = 0;
+        for (; offset < s->len && i < target; i++) {
+            offset += wy_utf8_decode_f(s->str, s->len, offset, &(wy_u32){0});
+        }
+        if (offset >= s->len || i != target) return make_error_value_f(ctx, "string index out of range", out);
+        wy_u32 cp;
+        wy_utf8_decode_f(s->str, s->len, offset, &cp);
+        *out = wy_value_word((wy_word) cp);
+        return WY_ERR_NONE;
+    }
+    if (obj.type == WY_TYPE_TAG_PAIR) {
+        if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
+            return make_error_value_f(ctx, "pair index must be an integer", out);
+        }
+        if (as_word_(idx) != 0) return make_error_value_f(ctx, "pair index out of range", out);
+        *out = ((wy_pair*) obj.data.gc_object)->car;
+        return WY_ERR_NONE;
+    }
+    return make_error_value_f(ctx, "object is not indexable", out);
+}
+
+wy_error wy_vm_setidx_f(wy_context* ctx, wy_value obj, wy_value idx, wy_value src)
+{
+    wy_value dummy;
+    if (obj.type == WY_TYPE_TAG_LIST) {
+        if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
+            return make_error_value_f(ctx, "list index must be an integer", &dummy);
+        }
+        wy_uword i = (wy_uword) as_word_(idx);
+        wy_error err = wy_list_set((wy_list*) obj.data.gc_object, i, src);
+        if (err != WY_ERR_NONE) return make_error_value_f(ctx, "list index out of range", &dummy);
+        return WY_ERR_NONE;
+    }
+    if (obj.type == WY_TYPE_TAG_TABLE) {
+        wy_error err = wy_dict_set(ctx, (wy_dict*) obj.data.gc_object, idx.type, idx.data, src.type, src.data);
+        if (err != WY_ERR_NONE) return make_error_value_f(ctx, "dict set failed", &dummy);
+        return WY_ERR_NONE;
+    }
+    if (obj.type == WY_TYPE_TAG_PAIR) {
+        if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
+            return make_error_value_f(ctx, "pair index must be an integer", &dummy);
+        }
+        if (as_word_(idx) != 0) return make_error_value_f(ctx, "pair index out of range", &dummy);
+        ((wy_pair*) obj.data.gc_object)->car = src;
+        return WY_ERR_NONE;
+    }
+    return make_error_value_f(ctx, "object does not support item assignment", &dummy);
+}
+
+wy_error wy_vm_in_f(wy_context* ctx, wy_value item, wy_value container, wy_value* out)
+{
+    if (container.type == WY_TYPE_TAG_LIST) {
+        wy_list* list = (wy_list*) container.data.gc_object;
+        for (wy_uword i = 0; i < list->count; i++) {
+            if (wy_op_eq(ctx, item.type, item.data, list->items[i].type, list->items[i].data)) {
+                *out = wy_value_bool(true);
+                return WY_ERR_NONE;
+            }
+        }
+        *out = wy_value_bool(false);
+        return WY_ERR_NONE;
+    }
+    if (container.type == WY_TYPE_TAG_TUPLE) {
+        wy_tuple* tup = (wy_tuple*) container.data.gc_object;
+        for (wy_uword i = 0; i < tup->count; i++) {
+            if (wy_op_eq(ctx, item.type, item.data, tup->items[i].type, tup->items[i].data)) {
+                *out = wy_value_bool(true);
+                return WY_ERR_NONE;
+            }
+        }
+        *out = wy_value_bool(false);
+        return WY_ERR_NONE;
+    }
+    if (container.type == WY_TYPE_TAG_TABLE) {
+        wy_value* v = wy_dict_get(ctx, (wy_dict*) container.data.gc_object, item.type, item.data);
+        *out = wy_value_bool(v != WY_NULL);
+        return WY_ERR_NONE;
+    }
+    if (container.type == WY_TYPE_TAG_STR) {
+        if (item.type != WY_TYPE_TAG_STR) {
+             return make_error_value_f(ctx, "'in <string>' requires string as left operand", out);
+        }
+        wy_string* s = container.data.str;
+        wy_string* sub = item.data.str;
+        if (sub->len == 0) { *out = wy_value_bool(true); return WY_ERR_NONE; }
+        if (sub->len > s->len) { *out = wy_value_bool(false); return WY_ERR_NONE; }
+        
+        bool found = false;
+        for (wy_uword i = 0; i <= s->len - sub->len; i++) {
+            if (wy_memcmp(s->str + i, sub->str, sub->len) == 0) {
+                found = true;
+                break;
+            }
+        }
+        *out = wy_value_bool(found);
+        return WY_ERR_NONE;
+    }
+    return make_error_value_f(ctx, "object is not a container", out);
 }
 
 wy_error wy_vm_unary_f(wy_context* ctx, wy_u8 op, wy_value src, wy_value* out)

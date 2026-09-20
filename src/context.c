@@ -41,6 +41,7 @@ void wy_context_init_s(wy_context* self)
     self->parent = WY_NULL;
     self->root_module = WY_NULL;
     self->builtins = WY_NULL;
+    self->error_class = WY_NULL;
     self->current_fiber = WY_NULL;
     self->main_loop = WY_NULL;
     self->wakeable_source = wy_primitive_null();

@@ -7,11 +7,16 @@
 WY_BEGIN_DECLS
 
 
+enum {
+    WY_CLASS_ERROR = 0x01
+};
+
 struct wy_class
 {
     wy_prototype prototype;
     wy_class* super;
     wy_primitive sym_name;
+    wy_uword flags;
 };
 
 extern const wy_object_type wy_type_class;

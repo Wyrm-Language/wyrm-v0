@@ -31,6 +31,17 @@ struct wy_tuple
  */
 wy_error wy_tuple_new(wy_context* context, const wy_value* items, wy_uword count, wy_tuple** out);
 
+/**
+ * Access element `index`.
+ *
+ * @return Pointer to the stored value, or WY_NULL when `index` is out of range
+ */
+WY_INLINE wy_value* wy_tuple_at_f(wy_tuple* self, wy_uword index)
+{
+    if (self == WY_NULL || index >= self->count) { return WY_NULL; }
+    return &self->items[index];
+}
+
 WY_END_DECLS
 
 #endif

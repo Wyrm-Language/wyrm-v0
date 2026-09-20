@@ -20,22 +20,30 @@ WY_INLINE bool wy_op_eq(wy_context* context, wy_type_tag lhst, wy_primitive lhs,
     if (lhst != rhst) { return false; }
     switch (lhst) {
     case WY_TYPE_TAG_NIL:
-        /* primitive value of nil type ignored at runtime, but should be 0 */
-        WY_ASSERT(lhs.uword == 0 && rhs.uword == 0);
         return true;
+    case WY_TYPE_TAG_BOOL:
+        return lhs.flag == rhs.flag;
     case WY_TYPE_TAG_SYMBOL:
         return lhs.symtab_entry == rhs.symtab_entry;
+    case WY_TYPE_TAG_PTYPE:
     case WY_TYPE_TAG_UWORD:
         return lhs.uword == rhs.uword;
     case WY_TYPE_TAG_WORD:
         return lhs.word == rhs.word;
+    case WY_TYPE_TAG_FLOAT:
+        return lhs.fp == rhs.fp;
     case WY_TYPE_TAG_STR:
         return wy_string_eq_f(lhs.str, rhs.str);
 
-    case WY_TYPE_TAG_TABLE:
-    case WY_TYPE_TAG_BOX:
+    case WY_TYPE_TAG_ERROR:
+        /* Unset vs specific error object */
+        return lhs.gc_object == rhs.gc_object;
+
     default:
-        // TODO:
+        /* Pointer identity for other GC objects for now */
+        if (wy_type_is_object(lhst)) {
+            return lhs.gc_object == rhs.gc_object;
+        }
         return false;
     }
 }
@@ -47,19 +55,29 @@ WY_INLINE wy_uword wy_op_hash(wy_context* context, wy_type_tag vt, wy_primitive 
     case WY_TYPE_TAG_NIL:
         return 0;
 
-    case WY_TYPE_TAG_SYMBOL:
-        return (wy_uword) v.symtab_entry;
+    case WY_TYPE_TAG_BOOL:
+        return v.flag ? 1 : 0;
 
+    case WY_TYPE_TAG_SYMBOL:
+        return (wy_uword) (uintptr_t) v.symtab_entry;
+
+    case WY_TYPE_TAG_PTYPE:
     case WY_TYPE_TAG_UWORD:
         return v.uword;
 
     case WY_TYPE_TAG_WORD:
         return (wy_uword) v.word;
 
+    case WY_TYPE_TAG_FLOAT:
+        return wy_util_rehash(v.tagged_ptr);
+
     case WY_TYPE_TAG_STR:
         return wy_string_hash_f(v.str);
 
     default:
+        if (wy_type_is_object(vt)) {
+            return (wy_uword) (uintptr_t) v.gc_object;
+        }
         return WY_HASH_INVALID;
     }
 }

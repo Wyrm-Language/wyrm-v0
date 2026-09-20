@@ -10,6 +10,7 @@ wy_error wy_class_new(wy_context* context, wy_class** out)
 
     cls->super = WY_NULL;
     cls->sym_name.symtab_entry = WY_NULL;
+    cls->flags = 0;
 
     wy_prototype_init_f(&cls->prototype);
     wy_error last_error = wy_prototype_reserve_f(context, &cls->prototype, SLOT_COUNT);
@@ -18,7 +19,7 @@ wy_error wy_class_new(wy_context* context, wy_class** out)
         return WY_ERR_NOMEM;
     }
 
-    wy_context_object_init_header_f(context, &cls->prototype.object, &wy_type_class);
+    wy_context_object_init_header_f(context, (wy_object*) cls, &wy_type_class);
     *out = cls;
     return WY_ERR_NONE;
 }
