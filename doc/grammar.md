@@ -121,7 +121,7 @@ Nothing else is a legal symbol; e.g. `'@` is a lex error, not a symbol.
 
 ```ebnf
   identifier      ::= ( xid_start | "$" ) , { xid_continue | "$" } ;
-  symbol_literal  ::= "'" , ( xid_name | operator_symbol ) ;
+  symbol_literal  ::= "'" , ( identifier | operator_symbol ) ;
                  (* At least 31 significant characters recognized.
                     A symbol's name may be a reserved word ('fn, 'return,
                     'if): they are node kinds in the canonical s-expression
@@ -290,6 +290,11 @@ _S-Expression_
 _Example_: `a, b = b, a` (swap; both names must already be declared)
 
 _Example_: `k ?= 4`
+
+```scheme
+(set var value) ; set var to value
+(set_values (var1 var2) value) ; set multiple values
+```
 
 ```ebnf
   target          ::= ( identifier | postfix_expr , "." , identifier ) , { "[" , expression , "]" } ;
