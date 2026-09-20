@@ -12,6 +12,7 @@
 
 import std::io
 import wyrm::parser::*
+import wyrm::tokenizer::*
 import wyrm::compiler::module::*
 import wyrm::compiler::expansion::*
 import wyrm::image::*
@@ -75,3 +76,71 @@ fn _write_out(path: str, data):
         return error("cannot write " + path)
     println("wyrm: wrote " + path)
     return nil
+
+# ---------------------------------------------------------------------------
+# REPL session entry points (doc/repl-plan.md). The session object lives in the
+# host's context between calls; each input compiles to a delta container the
+# host feeds to wy_module_extend.
+
+fn session_new():
+    return new_session()
+
+# Undo the last successful compile (the host could not load its delta).
+fn session_undo(session):
+    session_undo_last(session)
+    return nil
+
+# Compile one parsed input (a `'module tree) to delta container bytes, or an
+# error value (the session is unchanged then).
+fn session_compile_tree(session, tree):
+    img := compile_snippet(session, tree, expand_decorators)
+    if img is error:
+        return error(str(error_message(img)))
+    blob := to_wyc(img)
+    if blob is error:
+        return error("serialize: " + str(error_message(blob)))
+    return blob
+
+# Parse `src` and compile it as one input.
+fn session_compile(session, src: str):
+    tree := Parser(src)!program()
+    if tree is error:
+        return error("parse: " + str(error_message(tree)))
+    # The parser answers a non-module tree for input it could not parse.
+    if not ((tree is pair) and (car(tree) == 'module)):
+        return error("syntax error: the input could not be parsed")
+    return session_compile_tree(session, tree)
+
+# Split a program into one `'module tree per top-level statement (test and
+# driver support: the exact statement boundaries, no text heuristics).
+fn session_pieces(src: str):
+    tree := Parser(src)!program()
+    if tree is error:
+        return error("parse: " + str(error_message(tree)))
+    out := []
+    for stmt in cdr(tree):
+        out ! append(cons('module, cons(stmt, nil)))
+    return out
+
+# Is `src` an unfinished input the REPL should keep reading? True when a
+# bracket is still open, a raw string or character literal ran off the end, or
+# a block is in progress (a line ending in ':' or an indented line): a block
+# ends at a blank line, which the driver treats as "submit". Decided from the
+# token stream, not the parser, because the parser's failures do not say
+# whether the input ended too soon.
+fn session_incomplete(src: str) -> bool:
+    stream := TokenStream(src)
+    tokens := stream ! scan()
+    if stream.group_depth > 0:
+        return true
+    prev := nil
+    for token in tokens:
+        if token.kind is error:
+            text := str(error_message(token.kind))
+            return (text == "unexpected stream end") or (text == "eof in character literal")
+        if token.kind == 'TOK_INDENT:
+            return true
+        if (token.kind == 'TOK_NEWLINE) and (prev == 'TOK_COLON):
+            return true
+        prev = token.kind
+    return false

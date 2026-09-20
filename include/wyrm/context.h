@@ -93,6 +93,14 @@ void wy_context_finalize_f(wy_context* self);
 wy_error wy_context_set_root(wy_context* context, wy_module* module);
 
 wy_error wy_context_module_register(wy_context* self, wy_module* module, wy_uword* out_module_id);
+/**
+ * Drop `module` from the registry (its id is kept: ids embedded in exec
+ * function values must stay valid, so the slot becomes NULL, not compacted).
+ * The module is no longer a GC root and no longer found by import; it is
+ * freed by the next collection once nothing else references it. Used to end a
+ * REPL session. WY_ERR_UNBOUND if `module` is not registered.
+ */
+wy_error wy_context_module_unregister(wy_context* self, wy_module* module);
 
 /**
  * Intern `len` bytes of UTF-8 as a symbol: two interned strings compare

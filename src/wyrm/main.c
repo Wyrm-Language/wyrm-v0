@@ -19,6 +19,7 @@
 #include <wyrm/platform/hosted/import_fs.h>
 #include <wyrm/platform/hosted/expand_native.h>
 #include "../embed/std/io_native.h"
+#include "repl.h"
 #include <wyrm/slot.h>
 #include <wyrm/string.h>
 #include <wyrm/vm.h>
@@ -96,7 +97,9 @@ static void print_usage(const char* argv0)
 {
     fprintf(stderr, "Usage: %s [-I dir]... [-v] [--cache-dir DIR] [--sections] [--disasm]\n"
         "       %*s[-m mod::sub] [--check] [--build-bc [-o DIR] [--emit LIST] [--strip]]\n"
-        "       %*sfile.wy|file.wyc|file.wyd [args...]\n", argv0, (int) strlen(argv0), "", (int) strlen(argv0), "");
+        "       %*sfile.wy|file.wyc|file.wyd [args...]\n"
+        "       %*s-i    (interactive: read and run input from standard input)\n",
+        argv0, (int) strlen(argv0), "", (int) strlen(argv0), "", (int) strlen(argv0), "");
 }
 
 /**
@@ -444,6 +447,7 @@ int main(int argc, char** argv)
     bool want_check = false;
     bool want_build_bc = false;
     bool want_strip = false;  /* accepted; the port never emits a debug section */
+    bool want_repl = false;   /* -i: the interactive loop (repl.c) */
     const char* module_arg = WY_NULL;   /* -m mod::sub */
     const char* emit_arg = WY_NULL;     /* --emit wya,c,wyd|wyc */
     const char* out_dir_arg = WY_NULL;  /* -o DIR with --build-bc */
@@ -466,6 +470,8 @@ int main(int argc, char** argv)
             want_build_bc = true;
         } else if (wy_strcmp_f(argv[i], "--strip") == 0) {
             want_strip = true;
+        } else if (wy_strcmp_f(argv[i], "-i") == 0 && file_path == WY_NULL && module_arg == WY_NULL) {
+            want_repl = true;
         } else if (wy_strcmp_f(argv[i], "--emit") == 0) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "wyrm: --emit requires a container list\n");
@@ -544,7 +550,12 @@ int main(int argc, char** argv)
         fprintf(stderr, "wyrm: --emit/--strip/-o require --build-bc\n");
         return 2;
     }
-    if (module_arg == WY_NULL && file_path == WY_NULL) {
+    if (want_repl && (file_path != WY_NULL || module_arg != WY_NULL || want_check || want_build_bc
+            || want_sections || want_disasm)) {
+        fprintf(stderr, "wyrm: -i takes no script and cannot combine with --check, --build-bc, -m, --sections or --disasm\n");
+        return 2;
+    }
+    if (module_arg == WY_NULL && file_path == WY_NULL && !want_repl) {
         print_usage(argv[0]);
         return 2;
     }
@@ -645,6 +656,8 @@ int main(int argc, char** argv)
         fprintf(stderr, "wyrm: failed to install std::expand\n");
         return 1;
     }
+
+    if (want_repl) { return wyrm_repl(context, isatty(STDIN_FILENO) != 0); }
 
     wy_module* module = WY_NULL;
     wy_error last_error = WY_ERR_NONE;

@@ -45,6 +45,16 @@ wy_error wy_slot_dict_add_entry(wy_slot_dict* self, wy_symbol sym, wy_uword idx)
 }
 
 
+wy_error wy_slot_dict_set(wy_slot_dict* self, wy_symbol sym, wy_uword idx)
+{
+    wy_slot_dict_entry* entry = wy_slot_dict_find_entry_(self->entry_table, self->capacity, sym);
+    if (entry == WY_NULL) { return WY_ERR_NOMEM; }
+    if (entry->symbol == WY_SYMBOL_INVALID) { self->entry_count++; }
+    entry->symbol = sym;
+    entry->slot = idx;
+    return WY_ERR_NONE;
+}
+
 void wy_slot_finalize_f(wy_slot_dict* self, wy_allocator* allocator)
 {
     wy_allocator_free(allocator, self->entry_table);

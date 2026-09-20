@@ -34,6 +34,8 @@ typedef struct wy_slot_dict
 
 wy_error wy_slot_dict_expand_f(wy_slot_dict* self, wy_allocator* allocator, wy_uword new_capacity);
 wy_error wy_slot_dict_add_entry(wy_slot_dict* self, wy_symbol sym, wy_uword idx);
+/** Like add_entry, but an existing `sym` is updated to `idx` instead of failing (a shadowing rebind). */
+wy_error wy_slot_dict_set(wy_slot_dict* self, wy_symbol sym, wy_uword idx);
 void wy_slot_finalize_f(wy_slot_dict* self, wy_allocator* allocator);
 
 /**

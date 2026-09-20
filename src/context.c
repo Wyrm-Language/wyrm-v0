@@ -138,6 +138,19 @@ wy_error wy_context_module_register(wy_context* self, wy_module* module, wy_uwor
     return WY_ERR_NONE;
 }
 
+wy_error wy_context_module_unregister(wy_context* self, wy_module* module)
+{
+    if (self == WY_NULL || module == WY_NULL) { return WY_ERR_INVAL; }
+    wy_module** modules = WY_MEM_INFO_BEGIN_PTR(wy_module*, &self->module_memory);
+    for (wy_uword i = 0; i < self->module_count; i++) {
+        if (modules[i] == module) {
+            modules[i] = WY_NULL;
+            return WY_ERR_NONE;
+        }
+    }
+    return WY_ERR_UNBOUND;
+}
+
 wy_error wy_context_attach_loop(wy_context* self, wy_main_loop* loop)
 {
     if (self->main_loop != WY_NULL) { return WY_ERR_BUSY; }
@@ -318,7 +331,7 @@ void wy_context_gc_full_run(wy_context* context)
     /* Registered modules are reachable by id alone, so they are roots. */
     wy_module** modules = WY_MEM_INFO_BEGIN_PTR(wy_module*, &context->module_memory);
     for (wy_uword i = 0; i < context->module_count; i++) {
-        wy_gc_object_visit(context, (wy_object*) modules[i]);
+        if (modules[i] != WY_NULL) { wy_gc_object_visit(context, (wy_object*) modules[i]); }  /* NULL: unregistered */
     }
 
     /* C code holding a fresh value across allocations. */

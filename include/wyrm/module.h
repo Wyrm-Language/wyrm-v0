@@ -34,6 +34,8 @@ enum
 
 enum { WY_CLASS_MAX_MESSAGES = 16 };
 
+struct wy_session;
+
 /** A function parameter (wyc-format.md §8.5's `p` entries). */
 typedef struct wy_param
 {
@@ -173,6 +175,22 @@ struct wy_module
 
     wy_wildcard* wildcards;    /**< registered wildcard namespaces */
     wy_uword wildcard_count;
+
+    /**
+     * Non-NULL for a REPL session module (wyrm/session.h): the arrays above
+     * (code, functions, class_protos, classes, statics, symbols, globals,
+     * fill_layer, fill_source, messages) are fixed-capacity reservations
+     * that only ever grow in place, so pointers into them (frames' `ip`, a
+     * function's proto) stay valid; they belong to the machine allocator, not
+     * the GC heap. NULL for every ordinary module.
+     */
+    struct wy_session* session;
+    /* Session extension bookkeeping (module.c): how far an in-progress
+     * wy_module_extend has filled each table, so a failure can free what the
+     * partial entries own. Unused (0) outside an extend. */
+    wy_uword session_fill_functions_;
+    wy_uword session_fill_classes_;
+    wy_uword session_fill_messages_;
 };
 
 #define WY_MODULE_GET_OBJ(self) (&((self)->head))

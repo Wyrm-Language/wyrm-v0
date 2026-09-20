@@ -1,5 +1,6 @@
 #include <wyrm/link.h>
 #include <wyrm/module.h>
+#include <wyrm/session.h>
 
 #include <wyrm/allocator.h>
 #include <wyrm/bson.h>
@@ -670,6 +671,47 @@ static wy_error module_load_section_classes_(wy_context* context, wy_module* mod
  * messages (id 7)
  * ------------------------------------------------------------------------- */
 
+/** One `messages[]` entry (wyc-format.md §8.7): a message identity as a path of symbol indices. */
+static wy_error decode_message_(wy_context* context, wy_module* module, const wy_u8* buffer, wy_uword len, wy_message_ref* out)
+{
+    out->path_len = 0;
+    out->path = WY_NULL;
+    out->bound = WY_NULL;
+
+    wy_bson_doc_reader mdoc;
+    wy_error last_error = wy_bson_doc_reader_start(&mdoc, buffer, len);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+
+    wy_u8 ptag;
+    const wy_u8* pbuf;
+    wy_uword plen;
+    last_error = wy_bson_doc_reader_find(&mdoc, "p", &ptag, &pbuf, &plen);
+    if (last_error != WY_ERR_NONE || ptag != WY_BSON_TAG_ARRAY) { return WY_ERR_IMAGE; }
+
+    wy_uword path_len;
+    last_error = bson_array_count_(pbuf, plen, &path_len);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    if (path_len == 0 || path_len > 0xFFFF) { return WY_ERR_IMAGE; }
+
+    out->path = wy_context_gc_alloc(context, sizeof(wy_u16) * path_len);
+    if (out->path == WY_NULL) { return WY_ERR_NOMEM; }
+    out->path_len = (wy_u16) path_len;
+
+    wy_bson_array_reader preader;
+    wy_bson_array_reader_start(&preader, pbuf, plen);
+    for (wy_uword j = 0; j < path_len; j++) {
+        wy_u8 sytag;
+        const wy_u8* sybuf;
+        wy_uword sylen;
+        last_error = wy_bson_array_reader_get(&preader, &sytag, &sybuf, &sylen);
+        if (last_error != WY_ERR_NONE || sytag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
+        wy_i32 symidx = wy_bson_get_i32(sybuf);
+        if (symidx < 0 || (wy_uword) symidx >= module->symbol_count) { return WY_ERR_IMAGE; }
+        out->path[j] = (wy_u16) symidx;
+    }
+    return WY_ERR_NONE;
+}
+
 static wy_error module_load_section_messages_(wy_context* context, wy_module* module, wy_section_ref section)
 {
     if (section.data == WY_NULL) { return WY_ERR_NONE; }
@@ -690,38 +732,8 @@ static wy_error module_load_section_messages_(wy_context* context, wy_module* mo
         last_error = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
         if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_DOCUMENT) { return WY_ERR_IMAGE; }
 
-        wy_bson_doc_reader mdoc;
-        last_error = wy_bson_doc_reader_start(&mdoc, buffer, len);
+        last_error = decode_message_(context, module, buffer, len, &module->messages[i]);
         if (last_error != WY_ERR_NONE) { return last_error; }
-
-        wy_u8 ptag;
-        const wy_u8* pbuf;
-        wy_uword plen;
-        last_error = wy_bson_doc_reader_find(&mdoc, "p", &ptag, &pbuf, &plen);
-        if (last_error != WY_ERR_NONE || ptag != WY_BSON_TAG_ARRAY) { return WY_ERR_IMAGE; }
-
-        wy_uword path_len;
-        last_error = bson_array_count_(pbuf, plen, &path_len);
-        if (last_error != WY_ERR_NONE) { return last_error; }
-        if (path_len == 0 || path_len > 0xFFFF) { return WY_ERR_IMAGE; }
-
-        module->messages[i].path_len = (wy_u16) path_len;
-        module->messages[i].bound = WY_NULL;
-        module->messages[i].path = wy_context_gc_alloc(context, sizeof(wy_u16) * path_len);
-        if (module->messages[i].path == WY_NULL) { return WY_ERR_NOMEM; }
-
-        wy_bson_array_reader preader;
-        wy_bson_array_reader_start(&preader, pbuf, plen);
-        for (wy_uword j = 0; j < path_len; j++) {
-            wy_u8 sytag;
-            const wy_u8* sybuf;
-            wy_uword sylen;
-            last_error = wy_bson_array_reader_get(&preader, &sytag, &sybuf, &sylen);
-            if (last_error != WY_ERR_NONE || sytag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-            wy_i32 symidx = wy_bson_get_i32(sybuf);
-            if (symidx < 0 || (wy_uword) symidx >= module->symbol_count) { return WY_ERR_IMAGE; }
-            module->messages[i].path[j] = (wy_u16) symidx;
-        }
     }
     return WY_ERR_NONE;
 }
@@ -896,6 +908,17 @@ wy_error wy_module_run_init(wy_context* context, wy_module* module)
     return last_error;
 }
 
+/* A session module's big arrays are reservations from the machine allocator
+ * (wyrm/session.h); every other module's are GC-heap allocations. */
+static void free_table_(wy_context* context, const wy_module* module, void* ptr)
+{
+    if (module->session != WY_NULL) {
+        if (ptr != WY_NULL) { wy_allocator_free(wy_context_get_machine(context)->allocator, ptr); }
+    } else {
+        wy_context_gc_free(context, ptr);
+    }
+}
+
 static void finalize(wy_context* context, wy_object* self_s)
 {
     wy_module* self = (wy_module*) self_s;
@@ -905,25 +928,25 @@ static void finalize(wy_context* context, wy_object* self_s)
         wy_context_gc_free(context, self->functions[i].params);
         wy_context_gc_free(context, self->functions[i].dispatch_slots);
     }
-    wy_context_gc_free(context, self->functions);
+    free_table_(context, self, self->functions);
 
     for (wy_uword i = 0; i < self->class_count; i++) {
         wy_context_gc_free(context, self->class_protos[i].slots);
         wy_context_gc_free(context, self->class_protos[i].statics);
     }
-    wy_context_gc_free(context, self->class_protos);
-    wy_context_gc_free(context, self->classes);
+    free_table_(context, self, self->class_protos);
+    free_table_(context, self, self->classes);
 
     for (wy_uword i = 0; i < self->message_count; i++) {
         wy_context_gc_free(context, self->messages[i].path);
     }
-    wy_context_gc_free(context, self->messages);
+    free_table_(context, self, self->messages);
 
-    wy_context_gc_free(context, self->globals);
-    wy_context_gc_free(context, self->fill_layer);
-    wy_context_gc_free(context, self->fill_source);
-    wy_context_gc_free(context, self->statics);
-    wy_context_gc_free(context, self->symbols);
+    free_table_(context, self, self->globals);
+    free_table_(context, self, self->fill_layer);
+    free_table_(context, self, self->fill_source);
+    free_table_(context, self, self->statics);
+    free_table_(context, self, self->symbols);
     for (wy_uword i = 0; i < self->wildcard_count; i++) {
         wy_context_gc_free(context, self->wildcards[i].excepts);
     }
@@ -934,6 +957,12 @@ static void finalize(wy_context* context, wy_object* self_s)
 
     if (self->owns_image) {
         wy_context_gc_free(context, (void*) self->image);
+    }
+
+    if (self->session != WY_NULL) {
+        /* The code reservation and the bookkeeping struct (session.c). */
+        wy_allocator_free(allocator, (void*) self->code);
+        wy_session_free_(allocator, self->session);
     }
 }
 
@@ -1042,3 +1071,320 @@ const wy_object_type wy_module_type = {
     .children_iter_next = children_iter_next,
     .finalize = finalize,
 };
+
+/* -------------------------------------------------------------------------
+ * Session extension (doc/repl-plan.md, M1)
+ *
+ * A delta image is an ordinary container whose header carries `d: 1` and the
+ * module's counts *before* the delta:
+ *
+ *   bc code words, bf functions, bs statics, by symbols, bk classes,
+ *   bm messages, bg globals
+ *
+ * plus `g` (the total global count after the delta) and `i` (the absolute
+ * index of the function that runs this input). Every section holds only the
+ * new items; every cross-reference is absolute, so the same decoders that load
+ * an ordinary module check them against the growing tables. Jumps are
+ * ip-relative, so the code is relocatable. A delta whose base counts differ
+ * from the module's is refused: that is the guard against the compiling side
+ * and this side having drifted apart.
+ * ------------------------------------------------------------------------- */
+
+typedef struct session_delta_
+{
+    wy_uword base_code, base_functions, base_statics, base_symbols, base_classes, base_messages, base_globals;
+    wy_uword globals_after;
+    wy_uword init_function;
+    wy_uword new_code, new_functions, new_statics, new_symbols, new_classes, new_messages;
+} session_delta_;
+
+static wy_error delta_header_i32_(wy_bson_doc_reader* doc, const char* key, wy_uword* out)
+{
+    wy_u8 tag;
+    const wy_u8* buffer;
+    wy_uword len;
+    wy_error err = wy_bson_doc_reader_find(doc, key, &tag, &buffer, &len);
+    if (err != WY_ERR_NONE || tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
+    wy_i32 value = wy_bson_get_i32(buffer);
+    if (value < 0) { return WY_ERR_IMAGE; }
+    *out = (wy_uword) value;
+    return WY_ERR_NONE;
+}
+
+static wy_error delta_section_count_(wy_section_ref section, wy_uword* out)
+{
+    *out = 0;
+    if (section.data == WY_NULL) { return WY_ERR_NONE; }
+    return bson_array_count_(section.data, section.len, out);
+}
+
+/* Read and validate the header and section sizes; touches nothing. */
+static wy_error delta_read_(const wy_module* module, const wy_module_image* image, session_delta_* d)
+{
+    wy_section_ref header = image->sections[WY_SEC_HEADER];
+    if (header.data == WY_NULL) { return WY_ERR_IMAGE; }
+    wy_bson_doc_reader doc;
+    wy_error err = wy_bson_doc_reader_start(&doc, header.data, header.len);
+    if (err != WY_ERR_NONE) { return err; }
+
+    wy_uword marker = 0, version = 0;
+    if (delta_header_i32_(&doc, "v", &version) != WY_ERR_NONE || version != 1) { return WY_ERR_IMAGE; }
+    if (delta_header_i32_(&doc, "d", &marker) != WY_ERR_NONE || marker != 1) { return WY_ERR_IMAGE; }
+    if ((err = delta_header_i32_(&doc, "bc", &d->base_code)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_i32_(&doc, "bf", &d->base_functions)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_i32_(&doc, "bs", &d->base_statics)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_i32_(&doc, "by", &d->base_symbols)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_i32_(&doc, "bk", &d->base_classes)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_i32_(&doc, "bm", &d->base_messages)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_i32_(&doc, "bg", &d->base_globals)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_i32_(&doc, "g", &d->globals_after)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_i32_(&doc, "i", &d->init_function)) != WY_ERR_NONE) { return err; }
+
+    /* The desync guard: the delta was compiled against exactly this module. */
+    if (d->base_code != module->code_len || d->base_functions != module->function_count
+        || d->base_statics != module->static_count || d->base_symbols != module->symbol_count
+        || d->base_classes != module->class_count || d->base_messages != module->message_count
+        || d->base_globals != module->global_count) {
+        return WY_ERR_IMAGE;
+    }
+    if (d->globals_after < d->base_globals) { return WY_ERR_IMAGE; }
+
+    wy_section_ref code = image->sections[WY_SEC_CODE];
+    if (code.data == WY_NULL || code.len % 4 != 0) { return WY_ERR_IMAGE; }
+    d->new_code = code.len / 4;
+    if ((err = delta_section_count_(image->sections[WY_SEC_FUNCTIONS], &d->new_functions)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_section_count_(image->sections[WY_SEC_STATICS], &d->new_statics)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_section_count_(image->sections[WY_SEC_SYMBOLS], &d->new_symbols)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_section_count_(image->sections[WY_SEC_CLASSES], &d->new_classes)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_section_count_(image->sections[WY_SEC_MESSAGES], &d->new_messages)) != WY_ERR_NONE) { return err; }
+
+    if (d->init_function < d->base_functions || d->init_function >= d->base_functions + d->new_functions) {
+        return WY_ERR_IMAGE;  /* the input's function must be one of this delta's */
+    }
+    return WY_ERR_NONE;
+}
+
+/* Undo a partial commit: free what the new entries own and restore the counts. */
+static void delta_rollback_(wy_context* context, wy_module* module, const session_delta_* d)
+{
+    for (wy_uword i = d->base_functions; i < module->session_fill_functions_; i++) {
+        wy_context_gc_free(context, module->functions[i].params);
+        wy_context_gc_free(context, module->functions[i].dispatch_slots);
+    }
+    for (wy_uword i = d->base_classes; i < module->session_fill_classes_; i++) {
+        wy_context_gc_free(context, module->class_protos[i].slots);
+        wy_context_gc_free(context, module->class_protos[i].statics);
+    }
+    for (wy_uword i = d->base_messages; i < module->session_fill_messages_; i++) {
+        wy_context_gc_free(context, module->messages[i].path);
+    }
+    module->code_len = d->base_code;
+    module->function_count = d->base_functions;
+    module->static_count = d->base_statics;
+    module->symbol_count = d->base_symbols;
+    module->class_count = d->base_classes;
+    module->message_count = d->base_messages;
+    module->global_count = d->base_globals;
+}
+
+wy_error wy_module_extend(wy_context* context, wy_module* module, const wy_module_image* image, wy_uword* out_init_function)
+{
+    if (context == WY_NULL || module == WY_NULL || image == WY_NULL) { return WY_ERR_INVAL; }
+    if (!wy_module_is_session(module)) { return WY_ERR_INVAL; }
+    if (!host_is_little_endian_()) { return WY_ERR_IMAGE; }
+
+    session_delta_ d;
+    wy_memset(&d, 0, sizeof(d));
+    wy_error err = delta_read_(module, image, &d);
+    if (err != WY_ERR_NONE) { return err; }
+
+    /* Room in every reservation, and the dictionaries' entries, before any change. */
+    if ((err = wy_session_check_room(module, WY_SESSION_CODE, d.new_code)) != WY_ERR_NONE) { return err; }
+    if ((err = wy_session_check_room(module, WY_SESSION_FUNCTIONS, d.new_functions)) != WY_ERR_NONE) { return err; }
+    if ((err = wy_session_check_room(module, WY_SESSION_STATICS, d.new_statics)) != WY_ERR_NONE) { return err; }
+    if ((err = wy_session_check_room(module, WY_SESSION_SYMBOLS, d.new_symbols)) != WY_ERR_NONE) { return err; }
+    if ((err = wy_session_check_room(module, WY_SESSION_CLASSES, d.new_classes)) != WY_ERR_NONE) { return err; }
+    if ((err = wy_session_check_room(module, WY_SESSION_MESSAGES, d.new_messages)) != WY_ERR_NONE) { return err; }
+    if ((err = wy_session_check_room(module, WY_SESSION_GLOBALS, d.globals_after - d.base_globals)) != WY_ERR_NONE) { return err; }
+
+    /* Validate the two name dictionaries now (keys and slots), so applying them
+     * last cannot fail: a free name must be new, and every slot in range. */
+    for (int which = 0; which < 2; which++) {
+        wy_section_ref section = image->sections[which == 0 ? WY_SEC_EXPORTS : WY_SEC_FREE];
+        if (section.data == WY_NULL) { continue; }
+        wy_bson_doc_reader doc;
+        if ((err = wy_bson_doc_reader_start(&doc, section.data, section.len)) != WY_ERR_NONE) { return err; }
+        for (;;) {
+            wy_u8 tag;
+            const char* key;
+            const wy_u8* buffer;
+            wy_uword len;
+            err = wy_bson_doc_reader_get(&doc, &tag, &key, &buffer, &len);
+            if (err == WY_ERR_STOP_ITERATION) { break; }
+            if (err != WY_ERR_NONE || tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
+            wy_i32 slot = wy_bson_get_i32(buffer);
+            if (slot < 0 || (wy_uword) slot >= d.globals_after) { return WY_ERR_IMAGE; }
+            if (which == 1) {
+                wy_symbol sym;
+                if ((err = wy_context_intern(context, key, wy_strlen_f(key), &sym)) != WY_ERR_NONE) { return err; }
+                if (wy_slot_dict_get(&module->free_names, sym) != WY_SLOT_INVALID) { return WY_ERR_IMAGE; }
+            }
+        }
+    }
+
+    /* Commit, in load order, growing each count as its entries land so the
+     * decoders' bounds checks see the new items. `session_fill_*` track how
+     * far each table got, for the rollback. */
+    wy_section_ref code = image->sections[WY_SEC_CODE];
+    wy_memcpy((void*) (module->code + d.base_code), code.data, d.new_code * sizeof(wy_u32));
+    module->code_len = d.base_code + d.new_code;
+
+    for (wy_uword g = d.base_globals; g < d.globals_after; g++) {
+        module->globals[g] = wy_value_unset();
+        module->fill_layer[g] = 0;
+        module->fill_source[g] = WY_NULL;
+    }
+    module->global_count = d.globals_after;
+
+    module->session_fill_functions_ = d.base_functions;
+    module->session_fill_classes_ = d.base_classes;
+    module->session_fill_messages_ = d.base_messages;
+
+    err = module_load_section_slot_defaults_(context, module, image->sections[WY_SEC_SLOT_DEFAULTS]);
+
+    wy_section_ref sec = image->sections[WY_SEC_SYMBOLS];
+    if (err == WY_ERR_NONE && sec.data != WY_NULL && d.new_symbols > 0) {
+        wy_bson_array_reader reader;
+        wy_bson_array_reader_start(&reader, sec.data, sec.len);
+        for (wy_uword i = 0; i < d.new_symbols && err == WY_ERR_NONE; i++) {
+            wy_u8 tag;
+            const wy_u8* buffer;
+            wy_uword len;
+            err = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
+            if (err != WY_ERR_NONE || tag != WY_BSON_TAG_STRING) { err = WY_ERR_IMAGE; break; }
+            err = intern_bson_string_(context, buffer, &module->symbols[module->symbol_count]);
+            if (err == WY_ERR_NONE) { module->symbol_count++; }
+        }
+    }
+
+    sec = image->sections[WY_SEC_STATICS];
+    if (err == WY_ERR_NONE && sec.data != WY_NULL && d.new_statics > 0) {
+        wy_bson_array_reader reader;
+        wy_bson_array_reader_start(&reader, sec.data, sec.len);
+        for (wy_uword i = 0; i < d.new_statics && err == WY_ERR_NONE; i++) {
+            wy_u8 tag;
+            const wy_u8* buffer;
+            wy_uword len;
+            err = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
+            if (err != WY_ERR_NONE) { err = WY_ERR_IMAGE; break; }
+            err = decode_static_value_(context, tag, buffer, len, &module->statics[module->static_count]);
+            if (err == WY_ERR_NONE) { module->static_count++; }
+        }
+    }
+
+    sec = image->sections[WY_SEC_FUNCTIONS];
+    if (err == WY_ERR_NONE && sec.data != WY_NULL && d.new_functions > 0) {
+        wy_bson_array_reader reader;
+        wy_bson_array_reader_start(&reader, sec.data, sec.len);
+        for (wy_uword i = 0; i < d.new_functions && err == WY_ERR_NONE; i++) {
+            wy_u8 tag;
+            const wy_u8* buffer;
+            wy_uword len;
+            err = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
+            if (err != WY_ERR_NONE || tag != WY_BSON_TAG_DOCUMENT) { err = WY_ERR_IMAGE; break; }
+            wy_function_proto* slot = &module->functions[module->function_count];
+            wy_memset(slot, 0, sizeof(*slot));
+            module->session_fill_functions_ = module->function_count + 1;  /* the entry may own partial allocations */
+            err = decode_function_(context, module, buffer, len, slot);
+            if (err == WY_ERR_NONE) { module->function_count++; }
+        }
+    }
+
+    sec = image->sections[WY_SEC_CLASSES];
+    if (err == WY_ERR_NONE && sec.data != WY_NULL && d.new_classes > 0) {
+        wy_bson_array_reader reader;
+        wy_bson_array_reader_start(&reader, sec.data, sec.len);
+        for (wy_uword i = 0; i < d.new_classes && err == WY_ERR_NONE; i++) {
+            wy_u8 tag;
+            const wy_u8* buffer;
+            wy_uword len;
+            err = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
+            if (err != WY_ERR_NONE || tag != WY_BSON_TAG_DOCUMENT) { err = WY_ERR_IMAGE; break; }
+            wy_class_proto* slot = &module->class_protos[module->class_count];
+            wy_memset(slot, 0, sizeof(*slot));
+            module->classes[module->class_count] = WY_NULL;
+            module->session_fill_classes_ = module->class_count + 1;
+            err = decode_class_(context, module, buffer, len, slot);
+            if (err == WY_ERR_NONE) { module->class_count++; }
+        }
+    }
+
+    sec = image->sections[WY_SEC_MESSAGES];
+    if (err == WY_ERR_NONE && sec.data != WY_NULL && d.new_messages > 0) {
+        wy_bson_array_reader reader;
+        wy_bson_array_reader_start(&reader, sec.data, sec.len);
+        for (wy_uword i = 0; i < d.new_messages && err == WY_ERR_NONE; i++) {
+            wy_u8 tag;
+            const wy_u8* buffer;
+            wy_uword len;
+            err = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
+            if (err != WY_ERR_NONE || tag != WY_BSON_TAG_DOCUMENT) { err = WY_ERR_IMAGE; break; }
+            wy_message_ref* slot = &module->messages[module->message_count];
+            module->session_fill_messages_ = module->message_count + 1;
+            err = decode_message_(context, module, buffer, len, slot);
+            if (err == WY_ERR_NONE) { module->message_count++; }
+        }
+    }
+
+    if (err != WY_ERR_NONE) {
+        delta_rollback_(context, module, &d);
+        return err;
+    }
+
+    /* Names last (already validated): new bindings shadow by replacing the
+     * exported name's slot; free names are new by construction. */
+    for (int which = 0; which < 2; which++) {
+        wy_section_ref section = image->sections[which == 0 ? WY_SEC_EXPORTS : WY_SEC_FREE];
+        if (section.data == WY_NULL) { continue; }
+        wy_bson_doc_reader doc;
+        (void) wy_bson_doc_reader_start(&doc, section.data, section.len);
+        for (;;) {
+            wy_u8 tag;
+            const char* key;
+            const wy_u8* buffer;
+            wy_uword len;
+            if (wy_bson_doc_reader_get(&doc, &tag, &key, &buffer, &len) != WY_ERR_NONE) { break; }
+            wy_symbol sym;
+            (void) wy_context_intern(context, key, wy_strlen_f(key), &sym);
+            (void) wy_slot_dict_set(which == 0 ? &module->exports : &module->free_names, sym,
+                (wy_uword) wy_bson_get_i32(buffer));
+        }
+    }
+
+    err = wy_link_fill_from_builtins(context, module, context->builtins);
+    if (err != WY_ERR_NONE) { return err; }
+    /* New free names (`std::io::println`) may belong to imports that ran in an
+     * earlier input; fill them before this input runs. */
+    err = wy_session_refill_(context, module);
+    if (err != WY_ERR_NONE) { return err; }
+
+    if (out_init_function != WY_NULL) { *out_init_function = d.init_function; }
+    return WY_ERR_NONE;
+}
+
+wy_error wy_module_run_function(wy_context* context, wy_module* module, wy_uword function_index, wy_value* out_result)
+{
+    if (context == WY_NULL || module == WY_NULL || !wy_module_is_session(module)) { return WY_ERR_INVAL; }
+    if (function_index >= module->function_count) { return WY_ERR_RANGE; }
+
+    wy_function* fn = WY_NULL;
+    wy_error err = wy_function_new(context, module, &module->functions[function_index], WY_NULL, 0, &fn);
+    if (err != WY_ERR_NONE) { return err; }
+
+    /* Never touches module->state: one faulting input must not poison the session. */
+    wy_value callee = wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn);
+    wy_value result = wy_value_nil();
+    err = wy_vm_call_sync(context, callee, WY_NULL, 0, &result, 1);
+    if (err == WY_ERR_NONE && out_result != WY_NULL) { *out_result = result; }
+    return err;
+}

@@ -229,7 +229,7 @@ static wy_error ensure_std_package_(wy_context* context)
 {
     for (wy_uword i = 0; i < context->module_count; i++) {
         wy_module* m = wy_context_get_module(context, i);
-        if (m->import_path != WY_NULL && m->import_path->len == 3 && wy_memcmp(m->import_path->str, "std", 3) == 0) {
+        if (m != WY_NULL && m->import_path != WY_NULL && m->import_path->len == 3 && wy_memcmp(m->import_path->str, "std", 3) == 0) {
             return WY_ERR_NONE;
         }
     }

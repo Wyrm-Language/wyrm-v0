@@ -5,7 +5,7 @@
 # like std/io_native.c) and compiled into the wyrm executable (and into
 # test_cwyrm) only.
 wyrm_exe = executable('wyrm',
-    files('main.c'), embed_sources,
+    files('main.c', 'repl.c'), embed_sources,
     dependencies: [cwyrm_lib_dep],
     install: true,
 )
@@ -30,4 +30,18 @@ endif
 check_wy_flags = find_program('../../scripts/check_wy_flags.sh', required: false)
 if check_wy_flags.found()
     test('wy-flags', check_wy_flags, args: [wyrm_exe.full_path(), meson.project_source_root()], suite: 'wyrm')
+endif
+
+# The `trap([code])` intrinsic (repl-plan M-1): faults per code, shadowable,
+# literal 0-255 only.
+check_wy_trap = find_program('../../scripts/check_wy_trap.sh', required: false)
+if check_wy_trap.found()
+    test('wy-trap', check_wy_trap, args: [wyrm_exe.full_path()], suite: 'wyrm')
+endif
+
+# The interactive loop (`wyrm -i`, repl-plan M3): piped transcripts under
+# test/corpus/repl, local only.
+check_wy_repl = find_program('../../scripts/check_wy_repl.sh', required: false)
+if check_wy_repl.found()
+    test('wy-repl', check_wy_repl, args: [wyrm_exe.full_path(), meson.project_source_root()], suite: 'wyrm', timeout: 300)
 endif

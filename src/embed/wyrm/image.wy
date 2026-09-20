@@ -137,7 +137,16 @@ fn make_function(name: str, params: list | nil = nil, nlocals: int = 0,
 # section document builders
 
 fn _header_doc(image: dict) -> dict:
-    return {"n": image["name"], "v": image["version"], "g": image["globals"], "l": image["init_l"]}
+    doc := {"n": image["name"], "v": image["version"], "g": image["globals"], "l": image["init_l"]}
+    # A REPL session delta (doc/repl-plan.md): `d` marks it, `bc`..`bg` are the
+    # module's counts before the delta (the loader refuses a mismatch), `i` is
+    # the absolute index of the function that runs this input.
+    delta := (image["delta"] catch nil)
+    if not (delta is nil):
+        doc["d"] = 1
+        for key in ["bc", "bf", "bs", "by", "bk", "bm", "bg", "i"]:
+            doc[key] = delta[key]
+    return doc
 
 fn _function_doc(func: dict) -> dict:
     doc := {}

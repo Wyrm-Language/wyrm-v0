@@ -115,3 +115,19 @@ declaration forms the rule covers (`:=`, `var`, `fn`, `class`, `import`, slots).
 the per-scope `declared_here` mechanism described in `doc/repl-plan.md` (the REPL treats each
 input as a scope and needs the same machinery). A change under `src/embed/` needs a stage0
 regen.
+
+## REPL follow-ups
+
+`wyrm -i` works (`doc/repl-plan.md`), with these known gaps:
+
+- **Blank line ends an input,** so a class or function body cannot contain a blank line. Same
+  rule as Python's REPL, but hostile when pasting a script. Done when the driver can tell a
+  blank line inside a block from one that ends it (for example by peeking at the next line when
+  input is not a terminal).
+- **No `_` (last value), no line editing or history, no Ctrl-C** to interrupt a running input.
+- **A delta-aware `verify`:** session inputs skip `verify.wy` (it reads a whole image); the loader
+  bounds-checks every delta but nothing checks register/stack discipline of session code.
+- **Syntax errors have no location:** they print "syntax error: the input could not be parsed".
+  Blocked on the parser reporting a position (the existing parse-failure item above).
+- **`definitions` (`foo::$ast`) keeps the first definition** of a name across inputs; a redefined
+  function's `$ast` is stale.

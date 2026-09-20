@@ -1,0 +1,11 @@
+keep := 1
+zzz = 5
+x := := 1
+keep + 1
+not_defined_yet()
+keep + 2
+trap(7)
+keep + 3
+:bogus
+fn open_paren(
+keep + 4

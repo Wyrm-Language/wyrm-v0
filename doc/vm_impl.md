@@ -163,3 +163,31 @@ A context that skips step 2 can import `std::io` but not do I/O. Expansion VMs
 skip it on purpose and their import hook also refuses `std::io`. `__write` to fd
 1 goes through `ctx->io.write` when the host set one, so captured output covers
 `File` writes and `println`.
+
+## Session modules (the REPL)
+
+A session module (`include/wyrm/session.h`, `src/session.c`, `src/module.c`) is one `wy_module`
+that grows instead of being loaded once. Its arrays (code, function protos, class protos and
+classes, statics, symbols, globals with their fill tables, messages) are reserved at full
+capacity when it is created and only appended to, so raw pointers into them - a frame's `ip`, a
+`wy_function`'s proto - never move. The reservation comes from the machine allocator, not the GC
+heap, and is lazily committed on hosted systems.
+
+| API | Purpose |
+|---|---|
+| `wy_module_session_new(ctx, &config, &m)` | reserve everything, name it `__repl__`, register it |
+| `wy_module_extend(ctx, m, &image, &init)` | append a delta image; all-or-nothing; base counts must match |
+| `wy_module_run_function(ctx, m, index, &result)` | run one function without touching module state |
+| `wy_session_check_room(m, table, n)` | would `n` more elements fit (`WY_ERR_SESSION_FULL` if not) |
+| `wy_context_module_unregister(ctx, m)` | drop the session from the registry so a collection frees it |
+
+A delta image is an ordinary container whose header carries `d: 1`, the module's counts before
+the delta (`bc bf bs by bk bm bg`), the total globals after (`g`) and the input's function index
+(`i`); sections hold only new items and every reference is absolute. The compiler side
+(`SessionContext`, `compile_snippet`) and the driver (`src/wyrm/repl.c`) are described in
+`doc/repl-plan.md`. If the loader refuses a delta the compiler already counted, call
+`session_undo` (compile_source.wy) so the two sides stay in step; `repl.c` does.
+
+Embedding: the session compiles in the same context that hosts it. Keep the compiler's session
+value rooted (`wy_context_root_push_f`), install the std::io natives, and resolve library imports
+through the builtin table, exactly as `repl.c` does; see also "Embedding `std::io`" above.

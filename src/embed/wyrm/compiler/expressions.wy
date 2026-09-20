@@ -334,7 +334,15 @@ fn resolve_name(name, frame: FnContext, dst):
                 return e2
         return reg
     module := frame.module
-    if (not (module ! is_builtin(name))) and (not module.has_wildcard_import):
+    if not (module.session_declared is nil):
+        # REPL session: an unknown name may be defined by a later input, so it
+        # is a forward reference (a fillable slot), never "undefined".
+        if not (module ! is_builtin(name)):
+            fwd := module ! declare_forward_global(name)
+            if fwd is error:
+                return fwd
+            return _land_free(frame, dst, fwd)
+    elif (not (module ! is_builtin(name))) and (not module.has_wildcard_import):
         return error("undefined name '" + str(name) + "'")
     free := module ! declare_free_global(str(name))
     if free is error:
@@ -670,7 +678,51 @@ fn _compile_call(node, frame: FnContext, nres: int) -> int | error:
         return fr
     return window
 
+# `trap([code])`: an intrinsic, not a function. Lowers to the `trap` opcode,
+# whose `code` is an 8-bit immediate - hence an integer *literal* 0-255
+# (default 1, "debugger break"; 0 is what the compiler itself emits for a
+# body it could not lower; 2-255 are the program's own). The fault ends the
+# call, so the instructions after it are dead: `nres` registers are still
+# reserved (and one is nil-filled) only so callers that expect a window keep
+# their register discipline. It is recognised only as a call whose name is
+# not bound (a local, parameter, capture or module global named `trap`
+# shadows it), and never as a value.
+fn _compile_trap(node, frame: FnContext, nres: int) -> int | error:
+    args := (_field(node, 2) catch nil)
+    code := 1
+    if len(args) > 1:
+        return error("trap takes at most one argument, an integer literal 0-255")
+    if len(args) == 1:
+        arg := args[0]
+        if (arg is sym) or (node_kind(arg) != 'int):
+            return error("trap's argument must be an integer literal 0-255")
+        code = (_field(arg, 1) catch -1)
+        if (code < 0) or (code > 255):
+            return error("trap's argument must be an integer literal 0-255")
+    base := frame ! mark()
+    window := frame ! push()
+    if window is error:
+        return window
+    e := _emit_pack(frame, 'trap, f=code)
+    if e is error:
+        return e
+    e2 := _emit_pack(frame, 'lnil, a0=window)
+    if e2 is error:
+        return e2
+    held := base + _max2(nres, 1)
+    while (frame ! mark()) < held:
+        p := frame ! push()
+        if p is error:
+            return p
+    fr := frame ! free_to(held)
+    if fr is error:
+        return fr
+    return window
+
 fn compile_call(node, frame: FnContext, nres: int) -> int | error:
+    func_node := (_field(node, 1) catch nil)
+    if (func_node is sym) and (func_node == 'trap) and ((frame ! storage(func_node)) is nil):
+        return _compile_trap(node, frame, nres)
     args := (_field(node, 2) catch nil)
     if has_spread_or_keyword(args):
         func_node := (_field(node, 1) catch nil)

@@ -1,5 +1,6 @@
 #include <wyrm.h>
 #include <wyrm/link.h>
+#include <wyrm/session.h>
 #include <wyrm/dict.h>
 #include <wyrm/error.h>
 #include <wyrm/function.h>
@@ -109,6 +110,7 @@ wy_error wy_link_fill_from_builtins(wy_context* ctx, wy_module* module, wy_modul
 wy_error wy_link_fill_from_import(wy_context* ctx, wy_module* module, wy_symbol path, wy_module* dep)
 {
     if (ctx == WY_NULL || module == WY_NULL || path == WY_NULL || dep == WY_NULL) { return WY_ERR_INVAL; }
+    wy_session_note_import_(ctx, module, path, dep);  /* no-op unless `module` is a REPL session */
     wy_uword len = strlen(path);
     for (wy_uword i = 0; i < module->free_names.capacity; i++) {
         const wy_slot_dict_entry* entry = &module->free_names.entry_table[i];
@@ -242,6 +244,7 @@ wy_error wy_link_import(wy_context* ctx, wy_string* path, wy_module** out)
     if (start == path->len) { return WY_ERR_INVAL; }
     for (wy_uword i = 0; i < ctx->module_count; i++) {
         wy_module* module = wy_context_get_module(ctx, i);
+        if (module == WY_NULL) { continue; }  /* unregistered */
         bool match = module->import_path ? wy_string_eq_f(module->import_path, path) :
             (module->name && strlen(module->name) == path->len && memcmp(module->name, path->str, path->len) == 0);
         if (!match) { continue; }

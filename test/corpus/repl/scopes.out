@@ -1,0 +1,5 @@
+1
+2
+1
+fault: unbound global 'later_defined'
+'now defined'

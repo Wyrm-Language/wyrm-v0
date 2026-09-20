@@ -1,0 +1,19 @@
+fn a():
+    return 1
+
+fn b():
+    return a()
+
+fn a():
+    return 2
+
+b()
+a()
+a = fn(): 3
+b()
+late := fn(): later_defined()
+late()
+fn later_defined():
+    return "now defined"
+
+late()

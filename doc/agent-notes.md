@@ -173,3 +173,20 @@ Symptom -> usual cause seen so far:
 - Fast loop for compiler-side changes: copy a `SELFCOMPILE_KEEP` gen1 tree, recompile single
   modules into it with its own `compiler_main.wyc --mirror wy <tree> <rel.wy>`, then compile
   the module under test against it (seconds instead of a ~7 min self-compile).
+
+## REPL / session traps (found while building it)
+
+- `slot` is a keyword: a variable named `slot` in wy source is a parse failure that surfaces only
+  as "compile_module needs a 'module node". Same for a statement starting with `(` right after
+  another expression (it glues on as a call): use a helper function or a local.
+- The compiler is the same one for scripts and sessions; a session is switched on by
+  `ModuleContext.session_declared` being non-nil. Anything you add to name resolution must keep the
+  ordinary path (nil) byte-identical: check `git status src/embed` after a regen, only the modules
+  you edited may change.
+- A delta's exports/free tables list only *new* names; a shadowing name replaces its slot
+  (`wy_slot_dict_set`), and a filled forward slot is exported although it predates the delta.
+- Free names filled by an import (`std::io::println`) are filled when the import runs, so a session
+  re-runs the fills after every extend (`wy_session_refill_`). If a qualified name in a later input
+  is unbound, look there first.
+- The REPL compiles inside the collected VM, so GC-stress runs of the differential are slow; keep
+  those to a small subset.

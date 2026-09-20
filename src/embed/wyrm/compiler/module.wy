@@ -691,3 +691,307 @@ fn compile_module(program_node, module_name: str, source_file = nil, check: bool
         if v is error:
             return v
     return img
+
+# ---------------------------------------------------------------------------
+# REPL session (doc/repl-plan.md, M2)
+#
+# One ModuleContext (and its ModuleImage) lives for the whole session, so
+# global slots, statics, symbols, functions, classes and - crucially - message
+# identities keep their absolute numbering from one input to the next. Each
+# input compiles into a *delta*: the tail of every pool beyond what earlier
+# inputs left, an init of its own as a function-table entry (the delta
+# header's `i`), and code offsets that continue where the last input's code
+# ended. Nothing about the ordinary compile_module path changes.
+#
+# Each input is a scope nested in the ones before it (ModuleContext.
+# _declare_session_global): redeclaring a name shadows it with a fresh slot,
+# and a name used before anything defines it is a forward reference the first
+# declaration fills. A failed input is rolled back to a snapshot taken before
+# it, so a bad line changes nothing.
+
+class SessionContext:
+    slot module: ModuleContext
+    slot inputs: int
+    slot code_len: int
+    # What undoing the last successful compile needs (session_undo): the
+    # snapshot taken before it, the undo list of older global entries it
+    # touched, and the session's code length before it.
+    slot last_snap
+    slot last_undo
+    slot last_code_len
+
+    fn init():
+        m := ModuleContext("__repl__", nil)
+        m.session_declared = {}
+        this.module = m
+        this.inputs = 0
+        this.code_len = 0
+        this.last_snap = nil
+        this.last_undo = []
+        this.last_code_len = 0
+
+fn new_session() -> SessionContext:
+    return SessionContext()
+
+# The elements of `items` from index `start` on (wy has no list slices).
+fn _from(items: list, start: int) -> list:
+    out := []
+    i := start
+    n := len(items)
+    while i < n:
+        out ! append(items[i])
+        i = i + 1
+    return out
+
+# Shrink `items` to `n` elements (a helper so no statement has to start with `(`).
+fn _truncate(items: list, n: int) -> nil:
+    items ! resize(n)
+    return nil
+
+# Everything an input can change that is not append-only: pool lengths (to
+# truncate back to) and shallow copies of the name dictionaries (to put back).
+fn _session_snapshot(session: SessionContext) -> dict:
+    m := session.module
+    image := m.image
+    snap := {}
+    snap["lens"] = [len(image.statics), len(image.symbols), len(image.messages), len(image.globals), len(image.functions), len(image.classes), len(m.static_imports)]
+    snap["image_dicts"] = [copy(image._static_index), copy(image._symbol_index), copy(image._message_index), copy(image._global_index), copy(image._free_index)]
+    snap["module_dicts"] = [copy(m.globals), copy(m.classes), copy(m.class_statics), copy(m.slot_names), copy(m.superclasses), copy(m.definitions), copy(m.promoted_arities), copy(m.session_pending)]
+    snap["wildcard"] = m.has_wildcard_import
+    return snap
+
+fn _session_restore(session: SessionContext, snap: dict) -> nil:
+    m := session.module
+    image := m.image
+    # Older global entries this input touched (a filled forward slot): put back.
+    undo := m.session_undo
+    i := len(undo) - 1
+    while i >= 0:
+        entry := image.globals[undo[i][0]]
+        entry["exported"] = undo[i][1]
+        entry["free"] = undo[i][2]
+        i = i - 1
+    lens := snap["lens"]
+    _truncate(image.statics, lens[0])
+    _truncate(image.symbols, lens[1])
+    _truncate(image.messages, lens[2])
+    _truncate(image.globals, lens[3])
+    _truncate(image.functions, lens[4])
+    _truncate(image.classes, lens[5])
+    _truncate(m.static_imports, lens[6])
+    d := snap["image_dicts"]
+    image._static_index = d[0]
+    image._symbol_index = d[1]
+    image._message_index = d[2]
+    image._global_index = d[3]
+    image._free_index = d[4]
+    e := snap["module_dicts"]
+    m.globals = e[0]
+    m.classes = e[1]
+    m.class_statics = e[2]
+    m.slot_names = e[3]
+    m.superclasses = e[4]
+    m.definitions = e[5]
+    m.promoted_arities = e[6]
+    m.session_pending = e[7]
+    m.has_wildcard_import = snap["wildcard"]
+    m.session_undo = []
+    m.session_filled = []
+    m.pending = []
+    m.pending_statics = []
+    return nil
+
+# Compile one input (a `'module` tree) against the session; answers the delta
+# image dict `image.wy`'s to_wyc() serializes, or an error, in which case the
+# session is exactly as it was. `expander` is the decorator hook, as for
+# compile_module. Verification is skipped: verify.wy reads a whole image, and
+# the loader bounds-checks every delta.
+fn compile_snippet(session: SessionContext, program_node, expander = nil) -> dict | error:
+    if node_kind(program_node) != 'module:
+        return error("compile_snippet needs a 'module node")
+    snap := _session_snapshot(session)
+    before := session.code_len
+    r := _compile_snippet_body(session, program_node, expander)
+    if r is error:
+        _session_restore(session, snap)
+        return r
+    session.last_snap = snap
+    session.last_code_len = before
+    return r
+
+# Undo the last successful compile_snippet: for a host that then could not
+# load its delta (the session was full), so the two sides stay in step. A
+# no-op when there is nothing to undo.
+fn session_undo_last(session: SessionContext) -> nil:
+    snap := session.last_snap
+    if snap is nil:
+        return nil
+    session.module.session_undo = session.last_undo
+    _session_restore(session, snap)
+    session.code_len = session.last_code_len
+    session.last_snap = nil
+    return nil
+
+fn _compile_snippet_body(session: SessionContext, program_node, expander) -> dict | error:
+    module := session.module
+    image := module.image
+    session.inputs = session.inputs + 1
+    name := "<repl-" + str(session.inputs) + ">"
+
+    module.session_declared = {}
+    module.session_undo = []
+    module.session_filled = []
+    module.pending = []
+    module.pending_statics = []
+    image.module_uses = []
+    image.unlowered = []
+    module.init_ctx = FnContext(module, name, nil, nil, 0, true, nil)
+
+    wm_statics := len(image.statics)
+    wm_symbols := len(image.symbols)
+    wm_messages := len(image.messages)
+    wm_globals := len(image.globals)
+    wm_functions := len(image.functions)
+    wm_classes := len(image.classes)
+
+    body := cdr(program_node)
+    rewritten := expand_predefined_decorators(body)
+    if rewritten is error:
+        return rewritten
+    body = rewritten
+    if _has_decorated(body):
+        if expander is nil:
+            return error("this input has decorators but no expander was supplied (see wyrm::compiler::expansion)")
+        expanded := expander(body, name)
+        if expanded is error:
+            return expanded
+        body = cdr(expanded)
+
+    d := _declare_module_names(body, module)
+    if d is error:
+        return d
+    c := _collect_definitions(body, module)
+    if c is error:
+        return c
+    pending := _hoist_imports(body, module)
+    if pending is error:
+        return pending
+    b := _bind_imported_names(pending, module)
+    if b is error:
+        return b
+
+    init := module.init_ctx
+    visible := []
+    for gname in module.globals:
+        visible ! append(gname)
+    scopes := init ! allocate_block_scopes(body, visible)
+    if scopes is error:
+        return scopes
+
+    nodes := []
+    for node in body:
+        nodes ! append(node)
+    last := len(nodes) - 1
+    returned := false
+    idx := 0
+    for node in nodes:
+        mark := init ! mark()
+        var r: nil | error
+        if (idx == last) and (node_kind(node) == 'expr_stmt) and (not supported(TOPLEVEL_HANDLERS, node)):
+            # A trailing bare expression is the input's value: return it.
+            value := (_field(node, 1) catch nil)
+            reg := compile_expr(value, init, nil)
+            if reg is error:
+                return reg
+            f0 := _flush_statics(module)
+            if f0 is error:
+                return f0
+            re := init ! emit_return(reg)
+            if re is error:
+                return re
+            returned = true
+            idx = idx + 1
+            continue
+        if supported(TOPLEVEL_HANDLERS, node):
+            r = dispatch(TOPLEVEL_HANDLERS, node, module, nil)
+        else:
+            r = compile_statement(node, init)
+        if r is error:
+            return r
+        f := _flush_statics(module)
+        if f is error:
+            return f
+        fr := init ! free_to(mark)
+        if fr is error:
+            return fr
+        idx = idx + 1
+
+    if not returned:
+        nreg := init ! push()
+        if nreg is error:
+            return nreg
+        en := _emit_pack(init, 'lnil, a0=nreg)
+        if en is error:
+            return en
+        re2 := init ! emit_return(nreg)
+        if re2 is error:
+            return re2
+    p := init ! patch_labels()
+    if p is error:
+        return p
+
+    init_index := image ! add_function(name, nil, init.high, 0, 0, nil, 0, 1, nil)
+    if init_index is error:
+        return init_index
+
+    # Lay out: this input's init, then each pending body, at offsets that
+    # continue the session's code.
+    base := session.code_len
+    code := []
+    for w in init.code:
+        code ! append(w)
+    image.functions[init_index]["code_offset"] = base
+    for entry in module.pending:
+        fn_entry := image.functions[entry[0]]
+        fn_entry["code_offset"] = base + len(code)
+        for w in entry[1].code:
+            code ! append(w)
+
+    exports := {}
+    free := {}
+    i := wm_globals
+    while i < len(image.globals):
+        gslot := image.globals[i]
+        if gslot["exported"]:
+            exports[gslot["name"]] = i
+        if gslot["free"]:
+            free[gslot["name"]] = i
+        i = i + 1
+    for filled in module.session_filled:
+        exports[filled[0]] = filled[1]
+
+    img := {}
+    img["name"] = "__repl__"
+    img["version"] = 1
+    img["globals"] = len(image.globals)
+    img["init_l"] = init.high
+    img["init_nlocals"] = init.high
+    img["module_uses"] = []
+    img["unlowered"] = _from(image.unlowered, 0)
+    img["statics"] = _from(image.statics, wm_statics)
+    img["slot_defaults"] = nil
+    img["symbols"] = _from(image.symbols, wm_symbols)
+    img["functions"] = _from(image.functions, wm_functions)
+    img["classes"] = _from(image.classes, wm_classes)
+    img["messages"] = _from(image.messages, wm_messages)
+    if len(exports) > 0:
+        img["exports"] = exports
+    if len(free) > 0:
+        img["free"] = free
+    img["code"] = code
+    img["delta"] = {"bc": base, "bf": wm_functions, "bs": wm_statics, "by": wm_symbols, "bk": wm_classes, "bm": wm_messages, "bg": wm_globals, "i": init_index}
+
+    session.code_len = base + len(code)
+    session.last_undo = module.session_undo
+    module.session_undo = []
+    return img

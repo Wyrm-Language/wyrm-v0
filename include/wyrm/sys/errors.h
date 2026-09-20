@@ -39,6 +39,7 @@ enum wy_error {
     WY_ERR_FAULT,         ///< A fiber unwound with an unhandled fault; see fiber->fault
     WY_ERR_ARITY,         ///< Wrong argument count for a callable
     WY_ERR_AMBIGUOUS,     ///< Multiple equally-specific matches (message dispatch ranking)
+    WY_ERR_SESSION_FULL,  ///< A REPL session module's reserved space is exhausted (doc/repl-plan.md)
 };
 
 #ifndef __cplusplus

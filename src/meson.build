@@ -34,6 +34,7 @@ cwyrm_sources = files(
     'native.c',
     'pair.c',
     'slot.c',
+    'session.c',
     'symtab.c',
     'tuple.c',
     'vm_call.c',

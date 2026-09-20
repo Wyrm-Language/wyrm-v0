@@ -1103,6 +1103,20 @@ class ModuleContext:
     slot init_ctx: FnContext
     # [function index, FnContext] laid out after init
     slot pending: list
+    # REPL session state (module.wy's SessionContext); all nil/empty outside a
+    # session, where `session_declared` being nil is what marks an ordinary
+    # compile. `session_declared`: names declared by the current input (the
+    # scope: redeclaring one earlier in the *same* input is idempotent, an
+    # earlier input's binding is shadowed by a fresh slot). `session_pending`:
+    # forward-referenced names -> the slot the first declaration will fill.
+    # `session_undo`: [slot, exported, free] of older global entries this
+    # input mutated, for rollback. `session_filled`: [name, slot] forward
+    # slots this input defined (they need an exports entry though the slot
+    # predates the delta).
+    slot session_declared
+    slot session_pending
+    slot session_undo
+    slot session_filled
 
     fn init(module_name: str, source_file = nil):
         this.image = ModuleImage(module_name)
@@ -1122,6 +1136,10 @@ class ModuleContext:
         this.stub_unlowered = false
         this.init_ctx = FnContext(this, "<init>", nil, nil, 0, true, nil)
         this.pending = []
+        this.session_declared = nil
+        this.session_pending = {}
+        this.session_undo = []
+        this.session_filled = []
 
 # ---------------------------------------------------------------------------
 # ModuleContext's methods.
@@ -1138,6 +1156,8 @@ class ModuleContext:
 
 fn [ModuleContext] declare_global(name) -> int | error:
     key := str(name)
+    if not (this.session_declared is nil):
+        return this ! _declare_session_global(key)
     index := (this.globals[key] catch nil)
     if index is nil:
         index = (this.image) ! add_global(key)
@@ -1145,6 +1165,56 @@ fn [ModuleContext] declare_global(name) -> int | error:
             return index
         this.globals[key] = index
     return index
+
+
+# Remove `key` from a dict (a helper so no statement has to start with `(`).
+fn _drop_key(table: dict, key: str) -> nil:
+    table ! remove(key)
+    return nil
+
+
+# `declare_global` in a REPL session: each input is a scope nested in the
+# ones before it (spec: redeclaring in an enclosing scope shadows). The
+# first declaration of `key` in this input either fills a slot an earlier
+# input reserved for a forward reference, or takes a fresh slot - the older
+# binding stays where it is, so code compiled against it is untouched. A
+# second declaration in the same input answers the same slot (this compiler
+# declares each name from several passes).
+fn [ModuleContext] _declare_session_global(key: str) -> int | error:
+    declared := this.session_declared
+    if key in declared:
+        return this.globals[key]
+    image := this.image
+    sidx := (this.session_pending[key] catch nil)
+    if sidx is nil:
+        if key in image._global_index:
+            _drop_key(image._global_index, key)
+        sidx = image ! add_global(key)
+        if sidx is error:
+            return sidx
+    else:
+        entry := image.globals[sidx]
+        this.session_undo ! append([sidx, entry["exported"], entry["free"]])
+        entry["exported"] = true
+        entry["free"] = false
+        image._global_index[key] = sidx
+        _drop_key(this.session_pending, key)
+        this.session_filled ! append([key, sidx])
+    this.globals[key] = sidx
+    declared[key] = true
+    return sidx
+
+
+# A slot for a name a session input references before any input defines it:
+# an ordinary free slot, remembered as pending so the first later
+# declaration of the name fills it instead of shadowing.
+fn [ModuleContext] declare_forward_global(name) -> int | error:
+    key := str(name)
+    sidx := (this.image) ! add_free_global(key)
+    if sidx is error:
+        return sidx
+    this.session_pending[key] = sidx
+    return sidx
 
 
 # A global slot for a top-level *block*'s declaration.

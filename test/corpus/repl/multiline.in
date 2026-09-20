@@ -1,0 +1,27 @@
+squares := [
+    1,
+    4,
+    9,
+]
+len(squares)
+table := {"a": 1,
+          "b": 2}
+table["b"]
+fn classify(n):
+    if n < 0:
+        return "negative"
+    elif n == 0:
+        return "zero"
+    else:
+        return "positive"
+
+classify(-3)
+classify(0)
+classify(5)
+total := 0
+for i in [1, 2, 3]:
+    total = total + i
+
+total
+# a comment on its own
+total * 2

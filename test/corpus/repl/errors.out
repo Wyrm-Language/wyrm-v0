@@ -1,0 +1,9 @@
+error: cannot assign to 'zzz': it is not declared in this module
+error: syntax error: the input could not be parsed
+2
+fault: unbound global 'not_defined_yet'
+3
+fault: trap 7
+unknown command :bogus (:help)
+4
+error: syntax error: the input could not be parsed

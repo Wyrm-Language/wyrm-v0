@@ -1,0 +1,20 @@
+x := 40
+x + 2
+fn twice(n):
+    return n * 2
+
+twice(x)
+"a string"
+[1, 2, 3]
+println("printed")
+nothing := nil
+nothing
+class Box:
+    slot v: int = 3
+    fn get() -> int:
+        return this.v
+
+b := Box()
+b!get()
+import std::io
+std::io::println("via std::io", 7)

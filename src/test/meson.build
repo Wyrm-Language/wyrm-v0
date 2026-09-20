@@ -15,6 +15,8 @@ test_cwyrm_sources = files(
     'test_link.cpp',
     'test_machine.cpp',
     'test_module.cpp',
+    'test_session.cpp',
+    'test_session_compile.cpp',
     'test_slot.cpp',
     'test_stack.cpp',
     'test_symtab.cpp',
@@ -75,7 +77,12 @@ test_cwyrm_exe = executable('test_cwyrm',
     ],
 )
 
-test('cwyrm', test_cwyrm_exe, depends: [test_fixtures])
+# The REPL differential (every corpus source, one statement per input, plus a
+# GC-stress subset) runs the whole embedded compiler for hundreds of inputs, so
+# it is its own test with a long timeout and stays out of the default run.
+test('cwyrm', test_cwyrm_exe, args: ['--test-suite-exclude=session-differential'], timeout: 240, depends: [test_fixtures])
+test('cwyrm-session-differential', test_cwyrm_exe, args: ['--test-suite=session-differential'],
+    suite: 'session', timeout: 1800, depends: [test_fixtures])
 test('cwyrm-loader', test_cwyrm_exe, args: ['--test-suite=loader'], suite: 'loader', depends: [test_fixtures])
 test('cwyrm-golden', test_cwyrm_exe, args: ['--test-suite=golden'], suite: 'golden', depends: [test_fixtures])
 test('cwyrm-golden-gcstress', test_cwyrm_exe, args: ['--test-suite=golden-gcstress'], suite: 'golden', depends: [test_fixtures])
