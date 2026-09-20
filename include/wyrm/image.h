@@ -1,12 +1,6 @@
-/* Synced verbatim from pypoc/wypoc/compiler_bc/include/wyrm/image.h by
- * scripts/sync_pypoc_headers.py. Do not hand-edit here - edit the pypoc
- * source (wypoc/compiler_bc/opcodes.py for opcode.h) and rerun. */
 /* wyrm module image descriptors - the declarations a generated .c container
- * needs (doc/llm-bytecode.md 5.2).
- *
- * This header lives here so the compiler's .c output compiles standalone
- * under -Wall -Werror today; it is written to be adopted verbatim by the VM
- * tree as wyrm/image.h when that work starts. */
+ * needs (doc/llm-bytecode.md 5.2). Originally adopted from pypoc; now
+ * maintained here. */
 #ifndef WYRM_IMAGE_H
 #define WYRM_IMAGE_H
 

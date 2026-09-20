@@ -7,7 +7,6 @@
 
 # Caches
 *.wyc
-!test/bytecode/**/*.wyc
 *.wyd
 __wycache__
 

@@ -19,12 +19,19 @@ touching `src/vm*.c`, `wy/wyrm/*.wy`, or the self-hosted compiler.
 
 ## Generations of the self-hosted compiler
 
-- **gen0** = the *amalgam*: all front-end + compiler modules concatenated into ONE module
-  by `scripts/run_corpus_sweep.py::build_amalgam`, compiled by pypoc.
-- **gen1** = gen0 compiling the sources into separate `.wyc` modules (a real module tree).
-- **gen2** = gen1 compiling them again. Bar: gen1 == gen2 byte-for-byte
-  (`scripts/run_selfcompile.py`; `SELFCOMPILE_KEEP=<dir>` keeps the trees).
-- `parser.wyc` is pypoc-built in every tree until epic 10a (decorators unsupported by the port).
+- **gen0 / stage0** = the compiler images embedded in the binary (`src/wyrm/embedded/`,
+  committed). pypoc is no longer involved. (History: gen0 used to be a pypoc-compiled
+  *amalgam* of all compiler modules concatenated into one module; that driver and
+  `run_corpus_sweep.py` are gone.)
+- **gen1** = stage0 compiling the current `wy/` sources into separate `.wyd` modules
+  (`compiler_main.wy` run in-process by the binary). Output tree first on the import path,
+  so decorator expansion loads this compiler's own tree shapes.
+- **gen2** = gen1 compiling them again. Bar: gen1 == gen2 byte-for-byte, then the fresh
+  tree's embedded-table emit == committed stage0 (`scripts/run_selfcompile.py`;
+  `SELFCOMPILE_KEEP=<dir>` keeps the trees). After a compiler change, regenerate stage0
+  with `scripts/regen_builtins.py`.
+- The notes below about the amalgam describe historical gen0 bugs; the failure modes are
+  still a useful checklist when a gen1 image misbehaves.
 
 **The amalgam hides bugs.** One shared namespace means: same-name top-level helpers in
 different modules silently shadow each other (last wins), and transitive names (a name
@@ -131,8 +138,8 @@ Symptom -> usual cause seen so far:
 - Fan-out to parallel subagents works when each gets exact signatures and a "files you must
   not touch" list.
 - Tests to run before declaring done: `meson test -C buildDir` (includes the `compiler` suite:
-  corpus sweep 19/20 and self-compile fixed point). Slow pair alone:
-  `meson test -C buildDir --suite compiler`.
+  behavior corpus and self-compile fixed point). Slow one alone:
+  `meson test -C buildDir --suite compiler`. Prefer a release tree (AGENTS.md).
 
 ## Decorator expansion (epic 10a)
 
@@ -156,7 +163,7 @@ Symptom -> usual cause seen so far:
 - Builtins the C VM adds (`tree_box`, `bind_message`, `error_message`) are unknown to pypoc
   and must be listed in `compiler/context.wy` BUILTIN_NAMES for the port. pypoc cannot compile
   a module that uses them; fixtures that do are compiled by the port and have hand-written
-  `.out`s (`test/bytecode/expand/README.md`).
+  `.out`s (`test/corpus/expand/README.md`).
 - `f(*xs)` passes a native list positional; the VM accepts list or tuple (was tuple-only).
 - Function-level `import` is not supported by the bytecode compiler; imports are top-level.
 - Fast loop for compiler-side changes: copy a `SELFCOMPILE_KEEP` gen1 tree, recompile single

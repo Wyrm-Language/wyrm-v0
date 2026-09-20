@@ -10,7 +10,6 @@ test_cwyrm_sources = files(
     'test_coroutine.cpp',
     'test_dispatch.cpp',
     'test_fiber.cpp',
-    'test_headers_sync.cpp',
     'test_heap_objects.cpp',
     'test_image.cpp',
     'test_link.cpp',
@@ -32,11 +31,36 @@ extra_test_inc += include_directories('.')
 
 project_root = meson.project_source_root()
 
-# The embedded-image fixtures (epic 1 M4/M5): compiled straight into
-# test_cwyrm so a test can load them with no file I/O at all. The builtin
-# module table (epic 11 M1) rides along for the import-resolution tests.
-test_cwyrm_embedded_sources = files(
-    '../../test/bytecode/embedded/hello_1.c',
+if wy_opt.disabled()
+    error('tests option requires the wyrm executable (fixtures are built by its compiler)')
+endif
+
+# Fixtures are never committed: this build tree's own compiler produces them
+# from test/corpus (scripts/build_fixtures.py), so they always match the
+# bytecode format under test. Rebuilt on every build (well under a second).
+python = find_program('python3')
+test_fixture_dir = meson.project_build_root() / 'test_fixtures'
+test_fixtures = custom_target('test_fixtures',
+    output: 'test_fixtures.stamp',
+    command: [python, files('../../scripts/build_fixtures.py'), wyrm_exe, test_fixture_dir],
+    depends: [wyrm_exe],
+    depend_files: files('../../test/corpus/manifest.txt'),
+    build_always_stale: true,
+    build_by_default: true,
+)
+
+# The embedded-image fixture (epic 1 M4/M5): compiled straight into
+# test_cwyrm so a test can load it with no file I/O at all. Generated (C
+# source emitted by the compiler) rather than committed. The builtin module
+# table (epic 11 M1) rides along for the import-resolution tests.
+hello_1_c = custom_target('hello_1_c',
+    input: files('../../test/corpus/hello_1.wy'),
+    output: 'hello_1.c',
+    command: [wyrm_exe, '-I' + project_root / 'wy', '--build-bc', '-o', '@OUTDIR@',
+              '--emit', 'c', '@INPUT@'],
+)
+
+test_cwyrm_embedded_sources = [hello_1_c] + files(
     '../wyrm/embedded/embedded_images.c',
     '../wyrm/embedded/wyrm_builtins_table.c',
 )
@@ -48,14 +72,13 @@ test_cwyrm_exe = executable('test_cwyrm',
     link_with: [cwyrm_lib, wyrmxx_lib],
     cpp_args: [
         '-DWY_TEST_DEST_INCLUDE_DIR="' + project_root / 'include' / 'wyrm' + '"',
-        '-DWY_TEST_PYPOC_INCLUDE_DIR="' + project_root / 'pypoc' / 'wypoc' / 'compiler_bc' / 'include' / 'wyrm' + '"',
-        '-DWY_TEST_HELLO_WYC_PATH="' + project_root / 'test' / 'bytecode' / 'hello.wyc' + '"',
-        '-DWY_TEST_BYTECODE_DIR="' + project_root / 'test' / 'bytecode' + '"',
+        '-DWY_TEST_FIXTURE_DIR="' + test_fixture_dir + '"',
+        '-DWY_TEST_CORPUS_DIR="' + project_root / 'test' / 'corpus' + '"',
         '-DWY_TEST_REPO_ROOT="' + project_root + '"',
     ],
 )
 
-test('cwyrm', test_cwyrm_exe)
-test('cwyrm-loader', test_cwyrm_exe, args: ['--test-suite=loader'], suite: 'loader')
-test('cwyrm-golden', test_cwyrm_exe, args: ['--test-suite=golden'], suite: 'golden')
-test('cwyrm-golden-gcstress', test_cwyrm_exe, args: ['--test-suite=golden-gcstress'], suite: 'golden')
+test('cwyrm', test_cwyrm_exe, depends: [test_fixtures])
+test('cwyrm-loader', test_cwyrm_exe, args: ['--test-suite=loader'], suite: 'loader', depends: [test_fixtures])
+test('cwyrm-golden', test_cwyrm_exe, args: ['--test-suite=golden'], suite: 'golden', depends: [test_fixtures])
+test('cwyrm-golden-gcstress', test_cwyrm_exe, args: ['--test-suite=golden-gcstress'], suite: 'golden', depends: [test_fixtures])

@@ -132,11 +132,10 @@ dispatch loop executes real `.wyc` module images compiled by `pypoc/`
 `wy_module` table layout, and how to run one fixture; this section is the
 short version.
 
-`include/wyrm/opcode.h` and `include/wyrm/image.h` are synced verbatim from
-pypoc's compiler (`scripts/sync_pypoc_headers.py`; `src/test/test_headers_sync.cpp`
-fails the suite if they drift) — 88 real opcodes, the actual `wyc-format.md`
+`include/wyrm/opcode.h` and `include/wyrm/image.h` were originally adopted from
+pypoc's compiler and are now maintained here (the bytecode is ours to change) — 88 real opcodes, the actual `wyc-format.md`
 instruction encoding (1 or 2 packed `wy_u32` words, bit 7 of the opcode byte
-selects the length). `include/wyrm/opcode_names.h` is a generated
+selects the length). `include/wyrm/opcode_names.h` is the
 `wy_opcode_names[256]` mnemonic table for the disassembler.
 
 `src/image.c` (`wy_image_from_bytes`) parses the container: magic, version,
@@ -179,25 +178,21 @@ summary; `--disasm` prints one line per instruction (mnemonic + raw
 operands, no symbol resolution yet); with neither flag it links against
 builtins and actually runs the module's init, printing whatever it
 `print`s/`println`s to stdout (or a fault message to stderr, exit 1) —
-`./buildDir/src/wyrm/wyrm test/bytecode/hello.wyc` prints `Hello World`.
-`scripts/check_disasm.sh` diffs `--disasm`'s mnemonics against every
-fixture's compiler-emitted `.wy_a` listing. `src/test/test_bytecode_golden.cpp`
-(meson suites `golden`/`golden-gcstress`) is the automated version of the
-same check for the seven fixtures above, output captured via
-`ctx->io.write` and diffed against the corpus's committed `.out`.
+`src/test/test_bytecode_golden.cpp` (meson suites `golden`/`golden-gcstress`) runs
+fixtures built from `test/corpus`, output captured via `ctx->io.write` and
+diffed against the corpus's committed `.out`.
 
 Practical implication (since epic 11): `wyrm` is self-sufficient. A `.wy`
 script compiles in-process — the front end, the compiler, and the `wy/`
 library modules are embedded in the binary as the builtin module table
 (`src/wyrm/embedded/`, resolution order: `-I` roots (`.wy` through the
 `.wyd` cache, then precompiled `.wyd`/`.wyc`), then the table) — and then
-runs: `./buildDir/src/wyrm/wyrm -Iwy test/bytecode/hello.wy` prints
+runs: `./buildDir/src/wyrm/wyrm -Iwy test/corpus/hello.wy` prints
 `Hello World` with no Python and no external wyrm on the machine.
 `--check`, `--build-bc`, `-m`, `--cache-dir`, and `-v` round out the CLI
 (exit codes: 0 ok, 1 compile/run failure, 2 usage). pypoc remains the
-second, independent implementation used to regenerate golden fixtures and
-the compiler-suite seeds; `meson test` passes without it (the compiler
-suite skips itself). For anything past the VM's opcode coverage, embed via
+second, independent implementation, usable as the external oracle for the
+behavioral tests (`WYRM`, see AGENTS.md); `meson test` passes without it. For anything past the VM's opcode coverage, embed via
 the C API and drive fibers with native `wy_exec_fn` C callables directly
 (see `src/test/test_wvm.cpp`'s "a bytecode callable resolves its module and
 returns" for the shape of that path).

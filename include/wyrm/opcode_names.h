@@ -1,5 +1,4 @@
-/* wyrm opcode mnemonics - GENERATED from wypoc/compiler_bc/opcodes.py
- * by pypoc/tools/generate_opcode_names.py. Do not hand-edit.
+/* wyrm opcode mnemonics, maintained by hand alongside opcode.h.
  *
  * Indexed by the raw opcode byte (WYRM_OP(code)); a byte no opcode
  * uses is NULL (static storage zero-initializes the rest of the

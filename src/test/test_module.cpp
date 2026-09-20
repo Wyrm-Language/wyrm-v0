@@ -5,14 +5,15 @@
 #include <string>
 #include <vector>
 
+#include <filesystem>
 #include <wyrm.h>
 #include <wyrm/image_loader.h>
 #include <wyrm/module.h>
 #include <wyrm/string.h>
 #include <test_common/test_context_fixture.h>
 
-// test/bytecode/embedded/hello_1.c (compiled straight into test_cwyrm, see
-// src/test/meson.build).
+// hello_1.c, emitted by this build's compiler from test/corpus/hello_1.wy
+// and compiled straight into test_cwyrm (see src/test/meson.build).
 extern "C" {
 extern const wy_module_image hello_1_image;
 }
@@ -31,13 +32,13 @@ std::vector<wy_u8> read_file(const std::string& path)
 }
 
 /**
- * Load a fixture's .wyc. `storage` must outlive the returned module: the
+ * Load a fixture's .wyd. `storage` must outlive the returned module: the
  * loader never copies `code` (or the debug section, unread here), so
  * wy_module::code points straight into it.
  */
 wy_module* load_fixture(wy_context* context, const std::string& rel_path, std::vector<wy_u8>& storage)
 {
-    storage = read_file(std::string(WY_TEST_BYTECODE_DIR) + "/" + rel_path);
+    storage = read_file(std::string(WY_TEST_FIXTURE_DIR) + "/" + rel_path);
     wy_module* module = nullptr;
     REQUIRE_EQ(wy_module_load_bytes(context, storage.data(), storage.size(), false, &module), WY_ERR_NONE);
     return module;
@@ -54,11 +55,11 @@ wy_symbol intern(wy_context* context, const char* text)
 
 TEST_SUITE("module")
 {
-    TEST_CASE("hello.wyc loads its header, statics, functions, exports and free tables")
+    TEST_CASE("hello.wyd loads its header, statics, functions, exports and free tables")
     {
         test_context_fixture ctx;
         std::vector<wy_u8> storage;
-        wy_module* module = load_fixture(ctx.get_context_ptr(), "hello.wyc", storage);
+        wy_module* module = load_fixture(ctx.get_context_ptr(), "hello.wyd", storage);
 
         CHECK_EQ(module->global_count, 2);
         CHECK_EQ(module->init_nlocals, 3);
@@ -81,11 +82,11 @@ TEST_SUITE("module")
         CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx.get_context_ptr(), "println")), 1);
     }
 
-    TEST_CASE("classes.wyc loads slot layout and message maps")
+    TEST_CASE("classes.wyd loads slot layout and message maps")
     {
         test_context_fixture ctx;
         std::vector<wy_u8> storage;
-        wy_module* module = load_fixture(ctx.get_context_ptr(), "classes.wyc", storage);
+        wy_module* module = load_fixture(ctx.get_context_ptr(), "classes.wyd", storage);
 
         REQUIRE_EQ(module->class_count, 2);
 
@@ -126,11 +127,11 @@ TEST_SUITE("module")
         CHECK_EQ(module->messages[2].path[0], 5);  // "area"
     }
 
-    TEST_CASE("two_module/report.wyc loads its messages (none) and free table")
+    TEST_CASE("two_module/report.wyd loads its messages (none) and free table")
     {
         test_context_fixture ctx;
         std::vector<wy_u8> storage;
-        wy_module* module = load_fixture(ctx.get_context_ptr(), "two_module/report.wyc", storage);
+        wy_module* module = load_fixture(ctx.get_context_ptr(), "two_module/report.wyd", storage);
 
         CHECK_EQ(module->message_count, 0);
 
@@ -162,25 +163,15 @@ TEST_SUITE("module")
 
 TEST_SUITE("loader")
 {
-    TEST_CASE("every .wyc in the manifest loads")
+    TEST_CASE("every built fixture loads")
     {
-        std::string manifest_path = std::string(WY_TEST_BYTECODE_DIR) + "/manifest.txt";
-        std::ifstream manifest(manifest_path);
-        REQUIRE_MESSAGE(manifest.good(), "could not open ", manifest_path);
-
-        std::string line;
+        // Every .wyd build_fixtures.py produced (the manifest's runnable rows
+        // plus expand/ and embedded/) must load.
         wy_uword checked = 0;
-        while (std::getline(manifest, line)) {
-            std::istringstream row(line);
-            std::string name, wyc_path, out_path, status;
-            std::getline(row, name, '\t');
-            std::getline(row, wyc_path, '\t');
-            std::getline(row, out_path, '\t');
-            std::getline(row, status, '\t');
-            if (wyc_path == "-") { continue; }  // REFUSED: compiler rejected the source, no .wyc exists
-
-            INFO("manifest row: ", name);
-            std::vector<wy_u8> bytes = read_file(std::string(WY_TEST_REPO_ROOT) + "/" + wyc_path);
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(WY_TEST_FIXTURE_DIR)) {
+            if (!entry.is_regular_file() || entry.path().extension() != ".wyd") { continue; }
+            INFO("fixture: ", entry.path().string());
+            std::vector<wy_u8> bytes = read_file(entry.path().string());
 
             test_context_fixture ctx;
             wy_module* module = nullptr;

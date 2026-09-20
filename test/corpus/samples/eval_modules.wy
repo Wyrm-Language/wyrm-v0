@@ -1,0 +1,16 @@
+import shapes
+import std::io
+
+c := shapes::Circle()
+c_area_fn := shapes::Circle
+
+greeted := std::io::println("hi")
+
+from std::io import println
+direct := println("direct")
+
+import std::io::*
+bulk := println("bulk")
+
+import std::io::println as alias_println
+aliased := alias_println("aliased")

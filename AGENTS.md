@@ -17,6 +17,23 @@ Currently public domain licensed.
 - **Build:** `meson compile -C buildDir`
 - **Test:** `meson test -C buildDir`
 
+**Prefer optimized builds.** A plain `meson setup buildDir` is `-O0` debug and
+roughly 2-2.5x slower on VM workloads (the compiler-suite `selfcompile` test
+takes ~370s debug vs ~185s release). Unless you need debug information
+(gdb/lldb, `-O0` stepping), use one of:
+
+```sh
+meson setup buildDir -Dbuildtype=release -Db_ndebug=false  # release + WY_ASSERT checks (default choice)
+meson setup buildDir -Dbuildtype=release                   # release, asserts off (perf baselines, pre-merge)
+```
+
+Plain release sets `b_ndebug=if-release`, which disables `WY_ASSERT`; use the
+first form for day-to-day regressions so internal checks stay active. Use a
+separate debug tree for debugging. Any tree can be tested with
+`meson test -C <tree>`: the compiler-suite tests run that tree's binary (they
+read `WYRM_BUILD_DIR`, which meson sets; default `buildDir` when the scripts
+are run by hand). Perf numbers (epics 6/12) should come from plain release.
+
 Options (all default on where applicable):
 
 ```sh
@@ -40,8 +57,38 @@ with no Python and no external wyrm installation (the compiler, the `wy/`
 library modules, and the front end are embedded in the binary). Prefer it
 over any `wyrm` in user `$PATH` -- a pre-existing installation may be an
 older, divergent variant of the language. pypoc (a nested checkout) is
-optional: it regenerates golden fixtures and the compiler-suite seeds, and
-`meson test` passes without it.
+optional: `meson test` passes without it.
+
+### Testing
+
+`meson test -C <tree>` tests that tree (the tests that run the binary read
+`WYRM_BUILD_DIR`, which meson sets). Bytecode is never a test artifact: no
+`.wyc`/`.wy_a` is committed, and nothing compares our bytecode with pypoc's.
+Tests check behavior, plus our own compiler's self-consistency:
+
+- `behavior` (`scripts/run_behavior.py`): every `test/corpus` source (see
+  `manifest.txt`) run from source by the build tree, diffed against the
+  committed `.out` and, when available, an external wyrm.
+- C++ golden/loader/image/link tests run `.wyd` fixtures that a meson custom
+  target (`scripts/build_fixtures.py`) compiles from `test/corpus` with the
+  build tree's own compiler on every build.
+- `selfcompile`: gen1 (the binary's stage0 compiles current `wy/`) == gen2
+  byte-for-byte, and the result equals the committed stage0 in
+  `src/wyrm/embedded/`. After changing `wy/` compiler sources, regenerate
+  stage0 with `python3 scripts/regen_builtins.py` and commit.
+- `wy-tests`, `scripts/check_parser_truth.py`: run under the external wyrm.
+
+External wyrm selection (`scripts/wytest_env.py`): exported `$WYRM`, else
+`pypoc/.venv/bin/wyrm`, else `wyrm` on `$PATH`; `$WYRM_FLAGS` sets its
+arguments (default `-I<repo>/wy`; `~` expands):
+
+```sh
+WYRM=/bin/wyrm WYRM_FLAGS="-I~/wy" python3 scripts/run_wy_tests.py
+python3 scripts/run_behavior.py --reference-only   # is this wyrm a faithful oracle?
+```
+
+Tests skip (77) when no external wyrm exists; `behavior` then checks the
+committed `.out` only.
 
 Scripts resolve imports through `-I` roots, then the embedded builtin
 modules. To run a script:

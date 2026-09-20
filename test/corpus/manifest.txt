@@ -1,0 +1,51 @@
+# source	expected stdout	status	note
+arith.wy	arith.out	local-only	the interpreter models `return a, b` as a single tuple value, so `println(f())` prints the whole pair. A VM implementing spec 1.3 honestly drops every result past the first, because the call asked for one. This is doc/llm-bytecode.md 9's multi-value gap, and it is the only divergence any fixture has shown so far.
+classes.wy	classes.out	matches	
+closures.wy	closures.out	matches	
+collections.wy	collections.out	local-only	the interpreter models `return a, b` as a single tuple value, so `println(f())` prints the whole pair. A VM implementing spec 1.3 honestly drops every result past the first, because the call asked for one. This is doc/llm-bytecode.md 9's multi-value gap, and it is the only divergence any fixture has shown so far.
+control_flow.wy	control_flow.out	matches	
+coroutines.wy	coroutines.out	matches	
+decorators/declib.wy	decorators/declib.out	matches	
+decorators/decorated.wy	decorators/decorated.out	DIVERGES	pypoc's declib builds pypoc's 8-field 'fn node; the port's parser emits 'fn_def (see expand/wydecorated, its port-shaped twin).
+errors.wy	errors.out	matches	
+hello.wy	hello.out	matches	
+hello_1.wy	hello_1.out	matches	
+hello_2.wy	hello_2.out	matches	
+hello_3.wy	hello_3.out	matches	
+messages.wy	messages.out	matches	
+multiret.wy	multiret.out	local-only	the interpreter models `return a, b` as a single tuple value, so `println(f())` prints the whole pair. A VM implementing spec 1.3 honestly drops every result past the first, because the call asked for one. This is doc/llm-bytecode.md 9's multi-value gap, and it is the only divergence any fixture has shown so far.
+template.wy	template.out	matches	Added by epic 10a M0: `@template` marks `twice`/`_shadowed`; `_shadowed` uses `this` in a plain fn and exists only under the marking (a trapping stub in both engines' images, never called). `twice::$ast` yields the definition's tree - raw on the C VM, TreeBase-boxed on the walker - and the fixture only inspects it through what both agree on (`is nil`). The marking relieves a lowering failure, not semantics: `twice(21)` still runs. The source is checked in beside these artifacts (a fixture this repo authors, not one inherited from pypoc); the sweep still compiles it from pypoc/test/bytecode, where a copy must exist.
+two_module/geometry.wy	two_module/geometry.out	matches	
+two_module/report.wy	two_module/report.out	matches	
+two_module/shapes.wy	two_module/shapes.out	matches	Added by epic 10's cross-module dispatch fix: instance methods stay on the defining module's message identities, so an importer's `obj ! method(...)` needs the import-time message adoption the tree walker does (_adopt_messages) and the compiled reference lacks (its own bytecode VM faults `no overload` on this fixture). `wy_link_adopt_messages` (src/link.c) ports the adoption; this fixture is its regression test.
+two_module/shapes_main.wy	two_module/shapes_main.out	local-only	See two_module/shapes.wy's note: `square ! describe()`/`corners()` dispatch through inherited entries on the defining module's message objects; `area()` is the importer seeing an own-class override. [local-only: the external wyrm resolves `shapes` to its own corelib module, not the fixture]
+wildcard/paint.wy	wildcard/paint.out	matches	
+wildcard/palette.wy	wildcard/palette.out	matches	
+samples/basics.wy	-	REFUSED	`with` has been removed from the language
+samples/classes.wy	-	REFUSED	a fragment: `canvas` comes from the test harness, not the file
+samples/control_flow.wy	-	REFUSED	a fragment: `condition` comes from the test harness
+samples/decolib.wy	samples/decolib.out	DIVERGES	self-hosted compile fails ("compile_module needs a 'module node"); not diagnosed (a decorator library: `-> TreeBase` returns, cdr/car walks). Found by run_behavior.
+samples/decorators.wy	-	REFUSED	its decorators build trees the compiler expands at compile time
+samples/eval_args.wy	samples/eval_args.out	matches	
+samples/eval_assignments.wy	samples/eval_assignments.out	matches	Fixed by epic 7/M3: WY_OP_MSG/WY_OP_MSG_VA now fall back to ctx->builtins's own message_table and dispatch a NATIVE-tagged overload body via dispatch_native_body_f (src/vm.c), and resize/expand/append (LIST) + remove (TABLE) are registered there alongside epic 7's bytes methods. Wired into golden/golden-gcstress (src/test/test_bytecode_golden.cpp).
+samples/eval_builtins.wy	-	REFUSED	a fragment: `display` is a Python function the test exposes
+samples/eval_classes.wy	-	REFUSED	a fragment: `total` comes from the test harness
+samples/eval_closures.wy	samples/eval_closures.out	DIVERGES	`for i in range(0, end):` compiles to `iter`/`itnext` (design's general iterator protocol) over the coroutine `range` returns, but `wy_iterator_next` (src/iter.c) has no COROUTINE case - it silently answers WY_ERR_STOP_ITERATION on the first call instead of resuming the coroutine, so the loop body never runs (confirmed: only the fixture's non-loop println line produces output). Resuming a coroutine from inside `wy_iterator_next` needs the same fiber-switching machinery as `next()`/`send()`, which M3 wired only from WY_OP_CALL and the exec-native bridge, not from OP_ITER/ITNEXT - the same class of gap M3's report already flagged for CALL_VA/message dispatch, extended to the iterator protocol. Deferred to epic 6.
+samples/eval_control_flow.wy	samples/eval_control_flow.out	matches	
+samples/eval_coroutines.wy	samples/eval_coroutines.out	DIVERGES	`cofun.value` reads a coroutine's last-yielded/returned value via plain `getattr`, but design_c_vm.md §7's per-tag property table for non-INSTANCE receivers is "initially empty -> fault", and nothing populates a COROUTINE entry yet: faults "getattr: unsupported receiver type". Needs a property-table entry (or a dedicated opcode path) exposing `wy_coroutine::result`, deferred to epic 6.
+samples/eval_defer_with_do.wy	-	REFUSED	`with` has been removed from the language
+samples/eval_error_handling.wy	samples/eval_error_handling.out	DIVERGES	self-hosted compile fails ("compile_module needs a 'module node"); the source uses `try x` / `x catch y` / `catch return`. Not diagnosed further. Found by run_behavior.
+samples/eval_functions.wy	samples/eval_functions.out	matches	
+samples/eval_io.wy	-	REFUSED	a fragment: `path` comes from the test harness
+samples/eval_messages.wy	samples/eval_messages.out	DIVERGES	compiles from source but faults at run time: no overload of 'describe' matches 1 receiver(s). Passed only against pypoc-built bytecode. Found by run_behavior.
+samples/eval_modules.wy	samples/eval_modules.out	DIVERGES	`import std::io::println as alias_println` compiles a bare `import` of the full leaf path; the reference (pypoc/wypoc/vm/imports.py's `import_path`) falls back to importing the parent path and reading the last segment as a plain member when the full path does not itself resolve as a module ("`import a::b::c` is ambiguous... may name a member of the module before it"). `wy_link_import` (src/link.c) has no such member fallback, so it asks the import hook for a nonexistent `std/io/println.wyc`. Needs the parent-then-member fallback ported into `wy_link_import`/`WY_OP_IMPORT`, deferred to epic 6. (`import shapes` and `import std::io` in the same fixture now resolve correctly - the shapes corelib module is compiled into test/bytecode/samples/shapes.wyc, and `std::io::println` now exists as a plain qualified global read.)
+samples/eval_range.wy	samples/eval_range.out	matches	
+samples/eval_signals.wy	-	REFUSED	`signal` in a class body is not lowered (§8.5)
+samples/eval_strings.wy	samples/eval_strings.out	DIVERGES	the self-hosted tokenizer has no raw strings (`R"C(...)C"` lexes `R` as an identifier); the parser then returns a non-module node and the error surfaces only as "compile_module needs a 'module node". Found by run_behavior (the old sweep never compiled the samples from source).
+samples/lexical.wy	-	REFUSED	`with` has been removed from the language
+samples/shapes.wy	-	matches	C-VM-only corpus entry, not one of pypoc/test/test_vm_samples.py's own rows: pypoc/wypoc/corelib/shapes.wy (`wyrm_modules.DEFAULT_COREPATH`), compiled here because samples/eval_modules.wy's `import shapes` resolves against it. No standalone `.out` (it has no init-time output of its own); its class definitions are exercised through eval_modules.wy.
+bytes_header/cvm_header.wy	-	local-only	Epic 7 M5 exit criterion: builds the BSON `header` document by hand with `bytes` methods and writes it to a file, verified byte-for-byte against `bsonlite.encode_document` and against `bytes_header/pypoc_header.wy`'s output (same assembly, pypoc's File-class std::io instead of the C VM's raw natives - see `bytes_header/check.sh`). Not wired into the golden harness: its result is a written file, not stdout, so it doesn't fit `check_fixture`'s stdout-diff contract; `check.sh` is the standalone verification the epic's own plan allows, pending epic 9 formalizing file-output fixtures.
+two_module/dunder_name.wy	two_module/dunder_name.out	matches	Added with `__name__` injection at import time (wy_link_seed_global, src/link.c): an imported module reads its import path, the entry module reads __main__.
+two_module/dunder_name_main.wy	two_module/dunder_name_main.out	matches	Added with `__name__` injection at import time (wy_link_seed_global, src/link.c): an imported module reads its import path, the entry module reads __main__.
+expand/wydeclib.wy	-	local-only	port-shaped decorator library (compiled at import by wydecorated)
+expand/wydecorated.wy	expand/wydecorated.out	local-only	hand-authored .out; uses the port's tree shapes, which pypoc cannot compile

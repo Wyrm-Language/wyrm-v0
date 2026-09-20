@@ -1,10 +1,7 @@
-/* Synced verbatim from pypoc/wypoc/compiler_bc/include/wyrm/opcode.h by
- * scripts/sync_pypoc_headers.py. Do not hand-edit here - edit the pypoc
- * source (wypoc/compiler_bc/opcodes.py for opcode.h) and rerun. */
-/* wyrm bytecode opcodes - GENERATED from wypoc/compiler_bc/opcodes.py.
- *
- * Do not hand-edit: run tools/generate_opcode_header.py after changing the
- * opcode table. doc/llm-bytecode.md section 3 is the prose alongside it.
+/* wyrm bytecode opcodes. Originally adopted from pypoc's compiler; this
+ * repository now owns the instruction set and edits it in place. Keep
+ * opcode_names.h and wy/wyrm/opcodes.wy (the compiler's copy of the table)
+ * in step with any change. doc/llm-bytecode.md section 3 is the prose.
  *
  * Instruction encoding (section 2), little-endian:
  *

@@ -484,7 +484,7 @@ TEST_SUITE("builtin_table") {
         test_fiber_fixture fix;
         auto* ctx = fix.get_context_ptr();
         wy_import_fs_search_path search = table_search_path();
-        std::string shadow = std::string(WY_TEST_BYTECODE_DIR) + "/embedded/shadow";
+        std::string shadow = std::string(WY_TEST_FIXTURE_DIR) + "/embedded/shadow";
         REQUIRE_EQ(wy_import_fs_add_root(wy_context_get_machine(ctx)->allocator,
             &search, shadow.c_str()), WY_ERR_NONE);
         ctx->import_hook = wy_import_fs_hook;
@@ -495,7 +495,7 @@ TEST_SUITE("builtin_table") {
         REQUIRE_EQ(wy_string_strdup(ctx, "wyrm::compiler::module", &path), WY_ERR_NONE);
         REQUIRE_EQ(wy_link_import(ctx, path, &module), WY_ERR_NONE);
         REQUIRE_NE(module, nullptr);
-        // The shadow fixture is `x := 1` compiled by pypoc - a handful of
+        // The shadow fixture is `x := 1` compiled by this build - a handful of
         // words, not the embedded compiler module's thousand-plus.
         CHECK_LT(module->code_len, 100u);
     }

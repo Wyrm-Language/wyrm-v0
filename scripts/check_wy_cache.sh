@@ -14,7 +14,7 @@ ROOT="$2"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
-cp "$ROOT/test/bytecode/hello.wy" "$WORK/hello.wy"
+cp "$ROOT/test/corpus/hello.wy" "$WORK/hello.wy"
 
 OUT=$("$WYRM" -v "$WORK/hello.wy" 2>"$WORK/err1")
 grep -q "jit $WORK/hello.wy (cache absent)" "$WORK/err1"

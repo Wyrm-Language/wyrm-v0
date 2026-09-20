@@ -11,18 +11,9 @@ wyrm_exe = executable('wyrm',
     install: true,
 )
 
-# scripts/check_disasm.sh: diffs `wyrm --disasm` against every fixture's
-# checked-in .wy_a listing (epic 1 M5). Needs the corpus (test/bytecode/),
-# not just this binary, so it is skipped rather than failed when that's
-# absent from a partial checkout.
-check_disasm = find_program('../../scripts/check_disasm.sh', required: false)
-if check_disasm.found()
-    test('disasm-check', check_disasm, args: [wyrm_exe.full_path()], suite: 'disasm')
-endif
-
 # Epic 11 M2: `wyrm script.wy` compiles in-process through the embedded
-# compiler; its output must match the same script run from the committed
-# .wyc. (The stripped-PATH no-Python variant of this check is epic 11 M6.)
+# compiler; its output must match the same script run from a .wyd built with
+# --build-bc, and (epic 11 M6) with no Python reachable on PATH.
 check_wy_entry = find_program('../../scripts/check_wy_entry.sh', required: false)
 if check_wy_entry.found()
     test('wy-entry', check_wy_entry, args: [wyrm_exe.full_path(), meson.project_source_root()], suite: 'wyrm')

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Epic 8 M5: run every test/wy/*.wy under pypoc/.venv/bin/wyrm and fail if
-any of them reports trouble.
+"""Epic 8 M5: run every test/wy/*.wy under the external wyrm (see
+wytest_env.py: $WYRM / $WYRM_FLAGS, else pypoc, else PATH) and fail if any
+of them reports trouble.
 
 Each test/wy/*.wy file now calls exit(1) itself at the point of failure
 (confirmed to propagate as the real process exit code - see
@@ -9,24 +10,24 @@ primary signal. This script also greps stdout for a stray "FAIL" line as
 a redundant check, in case some future test prints FAIL without also
 exiting non-zero.
 
-Skips cleanly (meson's skip code, 77) when pypoc/.venv/bin/wyrm doesn't
-exist, so this works whether or not the pypoc submodule/venv is set up.
+Skips cleanly (meson's skip code, 77) when no external wyrm is available.
 """
 
 import os
 import subprocess
 import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.join(SCRIPT_DIR, "..")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wytest_env
+
+REPO_ROOT = wytest_env.REPO_ROOT
 WY_TEST_DIR = os.path.join(REPO_ROOT, "test", "wy")
-WYRM = os.path.join(REPO_ROOT, "pypoc", ".venv", "bin", "wyrm")
 
 
 def main():
-    if not os.path.isfile(WYRM):
-        print(f"run_wy_tests: {WYRM} not found, skipping", file=sys.stderr)
-        return 77
+    wyrm = wytest_env.require_reference("run_wy_tests")
+    if wyrm is None:
+        return wytest_env.SKIP
 
     failures = []
     ran = 0
@@ -35,7 +36,7 @@ def main():
             continue
         path = os.path.join(WY_TEST_DIR, name)
         result = subprocess.run(
-            [WYRM, "-Iwy", path],
+            wyrm + [path],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,

@@ -7,7 +7,7 @@ ROOT="$2"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
-cp "$ROOT/test/bytecode/hello.wy" "$WORK/hello.wy"
+cp "$ROOT/test/corpus/hello.wy" "$WORK/hello.wy"
 printf 'x := \n' > "$WORK/bad.wy"
 
 # --check: silent success, non-zero with a message on a compile error.

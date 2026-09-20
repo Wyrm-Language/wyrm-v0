@@ -3,8 +3,8 @@
 
 Epic 8 M4's comparing golden runner. For every `.wy` in
 test/samples/parser/, parses it with the self-hosted wyrm parser
-(pypoc/.venv/bin/wyrm -Iwy -m wyrm::parser, matching
-update_sample_parser_truth.py's invocation) and diffs the output against
+(the external wyrm, see wytest_env.py, run with -m wyrm::parser,
+matching update_sample_parser_truth.py's invocation) and diffs the output against
 the committed `.ast` file. Exits non-zero with a unified diff on any
 mismatch, or if a `.wy` is missing its `.ast` counterpart.
 """
@@ -14,16 +14,17 @@ import os
 import subprocess
 import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.join(SCRIPT_DIR, "..")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wytest_env
+
+REPO_ROOT = wytest_env.REPO_ROOT
 SAMPLES_DIR = os.path.join(REPO_ROOT, "test", "samples", "parser")
-WYRM = os.path.join(REPO_ROOT, "pypoc", ".venv", "bin", "wyrm")
 
 
 def main():
-    if not os.path.isfile(WYRM):
-        print(f"check_parser_truth: {WYRM} not found, skipping", file=sys.stderr)
-        return 77  # meson's "skip" exit code
+    wyrm = wytest_env.require_reference("check_parser_truth")
+    if wyrm is None:
+        return wytest_env.SKIP
 
     failures = 0
     checked = 0
@@ -38,7 +39,7 @@ def main():
             continue
 
         result = subprocess.run(
-            [WYRM, "-Iwy", "-m", "wyrm::parser", wy_path],
+            wyrm + ["-m", "wyrm::parser", wy_path],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,

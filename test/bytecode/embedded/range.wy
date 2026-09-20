@@ -1,5 +1,0 @@
-co range(begin, end) -> int:
-    i := begin
-    while i < end:
-        yield i
-        i = i + 1

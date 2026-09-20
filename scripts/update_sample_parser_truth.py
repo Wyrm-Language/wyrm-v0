@@ -5,19 +5,23 @@ import os
 import subprocess
 import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.join(SCRIPT_DIR, "..")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wytest_env
+
+REPO_ROOT = wytest_env.REPO_ROOT
 SAMPLES_DIR = os.path.join(REPO_ROOT, "test", "samples", "parser")
-WYRM = os.path.join(REPO_ROOT, "pypoc", ".venv", "bin", "wyrm")
 
 
 def main():
+    wyrm = wytest_env.require_reference("update_sample_parser_truth")
+    if wyrm is None:
+        return 1
     for name in sorted(os.listdir(SAMPLES_DIR)):
         if not name.endswith(".wy"):
             continue
         path = os.path.join(SAMPLES_DIR, name)
         result = subprocess.run(
-            [WYRM, "-Iwy", "-m", "wyrm::parser", path],
+            wyrm + ["-m", "wyrm::parser", path],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
