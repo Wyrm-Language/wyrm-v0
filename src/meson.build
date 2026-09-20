@@ -15,6 +15,7 @@ cwyrm_sources = files(
     'context.c',
     'fiber.c',
     'gc.c',
+    'image.c',
     'machine.c',
     'module.c',
     'pair.c',

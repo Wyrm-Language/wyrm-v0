@@ -34,6 +34,8 @@ enum wy_error {
     WY_ERR_NOMEM,
     WY_ERR_BAD_ARGUMENT_TYPE,
     WY_ERR_NOSUPPORT,     ///< Operation not supported by this backend
+    WY_ERR_IMAGE,         ///< Malformed .wyc module image (pypoc/doc/wyc-format.md)
+    WY_ERR_LINK,          ///< Module linking/loading failed after a well-formed image parsed
 };
 
 #ifndef __cplusplus

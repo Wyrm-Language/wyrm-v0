@@ -65,6 +65,24 @@ WY_INLINE wy_value wy_value_nil(void)
 }
 
 /**
+ * @brief Create a float primitive value
+ */
+WY_INLINE wy_value wy_value_float(wy_float value)
+{
+    wy_value v = { .type = WY_TYPE_TAG_FLOAT, .data = { .fp = value } };
+    return v;
+}
+
+/**
+ * @brief Create a bool primitive value
+ */
+WY_INLINE wy_value wy_value_bool(bool value)
+{
+    wy_value v = { .type = WY_TYPE_TAG_BOOL, .data = { .flag = value } };
+    return v;
+}
+
+/**
  * @brief Create Unset primitive
  */
 WY_INLINE wy_value wy_value_unset(void)

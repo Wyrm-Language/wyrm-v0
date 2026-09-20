@@ -76,7 +76,7 @@ wy_error wy_machine_find_symbol(wy_machine* self, const char* cstr, wy_symtab_en
     if (self->symtab->data[offset] == 0) {
         *out = WY_NULL; return WY_ERR_KEY;
     }
-    *out = &self->symtab->data[offset];
+    *out = &self->symtab->data[offset + 1];  // past the length-prefix byte, at the text itself
     return WY_ERR_NONE;
 }
 
@@ -91,7 +91,7 @@ wy_error wy_machine_insert_symbol(wy_machine* self, const char* cstr, wy_symtab_
     wy_uword offset = symtab_find_str(self->symtab->data, cstr);
     char* symtab_buffer = &self->symtab->data[offset];
 
-    if (*symtab_buffer != 0) { *out = symtab_buffer; return WY_ERR_EXISTS; }
+    if (*symtab_buffer != 0) { *out = &self->symtab->data[offset + 1]; return WY_ERR_EXISTS; }
 
     wy_uword end = offset + length + 2;
     if (end >= self->symtab->alloc_size) { return WY_ERR_NOMEM; }
@@ -100,6 +100,6 @@ wy_error wy_machine_insert_symbol(wy_machine* self, const char* cstr, wy_symtab_
     self->symtab->data[offset + 1 + length] = '\0';
     self->symtab->data[end] = 0;
     self->symtab->data[offset] = (char) length;
-    *out = &self->symtab->data[offset];
+    *out = &self->symtab->data[offset + 1];  // past the length-prefix byte, at the text itself
     return WY_ERR_NONE;
 }

@@ -187,6 +187,24 @@ wy_error wy_context_activate(wy_context* self, wy_fiber* fiber)
 }
 
 
+wy_error wy_context_intern(wy_context* context, const char* text, wy_uword len, wy_symbol* out)
+{
+    if (context == WY_NULL || text == WY_NULL || out == WY_NULL) { return WY_ERR_INVAL; }
+    // The scaffold symtab (src/machine.c) takes a NUL-terminated cstr and
+    // caps entries at 127 bytes; epic 2 replaces it with a real symtab that
+    // enforces wyc-format.md §8.4's 31-codepoint significant prefix instead.
+    if (len >= 127) { return WY_ERR_RANGE; }
+
+    char buffer[128];
+    wy_memcpy(buffer, text, len);
+    buffer[len] = '\0';
+
+    wy_error last_error = wy_machine_insert_symbol(wy_context_get_machine(context), buffer, out);
+    if (last_error == WY_ERR_EXISTS) { return WY_ERR_NONE; }
+    return last_error;
+}
+
+
 void* wy_context_gc_alloc(wy_context* context, wy_uword dsize)
 {
     wy_machine* machine = wy_context_get_machine(context);

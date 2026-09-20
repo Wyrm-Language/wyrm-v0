@@ -12,6 +12,9 @@
 
 WY_BEGIN_DECLS
 
+/** Initial capacity reserved for the module list on first registration */
+#define WY_CONTEXT_MODULE_INITIAL 4
+
 struct wy_context
 {
     wy_machine* parent;
@@ -31,6 +34,17 @@ void wy_context_finalize_f(wy_context* self);
 wy_error wy_context_set_root(wy_context* context, wy_module* module);
 
 wy_error wy_context_module_register(wy_context* self, wy_module* module, wy_uword* out_module_id);
+
+/**
+ * Intern `len` bytes of UTF-8 as a symbol: identical text returns identical
+ * pointer identity (`wy_symbol` is compared by pointer). Loader code MUST
+ * go through this one entry point rather than the scaffold symtab directly,
+ * so replacing that symtab (epic 2) is a one-function change.
+ *
+ * @return WY_ERR_NONE, WY_ERR_INVAL for a null argument, or WY_ERR_RANGE if
+ *   `len` exceeds the scaffold symtab's per-symbol limit
+ */
+wy_error wy_context_intern(wy_context* context, const char* text, wy_uword len, wy_symbol* out);
 
 wy_error wy_context_attach_loop(wy_context* context, wy_main_loop* loop);
 void wy_context_detach_loop(wy_context* context);

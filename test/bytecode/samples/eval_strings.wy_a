@@ -1,0 +1,39 @@
+WYA 1 eval_strings
+
+SECTION header
+0000: 2E 00 00 00 02 6E 00 0D 00 00 00 65 76 61 6C 5F ; n: "eval_strings"
+0010: 73 74 72 69 6E 67 73 00 10 76 00 01 00 00 00 10 ; v: 1; g: 3
+0020: 67 00 03 00 00 00 10 6C 00 01 00 00 00 00       ; l: 1
+
+SECTION statics
+0000: 57 00 00 00 02 30 00 06 00 00 00 68 65 6C 6C 6F ; [0] str "hello"
+0010: 00 02 31 00 09 00 00 00 6F 6E 65 20 6C 69 6E 65 ; [1] str "one line"
+0020: 00 02 32 00 2E 00 00 00 0A 23 69 6E 63 6C 75 64 ; [2] str "\n#include <stdio.h>\nint main() { return 0; }\n"
+0030: 65 20 3C 73 74 64 69 6F 2E 68 3E 0A 69 6E 74 20
+0040: 6D 61 69 6E 28 29 20 7B 20 72 65 74 75 72 6E 20
+0050: 30 3B 20 7D 0A 00 00
+
+SECTION code
+; module init
+;   eval_strings.wy:1
+0000: 46 00 00 00                                     ; lconst L0 <- static#0   ("hello")
+0004: 43 00 00 00                                     ; gset g0 <- L0   (plain)
+;   eval_strings.wy:2
+0008: 46 00 01 00                                     ; lconst L0 <- static#1   ("one line")
+000C: 43 00 01 00                                     ; gset g1 <- L0   (raw_single_line)
+;   eval_strings.wy:3
+0010: 46 00 02 00                                     ; lconst L0 <- static#2   ("\n#include <stdio.h>\nint main() { return 0; }\n")
+0014: 43 00 02 00                                     ; gset g2 <- L0   (raw_multiline)
+0018: 02 00 00 00                                     ; return count=0
+
+SECTION debug
+0000: 3A 00 00 00 02 66 00 10 00 00 00 65 76 61 6C 5F ; f: "eval_strings.wy"
+0010: 73 74 72 69 6E 67 73 2E 77 79 00 03 6C 6E 00 1A ; ln: {'0': 1, '2': 2, '4': 3}
+0020: 00 00 00 10 30 00 01 00 00 00 10 32 00 02 00 00
+0030: 00 10 34 00 03 00 00 00 00 00
+
+SECTION exports
+0000: 38 00 00 00 10 70 6C 61 69 6E 00 00 00 00 00 10 ; plain: 0; raw_single_line: 1
+0010: 72 61 77 5F 73 69 6E 67 6C 65 5F 6C 69 6E 65 00
+0020: 01 00 00 00 10 72 61 77 5F 6D 75 6C 74 69 6C 69 ; raw_multiline: 2
+0030: 6E 65 00 02 00 00 00 00

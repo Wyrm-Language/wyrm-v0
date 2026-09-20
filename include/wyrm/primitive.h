@@ -22,6 +22,8 @@ typedef enum wy_type_tag
 
     WY_TYPE_TAG_WORD,
     WY_TYPE_TAG_UWORD,
+    WY_TYPE_TAG_FLOAT,   ///< IEEE-754 binary64 (binary32 on a single-precision wy_float build); data.fp
+    WY_TYPE_TAG_BOOL,    ///< data.flag
 
     WY_TYPE_TAG_SYMBOL,
 

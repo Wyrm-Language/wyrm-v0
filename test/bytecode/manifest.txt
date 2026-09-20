@@ -1,0 +1,41 @@
+arith.wy	test/bytecode/arith.wyc	test/bytecode/arith.out	matches	the interpreter models `return a, b` as a single tuple value, so `println(f())` prints the whole pair. A VM implementing spec 1.3 honestly drops every result past the first, because the call asked for one. This is doc/llm-bytecode.md 9's multi-value gap, and it is the only divergence any fixture has shown so far.
+classes.wy	test/bytecode/classes.wyc	test/bytecode/classes.out	matches	
+closures.wy	test/bytecode/closures.wyc	test/bytecode/closures.out	matches	
+collections.wy	test/bytecode/collections.wyc	test/bytecode/collections.out	matches	the interpreter models `return a, b` as a single tuple value, so `println(f())` prints the whole pair. A VM implementing spec 1.3 honestly drops every result past the first, because the call asked for one. This is doc/llm-bytecode.md 9's multi-value gap, and it is the only divergence any fixture has shown so far.
+control_flow.wy	test/bytecode/control_flow.wyc	test/bytecode/control_flow.out	matches	
+coroutines.wy	test/bytecode/coroutines.wyc	test/bytecode/coroutines.out	matches	
+decorators/declib.wy	test/bytecode/decorators/declib.wyc	test/bytecode/decorators/declib.out	matches	
+decorators/decorated.wy	test/bytecode/decorators/decorated.wyc	test/bytecode/decorators/decorated.out	matches	
+errors.wy	test/bytecode/errors.wyc	test/bytecode/errors.out	matches	
+hello.wy	test/bytecode/hello.wyc	test/bytecode/hello.out	matches	
+hello_1.wy	test/bytecode/hello_1.wyc	test/bytecode/hello_1.out	matches	
+hello_2.wy	test/bytecode/hello_2.wyc	test/bytecode/hello_2.out	matches	
+hello_3.wy	test/bytecode/hello_3.wyc	test/bytecode/hello_3.out	matches	
+messages.wy	test/bytecode/messages.wyc	test/bytecode/messages.out	matches	
+multiret.wy	test/bytecode/multiret.wyc	test/bytecode/multiret.out	matches	the interpreter models `return a, b` as a single tuple value, so `println(f())` prints the whole pair. A VM implementing spec 1.3 honestly drops every result past the first, because the call asked for one. This is doc/llm-bytecode.md 9's multi-value gap, and it is the only divergence any fixture has shown so far.
+two_module/geometry.wy	test/bytecode/two_module/geometry.wyc	test/bytecode/two_module/geometry.out	matches	
+two_module/report.wy	test/bytecode/two_module/report.wyc	test/bytecode/two_module/report.out	matches	
+wildcard/paint.wy	test/bytecode/wildcard/paint.wyc	test/bytecode/wildcard/paint.out	matches	
+wildcard/palette.wy	test/bytecode/wildcard/palette.wyc	test/bytecode/wildcard/palette.out	matches	
+samples/basics.wy	-	-	REFUSED	`with` has been removed from the language
+samples/classes.wy	-	-	REFUSED	a fragment: `canvas` comes from the test harness, not the file
+samples/control_flow.wy	-	-	REFUSED	a fragment: `condition` comes from the test harness
+samples/decolib.wy	test/bytecode/samples/decolib.wyc	test/bytecode/samples/decolib.out	matches	
+samples/decorators.wy	-	-	REFUSED	its decorators build trees the compiler expands at compile time
+samples/eval_args.wy	test/bytecode/samples/eval_args.wyc	test/bytecode/samples/eval_args.out	matches	
+samples/eval_assignments.wy	test/bytecode/samples/eval_assignments.wyc	test/bytecode/samples/eval_assignments.out	matches	
+samples/eval_builtins.wy	-	-	REFUSED	a fragment: `display` is a Python function the test exposes
+samples/eval_classes.wy	-	-	REFUSED	a fragment: `total` comes from the test harness
+samples/eval_closures.wy	test/bytecode/samples/eval_closures.wyc	test/bytecode/samples/eval_closures.out	matches	
+samples/eval_control_flow.wy	test/bytecode/samples/eval_control_flow.wyc	test/bytecode/samples/eval_control_flow.out	matches	
+samples/eval_coroutines.wy	test/bytecode/samples/eval_coroutines.wyc	test/bytecode/samples/eval_coroutines.out	matches	
+samples/eval_defer_with_do.wy	-	-	REFUSED	`with` has been removed from the language
+samples/eval_error_handling.wy	test/bytecode/samples/eval_error_handling.wyc	test/bytecode/samples/eval_error_handling.out	matches	
+samples/eval_functions.wy	test/bytecode/samples/eval_functions.wyc	test/bytecode/samples/eval_functions.out	matches	
+samples/eval_io.wy	-	-	REFUSED	a fragment: `path` comes from the test harness
+samples/eval_messages.wy	test/bytecode/samples/eval_messages.wyc	test/bytecode/samples/eval_messages.out	DIVERGES	message promotion: the interpreter turns a plain `fn describe()` into the wildcard overload of the message `describe` becomes, so a receiver with no specific overload still dispatches. The compiler emits no `reg_msg` for the plain function, so the compiled message has only the typed arm - see doc/llm-bytecode.md §9.
+samples/eval_modules.wy	test/bytecode/samples/eval_modules.wyc	test/bytecode/samples/eval_modules.out	matches	
+samples/eval_range.wy	test/bytecode/samples/eval_range.wyc	test/bytecode/samples/eval_range.out	matches	
+samples/eval_signals.wy	-	-	REFUSED	`signal` in a class body is not lowered (§8.5)
+samples/eval_strings.wy	test/bytecode/samples/eval_strings.wyc	test/bytecode/samples/eval_strings.out	matches	
+samples/lexical.wy	-	-	REFUSED	`with` has been removed from the language

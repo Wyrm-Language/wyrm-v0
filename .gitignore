@@ -7,6 +7,7 @@
 
 # Caches
 *.wyc
+!test/bytecode/**/*.wyc
 __wycache__
 
 # Generate python
@@ -29,3 +30,6 @@ build-*
 # Temporary / working files
 doc.tmp
 gen
+
+# nested checkout of the Python proof-of-concept (own git history)
+pypoc/

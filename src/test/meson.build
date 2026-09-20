@@ -6,7 +6,10 @@ test_cwyrm_sources = files(
     'test_class.cpp',
     'test_context.cpp',
     'test_fiber.cpp',
+    'test_headers_sync.cpp',
+    'test_image.cpp',
     'test_machine.cpp',
+    'test_module.cpp',
     'test_slot.cpp',
     'test_stack.cpp',
     'test_wbox.cpp',
@@ -19,11 +22,27 @@ test_cwyrm_sources = files(
 
 extra_test_inc += include_directories('.')
 
+project_root = meson.project_source_root()
+
+# The embedded-image fixtures (epic 1 M4/M5): compiled straight into
+# test_cwyrm so a test can load them with no file I/O at all.
+test_cwyrm_embedded_sources = files(
+    '../../test/bytecode/embedded/hello_1.c',
+)
+
 test_cwyrm_exe = executable('test_cwyrm',
-    test_cwyrm_sources + extra_test_sources,
+    test_cwyrm_sources + extra_test_sources + test_cwyrm_embedded_sources,
     include_directories: [cwyrm_lib_inc] + extra_test_inc,
     dependencies: [doctest_dep, wyrmxx_lib_dep] + extra_test_deps,
     link_with: [cwyrm_lib, wyrmxx_lib],
+    cpp_args: [
+        '-DWY_TEST_DEST_INCLUDE_DIR="' + project_root / 'include' / 'wyrm' + '"',
+        '-DWY_TEST_PYPOC_INCLUDE_DIR="' + project_root / 'pypoc' / 'wypoc' / 'compiler_bc' / 'include' / 'wyrm' + '"',
+        '-DWY_TEST_HELLO_WYC_PATH="' + project_root / 'test' / 'bytecode' / 'hello.wyc' + '"',
+        '-DWY_TEST_BYTECODE_DIR="' + project_root / 'test' / 'bytecode' + '"',
+        '-DWY_TEST_REPO_ROOT="' + project_root + '"',
+    ],
 )
 
 test('cwyrm', test_cwyrm_exe)
+test('cwyrm-loader', test_cwyrm_exe, args: ['--test-suite=loader'], suite: 'loader')
