@@ -1,0 +1,1 @@
+$['module, $['class_def, 'Widget, nil, $[$['slot_def, 'width, nil, nil, nil], $['slot_def, 'height, $['type, 'int], nil, nil], $['slot_def, 'color, nil, $['str, "red"], nil], $['slot_def, 'depth, $['type, 'int], $['int, 1], nil]]]]

@@ -1,0 +1,4 @@
+"plain string"
+"line one\nline two\ttabbed"
+"hex escape: \x41 and \x42"
+"unicode escape: é and ☃"

@@ -5,7 +5,8 @@ import std::io::*;
 fn test_single_token(name: str, buffer: str, expected: sym, match: str):
     defer on error:
         println("FAIL on error")
-    
+        exit(1)
+
     print("Test:", name, "- ")
 
     parser := tok::Scanner(buffer)
@@ -13,19 +14,20 @@ fn test_single_token(name: str, buffer: str, expected: sym, match: str):
 
     if token.kind != expected:
         println("FAIL unexpected kind check:", expected, "!=", token.kind)
-        return
+        exit(1)
 
     found_match := token ! get_text(buffer)
     if found_match != match:
         println("FAIL bad match check:", found_match, "!=", match)
-        return
+        exit(1)
 
     println(" PASS")
 
 fn test_token_stream(name: str, buffer: str, *symbols):
     defer on error:
         println("FAIL no result: ", name)
-    
+        exit(1)
+
     print("Test:", name, "- ")
     parser := tok::Scanner(buffer)
     count := 0
@@ -34,9 +36,9 @@ fn test_token_stream(name: str, buffer: str, *symbols):
         token := try parser ! scan()
         if token.kind != expected:
             println("FAIL bad match, check: ", expected, "!=", token.kind, "elem:", count)
-            return
+            exit(1)
         count = count + 1
-    
+
     println("PASS")
 
 println("Token Tests")

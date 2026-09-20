@@ -1,44 +1,6 @@
 # AST Types
 import std::pairs::*
 
-class TreeItem:
-    slot kind: sym
-
-class UnaryOp(TreeItem):
-    slot target: TreeItem
-
-    fn init(kind: sym, target: TreeItem):
-        this.kind = kind
-        this.target = target
-
-class BinOp(TreeItem):
-    slot lhs: TreeItem
-    slot rhs: TreeItem
-
-    fn init(kind: sym, lhs: TreeItem, rhs: TreeItem):
-        this.kind = kind
-        this.lhs = lhs
-        this.rhs = rhs
-
-
-
-# Full Program
-#   expr_list: list of tokens, each one to eval
-class Program(TreeItem):
-    slot expr_list: list
-
-    fn init(expr_list: list):
-        this.expr_list = expr_list
-
-
-# Literal
-#     value - the underlying token
-class Number(TreeItem):
-    slot value: int
-
-    fn init(number: int):
-        this.value = number
-
 # -------------------------------
 # S-Expression AST manipulation
 # -------------------------------
@@ -117,6 +79,290 @@ fn s_fn_with_body(node, body) -> pair:
 fn test_parse(s: str) -> pair:
     return cadr(sexpr(parse(s)))
 
+# ---------------------------------------------------------------------------
+# Node-kind table
+#
+# Every node kind wy/wyrm/parser.wy's self-hosted parser actually emits in
+# its final output tree, as `kind -> (field, field, ...)`. Transient tags
+# used mid-parse and folded away before the tree reaches a caller (postfix
+# `attr_op`/`call_op`/`index_op`/`message_op`, and the assignment-operator
+# tags `assign`/`assign_bind`/`assign_qeq`) are NOT listed here - see
+# "Transient (not in the table)" below for what happens to each.
+#
+# `DIVERGES(reason)` marks a kind where wyrm's parser output differs from
+# pypoc's canonical sexpr table (`pypoc/wypoc/sexpr.py`'s `ROWS` plus its
+# `_ENCODERS`/`_DECODERS`), per vm_plan/README.md's corpus convention - this
+# is documentation of the current mismatch, not a fix (that's epic 8 M2+).
+#
+# A bare `sym` (no `$['kind, ...]` wrapper) is itself a valid node: every
+# unqualified identifier reference (`a`, `COUNT`, ...) is emitted as a plain
+# symbol, not as pypoc's `$['name, id]`. DIVERGES(pypoc always wraps a name
+# reference in a `'name` node; wyrm's parser never constructs a `'name` node
+# at all - `ast.wy`'s `mk_name` helper is kept for a future caller but has no
+# parser.wy call site today).
+#
+# -- Literals and atoms -----------------------------------------------------
+# sym      -> (value)                    symbol literal, 'foo
+# str      -> (value)                    decoded string
+# int      -> (value)                    decoded integer
+# float    -> (value)                    decoded float
+# nil      -> ()                         a BARE SYMBOL 'nil, not a wrapped
+#                                         $['nil] node - value('nil, ...)'s
+#                                         repl substitutes the symbol
+#                                         directly (the parser DSL's own
+#                                         `value(sym, subseq)` doc comment
+#                                         says "replace subseq with the
+#                                         literal node $[sym]", which reads
+#                                         as if it wraps; it doesn't -
+#                                         verified: `x := nil` parses to
+#                                         $['define, 'x, ..., 'nil], the last
+#                                         field a bare symbol). Still matches
+#                                         pypoc's own bare-symbol convention
+#                                         for this case.
+# true     -> ()                         bare symbol 'true, same as nil above
+# false    -> ()                         bare symbol 'false, same as nil above
+#
+# -- Structure ---------------------------------------------------------------
+# module        -> (stmt, stmt, ...)     flat, n-ary; matches pypoc's 'module
+# do            -> (body)                body is a block result (see block's
+#                                         known bug below)
+# tuple         -> (item, item, ...)     flat n-ary; matches pypoc's 'tuple
+# array         -> (item, item, ...)     flat n-ary; matches pypoc's 'list
+#                                         DIVERGES(name only: wyrm calls this
+#                                         kind 'array, pypoc's Row keys the
+#                                         same shape as 'list)
+# list          -> (item, item, ...)     flat n-ary, `$[...]` pair-literal
+#                                         syntax; pypoc has no separate kind
+#                                         for this literal form (its 'list
+#                                         Row is wyrm's 'array - see above)
+# dict          -> (pair, pair, ...)     each pair is a bare 2-element list
+#                                         $[key, value], no head symbol.
+#                                         DIVERGES(pypoc's DictEntry wraps
+#                                         each entry as $['pair, key, value])
+# qualified_name -> (seg, seg, ...)      flat n-ary of syms, 2+ segments only
+#                                         (a single segment collapses to a
+#                                         bare sym, matching pypoc's
+#                                         `_encode_type`/type_atom behavior)
+#
+# -- Expressions --------------------------------------------------------------
+# attr     -> (obj, name)                fixed (epic 8 M2): $_mk_postfix used
+#                                         cdr(op) where cadr(op) was needed
+#                                         (message_op already used the
+#                                         correct cadr/cddr), which
+#                                         double-wrapped name/index_expr in a
+#                                         one-item list. Verified: `a.b` now
+#                                         parses to $['attr, 'a, 'b].
+# index    -> (obj, index_expr)          fixed alongside attr above; `a[0]`
+#                                         now parses to $['index, 'a, $['int, 0]].
+# call     -> (target, args)             args is a flat list (nil if none);
+#                                         matches pypoc's 'call
+# message  -> (target, name, args)       matches pypoc's 'msg (name only)
+# not      -> (operand)                  matches pypoc's 'not
+# neg      -> (operand)                  DIVERGES(pypoc has no 'neg/'pos/
+# pos      -> (operand)                  'invert kinds; it encodes unary
+# invert   -> (operand)                  +/-/~ as a single 'unop kind with
+#                                         an op symbol field: $['unop, OP,
+#                                         operand])
+# exp      -> (base, exponent)           `**`; DIVERGES(pypoc treats `**` as
+#                                         an ordinary 'binop, no 'exp kind)
+# and      -> (operand, operand, ...)    flat n-ary chain.
+#                                         DIVERGES(pypoc's 'and' Row is
+#                                         strictly binary: left, right - a
+#                                         chain nests BinOp, it isn't flat)
+# or       -> (operand, operand, ...)    flat n-ary chain; same DIVERGES as
+#                                         'and above
+# in       -> (value, target)            fixed (epic 8 M2): $_mk_in used bare
+#                                         `[...]` array-literal syntax instead
+#                                         of `$[...]` (parser.wy, missing the
+#                                         `$` pair-literal sigil), so this
+#                                         node was a real array, not a pair
+#                                         list like every other kind. pypoc
+#                                         has no 'in kind at all (DIVERGES on
+#                                         content, not shape).
+# is       -> (value, type)              fixed alongside 'in above (same
+#                                         missing-`$` mistake in $_mk_is).
+#                                         type_expression's union-type fix
+#                                         (below) also means `is` now carries
+#                                         a real $['type, 'union, ...] node
+#                                         for `x is int | str`, matching
+#                                         pypoc's 'is Row carrying a list of
+#                                         type nodes in spirit (DIVERGES on
+#                                         exact shape: pypoc's is a bare list,
+#                                         wyrm's is a 'union-tagged 'type node
+#                                         - see the 'type entry below).
+# binop    -> (op, lhs, rhs)             fixed (epic 8 M2): $_binary_expr
+#                                         returned the raw flat parse sequence
+#                                         (operand op operand op ...) with no
+#                                         'binop head at all for more than one
+#                                         operand. Now folds left-associatively
+#                                         into nested $['binop, op, lhs, rhs]
+#                                         per pair, matching mk_binop/
+#                                         s_binop_lhs/s_binop_rhs's shape
+#                                         exactly and pypoc's own binary-op
+#                                         convention (matches, no DIVERGES).
+#                                         `1 + 2 + 3` -> $['binop, '+,
+#                                         $['binop, '+, $['int,1], $['int,2]],
+#                                         $['int,3]].
+#
+# -- Assignment and declaration ----------------------------------------------
+# define        -> (name, type, init)          matches pypoc's 'define
+# define_values -> ([[name, type], ...], init) matches pypoc's 'define_values
+# set           -> (target, value)             matches pypoc's 'set
+# if_set        -> (target, value)             `?=`; matches pypoc's 'if_set
+# set_values    -> ([target, ...], value)      matches pypoc's 'set_values
+# target        -> (base, indices)             trailing `[i][j]...` on an
+#                                               attr/name assignment target.
+#                                               DIVERGES(pypoc has no 'target
+#                                               kind; it represents the same
+#                                               construct as nested 'index
+#                                               nodes over the base)
+# static        -> (name, type, init)          DIVERGES(pypoc's 'static Row
+#                                               takes only (name, default);
+#                                               the type isn't carried on the
+#                                               wire there, so a 3-field
+#                                               'static fails pypoc's decode)
+#
+# -- Types --------------------------------------------------------------------
+# type -> (name)  or  type -> (qualified_name_node)  or  (union, type, type, ...)
+#      matches pypoc's 'type (bare name, or nested 'qualified_name for a
+#      `::`-qualified one); `$['type, 'auto]` is the no-annotation sentinel,
+#      also matching pypoc. `$['type, 'union, type1, type2, ...]` (fixed
+#      epic 8 M2, was discarded to 'auto - see type_expression's former
+#      FIXME) is wyrm-only: pypoc's 'type Row has no union representation at
+#      all, so anything reading a 'type node still has to special-case
+#      'union (nothing does yet, per the epic's own scope: only stop
+#      discarding it, not make every consumer understand it).
+#
+# -- Control flow ---------------------------------------------------------------
+# if       -> (cond, body, elifs, else_block)  DIVERGES(pypoc's 'if Row is
+#                                               strictly 3 fields - cond,
+#                                               then, orelse - and folds an
+#                                               elif chain into nested 'if
+#                                               nodes in the orelse position;
+#                                               wyrm keeps a separate elifs
+#                                               list field instead, so a
+#                                               4-field 'if fails pypoc's
+#                                               decode)
+# while    -> (cond, body)                     matches pypoc's 'while
+# for      -> (var, iterable, body, else_block) DIVERGES(pypoc's 'for Row/
+#                                               decoder takes exactly 3
+#                                               fields and has no for/else
+#                                               support; a 4-field 'for fails
+#                                               pypoc's decode)
+# return   -> (value)                          matches pypoc's 'return
+# yield    -> (value)                          not in pypoc's ROWS (Yield is
+#                                               in pypoc's _CANNOT_CROSS list)
+# yield_from -> (value)                        same, not representable yet
+# break    -> ()                                a BARE SYMBOL 'break, same
+#                                               representation as nil/true/
+#                                               false above, not a wrapped
+#                                               $['break] node (verified:
+#                                               `while true: continue` body
+#                                               is $['continue], a one-
+#                                               statement list whose sole
+#                                               statement is the bare symbol
+#                                               'continue - easy to misread
+#                                               as "the continue node's
+#                                               contents leaked into the
+#                                               body list" if you expect a
+#                                               wrapped node here, but it
+#                                               isn't a bug, see epic 8 M3's
+#                                               report). DIVERGES(pypoc's
+#                                               'break Row takes a reserved-
+#                                               nil value field; wyrm's is a
+#                                               bare symbol with none, so
+#                                               field counts still happen to
+#                                               agree at decode time since
+#                                               the reserved field just stays
+#                                               nil)
+# continue -> ()                                bare symbol 'continue, same
+#                                               as break above; matches
+#                                               pypoc's 'continue
+# pass     -> ()                                bare symbol 'pass, same as
+#                                               break above; matches pypoc's
+#                                               'pass
+# try      -> (expr)                             matches pypoc's 'try
+# catch    -> (value, handler)                   matches pypoc's irregular
+#                                                 'catch encoder/decoder
+#
+# -- Functions, coroutines, classes -----------------------------------------
+# (Most of this section has no pypoc counterpart at all: class/slot/co
+# definitions are in pypoc's `_CANNOT_CROSS` list - "cannot cross into a
+# decorator yet" - so every DIVERGES below is "pypoc doesn't carry this
+# construct yet", not a field-shape disagreement, unless noted otherwise.)
+#
+# fn_def   -> (name, dispatch, params, ret_type, body)
+#             DIVERGES(pypoc's matching construct is keyed 'fn, not
+#             'fn_def, with a different 7-field shape: name, results, rest,
+#             kwargs-reserved, params, dispatch, body - rest/kwargs come
+#             out of the params list on wyrm's side instead of being split
+#             into their own fields)
+# param    -> (name, type, default)      DIVERGES(pypoc's 'param Row is only
+#                                         2 fields, name and type; it has no
+#                                         wire slot for a default expression)
+# var_positional -> (name)               `*rest`; no pypoc counterpart (rest
+#                                         is folded into 'fn's own rest slot
+#                                         there, never a param-list entry)
+# var_keyword    -> (name)               `**kwargs`; pypoc explicitly
+#                                         refuses to encode this (SexprError)
+# co_def     -> (name, dispatch, params, ret_type, body)   no pypoc kind
+# co_params  -> (send_type, params)                        no pypoc kind
+# co_lambda  -> (params, ret_type, body)                   no pypoc kind
+# lambda     -> (params, ret_type, body)                   no pypoc kind
+#                                         (pypoc's Lambda is _CANNOT_CROSS)
+# class_def   -> (name, bases, body)     no pypoc kind (_CANNOT_CROSS)
+# class_expr  -> (bases, body)           anonymous class; no pypoc kind
+# slot_def    -> (name, type, init, options)  no pypoc kind (_CANNOT_CROSS)
+# slot_option -> (kind, value)           kind is 'setter/'getter/'undefined;
+#                                         no pypoc kind
+# decorator  -> (name, args)             matches pypoc's 'decorator
+# decorated  -> (decorators, stmt)       DIVERGES(pypoc's 'decorated Row
+#                                         takes one decorator NODE; wyrm
+#                                         gives a LIST of decorators, since
+#                                         `stmt_line` collects every stacked
+#                                         `@decorator` line at once instead
+#                                         of nesting one 'decorated per
+#                                         decorator)
+#
+# -- Modules and imports ------------------------------------------------------
+# (wyrm's import shape is structurally different from pypoc's: pypoc has one
+# flat 'import Row with optional fields for every narrowing form; wyrm
+# instead nests a narrowing kind - import_all/import_items/import_as/a bare
+# qualified_name - inside an outer import/import_static wrapper. All of the
+# following DIVERGE from pypoc's single-kind 'import shape.)
+# import          -> (body)              body is one of the narrowing kinds
+#                                         below, or a bare qualified_name
+# import_static   -> (body)              `import static ...`
+# import_all      -> (path, except_names_or_nil)   `path::*[except ...]`
+# import_items    -> (path, item_list)             `path::(a, b as c)`
+# import_as       -> (path, alias)                 `path as alias`
+# import_item     -> (name, alias_or_nil)          one entry of item_list
+#
+# -- Transient (not in the table) --------------------------------------------
+# call_op, index_op, attr_op, message_op: postfix-chain tags, each pushed by
+# its own rule (parser.wy:1102-1112) and consumed by `$_mk_postfix`
+# (parser.wy:1060-1081), which folds the whole chain into nested
+# 'call/'index/'attr/'message nodes before postfix_expr() returns. None of
+# the four `_op` tags survive into the final tree.
+#
+# assign, assign_bind, assign_qeq: the `=`/`:=`/`?=` operator tag from
+# `assign_op()` (parser.wy:530-531), consumed immediately by `$_mk_assign`
+# (parser.wy:452-469), which dispatches to 'define/'define_values/'if_set/
+# 'set/'set_values and never keeps the tag itself.
+#
+# -- Known bug affecting most bodies -----------------------------------------
+# `stmt_list()` (parser.wy:198-199) does not wrap its statements into a
+# clean list: `$[ stmt_line, many(...), opt(stmt_sep) ]` returns the raw
+# 3-part parse sequence, not a flattened statement list, and its trailing
+# `opt(stmt_sep)` is not discarded (no `~`), so today a block's body is
+# `$[first_stmt, more_stmts_or_nil, consumed_separator_token_or_nil]`
+# instead of a flat list of statements - e.g. `if x:\n    1\n` parses to
+# `$['if, 'x, $[$['int, 1], nil, <Token ...>], nil, nil]`. This affects the
+# `body` field of every construct that uses `block()`: if/while/for/fn_def/
+# co_def/class_def/lambda/co_lambda/do. `program()`'s own statement list
+# (`_mk_module`) is a separate, correct implementation and is not affected.
+# Flag for M2 - real parser surgery, not a docs fix.
+#
 # ---------------------------
 # Creators
 # NOTE: These are generally _ALL_ faulty; this is all based

@@ -1,0 +1,7 @@
+fn cleanup():
+    v := resource()
+    defer:
+        v ! release()
+
+    defer on error:
+        println("FAIL on error")

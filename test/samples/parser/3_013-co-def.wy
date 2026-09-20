@@ -1,0 +1,5 @@
+co worker(x: int) -> int:
+    yield x
+
+co listener(<- int, name: str) -> int:
+    yield 0

@@ -1,0 +1,3 @@
+square := fn (x: int) -> int: x * x
+
+gen := co (<- int): yield 0

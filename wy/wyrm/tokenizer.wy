@@ -97,9 +97,9 @@ _S_CHARS := [
 #>
 #>  Keywords are considered own tokens:
 #>      **and, break, catch, class, co, continue, defer, do, elif,
-#>      else, emit, false, fn, for, from, if, import, in, is,
-#>      nil, not, or, pass, return, signal, slot
-#>      static, task, thread, true, try, var, while, with, yield**
+#>      else, false, fn, for, from, if, import, in, is,
+#>      nil, not, or, pass, return, slot
+#>      static, true, try, var, while, with, yield**
 #>
 
 _HARD_KEYWORDS := [
@@ -113,7 +113,6 @@ _HARD_KEYWORDS := [
     ("do", 'TOK_KW_DO),
     ("elif", 'TOK_KW_ELIF),
     ("else", 'TOK_KW_ELSE),
-    ("emit", 'TOK_KW_EMIT),
     ("false", 'TOK_KW_FALSE),
     ("fn", 'TOK_KW_FN),
     ("for", 'TOK_KW_FOR),
@@ -127,11 +126,8 @@ _HARD_KEYWORDS := [
     ("or", 'TOK_KW_OR),
     ("pass", 'TOK_KW_PASS),
     ("return", 'TOK_KW_RETURN),
-    ("signal", 'TOK_KW_SIGNAL),
     ("slot", 'TOK_KW_SLOT),
     ("static", 'TOK_KW_STATIC),
-    ("task", 'TOK_TASK),
-    ("thread", 'TOK_THREAD),
     ("true", 'TOK_KW_TRUE),
     ("try", 'TOK_KW_TRY),
     ("var", 'TOK_KW_VAR),

@@ -1,0 +1,7 @@
+@memoize
+fn square(x: int) -> int:
+    return x * x
+
+@route("/home", "GET")
+fn handler():
+    return nil

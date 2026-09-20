@@ -1,0 +1,7 @@
+class Counter:
+    slot count: int = 0
+
+fn [Counter] increment() -> int:
+    static total: int = 0
+    total = total + 1
+    return total

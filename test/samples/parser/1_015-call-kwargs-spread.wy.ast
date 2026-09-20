@@ -1,0 +1,1 @@
+$['module, $['define, 'a, $['type, 'auto], $['call, 'route, $[$['kwarg, 'method, $['str, "GET"]]]]], $['define, 'b, $['type, 'auto], $['call, 'f, $[$['int, 1], $['int, 2], $['kwarg, 'key, $['str, "val"]]]]], $['define, 'c, $['type, 'auto], $['call, 'g, $[$['spread, 'args], $['spread_kw, 'kwargs]]]]]

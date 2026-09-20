@@ -1,0 +1,2 @@
+fn greet(name: str, greeting: str = "Hello", *rest, **opts) -> str:
+    return greeting + name

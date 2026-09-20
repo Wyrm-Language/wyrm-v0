@@ -1,0 +1,1 @@
+$['module, $['define, 'f, $['type, 'auto], $['lambda, $[$['param, 'x, nil, nil], $['param, 'y, nil, nil]], nil, $['return, $['binop, '+, 'x, 'y]]]]]

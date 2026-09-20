@@ -166,6 +166,7 @@ fn check(what: str, got, want):
         println("PASS " + what)
     else:
         println("FAIL " + what + " got " + str(got))
+        exit(1)
 
 # a token kind: match and no-match
 p := DslTest("42")
@@ -215,6 +216,7 @@ if len(r6c) == 6:
     check("manyflat(seq) preserves match order across iterations", got6c, want6c)
 else:
     println("FAIL manyflat(seq) preserves match order across iterations skipped, shape was not flat")
+    exit(1)
 
 # manyflat($[a, b]): a dangling unpaired trailing number must not be
 # partially consumed - the loop should stop before it, same backtracking

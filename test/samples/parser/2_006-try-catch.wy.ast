@@ -1,0 +1,1 @@
+$['module, $['define, 'a, $['type, 'auto], $['try, $['call, 'open, $[$['str, "badfile.txt"]]]]], $['define, 'b, $['type, 'auto], $['catch, $['call, 'open, $[$['str, "badfile.txt"]]], $['call, 'open, $[$['str, "goodfile.txt"]]]]]]

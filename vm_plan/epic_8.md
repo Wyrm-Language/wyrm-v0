@@ -138,6 +138,21 @@ passes under `~/tools/bin/wyrm -Iwy`.
 
 ### M2 - Parser and decoder bug fixes
 
+**Re-cut 2026-09-17 (mid-execution finding, user approved expanding scope):** while
+building M1's node table, the executing session found four more real parser bugs beyond
+this milestone's original four, none suspected at plan time: (1) `stmt_list()` (every
+`if`/`while`/`for`/`fn`/`class`/`do` body) leaked a raw lexer `Token` into the tree and
+never discarded separators; (2) `$_binary_expr` never wrapped a multi-operand arithmetic
+chain in a `'binop` head at all (`1 + 2` produced an untagged bare list); (3)
+`$_mk_postfix`'s `attr_op`/`index_op` cases used `cdr(op)` where `cadr(op)` was needed,
+double-wrapping the attribute name/index expression; (4) `$_mk_is`/`$_mk_in` were built
+with bare `[...]` array-literal syntax instead of `$[...]` pair-literal syntax. Since
+nearly every real `.wy` file has a block body or an arithmetic expression, M3's planned
+corpus would have captured wrong-but-stable truth for almost every sample if these went
+unfixed - the exact trap M3's own text warns about. All four were fixed as part of this
+milestone (see the M2 commit and `epic_8_report.md` for detail); M3 can proceed as
+originally scoped.
+
 **Scope:** Fix the four confirmed bugs: (a) `decode.wy`'s missing `\x`/`\u` escapes in
 `decode_str`, matching whatever `doc/language-spec.md` documents for string literals (if
 undocumented, match Python's `\xHH`/`\uHHHH`); (b) the `getter` keyword, add it to
@@ -224,6 +239,13 @@ test before escalating.
 **Fan-out:** none, the meson wrapper depends on the scraper existing.
 
 ### M6 - Parity check against the C VM (contingent on epic 6)
+
+**Outcome 2026-09-17: blocked, but not on epic 6.** The C VM's CLI has been able to load
+and run `.wyc` images since epic 1 - epic 6 landing was never actually the real
+precondition. Investigation found two different, out-of-scope blockers instead; see
+`epic_8_report.md` for full detail and exact repro. Both are genuine bugs, neither is
+`wy/` front-end code, so neither was fixed here per the plan's own "epic 8 does not touch
+C code" boundary (the second is pypoc's Python compiler, also outside `wy/`).
 
 **Scope:** If epic 6's C VM CLI can load and run `.wyc` images by the time this
 milestone starts, compile the front end with pypoc's `--build-bc`, run it on the C VM

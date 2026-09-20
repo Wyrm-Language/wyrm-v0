@@ -1,0 +1,4 @@
+fn call_count():
+    static foo: int = 0
+    foo = foo + 1
+    return foo

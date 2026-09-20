@@ -1,5 +1,7 @@
 # Decoding of raw token text into native values.
 
+import std::ctype::*
+
 # expect - our sym(str) should generate proper symbol
 fn decode_sym(text: str) -> sym:
     return sym(text)
@@ -15,7 +17,43 @@ fn decode_float(text: str) -> float:
 fn _char_at(body: str, idx: int) -> int | sym:
     return body[idx] catch 'EOF
 
-# TODO: need a better interpretation here
+# `count` hex digits starting at `start` are all present and valid -
+# doc/language-spec.md's `\x<<HexLiteral>>` / `\u<<Literal>>`.
+fn _valid_hex_run(body: str, start: int, count: int) -> bool:
+    j := 0
+    while j < count:
+        c := _char_at(body, start + j)
+        if c == 'EOF or not is_hexdigit(c):
+            return false
+        j = j + 1
+    return true
+
+# UTF-8 encode a single codepoint as a str, the only way to turn a
+# computed int codepoint into wyrm text (no chr()-style builtin exists).
+fn _encode_codepoint(cp: int) -> str:
+    if cp < 0x80:
+        b := bytes(1)
+        b!pack_u8(0, cp)
+        return b!to_str()
+    elif cp < 0x800:
+        b := bytes(2)
+        b!pack_u8(0, 0xC0 | (cp >> 6))
+        b!pack_u8(1, 0x80 | (cp & 0x3F))
+        return b!to_str()
+    elif cp < 0x10000:
+        b := bytes(3)
+        b!pack_u8(0, 0xE0 | (cp >> 12))
+        b!pack_u8(1, 0x80 | ((cp >> 6) & 0x3F))
+        b!pack_u8(2, 0x80 | (cp & 0x3F))
+        return b!to_str()
+    else:
+        b := bytes(4)
+        b!pack_u8(0, 0xF0 | (cp >> 18))
+        b!pack_u8(1, 0x80 | ((cp >> 12) & 0x3F))
+        b!pack_u8(2, 0x80 | ((cp >> 6) & 0x3F))
+        b!pack_u8(3, 0x80 | (cp & 0x3F))
+        return b!to_str()
+
 fn decode_str(text: str) -> str:
     body := text
     n := len(body)
@@ -51,6 +89,22 @@ fn decode_str(text: str) -> str:
             elif next_c == \b:
                 out = out + "\b"
                 i = i + 2
+            elif next_c == \x:
+                if _valid_hex_run(body, i + 2, 2):
+                    code := int("0x" + (body ! substr(i + 2, 2)))
+                    out = out + _encode_codepoint(code)
+                    i = i + 4
+                else:
+                    out = out + (body ! substr(i, 1))
+                    i = i + 1
+            elif next_c == \u:
+                if _valid_hex_run(body, i + 2, 4):
+                    code := int("0x" + (body ! substr(i + 2, 4)))
+                    out = out + _encode_codepoint(code)
+                    i = i + 6
+                else:
+                    out = out + (body ! substr(i, 1))
+                    i = i + 1
             else:
                 out = out + (body ! substr(i, 1))
                 i = i + 1

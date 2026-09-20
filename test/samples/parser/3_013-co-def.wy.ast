@@ -1,0 +1,1 @@
+$['module, $['co_def, 'worker, nil, $['co_params, nil, $[$['param, 'x, $['type, 'int], nil]]], $['type, 'int], $[$['yield, 'x]]], $['co_def, 'listener, nil, $['co_params, $['type, 'int], $[$['param, 'name, $['type, 'str], nil]]], $['type, 'int], $[$['yield, $['int, 0]]]]]

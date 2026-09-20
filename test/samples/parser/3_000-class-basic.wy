@@ -1,0 +1,5 @@
+class Person:
+    slot name: str
+
+class FamilyMember(Person):
+    slot relation: str

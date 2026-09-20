@@ -1,0 +1,6 @@
+@final
+class Singleton:
+    slot instance
+
+@cached
+x := compute()

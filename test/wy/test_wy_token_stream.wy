@@ -28,13 +28,14 @@ fn render(tokens: list) -> str:
 fn check(name: str, buffer: str, expected: str):
     defer on error:
         println("FAIL on error:", name)
+        exit(1)
 
     stream := tok::TokenStream(buffer)
     tokens := try stream ! scan()
     found := render(tokens)
     if found != expected:
         println("FAIL", name, "- expected", expected, "got", found)
-        return
+        exit(1)
     println("PASS", name)
 
 

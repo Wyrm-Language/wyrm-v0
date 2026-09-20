@@ -1,0 +1,2 @@
+a := try open("badfile.txt")
+b := open("badfile.txt") catch open("goodfile.txt")

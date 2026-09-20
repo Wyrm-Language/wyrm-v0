@@ -1,0 +1,5 @@
+class Widget:
+    slot width
+    slot height: int
+    slot color = "red"
+    slot depth: int = 1

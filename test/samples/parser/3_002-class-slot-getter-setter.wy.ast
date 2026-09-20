@@ -1,0 +1,1 @@
+$['module, $['class_def, 'Account, nil, $[$['slot_def, 'balance, $['type, 'int], nil, $[$['slot_option, 'getter, $['int, 0]], $['slot_option, 'setter, 'undefined]]]]]]

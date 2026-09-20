@@ -1,0 +1,1 @@
+$['module, $['fn_def, 'cleanup, nil, nil, nil, $[$['define, 'v, $['type, 'auto], $['call, 'resource, nil]], $['defer, nil, $[$['message, 'v, 'release, nil]]], $['defer, $['type, 'error], $[$['call, 'println, $[$['str, "FAIL on error"]]]]]]]]

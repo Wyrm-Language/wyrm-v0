@@ -242,7 +242,10 @@ fn _tmpl_bool(match_expr):
 fn _decode_bool(arg) -> pair:
     return mk_expand(_tmpl_bool::$ast, 'match_expr, _build_sequence_expr(arg))
 
-# --- value(sym, subseq) replace subseq with the literal node $[sym] if matched
+# --- value(sym, subseq) replace subseq with the bare symbol `sym` itself if
+# matched (NOT a wrapped $[sym] node - `repl` substitutes directly; see any
+# caller like true/false/nil/break/continue/pass in parser.wy, all of which
+# end up as a bare symbol in the final tree, not a one-element list)
 fn $_tmpl_value(repl, match_expr):
     v := match_expr
     if v != 'NO_MATCH and v is not error:

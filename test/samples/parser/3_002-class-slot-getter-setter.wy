@@ -1,0 +1,4 @@
+class Account:
+    slot balance: int with:
+        getter = 0
+        setter = undefined

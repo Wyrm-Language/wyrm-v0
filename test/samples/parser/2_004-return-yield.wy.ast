@@ -1,0 +1,1 @@
+$['module, $['fn_def, 'gen, nil, nil, nil, $[$['yield, $['int, 1]], $['yield_from, $['call, 'other, nil]], $['return, nil], $['return, $['int, 5]]]]]

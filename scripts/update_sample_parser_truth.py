@@ -6,7 +6,9 @@ import subprocess
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SAMPLES_DIR = os.path.join(SCRIPT_DIR, "..", "test", "samples", "parser")
+REPO_ROOT = os.path.join(SCRIPT_DIR, "..")
+SAMPLES_DIR = os.path.join(REPO_ROOT, "test", "samples", "parser")
+WYRM = os.path.join(REPO_ROOT, "pypoc", ".venv", "bin", "wyrm")
 
 
 def main():
@@ -15,7 +17,8 @@ def main():
             continue
         path = os.path.join(SAMPLES_DIR, name)
         result = subprocess.run(
-            ["wyrm", "-Iwy", "-m", "wyrm::parser", path],
+            [WYRM, "-Iwy", "-m", "wyrm::parser", path],
+            cwd=REPO_ROOT,
             capture_output=True,
             text=True,
         )

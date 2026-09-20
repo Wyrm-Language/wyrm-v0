@@ -1,0 +1,8 @@
+if a < b:
+    1
+elif a == b:
+    2
+elif a > b:
+    3
+else:
+    4

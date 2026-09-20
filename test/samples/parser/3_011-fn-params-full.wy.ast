@@ -1,0 +1,1 @@
+$['module, $['fn_def, 'greet, nil, $[$['param, 'name, $['type, 'str], nil], $['param, 'greeting, $['type, 'str], $['str, "Hello"]], $['var_positional, 'rest], $['var_keyword, 'opts]], $['type, 'str], $[$['return, $['binop, '+, 'greeting, 'name]]]]]

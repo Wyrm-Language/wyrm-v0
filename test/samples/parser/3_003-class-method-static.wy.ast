@@ -1,0 +1,1 @@
+$['module, $['class_def, 'Counter, nil, $[$['slot_def, 'count, $['type, 'int], $['int, 0], nil]]], $['fn_def, 'increment, $['Counter], nil, $['type, 'int], $[$['static, 'total, $['type, 'int], $['int, 0]], $['set, 'total, $['binop, '+, 'total, $['int, 1]]], $['return, 'total]]]]

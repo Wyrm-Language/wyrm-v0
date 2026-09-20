@@ -1,0 +1,3 @@
+AnonPerson := class():
+    slot name: str
+    slot age: int

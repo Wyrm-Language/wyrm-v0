@@ -149,8 +149,17 @@ fn [Parser] char_literal():
 fn _mk_module(expr):
     cons('module, expr)
 
+# Epic 8 M3 finding: program() never required reaching end-of-input, so any
+# top_level_stmt that failed to match partway through the file (for any
+# reason - a genuine syntax error, or a legitimate construct a parser bug
+# happens to choke on, e.g. a lambda as a slot_option value once nested
+# inside enough context) silently truncated the AST to whatever parsed
+# before that point, with no error at all - `program := Parser(content)
+# !program()` in __main() below never checked for one either. Requiring
+# ~'TOK_END here turns any such case into an honest parse failure instead
+# of a silently wrong (but well-formed-looking) partial tree.
 fn [Parser] program():
-    @accept apply_if(_mk_module, many($[~opt(stmt_sep), top_level_stmt]))
+    @accept $[apply_if(_mk_module, many($[~opt(stmt_sep), top_level_stmt])), ~opt(stmt_sep), ~'TOK_END]
 
 
 fn [Parser] top_level_stmt():
@@ -196,7 +205,7 @@ fn [Parser] block():
 #>  ```
 
 fn [Parser] stmt_list():
-    @accept $[ stmt_line, many($[opt(stmt_sep), stmt_line]), opt(stmt_sep) ]
+    @accept $[cons(stmt_line, many($[~opt(stmt_sep), stmt_line])), ~opt(stmt_sep)]
 
 fn [Parser] stmt_sep():
     @accept $['TOK_NEWLINE | 'TOK_SEMICOLON | 'TOK_END]
@@ -578,8 +587,7 @@ fn _mk_type_expression(type_expr):
         return $['type, 'auto]
     if cdr(type_expr) == nil:
         return car(type_expr)
-    # FIXME: should generated warning, algebraic types not supported
-    return $['type, 'auto]
+    return cons('type, cons('union, type_expr))
 
 #------------------------------------------------------------------------------
 #>  ## Modules and Imports
@@ -868,7 +876,7 @@ fn $_mk_slot_option(expr):
 #>  ```
 fn [Parser] slot_option():
     @accept apply_if($_mk_slot_option,
-        $[value('setter, "setter") | value('getter, 'TOK_KW_GETTER)],
+        $[value('setter, "setter") | value('getter, "getter")],
         ~'TOK_EQUAL,
         $[expression | value('undefined, "undefined")])
 
@@ -959,16 +967,16 @@ fn [Parser] not_expr():
 
 fn $_mk_is(expr):
     if cadr(expr):
-        return ['not, ['is, car(expr), caddr(expr)]]
-    return ['is, car(expr), caddr(expr)]
+        return $['not, $['is, car(expr), caddr(expr)]]
+    return $['is, car(expr), caddr(expr)]
 
 fn $_mk_comparison(expr):
     $[cadr(expr), car(expr), caddr(expr)]
 
 fn $_mk_in(expr):
     if cadr(expr):
-        return ['not, ['in, car(expr), caddr(expr)]]
-    return ['in, car(expr), caddr(expr)]
+        return $['not, $['in, car(expr), caddr(expr)]]
+    return $['in, car(expr), caddr(expr)]
 
 #>  ```ebnf
 #>    comparison      ::= binary_expr , "is" , [ "not" ] , type_constraint
@@ -993,11 +1001,19 @@ fn [Parser] comp_op():
                value('==, 'TOK_DEQUAL) |
                value('!=, 'TOK_NE) ]
 
-# Binary Op
+# Binary Op: builds a left-associative $['binop, op, lhs, rhs] chain from the
+# flat (operand op operand op ...) sequence binary_expr()'s grammar rule
+# produces, matching mk_binop/s_binop_lhs/s_binop_rhs's assumed shape
+# (ast.wy) - previously this just returned the flat sequence untagged.
 fn $_binary_expr(expr):
-    if cdr(expr) == nil:
-        return car(expr)
-    return expr
+    lhs := car(expr)
+    rest := cdr(expr)
+    while rest != nil:
+        op := car(rest)
+        rhs := cadr(rest)
+        lhs = $['binop, op, lhs, rhs]
+        rest = cddr(rest)
+    return lhs
 
 #>  ```ebnf
 #>    binary_expr     ::= unary_expr , { binary_op , unary_expr } ;
@@ -1069,9 +1085,9 @@ fn $_mk_postfix(expr):
         if op_kind == 'call_op:
             current = $['call, current, cdr(op)]
         elif op_kind == 'index_op:
-            current = $['index, current, cdr(op)]
+            current = $['index, current, cadr(op)]
         elif op_kind == 'attr_op:
-            current = $['attr, current, cdr(op)]
+            current = $['attr, current, cadr(op)]
         elif op_kind == 'message_op:
             current = $['message, current, cadr(op), cddr(op)]
         else:
@@ -1119,10 +1135,33 @@ fn [Parser] message_op():
 #>                       | "**" , expression ;                    (* spread keyword *)
 #>  ```
 fn [Parser] arg_list():
-    @accept cons(argument, many(~'TOK_COMMA, argument))
+    @accept cons(argument, many($[~'TOK_COMMA, argument]))
 
+fn $_mk_kwarg(expr):
+    return $['kwarg, car(expr), cadr(expr)]
+
+fn $_mk_spread(expr):
+    return $['spread, expr]
+
+fn $_mk_spread_kw(expr):
+    return $['spread_kw, expr]
+
+# Epic 8 M3 finding: this was `@accept expression` only - the documented
+# keyword/spread forms below were never implemented, so `f(x=1)` failed to
+# match `argument` at all and (since arg_list is wrapped in `opt(...)` by
+# every caller) silently degraded to a zero-argument call instead of
+# faulting. `**expr` (TOK_EXPONENT) is tried before `*expr` (TOK_MUL) - the
+# tokens can't collide, but keeping the longer-lexeme form first matches the
+# convention elsewhere in this file. kwarg/spread/spread_kw are wyrm-only
+# node kinds: pypoc's sexpr.py 'call Row is just (func, args) with no
+# separate keyword-argument concept exposed at this layer (DIVERGES).
 fn [Parser] argument():
-    @accept expression
+    @accept $[
+        apply_if($_mk_kwarg, $[xid, ~'TOK_EQUAL, expression])
+        | apply_if($_mk_spread_kw, $[~'TOK_EXPONENT, expression])
+        | apply_if($_mk_spread, $[~'TOK_MUL, expression])
+        | expression
+    ]
 
 
 #>  ```ebnf
