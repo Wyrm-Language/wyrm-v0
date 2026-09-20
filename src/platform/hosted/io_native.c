@@ -1,6 +1,7 @@
 #include <wyrm/platform/hosted/io_native.h>
 
 #include <wyrm/builtins.h>
+#include <wyrm/bytes.h>
 #include <wyrm/error.h>
 #include <wyrm/exec_fn.h>
 #include <wyrm/fiber.h>
@@ -102,6 +103,31 @@ static bool arg_str_(wy_context* context, wy_uword index, wy_string** out)
     return true;
 }
 
+/**
+ * Epic 7 M4: `write`'s data argument may be a str or a bytes value -
+ * whichever mode the handle was opened in ("w"/"a" for str, "wb"/"ab" for
+ * bytes), matching pypoc's corelib/std/io.wy File.write. There is no
+ * text/binary distinction at the POSIX write(2) layer either way, so both
+ * just hand their raw bytes to the same loop.
+ */
+static bool arg_data_(wy_context* context, wy_uword index, const wy_u8** out_data, wy_uword* out_len)
+{
+    wy_value v = *wy_fiber_value_n(context->current_fiber, index);
+    if (v.type == WY_TYPE_TAG_STR) {
+        wy_string* s = (wy_string*) v.data.gc_object;
+        *out_data = (const wy_u8*) s->str;
+        *out_len = s->len;
+        return true;
+    }
+    if (v.type == WY_TYPE_TAG_BYTES) {
+        wy_bytes* b = (wy_bytes*) v.data.gc_object;
+        *out_data = b->data;
+        *out_len = b->len;
+        return true;
+    }
+    return false;
+}
+
 /* -------------------------------------------------------------------------
  * The seven natives (pypoc/wypoc/wyrm_io.py's wyrm_open/read/write/lseek/
  * dup2/close/flush, backed by real POSIX fds instead of a synthetic handle
@@ -135,14 +161,17 @@ static wy_exec_state io_open_exec_(wy_context* context, wy_primitive c_data)
     return WY_EXEC_DONE;
 }
 
-static wy_exec_state io_read_exec_(wy_context* context, wy_primitive c_data)
+/**
+ * Shared `read(2)` loop behind both `read` (-> str) and epic 7 M4's
+ * `read_bytes` (-> bytes): reads `size` bytes, or to EOF when `size < 0`,
+ * into a heap buffer the caller owns on success. On a read() failure this
+ * sets the fiber's result to an OSError *value* itself (matching every
+ * other io_native.c native's error-value-not-fault contract) and returns
+ * false; the caller must return WY_EXEC_DONE immediately without touching
+ * the result again.
+ */
+static bool read_into_buffer_(wy_context* context, wy_word handle, wy_word size, char** out_buf, wy_uword* out_len)
 {
-    WY_UNUSED(c_data);
-    wy_word handle, size;
-    if (!arg_word_(context, 0, &handle) || !arg_word_(context, 1, &size)) {
-        return native_fault_(context, "read: handle and size must be integers");
-    }
-
     wy_allocator* allocator = wy_context_get_machine(context)->allocator;
     wy_uword want = (size < 0) ? 0 : (wy_uword) size;
     bool read_all = size < 0;
@@ -150,7 +179,7 @@ static wy_exec_state io_read_exec_(wy_context* context, wy_primitive c_data)
     wy_uword cap = read_all ? WY_IO_READ_CHUNK : want;
     if (cap == 0) { cap = 1; }
     char* buf = (char*) wy_allocator_alloc(allocator, cap);
-    if (buf == WY_NULL) { return native_fault_(context, "read: out of memory"); }
+    if (buf == WY_NULL) { native_fault_(context, "read: out of memory"); return false; }
 
     wy_uword total = 0;
     for (;;) {
@@ -159,7 +188,7 @@ static wy_exec_state io_read_exec_(wy_context* context, wy_primitive c_data)
         if (total == cap) {
             wy_uword new_cap = cap * 2;
             char* grown = (char*) wy_allocator_realloc(allocator, buf, new_cap);
-            if (grown == WY_NULL) { wy_allocator_free(allocator, buf); return native_fault_(context, "read: out of memory"); }
+            if (grown == WY_NULL) { wy_allocator_free(allocator, buf); native_fault_(context, "read: out of memory"); return false; }
             buf = grown;
             cap = new_cap;
         }
@@ -168,14 +197,33 @@ static wy_exec_state io_read_exec_(wy_context* context, wy_primitive c_data)
             int err_no = errno;
             wy_allocator_free(allocator, buf);
             wy_value result;
-            if (os_error_value_(context, err_no, &result) != WY_ERR_NONE) { return native_fault_(context, "read: out of memory building OSError"); }
+            if (os_error_value_(context, err_no, &result) != WY_ERR_NONE) {
+                native_fault_(context, "read: out of memory building OSError");
+                return false;
+            }
             wy_context_set_result(context, 0, result);
-            return WY_EXEC_DONE;
+            return false;
         }
         if (n == 0) { break; }
         total += (wy_uword) n;
         if (!read_all && total >= want) { break; }
     }
+    *out_buf = buf;
+    *out_len = total;
+    return true;
+}
+
+static wy_exec_state io_read_exec_(wy_context* context, wy_primitive c_data)
+{
+    WY_UNUSED(c_data);
+    wy_word handle, size;
+    if (!arg_word_(context, 0, &handle) || !arg_word_(context, 1, &size)) {
+        return native_fault_(context, "read: handle and size must be integers");
+    }
+    wy_allocator* allocator = wy_context_get_machine(context)->allocator;
+    char* buf = WY_NULL;
+    wy_uword total = 0;
+    if (!read_into_buffer_(context, handle, size, &buf, &total)) { return WY_EXEC_DONE; }
 
     wy_string* result_str = WY_NULL;
     wy_error err = wy_string_new(context, buf, total, &result_str);
@@ -185,17 +233,47 @@ static wy_exec_state io_read_exec_(wy_context* context, wy_primitive c_data)
     return WY_EXEC_DONE;
 }
 
+/**
+ * Epic 7 M4: a `std::io::read_bytes(handle, size) -> bytes` native, direct
+ * counterpart to `read`, for a handle opened in binary mode. Registered
+ * directly under `std::io` (not a compiled `.wy` File wrapper) for the
+ * same reason `println` was in epic 5/M6: the C VM does not load/compile
+ * `.wy` corelib sources yet (no compiler exists in this repo until epics
+ * 9-11), so `wy/std/io.wy`'s File.read_bytes (epic 7/M2) is pypoc-only
+ * for now.
+ */
+static wy_exec_state io_read_bytes_exec_(wy_context* context, wy_primitive c_data)
+{
+    WY_UNUSED(c_data);
+    wy_word handle, size;
+    if (!arg_word_(context, 0, &handle) || !arg_word_(context, 1, &size)) {
+        return native_fault_(context, "read_bytes: handle and size must be integers");
+    }
+    wy_allocator* allocator = wy_context_get_machine(context)->allocator;
+    char* buf = WY_NULL;
+    wy_uword total = 0;
+    if (!read_into_buffer_(context, handle, size, &buf, &total)) { return WY_EXEC_DONE; }
+
+    wy_bytes* result_bytes = WY_NULL;
+    wy_error err = wy_bytes_new(context, (const wy_u8*) buf, total, &result_bytes);
+    wy_allocator_free(allocator, buf);
+    if (err != WY_ERR_NONE) { return native_fault_(context, "read_bytes: out of memory building result"); }
+    wy_context_set_result(context, 0, wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) result_bytes));
+    return WY_EXEC_DONE;
+}
+
 static wy_exec_state io_write_exec_(wy_context* context, wy_primitive c_data)
 {
     WY_UNUSED(c_data);
     wy_word handle;
-    wy_string* data = WY_NULL;
-    if (!arg_word_(context, 0, &handle) || !arg_str_(context, 1, &data)) {
-        return native_fault_(context, "write: handle must be an integer, data a string");
+    const wy_u8* data = WY_NULL;
+    wy_uword data_len = 0;
+    if (!arg_word_(context, 0, &handle) || !arg_data_(context, 1, &data, &data_len)) {
+        return native_fault_(context, "write: handle must be an integer, data a string or bytes");
     }
     wy_uword total = 0;
-    while (total < data->len) {
-        ssize_t n = write((int) handle, data->str + total, data->len - total);
+    while (total < data_len) {
+        ssize_t n = write((int) handle, data + total, data_len - total);
         if (n < 0) {
             wy_value result;
             if (os_error_value_(context, errno, &result) != WY_ERR_NONE) { return native_fault_(context, "write: out of memory building OSError"); }
@@ -292,6 +370,7 @@ typedef struct io_exec_entry_
 static const io_exec_entry_ io_exec_natives_[] = {
     { "open",  2, 2, io_open_exec_ },
     { "read",  2, 2, io_read_exec_ },
+    { "read_bytes", 2, 2, io_read_bytes_exec_ },
     { "write", 2, 2, io_write_exec_ },
     { "lseek", 3, 3, io_lseek_exec_ },
     { "dup2",  2, 2, io_dup2_exec_ },

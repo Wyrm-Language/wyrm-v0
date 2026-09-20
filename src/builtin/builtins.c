@@ -1,5 +1,6 @@
 #include <wyrm/builtins.h>
 
+#include <wyrm/bytes.h>
 #include <wyrm/class.h>
 #include <wyrm/context.h>
 #include <wyrm/coroutine.h>
@@ -8,6 +9,7 @@
 #include <wyrm/image.h>
 #include <wyrm/list.h>
 #include <wyrm/machine.h>
+#include <wyrm/message.h>
 #include <wyrm/module.h>
 #include <wyrm/native.h>
 #include <wyrm/pair.h>
@@ -581,6 +583,361 @@ static wy_error builtin_remove_(wy_context* context, wy_value* args, wy_uword ar
 }
 
 /* -------------------------------------------------------------------------
+ * `bytes` natives (epic 7, doc/stdlib.md's `### bytes`). Registered both
+ * as a bare global (`bytes` construction only) and as native message
+ * overloads (install_native_messages_, below) so `b!append(x)` etc. work
+ * through the same `!`-dispatch path every other message uses.
+ * ------------------------------------------------------------------------- */
+
+/** Read `v` as a plain (non-negative-checked) word; caller range-checks. */
+static wy_word bytes_arg_word_(wy_value v)
+{
+    return v.type == WY_TYPE_TAG_UWORD ? (wy_word) v.data.uword : v.data.word;
+}
+
+static bool bytes_arg_is_int_(wy_value v)
+{
+    return v.type == WY_TYPE_TAG_WORD || v.type == WY_TYPE_TAG_UWORD;
+}
+
+static wy_error bytes_construct_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    wy_value v = args[0];
+    wy_bytes* b = WY_NULL;
+    wy_error err;
+    if (bytes_arg_is_int_(v)) {
+        wy_word n = bytes_arg_word_(v);
+        if (n < 0) { return WY_ERR_RANGE; }
+        err = wy_bytes_new(context, WY_NULL, 0, &b);
+        if (err != WY_ERR_NONE) { return err; }
+        err = wy_bytes_reserve(context, b, (wy_uword) n);
+        if (err != WY_ERR_NONE) { return err; }
+        wy_memset(b->data, 0, (wy_uword) n);
+        b->len = (wy_uword) n;
+    } else if (v.type == WY_TYPE_TAG_STR) {
+        wy_string* s = v.data.str;
+        err = wy_bytes_new(context, (const wy_u8*) s->str, s->len, &b);
+        if (err != WY_ERR_NONE) { return err; }
+    } else if (v.type == WY_TYPE_TAG_BYTES) {
+        wy_bytes* src = (wy_bytes*) v.data.gc_object;
+        err = wy_bytes_new(context, src->data, src->len, &b);
+        if (err != WY_ERR_NONE) { return err; }
+    } else {
+        return WY_ERR_BAD_TYPE;
+    }
+    out[0] = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) b);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_append_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_value v = args[1];
+    wy_error err;
+    if (bytes_arg_is_int_(v)) {
+        wy_word n = bytes_arg_word_(v);
+        if (n < 0 || n > 255) { return WY_ERR_RANGE; }
+        err = wy_bytes_reserve(context, b, b->len + 1);
+        if (err != WY_ERR_NONE) { return err; }
+        b->data[b->len++] = (wy_u8) n;
+    } else if (v.type == WY_TYPE_TAG_BYTES) {
+        wy_bytes* src = (wy_bytes*) v.data.gc_object;
+        err = wy_bytes_reserve(context, b, b->len + src->len);
+        if (err != WY_ERR_NONE) { return err; }
+        wy_memcpy(b->data + b->len, src->data, src->len);
+        b->len += src->len;
+    } else if (v.type == WY_TYPE_TAG_STR) {
+        wy_string* s = v.data.str;
+        err = wy_bytes_reserve(context, b, b->len + s->len);
+        if (err != WY_ERR_NONE) { return err; }
+        wy_memcpy(b->data + b->len, s->str, s->len);
+        b->len += s->len;
+    } else {
+        return WY_ERR_BAD_TYPE;
+    }
+    out[0] = args[0];
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_resize_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    if (!bytes_arg_is_int_(args[1])) { return WY_ERR_BAD_TYPE; }
+    wy_word n = bytes_arg_word_(args[1]);
+    if (n < 0) { return WY_ERR_RANGE; }
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    if ((wy_uword) n > b->len) {
+        wy_error err = wy_bytes_reserve(context, b, (wy_uword) n);
+        if (err != WY_ERR_NONE) { return err; }
+        wy_memset(b->data + b->len, 0, (wy_uword) n - b->len);
+    }
+    b->len = (wy_uword) n;
+    out[0] = args[0];
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_slice_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    if (!bytes_arg_is_int_(args[1]) || !bytes_arg_is_int_(args[2])) { return WY_ERR_BAD_TYPE; }
+    wy_word start = bytes_arg_word_(args[1]);
+    wy_word count = bytes_arg_word_(args[2]);
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    if (start < 0 || count < 0 || (wy_uword) start + (wy_uword) count > b->len) { return WY_ERR_RANGE; }
+    wy_bytes* out_b = WY_NULL;
+    wy_error err = wy_bytes_new(context, b->data + start, (wy_uword) count, &out_b);
+    if (err != WY_ERR_NONE) { return err; }
+    out[0] = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) out_b);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_copy_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_bytes* out_b = WY_NULL;
+    wy_error err = wy_bytes_new(context, b->data, b->len, &out_b);
+    if (err != WY_ERR_NONE) { return err; }
+    out[0] = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) out_b);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+/**
+ * Strict UTF-8 validation (doc/stdlib.md: "faults... does not silently
+ * substitute or truncate"), matching Python's `bytes.decode("utf-8")`
+ * default. `wy_utf8_decode_f` is deliberately lenient (never faults, used
+ * by string *indexing*, which must never crash on data already accepted
+ * into a wy_string) so it is not reused here - this rejects overlong
+ * encodings, truncated sequences, bad continuation bytes, out-of-range
+ * codepoints, and surrogate halves.
+ */
+static bool bytes_valid_utf8_(const wy_u8* data, wy_uword len)
+{
+    wy_uword i = 0;
+    while (i < len) {
+        wy_u8 lead = data[i];
+        wy_uword seqlen; wy_u32 min_cp; wy_u32 cp;
+        if (lead < 0x80) { i += 1; continue; }
+        else if ((lead & 0xE0) == 0xC0) { seqlen = 2; min_cp = 0x80; cp = lead & 0x1F; }
+        else if ((lead & 0xF0) == 0xE0) { seqlen = 3; min_cp = 0x800; cp = lead & 0x0F; }
+        else if ((lead & 0xF8) == 0xF0) { seqlen = 4; min_cp = 0x10000; cp = lead & 0x07; }
+        else { return false; }
+        if (i + seqlen > len) { return false; }
+        for (wy_uword k = 1; k < seqlen; k++) {
+            wy_u8 cont = data[i + k];
+            if ((cont & 0xC0) != 0x80) { return false; }
+            cp = (cp << 6) | (wy_u32) (cont & 0x3F);
+        }
+        if (cp < min_cp || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) { return false; }
+        i += seqlen;
+    }
+    return true;
+}
+
+static wy_error bytes_to_str_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    if (!bytes_valid_utf8_(b->data, b->len)) { return WY_ERR_BAD_TYPE; }
+    wy_string* s = WY_NULL;
+    wy_error err = wy_string_new(context, (const char*) b->data, b->len, &s);
+    if (err != WY_ERR_NONE) { return err; }
+    out[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) s);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+/** at..at+width must fall inside 0..b->len (design_c_vm.md/stdlib.md: pack/unpack never resize). */
+static wy_error bytes_pack_bounds_(wy_bytes* b, wy_value at_v, wy_uword width, wy_uword* out_at)
+{
+    if (!bytes_arg_is_int_(at_v)) { return WY_ERR_BAD_TYPE; }
+    wy_word at = bytes_arg_word_(at_v);
+    if (at < 0 || (wy_uword) at + width > b->len) { return WY_ERR_RANGE; }
+    *out_at = (wy_uword) at;
+    return WY_ERR_NONE;
+}
+
+static void bytes_write_le_(wy_u8* data, wy_uword at, wy_u64 bits, wy_uword width)
+{
+    for (wy_uword i = 0; i < width; i++) { data[at + i] = (wy_u8) ((bits >> (8 * i)) & 0xFF); }
+}
+
+static wy_u64 bytes_read_le_(const wy_u8* data, wy_uword at, wy_uword width)
+{
+    wy_u64 bits = 0;
+    for (wy_uword i = 0; i < width; i++) { bits |= ((wy_u64) data[at + i]) << (8 * i); }
+    return bits;
+}
+
+static wy_error bytes_pack_u8_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    if (!bytes_arg_is_int_(args[2])) { return WY_ERR_BAD_TYPE; }
+    wy_word v = bytes_arg_word_(args[2]);
+    if (v < 0 || v > 255) { return WY_ERR_RANGE; }
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_uword at;
+    wy_error err = bytes_pack_bounds_(b, args[1], 1, &at);
+    if (err != WY_ERR_NONE) { return err; }
+    b->data[at] = (wy_u8) v;
+    out[0] = args[0];
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_pack_i32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    if (!bytes_arg_is_int_(args[2])) { return WY_ERR_BAD_TYPE; }
+    wy_i32 v = (wy_i32) bytes_arg_word_(args[2]);
+    wy_u32 bits; wy_memcpy(&bits, &v, sizeof(bits));
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_uword at;
+    wy_error err = bytes_pack_bounds_(b, args[1], 4, &at);
+    if (err != WY_ERR_NONE) { return err; }
+    bytes_write_le_(b->data, at, bits, 4);
+    out[0] = args[0];
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_pack_u32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    if (!bytes_arg_is_int_(args[2])) { return WY_ERR_BAD_TYPE; }
+    wy_u32 bits = (wy_u32) bytes_arg_word_(args[2]);
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_uword at;
+    wy_error err = bytes_pack_bounds_(b, args[1], 4, &at);
+    if (err != WY_ERR_NONE) { return err; }
+    bytes_write_le_(b->data, at, bits, 4);
+    out[0] = args[0];
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_pack_f32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    if (args[2].type != WY_TYPE_TAG_FLOAT) { return WY_ERR_BAD_TYPE; }
+    float f = (float) args[2].data.fp;
+    wy_u32 bits; wy_memcpy(&bits, &f, sizeof(bits));
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_uword at;
+    wy_error err = bytes_pack_bounds_(b, args[1], 4, &at);
+    if (err != WY_ERR_NONE) { return err; }
+    bytes_write_le_(b->data, at, bits, 4);
+    out[0] = args[0];
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_pack_f64_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    if (args[2].type != WY_TYPE_TAG_FLOAT) { return WY_ERR_BAD_TYPE; }
+    double d = (double) args[2].data.fp;
+    wy_u64 bits; wy_memcpy(&bits, &d, sizeof(bits));
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_uword at;
+    wy_error err = bytes_pack_bounds_(b, args[1], 8, &at);
+    if (err != WY_ERR_NONE) { return err; }
+    bytes_write_le_(b->data, at, bits, 8);
+    out[0] = args[0];
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_unpack_u8_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_uword at;
+    wy_error err = bytes_pack_bounds_(b, args[1], 1, &at);
+    if (err != WY_ERR_NONE) { return err; }
+    out[0] = wy_value_word(b->data[at]);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_unpack_i32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_uword at;
+    wy_error err = bytes_pack_bounds_(b, args[1], 4, &at);
+    if (err != WY_ERR_NONE) { return err; }
+    wy_u32 bits = (wy_u32) bytes_read_le_(b->data, at, 4);
+    wy_i32 v; wy_memcpy(&v, &bits, sizeof(v));
+    out[0] = wy_value_word(v);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_unpack_u32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_uword at;
+    wy_error err = bytes_pack_bounds_(b, args[1], 4, &at);
+    if (err != WY_ERR_NONE) { return err; }
+    wy_u32 bits = (wy_u32) bytes_read_le_(b->data, at, 4);
+    out[0] = wy_value_word((wy_word) bits);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_unpack_f32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_uword at;
+    wy_error err = bytes_pack_bounds_(b, args[1], 4, &at);
+    if (err != WY_ERR_NONE) { return err; }
+    wy_u32 bits = (wy_u32) bytes_read_le_(b->data, at, 4);
+    float f; wy_memcpy(&f, &bits, sizeof(f));
+    out[0] = wy_value_float((wy_float) f);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+static wy_error bytes_unpack_f64_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(context); WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
+    wy_bytes* b = (wy_bytes*) args[0].data.gc_object;
+    wy_uword at;
+    wy_error err = bytes_pack_bounds_(b, args[1], 8, &at);
+    if (err != WY_ERR_NONE) { return err; }
+    wy_u64 bits = bytes_read_le_(b->data, at, 8);
+    double d; wy_memcpy(&d, &bits, sizeof(d));
+    out[0] = wy_value_float((wy_float) d);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+/* -------------------------------------------------------------------------
  * Coroutine natives: `next`/`send` (design_c_vm.md §3). Both are exec
  * natives - they may switch `ctx->current_fiber` onto the coroutine's own
  * fiber and only complete once it yields or returns - so unlike every
@@ -670,7 +1027,7 @@ static wy_exec_state builtin_send_exec_(wy_context* context, wy_primitive c_data
  * Module assembly
  * ------------------------------------------------------------------------- */
 
-enum { WY_BUILTINS_LEAF_COUNT = 18, WY_BUILTINS_EXEC_COUNT = 2, WY_BUILTINS_CLASS_COUNT = 5,
+enum { WY_BUILTINS_LEAF_COUNT = 19, WY_BUILTINS_EXEC_COUNT = 2, WY_BUILTINS_CLASS_COUNT = 5,
     /* +1 for the bare `nil` slot, +1 for the `range` prelude coroutine (M4),
      * +1 for the bare `TreeBase` class (M5: decorators fixture registers
      * messages typed on it, wyrm_builtins.py's TREE_BASE_CLASS). */
@@ -720,6 +1077,12 @@ static wy_error builtin_str_(wy_context* context, wy_value* args, wy_uword argc,
     case WY_TYPE_TAG_UWORD: len = (wy_uword) snprintf(buffer, sizeof(buffer), "%llu", (unsigned long long) value.data.uword); break;
     case WY_TYPE_TAG_FLOAT: len = format_float_((double) value.data.fp, buffer, sizeof(buffer)); break;
     case WY_TYPE_TAG_SYMBOL: text = value.data.symtab_entry; len = wy_strlen_f(text); break;
+    case WY_TYPE_TAG_BYTES:
+        /* doc/stdlib.md: "N bytes", matching image.py's _static_repr binary-
+         * constant format (no separate rendering invented for this VM). */
+        len = (wy_uword) snprintf(buffer, sizeof(buffer), "%llu bytes",
+            (unsigned long long) ((wy_bytes*) value.data.gc_object)->len);
+        break;
     default: return WY_ERR_BAD_TYPE;
     }
     wy_string* result = WY_NULL;
@@ -747,12 +1110,88 @@ static const builtin_leaf_entry_ leaf_builtins_[] = {
     { "resize",    2, 2,   builtin_resize_ },
     { "expand",    3, 3,   builtin_expand_ },
     { "remove",    2, 2,   builtin_remove_ },
+    { "bytes",     1, 1,   bytes_construct_ },
 };
 
 static const builtin_exec_entry_ exec_builtins_[] = {
     { "next", 1, 1, builtin_next_exec_ },
     { "send", 2, 2, builtin_send_exec_ },
 };
+
+/**
+ * design_c_vm.md §5's builtins `message_table` (epic 7): every native
+ * method callable via `!`-message dispatch, keyed by (name, receiver
+ * PTYPE). `min_argc`/`max_argc` count the *total* leaf argc including the
+ * receiver, exactly like `leaf_builtins_`'s bare-global entries above -
+ * `dispatch_native_body_f` (src/vm.c) merges the message's receiver and
+ * explicit arguments into one flat array before calling the leaf, so the
+ * native itself can't tell it was reached via `!` rather than a bare call.
+ *
+ * The four LIST/TABLE entries are epic 5's DIVERGES #1 fix (`grown!resize(5)`
+ * etc. - `samples/eval_assignments.wy`), reusing the exact same native
+ * bodies already registered as bare globals above. The BYTES entries are
+ * epic 7's own message set (doc/stdlib.md's `### bytes`); "append" and
+ * "resize" each get a *second* overload here alongside their LIST one -
+ * `wy_message_add_overload_f` appends, and dispatch ranks by the receiver's
+ * actual PTYPE (`src/dispatch.c`'s `overload_distance_f`), so a BYTES
+ * receiver never matches the LIST overload or vice versa.
+ */
+typedef struct builtin_message_entry_
+{
+    const char* name;
+    wy_type_tag receiver;
+    wy_native_leaf_fn fn;
+    wy_u8 min_argc;
+    wy_u8 max_argc;
+} builtin_message_entry_;
+
+static const builtin_message_entry_ native_messages_[] = {
+    { "resize", WY_TYPE_TAG_LIST,  builtin_resize_, 2, 2 },
+    { "expand", WY_TYPE_TAG_LIST,  builtin_expand_, 3, 3 },
+    { "append", WY_TYPE_TAG_LIST,  builtin_append_, 2, 2 },
+    { "remove", WY_TYPE_TAG_TABLE, builtin_remove_, 2, 2 },
+
+    { "append",     WY_TYPE_TAG_BYTES, bytes_append_,      2, 2 },
+    { "resize",     WY_TYPE_TAG_BYTES, bytes_resize_,      2, 2 },
+    { "slice",      WY_TYPE_TAG_BYTES, bytes_slice_,       3, 3 },
+    { "to_str",     WY_TYPE_TAG_BYTES, bytes_to_str_,      1, 1 },
+    { "copy",       WY_TYPE_TAG_BYTES, bytes_copy_,        1, 1 },
+    { "pack_u8",    WY_TYPE_TAG_BYTES, bytes_pack_u8_,     3, 3 },
+    { "pack_i32",   WY_TYPE_TAG_BYTES, bytes_pack_i32_,    3, 3 },
+    { "pack_u32",   WY_TYPE_TAG_BYTES, bytes_pack_u32_,    3, 3 },
+    { "pack_f32",   WY_TYPE_TAG_BYTES, bytes_pack_f32_,    3, 3 },
+    { "pack_f64",   WY_TYPE_TAG_BYTES, bytes_pack_f64_,    3, 3 },
+    { "unpack_u8",  WY_TYPE_TAG_BYTES, bytes_unpack_u8_,   2, 2 },
+    { "unpack_i32", WY_TYPE_TAG_BYTES, bytes_unpack_i32_,  2, 2 },
+    { "unpack_u32", WY_TYPE_TAG_BYTES, bytes_unpack_u32_,  2, 2 },
+    { "unpack_f32", WY_TYPE_TAG_BYTES, bytes_unpack_f32_,  2, 2 },
+    { "unpack_f64", WY_TYPE_TAG_BYTES, bytes_unpack_f64_,  2, 2 },
+};
+
+static wy_error install_native_messages_(wy_context* context, wy_module* module)
+{
+    for (wy_uword i = 0; i < sizeof(native_messages_) / sizeof(native_messages_[0]); i++) {
+        const builtin_message_entry_* entry = &native_messages_[i];
+
+        wy_symbol sym;
+        wy_error err = wy_context_intern(context, entry->name, wy_strlen_f(entry->name), &sym);
+        if (err != WY_ERR_NONE) { return err; }
+
+        wy_native* native = WY_NULL;
+        err = wy_native_leaf_new(context, sym, entry->min_argc, entry->max_argc, entry->fn, &native);
+        if (err != WY_ERR_NONE) { return err; }
+
+        wy_message* msg = WY_NULL;
+        err = wy_module_message_by_name_f(context, module, sym, &msg);
+        if (err != WY_ERR_NONE) { return err; }
+
+        wy_value types[1] = { wy_value_ptype(entry->receiver) };
+        err = wy_message_add_overload_f(context, msg, 1, types,
+            wy_value_object(WY_TYPE_TAG_NATIVE, (wy_object*) native));
+        if (err != WY_ERR_NONE) { return err; }
+    }
+    return WY_ERR_NONE;
+}
 
 /**
  * The base `error` class and its four predefined subtypes
@@ -943,6 +1382,9 @@ wy_error wy_builtins_new(wy_context* context, wy_module** out)
     }
 
     WY_ASSERT(slot == WY_BUILTINS_COUNT);
+
+    err = install_native_messages_(context, module);
+    if (err != WY_ERR_NONE) { return err; }
 
     *out = module;
     return WY_ERR_NONE;

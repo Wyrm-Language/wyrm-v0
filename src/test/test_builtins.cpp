@@ -1,12 +1,16 @@
 #include <doctest/doctest.h>
 
+#include "vm_internal.h"
+
 #include <wyrm.h>
 #include <wyrm/builtins.h>
+#include <wyrm/bytes.h>
 #include <wyrm/coroutine.h>
 #include <wyrm/error.h>
 #include <wyrm/function.h>
 #include <wyrm/module.h>
 #include <wyrm/native.h>
+#include <wyrm/op.h>
 #include <wyrm/opcode.h>
 #include <wyrm/slot.h>
 #include <wyrm/string.h>
@@ -324,5 +328,117 @@ TEST_SUITE("builtins") {
         CHECK_EQ(out[2].data.word, 2);
         REQUIRE_EQ(out[3].type, WY_TYPE_TAG_ERROR);
         CHECK_EQ(((wy_error_obj*) out[3].data.gc_object)->cls, ctx->stop_iteration_class);
+    }
+
+    TEST_CASE("epic 7: bytes!pack_u32 reaches a native overload via WY_OP_MSG's builtins fallback") {
+        // Exercises the real opcode path (not a direct C call to the native
+        // body): `module` below never reg_msg's "pack_u32" itself, so
+        // wy_module_resolve_message_f hands WY_OP_MSG an empty per-module
+        // wy_message - dispatch only succeeds because of the
+        // dispatch_builtins_fallback_f fallback onto ctx->builtins's own
+        // message_table (src/vm.c), landing on the PTYPE(BYTES) overload
+        // install_native_messages_ registers (src/builtin/builtins.c).
+        // Doubles as the epic's own worked example (doc/stdlib.md):
+        // bytes(4)!pack_u32(0, 258) writes 02 01 00 00 (258 little-endian).
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(ctx, &builtins), WY_ERR_NONE);
+        ctx->builtins = builtins;
+
+        wy_bytes* b = WY_NULL;
+        REQUIRE_EQ(wy_bytes_new(ctx, WY_NULL, 0, &b), WY_ERR_NONE);
+        REQUIRE_EQ(wy_bytes_reserve(ctx, b, 4), WY_ERR_NONE);
+        b->len = 4;
+        std::memset(b->data, 0, 4);
+
+        // main: L0 <- G0 (bytes receiver); L1 <- 0 (at); L2 <- 258 (v, wide
+        // immediate); L0!pack_u32(L1, L2) via msg base=0 argc=2 nres=0.
+        const wy_u32 code[] = {
+            enc1(WY_OP_GGET, 0, 0),
+            enc1(WY_OP_I8, 0, 1),
+            enc1(WY_OP_I32_WIDE, 0, 2), 258u,
+            enc2a(WY_OP_MSG, 2, 0), enc2b(0, 0),
+            enc1(WY_OP_RETURN, 0, 0),
+        };
+
+        wy_module* module = make_code_module(ctx, code, std::size(code), { proto_at(0, 3, 0) }, 1);
+        module->globals[0] = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) b);
+
+        wy_symbol pack_u32_sym = WY_NULL;
+        REQUIRE_EQ(wy_context_intern(ctx, "pack_u32", std::strlen("pack_u32"), &pack_u32_sym), WY_ERR_NONE);
+        module->symbols = (wy_symbol*) wy_context_gc_alloc(ctx, sizeof(wy_symbol));
+        module->symbols[0] = pack_u32_sym;
+        module->symbol_count = 1;
+        module->messages = (wy_message_ref*) wy_context_gc_alloc(ctx, sizeof(wy_message_ref));
+        module->messages[0].path_len = 1;
+        module->messages[0].path = (wy_u16*) wy_context_gc_alloc(ctx, sizeof(wy_u16));
+        module->messages[0].path[0] = 0;
+        module->messages[0].bound = WY_NULL;
+        module->message_count = 1;
+
+        REQUIRE_EQ(wy_context_module_register(ctx, module, nullptr), WY_ERR_NONE);
+        wy_function* fn0 = WY_NULL;
+        REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
+
+        wy_error err = wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+            WY_NULL, 0, WY_NULL, 0);
+        REQUIRE_EQ(err, WY_ERR_NONE);
+
+        CHECK_EQ(b->data[0], 0x02);
+        CHECK_EQ(b->data[1], 0x01);
+        CHECK_EQ(b->data[2], 0x00);
+        CHECK_EQ(b->data[3], 0x00);
+    }
+
+    TEST_CASE("epic 7: bytes construction, indexing, equality, and str rendering") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(ctx, &builtins), WY_ERR_NONE);
+        ctx->builtins = builtins;
+
+        wy_native* bytes_ctor = find_native(builtins, ctx, "bytes");
+
+        // bytes(4): four zero bytes.
+        wy_value args_n[1] = { wy_value_word(4) };
+        wy_value out_n[1];
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, bytes_ctor, args_n, 1, out_n, 1), WY_ERR_NONE);
+        REQUIRE_EQ(out_n[0].type, WY_TYPE_TAG_BYTES);
+        wy_bytes* n_bytes = (wy_bytes*) out_n[0].data.gc_object;
+        CHECK_EQ(n_bytes->len, 4u);
+        for (wy_uword i = 0; i < 4; i++) { CHECK_EQ(n_bytes->data[i], 0); }
+
+        // bytes("hi"): UTF-8 encoding.
+        wy_string* hi = WY_NULL;
+        REQUIRE_EQ(wy_string_new(ctx, "hi", 2, &hi), WY_ERR_NONE);
+        wy_value args_s[1] = { wy_value_object(WY_TYPE_TAG_STR, (wy_object*) hi) };
+        wy_value out_s[1];
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, bytes_ctor, args_s, 1, out_s, 1), WY_ERR_NONE);
+        wy_bytes* s_bytes = (wy_bytes*) out_s[0].data.gc_object;
+        REQUIRE_EQ(s_bytes->len, 2u);
+        CHECK_EQ(s_bytes->data[0], 'h');
+        CHECK_EQ(s_bytes->data[1], 'i');
+
+        // getidx/setidx (WY_OP_GETIDX/SETIDX's BYTES case, src/vm_ops.c).
+        wy_value idx_out;
+        REQUIRE_EQ(wy_vm_getidx_f(ctx, out_s[0], wy_value_word(0), &idx_out), WY_ERR_NONE);
+        CHECK_EQ(idx_out.data.word, 'h');
+        REQUIRE_EQ(wy_vm_setidx_f(ctx, out_s[0], wy_value_word(0), wy_value_word('H')), WY_ERR_NONE);
+        CHECK_EQ(s_bytes->data[0], 'H');
+
+        // == is byte-for-byte (wy_op_eq's BYTES case, include/wyrm/op.h), not identity.
+        wy_bytes* copy_of_n = WY_NULL;
+        REQUIRE_EQ(wy_bytes_new(ctx, n_bytes->data, n_bytes->len, &copy_of_n), WY_ERR_NONE);
+        wy_value copy_v = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) copy_of_n);
+        CHECK(wy_op_eq(ctx, WY_TYPE_TAG_BYTES, out_n[0].data, WY_TYPE_TAG_BYTES, copy_v.data));
+
+        // str(bytes) renders "N bytes" (builtin_str_'s BYTES case).
+        wy_native* str_native = find_native(builtins, ctx, "str");
+        wy_value str_out[1];
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str_native, out_n, 1, str_out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(str_out[0].type, WY_TYPE_TAG_STR);
+        wy_string* rendered = str_out[0].data.str;
+        CHECK_EQ(std::string(rendered->str, rendered->len), "4 bytes");
     }
 }

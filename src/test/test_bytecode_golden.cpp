@@ -181,9 +181,11 @@ TEST_SUITE("golden")
     TEST_CASE("decorators declib") { check_fixture("decorators/declib"); }
     TEST_CASE("samples/decolib") { check_fixture("samples/decolib"); }
     TEST_CASE("samples/eval_args") { check_fixture("samples/eval_args"); }
-    /* eval_assignments, eval_closures, eval_coroutines, eval_modules: real
-     * C-VM gaps the manifest sweep found (test/bytecode/manifest.txt's
-     * DIVERGES reasons); not wired here until epic 6 closes them. */
+    /* eval_closures, eval_coroutines, eval_modules: real C-VM gaps the
+     * manifest sweep found (test/bytecode/manifest.txt's DIVERGES reasons);
+     * not wired here until epic 6 closes them. eval_assignments' DIVERGES
+     * (native-message dispatch) was fixed by epic 7/M3. */
+    TEST_CASE("samples/eval_assignments") { check_fixture("samples/eval_assignments"); }
     TEST_CASE("samples/eval_control_flow") { check_fixture("samples/eval_control_flow"); }
     TEST_CASE("samples/eval_error_handling") { check_fixture("samples/eval_error_handling"); }
     TEST_CASE("samples/eval_functions") { check_fixture("samples/eval_functions"); }
@@ -215,6 +217,7 @@ TEST_SUITE("golden-gcstress")
     TEST_CASE("decorators declib") { check_fixture_gcstress("decorators/declib"); }
     TEST_CASE("samples/decolib") { check_fixture_gcstress("samples/decolib"); }
     TEST_CASE("samples/eval_args") { check_fixture_gcstress("samples/eval_args"); }
+    TEST_CASE("samples/eval_assignments") { check_fixture_gcstress("samples/eval_assignments"); }
     TEST_CASE("samples/eval_control_flow") { check_fixture_gcstress("samples/eval_control_flow"); }
     TEST_CASE("samples/eval_error_handling") { check_fixture_gcstress("samples/eval_error_handling"); }
     TEST_CASE("samples/eval_functions") { check_fixture_gcstress("samples/eval_functions"); }

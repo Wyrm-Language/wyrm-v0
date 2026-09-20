@@ -1,6 +1,7 @@
 #ifndef WYRM_OP_H_
 #define WYRM_OP_H_
 
+#include <wyrm/bytes.h>
 #include <wyrm/primitive.h>
 #include <wyrm/string.h>
 
@@ -38,6 +39,15 @@ WY_INLINE bool wy_op_eq(wy_context* context, wy_type_tag lhst, wy_primitive lhs,
     case WY_TYPE_TAG_ERROR:
         /* Unset vs specific error object */
         return lhs.gc_object == rhs.gc_object;
+
+    case WY_TYPE_TAG_BYTES: {
+        /* doc/stdlib.md: bytes `==` is byte-for-byte, unlike the pointer-
+         * identity default every other GC container still uses below. */
+        if (lhs.gc_object == rhs.gc_object) { return true; }
+        wy_bytes* a = (wy_bytes*) lhs.gc_object;
+        wy_bytes* b = (wy_bytes*) rhs.gc_object;
+        return a->len == b->len && (a->len == 0 || wy_memcmp(a->data, b->data, a->len) == 0);
+    }
 
     default:
         /* Pointer identity for other GC objects for now */

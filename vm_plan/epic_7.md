@@ -152,26 +152,64 @@ existing reference.
 **Fan-out:** up to 2 Sonnet subagents ("pack/unpack natives" vs. "File binary mode") on
 disjoint files if the milestone runs long; otherwise sequential.
 
-### M3 - C: `wy_bytes` methods and builtins registration
+### M3 - C: `wy_bytes` methods, builtins registration, and native-message dispatch
 
-**Scope:** Implement M1's method set as native leaf functions (`wy_native_leaf_fn` from
-§1.3), registered in the builtins module. `bytes(n)`/`bytes(str)` construction, `len`,
-`b[i]` get/set via the `getidx`/`setidx` dispatch epic 3 built (add a `BYTES` case),
-`append`/`resize`/`slice`/`to_str`/`copy`/`==`/`is bytes`, and the eight pack/unpack
-natives using explicit little-endian byte writes (never assume host endianness). Grow
-`wy_bytes.data` via `wy_allocator` only, per `AGENTS.md`.
+**Re-cut 2026-09-17 (scan finding, before execution):** epic 7's own exit criterion calls
+`bytes` methods via `!`-message syntax (`bytes(3)!pack_u32(0, 258)`), but `WY_OP_MSG`
+(`src/vm.c` ~1607) and `WY_OP_REG_MSG` (~1797) only ever handle a bytecode `wy_function`
+body — `dispatch_body_f`'s result is cast unconditionally to `wy_function*` and handed to
+`push_bytecode_call_bind_f`, and `reg_msg` faults `"reg_msg: not a function"` on anything
+that isn't `WY_TYPE_TAG_FUNCTION`. This is the same root cause epic 5's report recorded as
+**DIVERGES #1** (`samples/eval_assignments.wy`'s `grown!resize(5)` faults "no overload of
+'resize' matches 1 receiver(s)"), confirmed still unfixed by this scan. Per user decision
+2026-09-17: M3 now includes fixing this generically rather than only for `bytes`, since
+`design_c_vm.md` §5 already anticipates it ("Builtins are a module... `message_table` for
+per-primitive methods with PTYPE constraints") — this is an implementation gap against an
+already-written design, not a new design task.
 
-**Files:** `include/wyrm/bytes.h`, `src/bytes.c` (new, or fill in an epic-2/3 stub), the
-builtins module source, doctest cases in the per-type test file epic 3/4 established.
+**Scope:**
+1. **Native-message dispatch** (new sub-milestone, do first): give the builtins module a
+   `message_table` (per §5) holding PTYPE-constrained overloads whose body is a native
+   leaf, reachable from *any* module's `WY_OP_MSG` resolution (not just the receiver's own
+   module) — `wy_module_resolve_message_f` needs a fallback to `ctx->builtins->message_table`
+   when the receiver's own module has no matching entry. Add a body-type branch at both
+   `WY_OP_MSG`'s dispatch call site and `WY_OP_MSG`'s super/interface-dispatch twin (~1689)
+   so a NATIVE-tagged body invokes the existing native leaf-call path
+   (`wy_vm_call_leaf_f`/equivalent) instead of `push_bytecode_call_bind_f`. `WY_OP_REG_MSG`
+   itself stays FUNCTION-only (bytecode-authored messages); native overloads are registered
+   directly from C at builtins-init time, not through `reg_msg`. Add a doctest exercising
+   `grown!resize(5)` end-to-end (epic 5's own DIVERGES #1 fixture) to confirm the general
+   fix, in addition to `bytes`.
+2. Implement M1's `bytes` method set as native leaf functions (`wy_native_leaf_fn` from
+   §1.3), registered as PTYPE(BYTES)-constrained overloads via (1)'s mechanism.
+   `bytes(n)`/`bytes(str)` construction, `len`, `b[i]` get/set via the `getidx`/`setidx`
+   dispatch epic 3 built (add a `BYTES` case), `append`/`resize`/`slice`/`to_str`/`copy`/
+   `==`/`is bytes`, and the eight pack/unpack natives using explicit little-endian byte
+   writes (never assume host endianness). Grow `wy_bytes.data` via `wy_allocator` only, per
+   `AGENTS.md`.
 
-**Acceptance:** a doctest case constructs `bytes(4)`, calls `pack_u32(0, 0xdeadbeef)`, and
-asserts the bytes read `EF BE AD DE`; `meson test -C buildDir` green.
+**Files:** `include/wyrm/bytes.h`, `src/bytes.c` (new, or fill in an epic-2/3 stub),
+`src/vm.c` (`WY_OP_MSG` body-type branch), `src/message.c`/`src/module.c` (builtins
+message-table fallback resolution), the builtins module source, doctest cases in the
+per-type test file epic 3/4 established, plus one covering the general fix via
+`grown!resize(5)`.
 
-**Model:** Sonnet, the byte order and contracts are fully specified by M1 and M2; a port,
-not a design.
+**Acceptance:** a doctest case constructs `bytes(4)`, calls `!pack_u32(0, 0xdeadbeef)` via
+the real `!`-message opcode path (not a direct native call), and asserts the bytes read
+`EF BE AD DE`; a second doctest confirms `samples/eval_assignments.wy`'s previously-faulting
+`grown!resize(5)` now runs; `meson test -C buildDir` green. If `eval_assignments.wy` fully
+passes end-to-end, promote its manifest row from `DIVERGES` back to `matches` and wire it
+into the golden harness.
 
-**Fan-out:** 2 Sonnet subagents in parallel: one for construction/len/indexing/append/
-resize/slice/copy/`==`, one for the eight pack/unpack natives, pre-agreeing on a
+**Model:** Sonnet for part 2 (byte order and contracts fully specified by M1/M2, a port not
+a design). Part 1 (native-message dispatch) is implementation against an existing design
+section, not first-of-kind design work, so Sonnet is appropriate, but flag to Opus if the
+builtins-fallback resolution turns up a design question §5's text doesn't answer (e.g.
+ambiguity between a module's own overload and a builtins one at the same arity).
+
+**Fan-out:** part 1 first, sequential (touches shared dispatch code, easy to conflict);
+then up to 2 Sonnet subagents in parallel for part 2: one for construction/len/indexing/
+append/resize/slice/copy/`==`, one for the eight pack/unpack natives, pre-agreeing on a
 registration-table naming convention to avoid a merge conflict.
 
 ### M4 - `std::io` binary mode on the hosted port

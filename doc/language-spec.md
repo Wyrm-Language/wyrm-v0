@@ -905,7 +905,9 @@ Fundamental types expand to include more complicated collections and variables
 requiring dynamic memory allocation. Some of these types are not available within
 the wyrm source code:
 
-  - **bytes**: a byte buffer
+  - **bytes**: a heap-allocated, mutable, resizable array of `u8` bytes; get/set indexing,
+    append/resize/slice, str conversion, and little-endian numeric pack/unpack (see
+    `doc/stdlib.md`'s `### bytes` section for the full message set)
   - **str**: a string
   - **tuple**: an immutable value sequence
   - **list**: a mutable sequence with constant-time indexing

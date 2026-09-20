@@ -75,6 +75,19 @@ wy_error wy_module_message_by_name_f(wy_context* context, wy_module* module, wy_
  */
 wy_error wy_module_resolve_message_f(wy_context* context, wy_module* module, wy_uword message_idx, wy_message** out);
 
+/**
+ * Look up (never create) the message identity named `name` in
+ * `module->message_table`. `*out` is set to WY_NULL, WY_ERR_NONE returned,
+ * when `module` has no `message_table` yet or no entry under `name` -
+ * this is a plain miss, not an error. Used by epic 7's builtins-message
+ * fallback (design_c_vm.md §5: "Builtins are a module... message_table for
+ * per-primitive methods with PTYPE constraints") so `WY_OP_MSG`/`WY_OP_MSG_VA`
+ * can try `ctx->builtins`'s message table by the same name, without ever
+ * creating a spurious empty message entry there for a name that isn't
+ * actually a builtin method.
+ */
+wy_error wy_module_message_lookup_f(wy_context* context, wy_module* module, wy_symbol name, wy_message** out);
+
 WY_END_DECLS
 
 #endif

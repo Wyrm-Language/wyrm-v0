@@ -3,6 +3,7 @@
 #include <math.h>
 
 #include <wyrm.h>
+#include <wyrm/bytes.h>
 #include <wyrm/dict.h>
 #include <wyrm/error.h>
 #include <wyrm/instance.h>
@@ -72,6 +73,19 @@ static wy_error compare_f(wy_context* ctx, wy_value lhs, wy_value rhs, int* out_
     }
     if (lhs.type == WY_TYPE_TAG_BOOL && rhs.type == WY_TYPE_TAG_BOOL) {
         *out_cmp = (int) lhs.data.flag - (int) rhs.data.flag;
+        return WY_ERR_NONE;
+    }
+    if (lhs.type == WY_TYPE_TAG_BYTES && rhs.type == WY_TYPE_TAG_BYTES) {
+        /* doc/stdlib.md: `==` is byte-for-byte. Ordering (<, cmp3, ...) is
+         * not spec'd for bytes; a lexicographic compare (shared prefix,
+         * then length) is the least-surprising choice and makes `==`'s
+         * "equal length and contents" fall out as `cmp == 0`, matching
+         * wy_op_eq's BYTES case (include/wyrm/op.h) by construction. */
+        wy_bytes* a = (wy_bytes*) lhs.data.gc_object;
+        wy_bytes* b = (wy_bytes*) rhs.data.gc_object;
+        wy_uword shared = a->len < b->len ? a->len : b->len;
+        int c = (shared == 0) ? 0 : wy_memcmp(a->data, b->data, shared);
+        *out_cmp = (c != 0) ? ((c > 0) - (c < 0)) : (int) ((a->len > b->len) - (a->len < b->len));
         return WY_ERR_NONE;
     }
     *out_comparable = false;
@@ -289,6 +303,16 @@ wy_error wy_vm_getidx_f(wy_context* ctx, wy_value obj, wy_value idx, wy_value* o
         *out = ((wy_pair*) obj.data.gc_object)->car;
         return WY_ERR_NONE;
     }
+    if (obj.type == WY_TYPE_TAG_BYTES) {
+        if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
+            return make_error_value_f(ctx, "bytes index must be an integer", out);
+        }
+        wy_bytes* b = (wy_bytes*) obj.data.gc_object;
+        wy_word i = as_word_(idx);
+        if (i < 0 || (wy_uword) i >= b->len) return make_error_value_f(ctx, "bytes index out of range", out);
+        *out = wy_value_word(b->data[i]);
+        return WY_ERR_NONE;
+    }
     return make_error_value_f(ctx, "object is not indexable", out);
 }
 
@@ -315,6 +339,21 @@ wy_error wy_vm_setidx_f(wy_context* ctx, wy_value obj, wy_value idx, wy_value sr
         }
         if (as_word_(idx) != 0) return make_error_value_f(ctx, "pair index out of range", &dummy);
         ((wy_pair*) obj.data.gc_object)->car = src;
+        return WY_ERR_NONE;
+    }
+    if (obj.type == WY_TYPE_TAG_BYTES) {
+        if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
+            return make_error_value_f(ctx, "bytes index must be an integer", &dummy);
+        }
+        if (src.type != WY_TYPE_TAG_WORD && src.type != WY_TYPE_TAG_UWORD) {
+            return make_error_value_f(ctx, "bytes value must be an integer", &dummy);
+        }
+        wy_bytes* b = (wy_bytes*) obj.data.gc_object;
+        wy_word i = as_word_(idx);
+        wy_word v = as_word_(src);
+        if (i < 0 || (wy_uword) i >= b->len) return make_error_value_f(ctx, "bytes index out of range", &dummy);
+        if (v < 0 || v > 255) return make_error_value_f(ctx, "bytes value must be 0-255", &dummy);
+        b->data[i] = (wy_u8) v;
         return WY_ERR_NONE;
     }
     return make_error_value_f(ctx, "object does not support item assignment", &dummy);

@@ -423,6 +423,75 @@ static wy_error dispatch_body_f(wy_message* msg, const wy_value* receivers, wy_u
 }
 
 /**
+ * design_c_vm.md §5's builtins message_table fallback (epic 7): when `msg`
+ * (the identity resolved in the *calling* module's own table - always
+ * distinct per module, per `wy_module_resolve_message_f`) has no overload
+ * matching `receivers`, try the identically-named message in
+ * `ctx->builtins`'s own message table instead. This is what lets a native
+ * container method (`bytes`/`list`/...) registered once, at builtins-init
+ * time, be called via `!name(...)` from any module - the per-module `msg`
+ * a fresh module gets for a name it never `reg_msg`s itself is otherwise
+ * permanently empty. Never creates an entry in either table.
+ */
+static wy_error dispatch_builtins_fallback_f(wy_context* ctx, wy_message* msg, const wy_value* receivers,
+    wy_uword n, wy_value* out_body, char* fault_msg, wy_uword fault_msg_size)
+{
+    if (ctx->builtins == WY_NULL) { return WY_ERR_NOSUPPORT; }
+
+    wy_message* builtin_msg = WY_NULL;
+    wy_error err = wy_module_message_lookup_f(ctx, ctx->builtins, msg->name, &builtin_msg);
+    if (err != WY_ERR_NONE || builtin_msg == WY_NULL) { return WY_ERR_NOSUPPORT; }
+
+    return dispatch_body_f(builtin_msg, receivers, n, out_body, fault_msg, fault_msg_size);
+}
+
+/**
+ * Invoke a NATIVE-bodied message overload (epic 7: `design_c_vm.md` §5's
+ * builtins `message_table` is the first thing to ever put a NATIVE value
+ * into `wy_overload::body` - every path before this only ever wrote a
+ * bytecode FUNCTION there). Unlike `push_bytecode_call_bind_f`, a native
+ * leaf function has no separate "this" concept (`wy_native_leaf_fn`'s
+ * signature is a flat `args[0..argc)`), so `receivers[0..n)` and
+ * `args[0..argc)` - which are not necessarily adjacent in memory, e.g.
+ * `WY_OP_MSG_VA`'s args come from a tuple's own item array - are copied
+ * into one contiguous scratch buffer, receivers first, before the call.
+ *
+ * Scoped to single-receiver (`n == 1`) dispatch only: every native message
+ * this epic registers is a PTYPE(primitive)-constrained arity-1 overload,
+ * and no fixture needs multi-receiver (tuple-recv) dispatch onto a native
+ * body. `n > 1` faults explicitly rather than silently misbehaving.
+ */
+static wy_error dispatch_native_body_f(wy_context* ctx, wy_native* native, const wy_value* receivers, wy_uword n,
+    wy_value* args, wy_uword argc, wy_value* out, wy_uword nres, char* fault_msg, wy_uword fault_msg_size)
+{
+    if (n != 1) {
+        snprintf(fault_msg, fault_msg_size, "msg: native message dispatch supports exactly one receiver");
+        return WY_ERR_NOSUPPORT;
+    }
+    if (native->kind != WY_NATIVE_LEAF) {
+        snprintf(fault_msg, fault_msg_size, "msg: native exec bodies are not supported as message overloads yet");
+        return WY_ERR_NOSUPPORT;
+    }
+
+    enum { WY_NATIVE_MSG_MAX_ARGS = WY_DISPATCH_MAX_RECEIVERS + 256 };
+    if (n + argc > WY_NATIVE_MSG_MAX_ARGS) {
+        snprintf(fault_msg, fault_msg_size, "msg: too many arguments for a native message body");
+        return WY_ERR_RANGE;
+    }
+
+    wy_value merged[WY_NATIVE_MSG_MAX_ARGS];
+    for (wy_uword i = 0; i < n; i++) { merged[i] = receivers[i]; }
+    for (wy_uword i = 0; i < argc; i++) { merged[n + i] = args[i]; }
+
+    wy_error err = wy_vm_call_leaf_f(ctx, native, merged, n + argc, out, nres);
+    if (err != WY_ERR_NONE) {
+        snprintf(fault_msg, fault_msg_size, "%s", err == WY_ERR_ARITY ? "wrong argument count" : "native call failed");
+        return err;
+    }
+    return WY_ERR_NONE;
+}
+
+/**
  * How many of `receivers[0..n)` a chosen overload's `body` actually wants
  * in `P0..P(t-1)`: its own `ndispatch` (design_c_vm.md §7's "this values"),
  * capped to `n` for safety against a malformed image.
@@ -1628,9 +1697,25 @@ reload:;
             char fault_msg[WY_VM_CALL_FAULT_MSG];
             wy_error d_err = dispatch_body_f(msg, receivers, n, &body, fault_msg, sizeof(fault_msg));
             if (d_err != WY_ERR_NONE) {
+                d_err = dispatch_builtins_fallback_f(ctx, msg, receivers, n, &body, fault_msg, sizeof(fault_msg));
+            }
+            if (d_err != WY_ERR_NONE) {
                 fr->ip = next_ip;
                 fault_v = fault_value_f(ctx, fault_msg);
                 goto do_fault;
+            }
+
+            if (body.type == WY_TYPE_TAG_NATIVE) {
+                fr->ip = next_ip;
+                char fault_msg2[WY_VM_CALL_FAULT_MSG];
+                wy_error err = dispatch_native_body_f(ctx, (wy_native*) body.data.gc_object,
+                    receivers, n, &L[base + 1], argc, &L[base], nres, fault_msg2, sizeof(fault_msg2));
+                if (err != WY_ERR_NONE) {
+                    fault_v = fault_value_f(ctx, fault_msg2);
+                    goto do_fault;
+                }
+                ip = next_ip;
+                break;
             }
 
             fr->ip = next_ip;
@@ -1688,9 +1773,30 @@ reload:;
             char fault_msg[WY_VM_CALL_FAULT_MSG];
             wy_error d_err = dispatch_body_f(msg, receivers, n, &body, fault_msg, sizeof(fault_msg));
             if (d_err != WY_ERR_NONE) {
+                d_err = dispatch_builtins_fallback_f(ctx, msg, receivers, n, &body, fault_msg, sizeof(fault_msg));
+            }
+            if (d_err != WY_ERR_NONE) {
                 fr->ip = next_ip;
                 fault_v = fault_value_f(ctx, fault_msg);
                 goto do_fault;
+            }
+
+            if (body.type == WY_TYPE_TAG_NATIVE) {
+                if (kwargs != WY_NULL && kwargs->count > 0) {
+                    fr->ip = next_ip;
+                    fault_v = fault_value_f(ctx, "msg_va: native keyword calls are not supported");
+                    goto do_fault;
+                }
+                fr->ip = next_ip;
+                char fault_msg2[WY_VM_CALL_FAULT_MSG];
+                wy_error err = dispatch_native_body_f(ctx, (wy_native*) body.data.gc_object,
+                    receivers, n, args, tup->count, &L[base], nres, fault_msg2, sizeof(fault_msg2));
+                if (err != WY_ERR_NONE) {
+                    fault_v = fault_value_f(ctx, fault_msg2);
+                    goto do_fault;
+                }
+                ip = next_ip;
+                break;
             }
 
             fr->ip = next_ip;

@@ -7,6 +7,7 @@
 
 #include <wyrm.h>
 #include <wyrm/builtins.h>
+#include <wyrm/bytes.h>
 #include <wyrm/coroutine.h>
 #include <wyrm/error.h>
 #include <wyrm/function.h>
@@ -182,6 +183,52 @@ TEST_SUITE("io_native")
         auto read_back = call_native(ctx, read_fn, {wy_value_word(handle), wy_value_word(-1)}, 1);
         REQUIRE_EQ(read_back[0].type, WY_TYPE_TAG_STR);
         CHECK_EQ(std::string(read_back[0].data.str->str, read_back[0].data.str->len), "hello wyrm");
+
+        auto closed = call_native(ctx, close_fn, {wy_value_word(handle)}, 1);
+        REQUIRE_EQ(closed[0].type, WY_TYPE_TAG_WORD);
+        CHECK_EQ(closed[0].data.word, 0);
+    }
+
+    TEST_CASE("epic 7 M4: write accepts bytes and read_bytes round-trips binary data") {
+        test_fiber_fixture fix;
+        wy_context* ctx = fix.get_context_ptr();
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(ctx, &builtins), WY_ERR_NONE);
+        ctx->builtins = builtins;
+        wy_module* io = WY_NULL;
+        REQUIRE_EQ(wy_io_module_new(ctx, &io), WY_ERR_NONE);
+        REQUIRE_EQ(wy_context_module_register(ctx, io, nullptr), WY_ERR_NONE);
+
+        temp_file tf;
+        wy_value open_fn = native_value(ctx, io, "open");
+        wy_value write_fn = native_value(ctx, io, "write");
+        wy_value read_bytes_fn = native_value(ctx, io, "read_bytes");
+        wy_value lseek_fn = native_value(ctx, io, "lseek");
+        wy_value close_fn = native_value(ctx, io, "close");
+
+        // Includes a NUL and a high (non-ASCII, non-UTF-8) byte - exactly
+        // the case a str-only write/read pair can't carry losslessly.
+        const wy_u8 payload[] = {0x00, 0xFF, 0x10, 0xAB, 0xCD};
+        wy_bytes* payload_bytes = WY_NULL;
+        REQUIRE_EQ(wy_bytes_new(ctx, payload, sizeof(payload), &payload_bytes), WY_ERR_NONE);
+        wy_value payload_v = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) payload_bytes);
+
+        auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+b")}, 1);
+        REQUIRE_EQ(opened[0].type, WY_TYPE_TAG_WORD);
+        wy_word handle = opened[0].data.word;
+
+        auto written = call_native(ctx, write_fn, {wy_value_word(handle), payload_v}, 1);
+        REQUIRE_EQ(written[0].type, WY_TYPE_TAG_WORD);
+        CHECK_EQ(written[0].data.word, (wy_word) sizeof(payload));
+
+        auto sought = call_native(ctx, lseek_fn, {wy_value_word(handle), wy_value_word(0), wy_value_word(0)}, 1);
+        REQUIRE_EQ(sought[0].type, WY_TYPE_TAG_WORD);
+
+        auto read_back = call_native(ctx, read_bytes_fn, {wy_value_word(handle), wy_value_word(-1)}, 1);
+        REQUIRE_EQ(read_back[0].type, WY_TYPE_TAG_BYTES);
+        wy_bytes* result = (wy_bytes*) read_back[0].data.gc_object;
+        REQUIRE_EQ(result->len, sizeof(payload));
+        CHECK_EQ(std::memcmp(result->data, payload, sizeof(payload)), 0);
 
         auto closed = call_native(ctx, close_fn, {wy_value_word(handle)}, 1);
         REQUIRE_EQ(closed[0].type, WY_TYPE_TAG_WORD);

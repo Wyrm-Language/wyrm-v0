@@ -75,6 +75,21 @@ wy_error wy_module_message_by_name_f(wy_context* context, wy_module* module, wy_
     return WY_ERR_NONE;
 }
 
+wy_error wy_module_message_lookup_f(wy_context* context, wy_module* module, wy_symbol name, wy_message** out)
+{
+    if (context == WY_NULL || module == WY_NULL || out == WY_NULL) { return WY_ERR_INVAL; }
+
+    *out = WY_NULL;
+    if (module->message_table == WY_NULL) { return WY_ERR_NONE; }
+
+    wy_value* existing = wy_dict_get(context, module->message_table, WY_TYPE_TAG_SYMBOL,
+        (wy_primitive) { .symtab_entry = name });
+    if (existing != WY_NULL) {
+        *out = (wy_message*) existing->data.gc_object;
+    }
+    return WY_ERR_NONE;
+}
+
 wy_error wy_module_resolve_message_f(wy_context* context, wy_module* module, wy_uword message_idx, wy_message** out)
 {
     if (context == WY_NULL || module == WY_NULL || out == WY_NULL) { return WY_ERR_INVAL; }

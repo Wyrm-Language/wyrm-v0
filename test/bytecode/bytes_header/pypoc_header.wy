@@ -1,0 +1,59 @@
+# Epic 7 M5 exit criterion: build the BSON `header` document
+# { n: "hello", v: 1, g: 2, l: 3 } by hand using bytes methods, matching
+# pypoc/wypoc/compiler_bc/bsonlite.py's _frame/_element/_value/_cstring
+# exactly, and write it to a file. Compared byte-for-byte against
+# bsonlite.encode_document({"n": "hello", "v": 1, "g": 2, "l": 3}).
+#
+# Field lengths are hand-computed, not looked up via len(bytes) - the
+# bytes type has no len() support in either engine yet (a documented gap,
+# see the epic 7 report), and this fixture's schema is fixed, so a
+# constant is exact and simpler than adding that support here.
+import std::io
+
+TAG_STRING := 2
+TAG_INT32 := 16
+
+out := bytes(0)
+
+# "n": "hello"  (TAG_STRING key "n", int32 payload length, "hello\0")
+out!append(TAG_STRING)
+out!append("n")
+out!append(0)
+n_len := bytes(4)
+n_len!pack_i32(0, 6)          # len("hello\0")
+out!append(n_len)
+out!append("hello")
+out!append(0)
+
+# "v": 1  (TAG_INT32)
+out!append(TAG_INT32)
+out!append("v")
+out!append(0)
+v_val := bytes(4)
+v_val!pack_i32(0, 1)
+out!append(v_val)
+
+# "g": 2
+out!append(TAG_INT32)
+out!append("g")
+out!append(0)
+g_val := bytes(4)
+g_val!pack_i32(0, 2)
+out!append(g_val)
+
+# "l": 3
+out!append(TAG_INT32)
+out!append("l")
+out!append(0)
+l_val := bytes(4)
+l_val!pack_i32(0, 3)
+out!append(l_val)
+
+# frame: int32(len(body) + 5) + body + 0x00. body is 34 bytes
+# (13 for "n" + 7 each for "v"/"g"/"l"), so the frame total is 39.
+frame := bytes(4)
+frame!pack_i32(0, 39)
+frame!append(out)
+frame!append(0)
+
+std::io::write_bytes_file("bytes_header.bin", frame)
