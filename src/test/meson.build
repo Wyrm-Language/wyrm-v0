@@ -3,15 +3,21 @@ test_cwyrm_sources = files(
     'test_allocator.cpp',
     'test_atomics.cpp',
     'test_bson.cpp',
+    'test_builtins.cpp',
+    'test_bytecode_golden.cpp',
     'test_class.cpp',
     'test_context.cpp',
     'test_fiber.cpp',
     'test_headers_sync.cpp',
+    'test_heap_objects.cpp',
     'test_image.cpp',
+    'test_link.cpp',
     'test_machine.cpp',
     'test_module.cpp',
     'test_slot.cpp',
     'test_stack.cpp',
+    'test_symtab.cpp',
+    'test_vm_call.cpp',
     'test_wbox.cpp',
     'test_wgc.cpp',
     'test_wpair.cpp',
@@ -46,3 +52,5 @@ test_cwyrm_exe = executable('test_cwyrm',
 
 test('cwyrm', test_cwyrm_exe)
 test('cwyrm-loader', test_cwyrm_exe, args: ['--test-suite=loader'], suite: 'loader')
+test('cwyrm-golden', test_cwyrm_exe, args: ['--test-suite=golden'], suite: 'golden')
+test('cwyrm-golden-gcstress', test_cwyrm_exe, args: ['--test-suite=golden-gcstress'], suite: 'golden')

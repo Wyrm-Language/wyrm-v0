@@ -15,17 +15,47 @@ WY_BEGIN_DECLS
 /** Initial capacity reserved for the module list on first registration */
 #define WY_CONTEXT_MODULE_INITIAL 4
 
+/** Depth of the root stack C code can use to protect fresh objects across allocations */
+#define WY_CONTEXT_ROOT_STACK_LEN 64
+
+/** Default gc_pressure threshold (bytes) before a safepoint triggers a collection */
+#define WY_CONTEXT_GC_THRESHOLD_DEFAULT (1u << 16)
+
+/**
+ * Output sink for builtins like `print`/`println` (design_c_vm.md §5).
+ * `write` may be WY_NULL, in which case output is silently dropped; the
+ * hosted platform port defaults it to stdout (src/platform/hosted).
+ */
+typedef void (*wy_io_write_fn)(wy_context* context, const char* bytes, wy_uword len, void* ud);
+typedef struct wy_context_io
+{
+    wy_io_write_fn write;
+    void* ud;
+} wy_context_io;
+
 struct wy_context
 {
     wy_machine* parent;
     wy_fiber* current_fiber;
     wy_module* root_module;
+    wy_module* builtins;       /**< the builtins module; NULL until epic 2/M5 installs it */
     wy_main_loop* main_loop;
     wy_primitive wakeable_source;
     wy_gc_arena arena;
+    wy_context_io io;
 
     wy_mem_info module_memory;
     wy_uword module_count;
+
+    /** Bytes allocated since the last collection; compared against gc_threshold at safepoints */
+    wy_uword gc_pressure;
+    wy_uword gc_threshold;
+    /** Set mid-collection when the mark worklist could not grow; the sweep for that cycle is skipped */
+    bool gc_abandoned;
+
+    /** Fixed root stack: C code holding a fresh object across further allocations pushes its slot here */
+    wy_value* roots[WY_CONTEXT_ROOT_STACK_LEN];
+    wy_uword root_count;
 };
 
 void wy_context_init_s(wy_context* self);
@@ -36,13 +66,14 @@ wy_error wy_context_set_root(wy_context* context, wy_module* module);
 wy_error wy_context_module_register(wy_context* self, wy_module* module, wy_uword* out_module_id);
 
 /**
- * Intern `len` bytes of UTF-8 as a symbol: identical text returns identical
- * pointer identity (`wy_symbol` is compared by pointer). Loader code MUST
- * go through this one entry point rather than the scaffold symtab directly,
- * so replacing that symtab (epic 2) is a one-function change.
+ * Intern `len` bytes of UTF-8 as a symbol: two interned strings compare
+ * pointer-identical (`wy_symbol` is compared by pointer) iff their first 31
+ * UTF-8 codepoints are byte-identical (see wyc-format.md §8.4 and
+ * wy_symtab_intern). Loader code MUST go through this one entry point
+ * rather than the machine's wy_symtab directly.
  *
- * @return WY_ERR_NONE, WY_ERR_INVAL for a null argument, or WY_ERR_RANGE if
- *   `len` exceeds the scaffold symtab's per-symbol limit
+ * @return WY_ERR_NONE, WY_ERR_INVAL for a null argument, or WY_ERR_NOMEM on
+ *   allocation failure
  */
 wy_error wy_context_intern(wy_context* context, const char* text, wy_uword len, wy_symbol* out);
 
@@ -66,6 +97,28 @@ void wy_context_gc_free(wy_context* context, void* ptr);
 void wy_context_push_gc(wy_context* context, wy_object* gc_info);
 
 void wy_context_gc_full_run(wy_context* context);
+
+/**
+ * Collect if allocation pressure has crossed the threshold since the last
+ * collection; a no-op otherwise. Called between VM instructions (a
+ * safepoint), never mid-instruction, so instruction handlers need no
+ * handles for values they haven't yet rooted.
+ */
+void wy_context_gc_safepoint(wy_context* context);
+
+/**
+ * Push `slot`'s current value onto the root stack, so it survives any
+ * collection triggered by further allocation until popped
+ *
+ * For C code (loader, builtins, natives) that allocates more than once in
+ * a row before the first result is reachable from any other root.
+ *
+ * @return WY_ERR_NONE, or WY_ERR_STACK_OVERFLOW if the root stack is full
+ */
+wy_error wy_context_root_push_f(wy_context* context, wy_value* slot);
+
+/** Pop the most recently pushed root. No-op if the root stack is empty. */
+void wy_context_root_pop_f(wy_context* context);
 
 
 #define WY_CONTEXT_MEM_INFO_RESERVE_COUNT(context, mem_info, count, type) (wy_context_mem_reserve_count_f((context), (mem_info), (count), sizeof(type)))

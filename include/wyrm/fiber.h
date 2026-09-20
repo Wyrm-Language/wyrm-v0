@@ -2,6 +2,7 @@
 #define WYRM_FIBER_H_
 
 #include <wyrm/exec_fn.h>
+#include <wyrm/frame.h>
 #include <wyrm/fwd.h>
 #include <wyrm/mem_info.h>
 #include <wyrm/object.h>
@@ -16,21 +17,13 @@ WY_BEGIN_DECLS
 extern const wy_object_type wy_type_fiber;
 
 /**
- * A call frame
- *
- * The call frame stack lives parallel to the value stack and tracks
- * the continuations of the current fiber. This also tracks the number
- * of allowed return results.
- */
-typedef struct wy_fiber_frame
-{
-    wy_value* restore_base;     //!< Caller's base, restored on pop
-    wy_exec_fn fn;              //!< Continuation run once the call returns
-    wy_uword result_count;      //!< Result slots the caller reserved below base
-} wy_fiber_frame;
-
-/**
  * Fiber / stack
+ *
+ * The call frame stack (`wy_frame`, see frame.h) lives parallel to the
+ * value stack and tracks the continuations of the current fiber. Every
+ * frame pushed by this file's push/pop/tail-call functions is a native
+ * frame (`kind == WY_FRAME_NATIVE`, `ret_kind == WY_RET_RESERVED`); the
+ * bytecode fields are unused until epic 2/M4's dispatch loop pushes one.
  */
 struct wy_fiber
 {
@@ -38,9 +31,10 @@ struct wy_fiber
     wy_context* parent;
     wy_stack value_stack;
     wy_exec_fn pending;
+    wy_value fault;   //!< Error value that unwound this fiber; Unset when none
 
-    wy_mem_info frame_memory;               //!< Reserved memory for frame storage
-    wy_fiber_frame* current_frame;          //!< Innermost active frame
+    wy_mem_info frame_memory;       //!< Reserved memory for frame storage
+    wy_frame* current_frame;        //!< Innermost active frame
 };
 
 
@@ -85,7 +79,7 @@ WY_INLINE wy_error wy_fiber_push_value_f(wy_fiber* self, wy_value value)
 WY_INLINE wy_uword wy_fiber_result_count_f(wy_fiber* self)
 {
     WY_ASSERT(self != WY_NULL);
-    return self->current_frame->result_count;
+    return self->current_frame->ret_nres;
 }
 
 /**
@@ -94,7 +88,7 @@ WY_INLINE wy_uword wy_fiber_result_count_f(wy_fiber* self)
 WY_INLINE wy_value* wy_fiber_result_n(wy_fiber* self, wy_uword index)
 {
     WY_ASSERT(self != WY_NULL);
-    if (index >= self->current_frame->result_count) { return WY_NULL; }
+    if (index >= self->current_frame->ret_nres) { return WY_NULL; }
     return &self->value_stack.base[-(wy_word) (index + 1)];
 }
 
@@ -140,7 +134,7 @@ WY_INLINE wy_error wy_fiber_tail_call_c_call_f(wy_fiber* self, wy_exec_fn_c_call
 WY_INLINE wy_uword wy_fiber_frame_depth_f(wy_fiber* self)
 {
     WY_ASSERT(self != WY_NULL);
-    return (wy_uword) (self->current_frame - WY_MEM_INFO_BEGIN_PTR(wy_fiber_frame, &self->frame_memory));
+    return (wy_uword) (self->current_frame - WY_MEM_INFO_BEGIN_PTR(wy_frame, &self->frame_memory));
 }
 
 /**

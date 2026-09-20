@@ -1,11 +1,24 @@
 #include <wyrm.h>
 #include <stdio.h>
 
+#include <wyrm/builtins.h>
+#include <wyrm/error.h>
+#include <wyrm/fiber.h>
 #include <wyrm/image.h>
+#include <wyrm/link.h>
 #include <wyrm/module.h>
 #include <wyrm/opcode.h>
 #include <wyrm/opcode_names.h>
 #include <wyrm/platform/hosted/cmachine.h>
+#include <wyrm/string.h>
+
+enum { WY_MAIN_STACK_LEN = 4096, WY_MAIN_FRAME_COUNT = 256 };
+
+static void io_write_stdout_(wy_context* context, const char* bytes, wy_uword len, void* ud)
+{
+    WY_UNUSED(context); WY_UNUSED(ud);
+    fwrite(bytes, 1, len, stdout);
+}
 
 /**
  * Read a whole file into a buffer allocated through `context`'s allocator
@@ -141,6 +154,26 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    wy_fiber* fiber = wy_fiber_create(context, WY_MAIN_STACK_LEN, WY_MAIN_FRAME_COUNT);
+    if (fiber == WY_NULL) {
+        fprintf(stderr, "wyrm: failed to create fiber\n");
+        return 1;
+    }
+    if (wy_context_attach_fiber(context, fiber) != WY_ERR_NONE) {
+        fprintf(stderr, "wyrm: failed to attach fiber\n");
+        return 1;
+    }
+
+    context->io.write = io_write_stdout_;
+    context->io.ud = WY_NULL;
+
+    wy_module* builtins = WY_NULL;
+    if (wy_builtins_new(context, &builtins) != WY_ERR_NONE) {
+        fprintf(stderr, "wyrm: failed to build builtins module\n");
+        return 1;
+    }
+    context->builtins = builtins;
+
     wy_uword file_size = 0;
     wy_u8* file_content = read_file(context, file_path, &file_size);
     if (file_content == WY_NULL) {
@@ -160,7 +193,30 @@ int main(int argc, char** argv)
     if (want_disasm) { print_disasm(module); }
 
     if (!want_sections && !want_disasm) {
-        printf("not run: interpreter lands in epic 2\n");
+        last_error = wy_link_fill_from_builtins(context, module, builtins);
+        if (last_error != WY_ERR_NONE) {
+            fprintf(stderr, "wyrm: %s: failed to link module (error %d)\n", file_path, (int) last_error);
+            return 1;
+        }
+
+        last_error = wy_module_run_init(context, module);
+        if (last_error == WY_ERR_NONE) {
+            return 0;
+        }
+        if (last_error == WY_ERR_FAULT) {
+            wy_value fault = context->current_fiber->fault;
+            if (wy_value_is_error(fault) && fault.data.gc_object != WY_NULL) {
+                wy_error_obj* err = (wy_error_obj*) fault.data.gc_object;
+                if (err->what != WY_NULL) {
+                    fprintf(stderr, "wyrm: %s: fault: %s\n", file_path, err->what->str);
+                    return 1;
+                }
+            }
+            fprintf(stderr, "wyrm: %s: fault\n", file_path);
+            return 1;
+        }
+        fprintf(stderr, "wyrm: %s: failed to run module (error %d)\n", file_path, (int) last_error);
+        return 1;
     }
 
     return 0;

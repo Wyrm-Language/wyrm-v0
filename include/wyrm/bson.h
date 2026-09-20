@@ -49,11 +49,17 @@ WY_INLINE wy_i32 wy_bson_get_i32(const wy_u8* buffer) { wy_i32 v; wy_memcpy(&v, 
 WY_INLINE wy_i64 wy_bson_get_i64(const wy_u8* buffer) { wy_i64 v; wy_memcpy(&v, buffer, sizeof(wy_i64)); return v; }
 WY_INLINE wy_u64 wy_bson_get_u64(const wy_u8* buffer) { wy_u64 v; wy_memcpy(&v, buffer, sizeof(wy_u64)); return v; }
 
+/**
+ * Decode a BSON string field (tag 2): `int32` byte length *including* the
+ * trailing NUL terminator (wyc-format.md §4.2), then the UTF-8 bytes, then
+ * the terminator itself. `*out_len` is the content length, the terminator
+ * excluded, matching every other length-returning accessor in this header.
+ */
 WY_INLINE void wy_bson_get_str(const wy_u8* buffer, const char** out_str, wy_uword* out_len)
 {
     wy_i32 len = wy_bson_get_i32(buffer);
     *out_str = (const char*) &buffer[4];
-    *out_len = len;
+    *out_len = (len > 0) ? (wy_uword) (len - 1) : 0;
 }
 
 /**

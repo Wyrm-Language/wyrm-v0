@@ -1,5 +1,6 @@
 #include <wyrm/gc.h>
 #include <wyrm.h>
+#include <wyrm/util.h>
 #include <wyrm/work_area.h>
 
 void wy_gc_init_f(wy_gc_arena* self, wy_allocator* allocator)
@@ -66,22 +67,67 @@ void wy_gc_collect_start_f(wy_context* parent, wy_gc_arena* self)
 }
 
 
+/** A gray worklist of objects marked but not yet scanned for children. */
+typedef struct wy_gc_worklist
+{
+    wy_object** items;
+    wy_uword count;
+    wy_uword capacity;
+} wy_gc_worklist;
+
+static bool worklist_push_(wy_allocator* allocator, wy_gc_worklist* wl, wy_object* object)
+{
+    if (wl->count >= wl->capacity) {
+        wy_uword new_capacity = wy_next_array_capacity(wl->capacity, 256);
+        wy_object** grown = wy_allocator_realloc(allocator, wl->items, new_capacity * sizeof(wy_object*));
+        if (grown == WY_NULL) { return false; }
+        wl->items = grown;
+        wl->capacity = new_capacity;
+    }
+    wl->items[wl->count++] = object;
+    return true;
+}
+
 void wy_gc_object_visit(wy_context* context, wy_object* parent)
 {
-    wy_work_area wa;
+    if (context == WY_NULL || parent == WY_NULL) { return; }
 
-    parent->flags |= WY_GC_FLAG_MARKED;
+    wy_gc_worklist wl = { .items = WY_NULL, .count = 0, .capacity = 0 };
+    wy_allocator* allocator = context->arena.allocator;
 
-    if (wy_object_children_iter_start(context, parent, &wa) != WY_ERR_NONE) { return; }
-    const wy_object* child = WY_NULL;
+    if ((parent->flags & WY_GC_FLAG_MARKED) == 0) {
+        parent->flags |= WY_GC_FLAG_MARKED;
+        if (!worklist_push_(allocator, &wl, parent)) {
+            /* Single root, already marked; nothing pending to abandon. */
+            return;
+        }
+    } else {
+        return;
+    }
 
-    while (wy_object_children_iter_next_f(context, parent, &wa, &child) == WY_ERR_NONE) {
-        WY_ASSERT(child != WY_NULL);
-        if ((child->flags & WY_GC_FLAG_MARKED) == 0 &&
-            (child->flags & WY_GC_STATIC) == 0) {
-            wy_gc_object_visit(context, (wy_object*) child);
+    bool abandoned = false;
+    while (wl.count > 0 && !abandoned) {
+        wy_object* cur = wl.items[--wl.count];
+
+        wy_work_area wa;
+        if (wy_object_children_iter_start(context, cur, &wa) != WY_ERR_NONE) { continue; }
+
+        const wy_object* child = WY_NULL;
+        while (wy_object_children_iter_next_f(context, cur, &wa, &child) == WY_ERR_NONE) {
+            if (child == WY_NULL) { continue; }
+            wy_object* mutable_child = (wy_object*) child;
+            if ((mutable_child->flags & (WY_GC_FLAG_MARKED | WY_GC_STATIC)) != 0) { continue; }
+
+            mutable_child->flags |= WY_GC_FLAG_MARKED;
+            if (!worklist_push_(allocator, &wl, mutable_child)) {
+                context->gc_abandoned = true;
+                abandoned = true;
+                break;
+            }
         }
     }
+
+    wy_allocator_free(allocator, wl.items);
 }
 
 

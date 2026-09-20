@@ -41,7 +41,7 @@ wy_fiber* wy_fiber_create(wy_context* context, wy_uword stack_len, wy_uword fram
 
     /* One extra slot holds the sentinel frame that marks "no active frame". */
     wy_mem_info_init_empty_s(&fiber->frame_memory);
-    if (WY_CONTEXT_MEM_INFO_RESERVE_COUNT(context, &fiber->frame_memory, frame_count + 1, wy_fiber_frame) != WY_ERR_NONE) {
+    if (WY_CONTEXT_MEM_INFO_RESERVE_COUNT(context, &fiber->frame_memory, frame_count + 1, wy_frame) != WY_ERR_NONE) {
         wy_context_gc_free(context, stack);
         wy_context_gc_free(context, fiber);
         return WY_NULL;
@@ -51,11 +51,15 @@ wy_fiber* wy_fiber_create(wy_context* context, wy_uword stack_len, wy_uword fram
 
     fiber->parent = WY_NULL;
     fiber->pending = wy_exec_fn_create_empty();
+    fiber->fault = wy_value_unset();
 
-    fiber->current_frame = WY_MEM_INFO_BEGIN_PTR(wy_fiber_frame, &fiber->frame_memory);
+    fiber->current_frame = WY_MEM_INFO_BEGIN_PTR(wy_frame, &fiber->frame_memory);
+    wy_memset(fiber->current_frame, 0, sizeof(wy_frame));
+    fiber->current_frame->kind = WY_FRAME_NATIVE;
+    fiber->current_frame->ret_kind = WY_RET_RESERVED;
     fiber->current_frame->restore_base = wy_stack_base_f(&fiber->value_stack);
-    fiber->current_frame->fn = wy_exec_fn_create_empty();
-    fiber->current_frame->result_count = 0;
+    fiber->current_frame->native = wy_exec_fn_create_empty();
+    fiber->current_frame->ret_nres = 0;
 
     wy_context_object_init_header_f(context, &fiber->object, &wy_type_fiber);
     return fiber;
@@ -121,6 +125,22 @@ wy_error wy_fiber_exec_f(wy_fiber* self, wy_context* context)
             last_error = fiber_continue_with_return(self);
             break;
 
+        case WY_EXEC_SWITCH:
+            /* The callable already moved context->current_fiber elsewhere
+             * and left this fiber suspended, so its pending must stay
+             * empty - there is no continuation to chain here, unlike
+             * TAIL_CALL/CONTINUE. The while condition below then exits
+             * the loop without touching the frame stack. */
+            if (!wy_exec_fn_is_empty(&self->pending)) {
+                last_error = WY_ERR_INVAL;
+            }
+            break;
+
+        case WY_EXEC_FAULT:
+            /* The callable already set self->fault before returning this. */
+            last_error = WY_ERR_FAULT;
+            break;
+
         default:
             last_error = WY_ERR_INVAL;
         }
@@ -167,8 +187,8 @@ wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn, wy_uword result_co
 {
     WY_ASSERT(self != WY_NULL && !wy_exec_fn_is_empty(&fn));
 
-    wy_fiber_frame* new_frame = self->current_frame + 1;
-    if (!WY_MEM_INFO_TOP_NOT_AT_END(wy_fiber_frame, new_frame, &self->frame_memory)) {
+    wy_frame* new_frame = self->current_frame + 1;
+    if (!WY_MEM_INFO_TOP_NOT_AT_END(wy_frame, new_frame, &self->frame_memory)) {
         return WY_ERR_STACK_OVERFLOW;
     }
 
@@ -176,9 +196,12 @@ wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn, wy_uword result_co
     wy_error last_error = wy_stack_reserve_f(&self->value_stack, result_count);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
-    new_frame->fn = fn;
+    wy_memset(new_frame, 0, sizeof(wy_frame));
+    new_frame->kind = WY_FRAME_NATIVE;
+    new_frame->ret_kind = WY_RET_RESERVED;
+    new_frame->native = fn;
     new_frame->restore_base = wy_stack_base_f(&self->value_stack);
-    new_frame->result_count = result_count;
+    new_frame->ret_nres = (wy_u16) result_count;
 
     wy_stack_base_restore_f(&self->value_stack, wy_stack_top_f(&self->value_stack));
     self->current_frame = new_frame;
@@ -197,13 +220,13 @@ wy_error wy_fiber_pop_continuation_f(wy_fiber* self, wy_exec_fn* out_continuatio
 
     if (wy_fiber_frame_depth_f(self) == 0) { return WY_ERR_EMPTY; }
 
-    wy_fiber_frame* frame = self->current_frame;
+    wy_frame* frame = self->current_frame;
 
     /* Drop arguments and scratch; the reserved results sit just below base. */
     self->value_stack.top = self->value_stack.base;
     wy_stack_base_restore_f(&self->value_stack, frame->restore_base);
 
-    *out_continuation = frame->fn;
+    *out_continuation = frame->native;
     self->current_frame--;
     return WY_ERR_NONE;
 }

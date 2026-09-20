@@ -3,11 +3,13 @@
 #include <wyrm/allocator.h>
 #include <wyrm/bson.h>
 #include <wyrm/context.h>
+#include <wyrm/function.h>
 #include <wyrm/gc_flags.h>
 #include <wyrm/image_loader.h>
 #include <wyrm/machine.h>
 #include <wyrm/string.h>
 #include <wyrm/sys/string.h>
+#include <wyrm/vm.h>
 #include <wyrm/work_area.h>
 
 /* -------------------------------------------------------------------------
@@ -858,6 +860,27 @@ wy_error wy_module_load_bytes(wy_context* context, const wy_u8* data, wy_uword l
     (*out)->image_len = len;
     (*out)->owns_image = take_ownership;
     return WY_ERR_NONE;
+}
+
+wy_error wy_module_run_init(wy_context* context, wy_module* module)
+{
+    if (context == WY_NULL || module == WY_NULL) { return WY_ERR_INVAL; }
+
+    wy_function_proto init_proto = {0};
+    init_proto.code_offset = 0;
+    init_proto.nparams = 0;
+    init_proto.nlocals = module->init_nlocals;
+    init_proto.ncaptures = 0;
+
+    wy_function* init_fn = WY_NULL;
+    wy_error last_error = wy_function_new(context, module, &init_proto, WY_NULL, 0, &init_fn);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+
+    wy_value callee = wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) init_fn);
+    last_error = wy_vm_call_sync(context, callee, WY_NULL, 0, WY_NULL, 0);
+
+    module->state = (last_error == WY_ERR_NONE) ? WY_MODULE_READY : WY_MODULE_FAILED;
+    return last_error;
 }
 
 static void finalize(wy_context* context, wy_object* self_s)

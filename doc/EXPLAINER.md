@@ -125,9 +125,10 @@ src/platform/*                "hosted" = standard C11 malloc/free); platform/*
 
 ### Bytecode / VM state — **the most important thing to know before touching this**
 
-As of epic 1 (`vm_plan/epic_1.md`), this repo loads and inspects real `.wyc`
-module images compiled by `pypoc/` (`pypoc/.venv/bin/wyrm --build-bc`), but
-still executes nothing. See `doc/vm_impl.md` for the file-by-file map, the
+As of epic 2 (`vm_plan/epic_2.md`), `wyrm file.wyc` actually runs: the
+dispatch loop executes real `.wyc` module images compiled by `pypoc/`
+(`pypoc/.venv/bin/wyrm --build-bc`), linked against a builtins module for
+`println`/`print`. See `doc/vm_impl.md` for the file-by-file map, the
 `wy_module` table layout, and how to run one fixture; this section is the
 short version.
 
@@ -144,25 +145,54 @@ points into the caller's buffer. `src/module.c` (`wy_module_load_image` /
 `wy_module_load_bytes`) decodes every section into the `wy_module` in
 `include/wyrm/module.h`: globals (all Unset), statics, symbols, function and
 class prototypes, message identities, and the exports/free name→slot dicts.
-Every table index is bounds-checked at load. **Nothing runs yet**: no
-builtin fill, no `import`, and no init call — `src/vm.c`'s
-`wy_vm_exec_bytecode` is still a stub that returns `WY_ERR_INVAL`
-unconditionally. That interpreter loop, the three-layer name fill, and
-running word offset 0 as the module init call are epic 2
-(`vm_plan/epic_2.md`).
+Every table index is bounds-checked at load.
+
+`src/vm.c`'s `wy_vm_run` is the dispatch loop (design_c_vm.md §2): a
+`reload:`-labeled loop over `wy_frame` records (`include/wyrm/frame.h`)
+laid out `[P][L]` on the fiber's single value stack, with no C recursion —
+bytecode-to-bytecode calls/returns loop internally; a native call, a fault,
+or unwinding back to the nearest native frame is what yields control back
+to the fiber trampoline. It implements every opcode `hello`/`hello_1/2/3`/
+`arith`/`control_flow`/`multiret` (the epic 2 target set) use: loads,
+moves, globals (`gget`/`gset`, fault on Unset), jumps (`jf`/`jt`/`jerr`/
+`jnerr`/`jmp`, compact and wide), arithmetic/comparison (`src/vm_ops.c`,
+pinned against pypoc's `BINOPS`: `/` is always true division producing a
+float, div/mod-by-zero and negative shifts produce an *error value* not a
+fault), `is` (primitive-type-name form only), `call` (FUNCTION and leaf
+NATIVE), `closure` (0 captures only). Captures, tuples/lists/dicts,
+classes/messages, imports, coroutines, and defers are epic 3+ — calling
+into any of that faults cleanly with a "not supported until epic N"
+message rather than misbehaving.
+
+`src/link.c` (`wy_link_fill_from_builtins`) implements layer 3 of the
+three-layer name fill (wyc-format.md §7.2) — filling a module's free-name
+slots from the builtins module's exports; layers 1/2 (own definitions,
+`import`/`import_star`) are epic 2/M6. `src/builtin/builtins.c`
+(`wy_builtins_new`) is the builtins module itself: `println`/`print` as
+leaf natives writing through `ctx->io.write`, plus a `nil` constant.
+`wy_module_run_init` (`src/module.c`) builds a synthetic zero-arg init
+`wy_function_proto` for a module's word-offset-0 code and runs it via
+`wy_vm_call_sync`.
 
 `./buildDir/src/wyrm/wyrm file.wyc --sections` prints a one-line per-section
 summary; `--disasm` prints one line per instruction (mnemonic + raw
-operands, no symbol resolution yet); with neither flag it loads the module
-and prints `not run: interpreter lands in epic 2`. `scripts/check_disasm.sh`
-diffs `--disasm`'s mnemonics against every fixture's compiler-emitted
-`.wy_a` listing.
+operands, no symbol resolution yet); with neither flag it links against
+builtins and actually runs the module's init, printing whatever it
+`print`s/`println`s to stdout (or a fault message to stderr, exit 1) —
+`./buildDir/src/wyrm/wyrm test/bytecode/hello.wyc` prints `Hello World`.
+`scripts/check_disasm.sh` diffs `--disasm`'s mnemonics against every
+fixture's compiler-emitted `.wy_a` listing. `src/test/test_bytecode_golden.cpp`
+(meson suites `golden`/`golden-gcstress`) is the automated version of the
+same check for the seven fixtures above, output captured via
+`ctx->io.write` and diffed against the corpus's committed `.out`.
 
-Practical implication: if you're asked to "run a `.wy` script" end-to-end
-with no Python, that still needs epic 2's interpreter loop. Today, running
-anything happens either through pypoc (`pypoc/.venv/bin/wyrm file.wy`) or,
-on the C side, by embedding via the C API and driving fibers with native
-`wy_exec_fn` C callables directly (see `src/test/test_wvm.cpp`'s "a bytecode
+Practical implication: running a `.wy` script still needs `pypoc` to
+*compile* it first (`pypoc/.venv/bin/wyrm --build-bc`) — this repo has no
+front end of its own yet (that's Phase C, epics 8-11) — but once compiled,
+`wyrm file.wyc` runs it with no Python involved, for anything within epic
+2's opcode coverage above. For anything past that (closures with captures,
+classes, imports, coroutines...), embed via the C API and drive fibers
+with native `wy_exec_fn` C callables directly (see `src/test/test_wvm.cpp`'s "a bytecode
 callable resolves its module and returns" for the shape of that path).
 
 ### Call/stack model
@@ -204,14 +234,16 @@ external, already-built `wyrm` install per AGENTS.md's guidance).
   (doctest framework), regardless of which module directory they live in.
 - Fixtures under `src/test/test_common/*.h` (allocator/context/fiber/machine/
   main-loop fixtures) are shared setup for doctest cases.
-- 47 test cases currently, all passing (`meson test -C buildDir`), covering:
-  allocators (static/cmem/hosted), atomics, bson, class/slot basics,
-  context/module registration, fiber frame/continuation/tail-call mechanics,
-  gc tracking, machine init, stack push/pop, string/box/table/pair
-  primitives, and the glib main-loop integration. Nothing yet exercises
-  `src/vm.c` opcode execution beyond what's implicit in fiber tests — there's
-  no dedicated "run this bytecode and check the result" test, consistent
-  with the VM loop being unimplemented.
+- 161 test cases / 15132 assertions currently, all passing (`meson test -C
+  buildDir`), covering: allocators (static/cmem/hosted), atomics, bson,
+  class/slot basics, context/module registration, fiber frame/continuation/
+  tail-call mechanics, symbol interning, the heap object kinds
+  (tuple/list/bytes/error/function/native), iterative GC (including a
+  10k-object chain and a gc_threshold=0 stress mode), the native call
+  bridge, the dispatch loop's opcodes (hand-packed, `src/test/test_wvm.cpp`),
+  builtins/link/module-init, and the golden corpus (`golden`/
+  `golden-gcstress` meson suites, `src/test/test_bytecode_golden.cpp`) —
+  real `.wyc` fixtures run end-to-end and diffed against committed `.out`.
 
 ## Conventions Worth Knowing (see AGENTS.md for the full list)
 

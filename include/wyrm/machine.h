@@ -5,17 +5,16 @@
 #include <wyrm/sys/errors.h>
 #include <wyrm/fwd.h>
 #include <wyrm/symtab_entry.h>
+#include <wyrm/symtab.h>
 
 WY_BEGIN_DECLS
-
-struct wy_machine_symtab;
 
 struct wy_machine
 {
     wy_allocator* allocator;
     wy_context* context;
 
-    struct wy_machine_symtab* symtab;
+    wy_symtab symtab;
 };
 
 

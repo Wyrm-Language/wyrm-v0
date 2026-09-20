@@ -40,12 +40,21 @@ void wy_context_init_s(wy_context* self)
 {
     self->parent = WY_NULL;
     self->root_module = WY_NULL;
+    self->builtins = WY_NULL;
     self->current_fiber = WY_NULL;
     self->main_loop = WY_NULL;
     self->wakeable_source = wy_primitive_null();
 
     wy_mem_info_init_empty_s(&self->module_memory);
     self->module_count = 0;
+
+    self->gc_pressure = 0;
+    self->gc_threshold = WY_CONTEXT_GC_THRESHOLD_DEFAULT;
+    self->gc_abandoned = false;
+    self->root_count = 0;
+
+    self->io.write = WY_NULL;
+    self->io.ud = WY_NULL;
 
     wy_gc_init_f(&self->arena, WY_NULL);
 }
@@ -156,7 +165,22 @@ void wy_context_detach_loop(wy_context* self)
 wy_error wy_context_exec(wy_context* self)
 {
     if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
-    return wy_fiber_exec_f(self->current_fiber, self);
+
+    /* wy_fiber_exec_f drives one fiber until its own pending queue is
+     * empty, which includes the case where a WY_EXEC_SWITCH callable moved
+     * self->current_fiber elsewhere. Loop here so a switch resumes on
+     * whichever fiber is now current (design_c_vm.md §3; no coroutines
+     * exist yet to actually produce a switch, but the loop shape lands
+     * with this milestone). Stops once the fiber we just ran is still
+     * current, i.e. nothing switched. */
+    wy_fiber* last_run = WY_NULL;
+    wy_error last_error = WY_ERR_NONE;
+    while (self->current_fiber != WY_NULL && self->current_fiber != last_run) {
+        last_run = self->current_fiber;
+        last_error = wy_fiber_exec_f(last_run, self);
+        if (last_error != WY_ERR_NONE) { break; }
+    }
+    return last_error;
 }
 
 
@@ -190,18 +214,15 @@ wy_error wy_context_activate(wy_context* self, wy_fiber* fiber)
 wy_error wy_context_intern(wy_context* context, const char* text, wy_uword len, wy_symbol* out)
 {
     if (context == WY_NULL || text == WY_NULL || out == WY_NULL) { return WY_ERR_INVAL; }
-    // The scaffold symtab (src/machine.c) takes a NUL-terminated cstr and
-    // caps entries at 127 bytes; epic 2 replaces it with a real symtab that
-    // enforces wyc-format.md §8.4's 31-codepoint significant prefix instead.
-    if (len >= 127) { return WY_ERR_RANGE; }
 
-    char buffer[128];
-    wy_memcpy(buffer, text, len);
-    buffer[len] = '\0';
+    wy_machine* machine = wy_context_get_machine(context);
+    if (machine == WY_NULL) { return WY_ERR_INVAL; }
 
-    wy_error last_error = wy_machine_insert_symbol(wy_context_get_machine(context), buffer, out);
-    if (last_error == WY_ERR_EXISTS) { return WY_ERR_NONE; }
-    return last_error;
+    wy_symbol interned = wy_symtab_intern(&machine->symtab, text, len);
+    if (interned == WY_SYMBOL_INVALID) { return WY_ERR_NOMEM; }
+
+    *out = interned;
+    return WY_ERR_NONE;
 }
 
 
@@ -210,7 +231,9 @@ void* wy_context_gc_alloc(wy_context* context, wy_uword dsize)
     wy_machine* machine = wy_context_get_machine(context);
     if (machine == WY_NULL) { return WY_NULL; }
 
-    return wy_allocator_alloc(machine->allocator, dsize);
+    void* ptr = wy_allocator_alloc(machine->allocator, dsize);
+    if (ptr != WY_NULL) { context->gc_pressure += dsize; }
+    return ptr;
 }
 
 
@@ -248,6 +271,7 @@ void wy_context_object_init_header_f(wy_context* context, wy_object* object, con
 
 void wy_context_gc_full_run(wy_context* context)
 {
+    context->gc_abandoned = false;
     wy_gc_collect_start_f(context, &context->arena);
 
     if (context->current_fiber != WY_NULL) {
@@ -258,13 +282,57 @@ void wy_context_gc_full_run(wy_context* context)
         wy_gc_object_visit(context, (wy_object*) context->root_module);
     }
 
+    if (context->builtins != WY_NULL) {
+        wy_gc_object_visit(context, (wy_object*) context->builtins);
+    }
+
     /* Registered modules are reachable by id alone, so they are roots. */
     wy_module** modules = WY_MEM_INFO_BEGIN_PTR(wy_module*, &context->module_memory);
     for (wy_uword i = 0; i < context->module_count; i++) {
         wy_gc_object_visit(context, (wy_object*) modules[i]);
     }
 
+    /* C code holding a fresh value across allocations. */
+    for (wy_uword i = 0; i < context->root_count; i++) {
+        if (wy_value_is_gc_ref_f(*context->roots[i])) {
+            wy_gc_object_visit(context, context->roots[i]->data.gc_object);
+        }
+    }
+
+    if (context->gc_abandoned) {
+        /* A worklist growth failure means some reachable objects were never
+         * marked; sweeping now would free live objects, so skip it. Marks
+         * are cleared again by the next collect_start regardless. */
+        return;
+    }
+
     wy_gc_collect_finish_f(context, &context->arena);
+    context->gc_pressure = 0;
+}
+
+
+void wy_context_gc_safepoint(wy_context* context)
+{
+    if (context == WY_NULL) { return; }
+    if (context->gc_pressure > context->gc_threshold) {
+        wy_context_gc_full_run(context);
+    }
+}
+
+
+wy_error wy_context_root_push_f(wy_context* context, wy_value* slot)
+{
+    WY_ASSERT(context != WY_NULL && slot != WY_NULL);
+    if (context->root_count >= WY_CONTEXT_ROOT_STACK_LEN) { return WY_ERR_STACK_OVERFLOW; }
+    context->roots[context->root_count++] = slot;
+    return WY_ERR_NONE;
+}
+
+
+void wy_context_root_pop_f(wy_context* context)
+{
+    WY_ASSERT(context != WY_NULL);
+    if (context->root_count > 0) { context->root_count--; }
 }
 
 /**

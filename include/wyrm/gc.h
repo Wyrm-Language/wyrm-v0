@@ -23,6 +23,19 @@ void wy_gc_free(wy_gc_arena* arena, void* ptr);
 void wy_gc_track(wy_gc_arena* context, wy_object* gc_info);
 
 void wy_gc_collect_start_f(wy_context* parent, wy_gc_arena* self);
+
+/**
+ * Mark `parent` and everything reachable from it
+ *
+ * Iterative (gray worklist), not recursive: a stack of pending objects is
+ * grown via the context's allocator as marking proceeds. If the worklist
+ * cannot grow (allocator failure), the collection in progress is abandoned
+ * - `wy_context_gc_full_run` skips the sweep for that cycle rather than
+ * freeing objects this visit never reached, which would free live objects.
+ *
+ * @param context Context whose current cycle this visit belongs to
+ * @param parent Root object to mark, may be WY_NULL (no-op)
+ */
 void wy_gc_object_visit(wy_context* context, wy_object* parent);
 void wy_gc_collect_finish_f(wy_context* parent, wy_gc_arena* self);
 

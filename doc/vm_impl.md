@@ -7,11 +7,32 @@ Basic Stuff:
   - all functions namespaced with wy_ followed by the module (wy_fiber, wy_context, etc...)
   - all preprocessor macros use WY_ namespace in all caps (WY_)
 
-## Agent map (epic 1: toolchain, conformance corpus, image loader)
+## Agent map (epic 2: foundations and core interpreter)
 
-Read this before touching the loader. `vm_plan/README.md` and the current
-`vm_plan/epic_N.md` are the plan; this table is where each piece of it
-actually lives.
+Read this before touching the interpreter. `vm_plan/README.md` and the
+current `vm_plan/epic_N.md` are the plan; this table is where each piece
+of it actually lives. Epic 1's own map (loader-only) follows below it.
+
+| File | Responsibility |
+|---|---|
+| `include/wyrm/primitive.h` | `wy_type_tag`: NIL, BOOL, WORD, UWORD, FLOAT, SYMBOL, PTYPE, then the object-bearing tags (ERROR, PAIR, ..., TUPLE, LIST, BYTES, FUNCTION, NATIVE, INSTANCE, MESSAGE, BOUND_MSG, COROUTINE, ITER). |
+| `include/wyrm/value.h` | Constructors/accessors for every tag; `wy_value_is_error` (true for a realised error object **and Unset itself** - this is what `jerr`/`jnerr`/`?=` rely on, don't "fix" it to exclude Unset); `wy_value_truthy` (defined in `src/string.c`, not inline - needs `wy_string`'s complete type). |
+| `include/wyrm/symtab.h`, `src/symtab.c` | Real interning hash keyed on the wyc-format.md §8.4 31-codepoint significant prefix, FNV-1a, open addressing. Replaces the old 8KB scaffold in `src/machine.c`; `wy_context_intern` (`src/context.c`) is still the one entry point. |
+| `include/wyrm/{tuple,list,bytes,error,function,native}.h` + matching `.c` | The six new GC-tracked heap object kinds (design_c_vm.md §4). `wy_bytes` is a placeholder for epic 7's `bytes` type - no language surface yet. |
+| `include/wyrm/gc.h`, `src/gc.c` | Iterative mark (gray worklist, not recursive); abandons the sweep (not just the visit) if the worklist can't grow, so a partial mark never frees a live object. |
+| `include/wyrm/context.h`, `src/context.c` | `gc_pressure`/`gc_threshold` + `wy_context_gc_safepoint` (checked once per dispatch-loop instruction); `roots[64]` + `wy_context_root_push_f`/`pop_f` for C code holding a fresh value across allocations; `io.write`/`io.ud` output hook; `builtins` field (a GC root). |
+| `include/wyrm/frame.h` | `wy_frame`: tagged native/bytecode call frame, replacing the old `wy_fiber_frame`. `wy_fiber_push_frame_f`/`pop_continuation_f`/`tail_call_f` (`src/fiber.c`) use only its native-frame fields (`native`, `ret_nres`, `restore_base`) with no behavioral change from before this type existed. |
+| `include/wyrm/exec_fn.h` | `wy_exec_state` gained `WY_EXEC_SWITCH`/`WY_EXEC_FAULT`; `wy_fiber_exec_f` (`src/fiber.c`) surfaces a fault as `WY_ERR_FAULT` (`fiber->fault` readable) and stops driving a fiber that switched away; `wy_context_exec` (`src/context.c`) loops across switches. |
+| `src/vm.c` | `wy_vm_run`: the dispatch loop (design_c_vm.md §2) - a `reload:`-labeled loop over `wy_frame`s, no C recursion. `wy_vm_call_sync` (host/loader entry point) lives here too, moved up from its planned epic-2/M5 slot because M4's own tests need it. |
+| `src/vm_ops.c` | Arithmetic/comparison/`is`/unary semantics, pinned against `pypoc/wypoc/wyrm_eval_parse_tree.py`'s `BINOPS` table: `/` is always true division (float even for two ints), div/mod-by-zero and negative shifts produce an **error value**, not a fault. |
+| `src/vm_call.c`, `src/vm_internal.h` | Native call bridge: `wy_vm_call_leaf_f` (inline leaf call), `wy_vm_call_exec_push_f`/`wy_vm_native_await_complete_f` (exec-native reservation bridge, built but not yet reachable from bytecode - `call` on an exec NATIVE faults "not supported until epic 3+"). Register accessors (`wy_vm_reg_f`/`reg8_f`) and the window backfill helper. |
+| `src/builtin/builtins.c`, `include/wyrm/builtins.h` | `wy_builtins_new`: a synthetic `wy_module` (`state = WY_MODULE_BUILTIN`) exporting `println`/`print` (leaf natives) and `nil`. |
+| `src/link.c`, `include/wyrm/link.h` | `wy_link_fill_from_builtins`: layer 3 only (wyc-format.md §7.2) - fills a module's free-name slots from builtins' exports. Layers 1/2 (own definitions, `import`/`import_star`) are epic 2/M6. |
+| `src/module.c` | `wy_module_run_init` (new, epic 2/M5): builds a synthetic zero-arg init `wy_function_proto` for a module's word-offset-0 code and runs it via `wy_vm_call_sync`, setting `state` to READY/FAILED. |
+| `src/wyrm/main.c` | The `wyrm` CLI's no-flag path now actually runs a module: creates a fiber, installs a real stdout `io.write`, builds+stores `context->builtins`, links, runs init, prints a fault message on error. |
+| `src/test/test_bytecode_golden.cpp` | `golden`/`golden-gcstress` meson suites: loads, links and runs each of the seven epic-2 target fixtures' real `.wyc`, diffs captured output against the corpus's `.out`. The strongest available regression check for the interpreter. |
+
+## Agent map (epic 1: toolchain, conformance corpus, image loader)
 
 | File | Responsibility |
 |---|---|
@@ -89,14 +110,16 @@ scripts/sync_pypoc_headers.py
 meson compile -C buildDir
 ./buildDir/src/wyrm/wyrm test/bytecode/hello.wyc --sections   # section summary
 ./buildDir/src/wyrm/wyrm test/bytecode/hello.wyc --disasm     # one line per instruction
-./buildDir/src/wyrm/wyrm test/bytecode/hello.wyc              # loads only: "not run: interpreter lands in epic 2"
+./buildDir/src/wyrm/wyrm test/bytecode/hello.wyc              # runs it: prints "Hello World"
 ```
 
 To iterate on the loader against one doctest case without running the whole suite:
 
 ```
 meson test -C buildDir --suite loader                          # every manifest .wyc loads
+meson test -C buildDir --suite golden                           # the seven epic-2 fixtures run end-to-end
 ./buildDir/src/test/test_cwyrm --test-suite="module"            # exact-value assertions
+./buildDir/src/test/test_cwyrm --test-suite="golden"            # same, doctest-only
 ./buildDir/src/test/test_cwyrm --test-case="*hello*"
 ```
 
@@ -104,20 +127,37 @@ meson test -C buildDir --suite loader                          # every manifest 
 disassembler against the corpus's `.wy_a` files; run it directly for a verbose diff on
 mismatch.
 
-## Known gaps left for epic 2
+## Known gaps left for epic 3+
 
-- **Big-endian hosts are rejected.** `wy_module_load_image` refuses to load
-  (`WY_ERR_IMAGE`) on a big-endian host rather than byte-swapping `code`;
-  nothing in this codebase currently runs on one, so it is untested rather
-  than actively broken.
-- **The scaffold symtab caps a symbol at 127 bytes** and does not yet
-  enforce wyc-format.md §8.4's 31-codepoint significant-prefix rule (it
-  compares full byte content). Fine for every symbol in the current corpus;
-  epic 2's real symtab must fix both.
-- **`wy_float` may be single-precision.** BSON `double` is always 8-byte
-  IEEE-754 binary64; on a 32-bit-cell build `wy_float` is `float`, so a
-  static double value loses precision. Harmless until epic 2 does float
-  arithmetic on such a build.
-- **Binary statics have no real type.** They load as a `wy_string` flagged
-  `WY_GC_FLAG_BINARY`; nothing reads that flag yet. Epic 7's `bytes` type
-  replaces this.
+Epic 1's gaps (big-endian hosts, the 127-byte scaffold symtab) are closed:
+the real symtab (`include/wyrm/symtab.h`) has no length cap and enforces
+the 31-codepoint significant-prefix rule; big-endian rejection is still in
+place (no byte-swap implemented) but that was always the intended fix, not
+a gap. `wy_float`-on-32-bit precision and binary statics having no real
+type are unchanged (still open, epic 7's `bytes` type is the fix for the
+latter).
+
+- **Captures, tuples/lists/dicts, classes/messages, imports, coroutines,
+  defers are all epic 3+.** The dispatch loop faults cleanly ("not
+  supported until epic N") rather than misbehaving on any bytecode that
+  needs them - `closure` with `ncaps > 0`, `call` on an exec NATIVE from
+  bytecode, `tuple`/`list`/`dict`/`plist`, `getattr`/`setattr`/`getslot`/
+  `setslot`, `msg`/`super`/`class`, `import`/`import_star`, `yield`.
+- **`gget` faults on *any* Unset slot**, not just a free slot specifically
+  (design_c_vm.md's own text says "fault on Unset *free* slot"; the format
+  spec's plain-language rule is "gget on it faults the way reading any
+  declared-but-unassigned variable does" for *any* unset global - the
+  looser, simpler rule this epic implements). No ambiguity-marker handling
+  either (nothing produces one yet - that's epic 2/M6's wildcard imports).
+- **No `packed_ops.h`/`pypoc/tools/generate_c_fixtures.py`.** The
+  pypoc-generated hand-packed-fixture pipeline design_c_vm.md §9a
+  describes was not built; `src/test/test_wvm.cpp` hand-packs instruction
+  words directly instead, covering the same ground for this epic's opcode
+  set. Worth building properly before epic 3 adds many more opcodes to
+  hand-pack by hand.
+- **Argument binding is fast-path only**: `argc == nparams`, no defaults,
+  no `*args`/`**kwargs`. Anything else faults with `WY_ERR_ARITY`. The
+  slow path (`frame.py:build_pframe`'s full binding logic) is epic 3.
+- **`wy_vm_call_continue`** (natives calling back into the VM) is declared
+  but returns `WY_ERR_NOSUPPORT` unconditionally - needed once epic 3+
+  gives natives a reason to re-enter bytecode (e.g. `__iter__` dispatch).

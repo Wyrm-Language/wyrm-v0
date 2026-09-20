@@ -29,6 +29,20 @@ typedef enum wy_exec_state_tag
     /// be based on only the call of this function. preserve count must
     /// be set to the desired count of pushed arguments for the call.
     WY_EXEC_TAIL_CALL,
+
+    /// The context's current fiber has been switched to a different one
+    ///
+    /// The callable already updated context->current_fiber before
+    /// returning this; the fiber it was running (self) is left suspended
+    /// with an empty pending, so the trampoline stops driving it and
+    /// wy_context_exec resumes on whichever fiber is now current.
+    WY_EXEC_SWITCH,
+
+    /// The fiber unwound with an unhandled fault
+    ///
+    /// The callable already set fiber->fault before returning this.
+    /// wy_fiber_exec_f surfaces it as WY_ERR_FAULT.
+    WY_EXEC_FAULT,
 } wy_exec_state;
 
 /**

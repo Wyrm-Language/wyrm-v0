@@ -2,6 +2,8 @@ cfg = configuration_data()
 
 doctest_dep = dependency('doctest', fallback: ['doctest', 'doctest_dep'], required: get_option('tests'))
 glib_dep = dependency('glib-2.0', version: '>=2.56', required: get_option('glib'))
+cc_compiler = meson.get_compiler('c')
+libm_dep = cc_compiler.find_library('m', required: false)
 
 
 # -----------------------------------------------------------------------------
@@ -12,14 +14,24 @@ cwyrm_lib_inc = include_directories('.', '../include')
 
 cwyrm_sources = files(
     'bson.c',
+    'bytes.c',
     'context.c',
+    'error.c',
     'fiber.c',
+    'function.c',
     'gc.c',
     'image.c',
+    'link.c',
+    'list.c',
     'machine.c',
     'module.c',
+    'native.c',
     'pair.c',
     'slot.c',
+    'symtab.c',
+    'tuple.c',
+    'vm_call.c',
+    'vm_ops.c',
     'wbox.c',
     'wclass.c',
     'wdict.c',
@@ -104,7 +116,7 @@ subdir('builtin')
 cwyrm_lib = library('cwyrm',
     cwyrm_sources + extra_sources,
     include_directories: [cwyrm_lib_inc] + extra_inc,
-    dependencies: extra_deps,
+    dependencies: extra_deps + [libm_dep],
     install: true,
 )
 

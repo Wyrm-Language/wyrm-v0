@@ -205,6 +205,19 @@ wy_error wy_module_load_image(wy_context* context, const wy_module_image* image,
  */
 wy_error wy_module_load_bytes(wy_context* context, const wy_u8* data, wy_uword len, bool take_ownership, wy_module** out);
 
+/**
+ * Load step 6 (wyc-format.md §7.1): run the module's top-level init code -
+ * word offset 0 of `code`, a zero-argument, zero-capture call with
+ * `nlocals = init_nlocals` - synchronously via wy_vm_call_sync.
+ *
+ * On success sets `module->state = WY_MODULE_READY`; on a fault sets it to
+ * WY_MODULE_FAILED (the fault value is left on `context->current_fiber->fault`
+ * for the caller to inspect, per wy_vm_call_sync's contract).
+ *
+ * @return WY_ERR_NONE, WY_ERR_FAULT, or whatever wy_vm_call_sync/wy_function_new returned
+ */
+wy_error wy_module_run_init(wy_context* context, wy_module* module);
+
 WY_END_DECLS
 
 #endif

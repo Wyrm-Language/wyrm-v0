@@ -19,17 +19,18 @@ WY_BEGIN_DECLS
 typedef enum wy_type_tag
 {
     WY_TYPE_TAG_NIL = 0,
-
+    WY_TYPE_TAG_BOOL,    ///< data.flag
     WY_TYPE_TAG_WORD,
     WY_TYPE_TAG_UWORD,
     WY_TYPE_TAG_FLOAT,   ///< IEEE-754 binary64 (binary32 on a single-precision wy_float build); data.fp
-    WY_TYPE_TAG_BOOL,    ///< data.flag
 
     WY_TYPE_TAG_SYMBOL,
 
+    WY_TYPE_TAG_PTYPE,   ///< a primitive-type value (e.g. as used in dispatch/cast); data.uword = the tag it names
+
     WY_TYPE_TAG_GC_PATH_START,
 
-    WY_TYPE_TAG_ERROR,
+    WY_TYPE_TAG_ERROR,   ///< data.gc_object: wy_error_obj*, or NULL for Unset
     WY_TYPE_TAG_PAIR,
     WY_TYPE_TAG_BOX,
     WY_TYPE_TAG_OBJECT,
@@ -38,8 +39,18 @@ typedef enum wy_type_tag
     WY_TYPE_TAG_DTYPE,
     WY_TYPE_TAG_CLASS,
     WY_TYPE_TAG_MODULE,
+    WY_TYPE_TAG_TABLE,   ///< dict
 
-    WY_TYPE_TAG_TABLE
+    WY_TYPE_TAG_TUPLE,
+    WY_TYPE_TAG_LIST,
+    WY_TYPE_TAG_BYTES,
+    WY_TYPE_TAG_FUNCTION,
+    WY_TYPE_TAG_NATIVE,
+    WY_TYPE_TAG_INSTANCE,
+    WY_TYPE_TAG_MESSAGE,
+    WY_TYPE_TAG_BOUND_MSG,
+    WY_TYPE_TAG_COROUTINE,
+    WY_TYPE_TAG_ITER,
 } wy_type_tag;
 
 

@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <wyrm/box.h>
+#include <wyrm/pair.h>
 #include <wyrmxx/core.h>
 #include <test_common/test_context_fixture.h>
 
@@ -96,5 +97,81 @@ TEST_SUITE("wgc") {
         REQUIRE(arena_contains(arena, &inner->object));
         REQUIRE_FALSE(arena_contains(arena, &dead->object));
         (void) arena_check_count(arena);
+    }
+
+    TEST_CASE("mark walks a 10k-deep pair chain without recursion") {
+        test_context_fixture fix;
+        wy_context* context = fix.get_context_ptr();
+        wy_gc_arena* arena = arena_of(fix);
+
+        const wy_uword chain_len = 10000;
+        wy_pair* head = wy_pair_new_f(context);
+        REQUIRE_NE(head, WY_NULL);
+        wy_pair* tail = head;
+        for (wy_uword i = 1; i < chain_len; i++) {
+            wy_pair* next = wy_pair_new_f(context);
+            REQUIRE_NE(next, WY_NULL);
+            tail->cdr = wy_value_object(WY_TYPE_TAG_PAIR, &next->object);
+            tail = next;
+        }
+
+        /* head is the only externally-held reference; everything else is
+         * reachable only by walking cdr chains, so a recursive visit at
+         * this depth would blow the C stack if one were still used. */
+        wy_gc_collect_start_f(context, arena);
+        wy_gc_object_visit(context, &head->object);
+        wy_gc_collect_finish_f(context, arena);
+
+        REQUIRE(arena_contains(arena, &head->object));
+        REQUIRE(arena_contains(arena, &tail->object));
+        REQUIRE_FALSE(context->gc_abandoned);
+    }
+
+    TEST_CASE("gc_threshold = 0 collects at every safepoint and existing objects survive it") {
+        test_context_fixture fix;
+        wy_context* context = fix.get_context_ptr();
+        wy_gc_arena* arena = arena_of(fix);
+
+        context->gc_threshold = 0;
+
+        wy_pair* rooted = wy_pair_new_f(context);
+        REQUIRE_NE(rooted, WY_NULL);
+        wy_value rooted_value = wy_value_object(WY_TYPE_TAG_PAIR, &rooted->object);
+        REQUIRE_EQ(wy_context_root_push_f(context, &rooted_value), WY_ERR_NONE);
+
+        /* Every allocation below crosses the (zero) threshold; the rooted
+         * pair must still be alive afterward. */
+        for (int i = 0; i < 50; i++) {
+            wy_box* scratch = WY_NULL;
+            REQUIRE_EQ(wy_box_new_f(context, &scratch), WY_ERR_NONE);
+            wy_context_gc_safepoint(context);
+        }
+
+        REQUIRE(arena_contains(arena, &rooted->object));
+        wy_context_root_pop_f(context);
+    }
+
+    TEST_CASE("root push/pop protects an object across a forced collection") {
+        test_context_fixture fix;
+        wy_context* context = fix.get_context_ptr();
+        wy_gc_arena* arena = arena_of(fix);
+
+        wy_box* protected_box = WY_NULL;
+        REQUIRE_EQ(wy_box_new_f(context, &protected_box), WY_ERR_NONE);
+        wy_value protected_value = box_value(protected_box);
+
+        wy_box* unrooted = WY_NULL;
+        REQUIRE_EQ(wy_box_new_f(context, &unrooted), WY_ERR_NONE);
+        const wy_object* unrooted_obj = &unrooted->object;
+
+        REQUIRE_EQ(wy_context_root_push_f(context, &protected_value), WY_ERR_NONE);
+        wy_context_gc_full_run(context);
+
+        REQUIRE(arena_contains(arena, &protected_box->object));
+        REQUIRE_FALSE(arena_contains(arena, unrooted_obj));
+
+        wy_context_root_pop_f(context);
+        wy_context_gc_full_run(context);
+        REQUIRE_FALSE(arena_contains(arena, &protected_box->object));
     }
 }

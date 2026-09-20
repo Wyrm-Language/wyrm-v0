@@ -36,6 +36,8 @@ enum wy_error {
     WY_ERR_NOSUPPORT,     ///< Operation not supported by this backend
     WY_ERR_IMAGE,         ///< Malformed .wyc module image (pypoc/doc/wyc-format.md)
     WY_ERR_LINK,          ///< Module linking/loading failed after a well-formed image parsed
+    WY_ERR_FAULT,         ///< A fiber unwound with an unhandled fault; see fiber->fault
+    WY_ERR_ARITY,         ///< Wrong argument count for a callable
 };
 
 #ifndef __cplusplus
