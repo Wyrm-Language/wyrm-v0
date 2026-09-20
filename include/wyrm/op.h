@@ -31,8 +31,6 @@ WY_INLINE bool wy_op_eq(wy_context* context, wy_type_tag lhst, wy_primitive lhs,
         return lhs.word == rhs.word;
     case WY_TYPE_TAG_STR:
         return wy_string_eq_f(lhs.str, rhs.str);
-    case WY_TYPE_TAG_FUNCTION:
-        return lhs.cb == rhs.cb;
 
     case WY_TYPE_TAG_TABLE:
     case WY_TYPE_TAG_BOX:

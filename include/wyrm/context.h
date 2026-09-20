@@ -20,6 +20,9 @@ struct wy_context
     wy_main_loop* main_loop;
     wy_primitive wakeable_source;
     wy_gc_arena arena;
+
+    wy_mem_info module_memory;
+    wy_uword module_count;
 };
 
 void wy_context_init_s(wy_context* self);
@@ -27,7 +30,7 @@ void wy_context_finalize_f(wy_context* self);
 
 wy_error wy_context_set_root(wy_context* context, wy_module* module);
 
-
+wy_error wy_context_module_register(wy_context* self, wy_module* module, wy_uword* out_module_id);
 
 wy_error wy_context_attach_loop(wy_context* context, wy_main_loop* loop);
 void wy_context_detach_loop(wy_context* context);
@@ -129,14 +132,26 @@ WY_INLINE wy_error wy_context_push(wy_context* self, wy_value value)
 }
 
 /**
- * Set the function the current fiber runs next
+ * Set the callable the current fiber runs next
  */
 WY_INLINE wy_error wy_context_set_pending(wy_context* self, wy_exec_fn pending)
 {
     if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
-    if (self->current_fiber->pending != WY_NULL) { return WY_ERR_BUSY; }
+    if (wy_exec_fn_is_empty(&pending)) { return WY_ERR_INVAL; }
+    if (!wy_exec_fn_is_empty(&self->current_fiber->pending)) { return WY_ERR_BUSY; }
     self->current_fiber->pending = pending;
     return WY_ERR_NONE;
+}
+
+/**
+ * Set the C function the current fiber runs next
+ *
+ * @see wy_context_set_pending
+ */
+WY_INLINE wy_error wy_context_set_pending_c_call(wy_context* self, wy_exec_fn_c_call pending)
+{
+    if (pending == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_context_set_pending(self, wy_exec_fn_create(pending, wy_primitive_null()));
 }
 
 /**
@@ -172,7 +187,18 @@ WY_INLINE bool wy_context_set_result(wy_context* self, wy_uword index, wy_value 
  * The top `arg_count` values become the arguments. `fn` inherits this call's
  * reserved return slots and the written count is reset.
  */
-WY_INLINE wy_error wy_context_tail_call(wy_context* self, wy_exec_fn fn, wy_uword arg_count)
+WY_INLINE wy_error wy_context_tail_call(wy_context* self, wy_exec_fn_c_call fn, wy_uword arg_count)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_tail_call_c_call_f(self->current_fiber, fn, arg_count);
+}
+
+/**
+ * Reuse the current call's frame to call the callable `fn`
+ *
+ * @see wy_context_tail_call
+ */
+WY_INLINE wy_error wy_context_tail_call_exec_fn(wy_context* self, wy_exec_fn fn, wy_uword arg_count)
 {
     if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
     return wy_fiber_tail_call_f(self->current_fiber, fn, arg_count);
@@ -184,11 +210,44 @@ WY_INLINE wy_error wy_context_tail_call(wy_context* self, wy_exec_fn fn, wy_uwor
  * Reserve `result_count` return slots for the function call and value with
  * the given arguments.
  */
-WY_INLINE wy_error wy_context_call_continue(wy_context* self, wy_exec_fn result_cb, wy_exec_fn fn, const wy_value* args, wy_uword arg_count, wy_uword result_count)
+WY_INLINE wy_error wy_context_call_continue(wy_context* self, wy_exec_fn_c_call result_cb, wy_exec_fn_c_call fn, const wy_value* args, wy_uword arg_count, wy_uword result_count)
 {
     if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
     if (arg_count > 0 && args == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_exec_continue_c_call_f(self->current_fiber, result_cb, fn, args, arg_count, result_count);
+}
+
+/**
+ * Call the callable `fn`, resuming at `result_cb`
+ *
+ * @see wy_context_call_continue
+ */
+WY_INLINE wy_error wy_context_call_continue_exec_fn(wy_context* self, wy_exec_fn result_cb, wy_exec_fn fn, const wy_value* args, wy_uword arg_count, wy_uword result_count)
+{
+    if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
+    if (arg_count > 0 && args == WY_NULL) { return WY_ERR_INVAL; }
+    if (wy_exec_fn_is_empty(&result_cb) || wy_exec_fn_is_empty(&fn)) { return WY_ERR_INVAL; }
     return wy_fiber_exec_continue_f(self->current_fiber, result_cb, fn, args, arg_count, result_count);
+}
+
+
+/**
+ * Get the total number of modules
+ */
+WY_INLINE wy_uword wy_context_module_count(wy_context* self)
+{
+    if (self == WY_NULL) { return 0; }
+    return self->module_count;
+}
+
+
+/**
+ * Get module from module index
+ */
+WY_INLINE wy_module* wy_context_get_module(wy_context* self, wy_uword module_id)
+{
+    if (self == WY_NULL || module_id >= self->module_count) { return WY_NULL; }
+    return WY_MEM_INFO_BEGIN_PTR(wy_module*, &self->module_memory)[module_id];
 }
 
 

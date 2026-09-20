@@ -44,6 +44,9 @@ void wy_context_init_s(wy_context* self)
     self->main_loop = WY_NULL;
     self->wakeable_source = wy_primitive_null();
 
+    wy_mem_info_init_empty_s(&self->module_memory);
+    self->module_count = 0;
+
     wy_gc_init_f(&self->arena, WY_NULL);
 }
 
@@ -56,6 +59,9 @@ void wy_context_finalize_f(wy_context* self)
     if (self->main_loop != WY_NULL) {
         wy_context_detach_loop(self);
     }
+
+    wy_context_mem_release_f(self, &self->module_memory);
+    self->module_count = 0;
 
     /* Free all objects */
     wy_gc_finalize_f(self, &self->arena);
@@ -77,6 +83,40 @@ wy_error wy_context_set_root(wy_context* context, wy_module* module)
 {
     if (context->root_module != WY_NULL) { return WY_ERR_BUSY; }
     context->root_module = module;
+    return WY_ERR_NONE;
+}
+
+/**
+ * Register a module and hand back the id that names it
+ *
+ * Ids are dense and assigned in registration order, so they index the list
+ * directly. The list grows by doubling and is capped at the width of the
+ * module field in a packed bytecode callable.
+ *
+ * @param self Context
+ * @param module Module to register
+ * @param out_module_id Receives the assigned id, may be WY_NULL
+ * @return WY_ERR_NONE on success, WY_ERR_RANGE when the id space is full
+ */
+wy_error wy_context_module_register(wy_context* self, wy_module* module, wy_uword* out_module_id)
+{
+    if (self == WY_NULL || module == WY_NULL) { return WY_ERR_INVAL; }
+    if (self->module_count >= WY_EXEC_FN_MODULE_MAX) { return WY_ERR_RANGE; }
+
+    wy_uword capacity = WY_MEM_INFO_COUNT(wy_module*, &self->module_memory);
+    if (self->module_count >= capacity) {
+        wy_uword grown = (capacity == 0) ? WY_CONTEXT_MODULE_INITIAL : (capacity * 2);
+        if (grown > WY_EXEC_FN_MODULE_MAX) { grown = WY_EXEC_FN_MODULE_MAX; }
+
+        wy_error last_error = WY_CONTEXT_MEM_INFO_RESERVE_COUNT(self, &self->module_memory, grown, wy_module*);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+    }
+
+    wy_uword module_id = self->module_count;
+    WY_MEM_INFO_BEGIN_PTR(wy_module*, &self->module_memory)[module_id] = module;
+    self->module_count++;
+
+    if (out_module_id != WY_NULL) { *out_module_id = module_id; }
     return WY_ERR_NONE;
 }
 
@@ -198,6 +238,12 @@ void wy_context_gc_full_run(wy_context* context)
 
     if (context->root_module != WY_NULL) {
         wy_gc_object_visit(context, (wy_object*) context->root_module);
+    }
+
+    /* Registered modules are reachable by id alone, so they are roots. */
+    wy_module** modules = WY_MEM_INFO_BEGIN_PTR(wy_module*, &context->module_memory);
+    for (wy_uword i = 0; i < context->module_count; i++) {
+        wy_gc_object_visit(context, (wy_object*) modules[i]);
     }
 
     wy_gc_collect_finish_f(context, &context->arena);

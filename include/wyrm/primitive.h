@@ -6,15 +6,12 @@
 #include <wyrm/sys/errors.h>
 #include <wyrm/sys/thread_id.h>
 
-#include <wyrm/exec_fn.h>
 #include <wyrm/fwd.h>
 #include <wyrm/symtab_entry.h>
 
 WY_BEGIN_DECLS
 
 #define WY_PRIMITIVE_PTR(dtype, v) ((dtype*) (v).ptr)
-
-
 
 /**
  * @brief Primitive Types
@@ -26,7 +23,6 @@ typedef enum wy_type_tag
     WY_TYPE_TAG_WORD,
     WY_TYPE_TAG_UWORD,
 
-    WY_TYPE_TAG_FUNCTION,
     WY_TYPE_TAG_SYMBOL,
 
     WY_TYPE_TAG_GC_PATH_START,
@@ -76,7 +72,6 @@ union wy_primitive {
     wy_float_s fp_s;
     wy_uintptr tagged_ptr;
     wy_error error;
-    wy_exec_fn cb;
     wy_atomic_word ref_count;
     wy_sys_thread_id thread_id;
     wy_value* value_ptr;
@@ -89,6 +84,15 @@ union wy_primitive {
     wy_string* str;
     wy_class* cls;
 };
+
+/**
+ * @brief Create a null primitive value
+ */
+WY_INLINE wy_primitive wy_primitive_null(void)
+{
+    wy_primitive v = { .gc_object = WY_NULL };
+    return v;
+}
 
 WY_INLINE wy_primitive wy_primitive_int(wy_word value) { const wy_primitive v = {.word = value}; return v; }
 WY_INLINE wy_primitive wy_primitive_uword(wy_uword value) { const wy_primitive v = {.uword = value}; return v; }

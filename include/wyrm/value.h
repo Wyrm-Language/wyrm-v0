@@ -53,15 +53,6 @@ WY_INLINE wy_value wy_value_uword(wy_uword value)
 
 
 /**
- * @brief Create a null primitive value
- */
-WY_INLINE wy_primitive wy_primitive_null(void)
-{
-    wy_primitive v = { .gc_object = WY_NULL };
-    return v;
-}
-
-/**
  * @brief Create 'nil' primitive
  */
 WY_INLINE wy_value wy_value_nil(void)

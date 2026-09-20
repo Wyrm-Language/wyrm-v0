@@ -10,7 +10,7 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
 static wy_error fiber_continue_with_return(wy_fiber* self)
 {
     /* Not completed executing current task */
-    if (self->pending != WY_NULL) { return WY_ERR_INVAL; }
+    if (!wy_exec_fn_is_empty(&self->pending)) { return WY_ERR_INVAL; }
 
     wy_error last_error = wy_fiber_pop_continuation_f(self, &self->pending);
 
@@ -50,11 +50,11 @@ wy_fiber* wy_fiber_create(wy_context* context, wy_uword stack_len, wy_uword fram
     wy_stack_init_f(&fiber->value_stack, stack, stack_len);
 
     fiber->parent = WY_NULL;
-    fiber->pending = WY_NULL;
+    fiber->pending = wy_exec_fn_create_empty();
 
     fiber->current_frame = WY_MEM_INFO_BEGIN_PTR(wy_fiber_frame, &fiber->frame_memory);
     fiber->current_frame->restore_base = wy_stack_base_f(&fiber->value_stack);
-    fiber->current_frame->fn = WY_NULL;
+    fiber->current_frame->fn = wy_exec_fn_create_empty();
     fiber->current_frame->result_count = 0;
 
     wy_context_object_init_header_f(context, &fiber->object, &wy_type_fiber);
@@ -84,36 +84,36 @@ wy_error wy_fiber_exec_f(wy_fiber* self, wy_context* context)
     wy_error last_error = WY_ERR_NONE;
 
     // Continue execution through continuation stack if no forward stack present
-    if (self->pending == WY_NULL) {
+    if (wy_exec_fn_is_empty(&self->pending)) {
         last_error = fiber_continue_with_return(self);
     }
 
-    if (last_error != WY_ERR_NONE || self->pending == WY_NULL) {
+    if (last_error != WY_ERR_NONE || wy_exec_fn_is_empty(&self->pending)) {
         return last_error;
     }
 
-    while (last_error == WY_ERR_NONE && self->pending != WY_NULL) {
+    while (last_error == WY_ERR_NONE && !wy_exec_fn_is_empty(&self->pending)) {
         wy_exec_fn pending = self->pending;
-        self->pending = WY_NULL;
+        self->pending = wy_exec_fn_create_empty();
 
-        wy_exec_state result = pending(context);
+        wy_exec_state result = pending.fn(context, pending.c_data);
 
         switch (result) {
         case WY_EXEC_TAIL_CALL:
             /* wy_fiber_tail_call_f already rebuilt the frame's arguments. */
-            if (self->pending == WY_NULL) {
+            if (wy_exec_fn_is_empty(&self->pending)) {
                 last_error = WY_ERR_INVAL;
             }
             break;
 
         case WY_EXEC_CONTINUE:
-            if (self->pending == WY_NULL) {
+            if (wy_exec_fn_is_empty(&self->pending)) {
                 last_error = WY_ERR_INVAL;
             }
             break;
 
         case WY_EXEC_DONE:
-            if (self->pending != WY_NULL) {
+            if (!wy_exec_fn_is_empty(&self->pending)) {
                 last_error = WY_ERR_INVAL;
                 break;
             }
@@ -165,7 +165,7 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
  */
 wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn, wy_uword result_count)
 {
-    WY_ASSERT(self != WY_NULL && fn != WY_NULL);
+    WY_ASSERT(self != WY_NULL && !wy_exec_fn_is_empty(&fn));
 
     wy_fiber_frame* new_frame = self->current_frame + 1;
     if (!WY_MEM_INFO_TOP_NOT_AT_END(wy_fiber_frame, new_frame, &self->frame_memory)) {
@@ -220,8 +220,8 @@ wy_error wy_fiber_pop_continuation_f(wy_fiber* self, wy_exec_fn* out_continuatio
 wy_error wy_fiber_tail_call_f(wy_fiber* self, wy_exec_fn fn, wy_uword arg_count)
 {
     WY_ASSERT(self != WY_NULL);
-    if (fn == WY_NULL) { return WY_ERR_INVAL; }
-    if (self->pending != WY_NULL) { return WY_ERR_BUSY; }
+    if (wy_exec_fn_is_empty(&fn)) { return WY_ERR_INVAL; }
+    if (!wy_exec_fn_is_empty(&self->pending)) { return WY_ERR_BUSY; }
 
     wy_error last_error = wy_stack_replace_frame_f(&self->value_stack, arg_count);
     if (last_error != WY_ERR_NONE) { return last_error; }

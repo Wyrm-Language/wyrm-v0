@@ -7,21 +7,24 @@
 #include <wyrm/platform/hosted/cmachine.h>
 #include <wyrm/fiber.h>
 
-wy_exec_state w_main(wy_context* context)
+wy_exec_state w_main(wy_context* context, wy_primitive ignored)
 {
+    WY_UNUSED(ignored);
     printf("Last of the call stack, expect values = 0 actual = %ld\n", wy_context_value_count(context));
     return WY_EXEC_DONE;
 }
 
-wy_exec_state w_print_int(wy_context* context)
+wy_exec_state w_print_int(wy_context* context, wy_primitive ignored)
 {
+    WY_UNUSED(ignored);
     wy_value* a = wy_context_value_n(context, 0);
     printf("w_print_int: %ld\n", a->data.word);
     return WY_EXEC_DONE;
 }
 
-wy_exec_state w_mul_int(wy_context* context)
+wy_exec_state w_mul_int(wy_context* context, wy_primitive ignored)
 {
+    WY_UNUSED(ignored);
     wy_value* a = wy_context_value_n(context, 0);
     wy_value* b = wy_context_value_n(context, 1);
 
@@ -30,9 +33,10 @@ wy_exec_state w_mul_int(wy_context* context)
     return WY_EXEC_DONE;
 }
 
-wy_exec_state w_do_a_mul(wy_context* context)
+wy_exec_state w_do_a_mul(wy_context* context, wy_primitive ignored)
 {
     WY_UNUSED(context);
+    WY_UNUSED(ignored);
     printf("pushing arguments\n");
     wy_value v_ints[2] = {
         { .type = WY_TYPE_TAG_WORD, .data.word = 8 },
@@ -118,8 +122,8 @@ int main(int argc, char** argv) {
 
     // TODO: add wy_eval or something...
 
-    wy_fiber_push_continuation(fiber, w_main, 0);
-    wy_fiber_push_continuation(fiber, w_do_a_mul, 0);
+    wy_fiber_push_continuation_c_call(fiber, w_main, 0);
+    wy_fiber_push_continuation_c_call(fiber, w_do_a_mul, 0);
 
     wy_context_exec(context);
 

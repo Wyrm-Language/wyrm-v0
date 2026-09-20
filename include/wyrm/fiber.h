@@ -1,6 +1,7 @@
 #ifndef WYRM_FIBER_H_
 #define WYRM_FIBER_H_
 
+#include <wyrm/exec_fn.h>
 #include <wyrm/fwd.h>
 #include <wyrm/mem_info.h>
 #include <wyrm/object.h>
@@ -116,6 +117,24 @@ wy_error wy_fiber_pop_continuation_f(wy_fiber* self, wy_exec_fn* out_continuatio
 wy_error wy_fiber_tail_call_f(wy_fiber* self, wy_exec_fn fn, wy_uword arg_count);
 
 /**
+ * Push a frame whose continuation is the C function `fn`
+ */
+WY_INLINE wy_error wy_fiber_push_frame_c_call_f(wy_fiber* self, wy_exec_fn_c_call fn, wy_uword result_count)
+{
+    if (fn == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_push_frame_f(self, wy_exec_fn_create(fn, wy_primitive_null()), result_count);
+}
+
+/**
+ * Reuse the active frame for a call to the C function `fn`
+ */
+WY_INLINE wy_error wy_fiber_tail_call_c_call_f(wy_fiber* self, wy_exec_fn_c_call fn, wy_uword arg_count)
+{
+    if (fn == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_tail_call_f(self, wy_exec_fn_create(fn, wy_primitive_null()), arg_count);
+}
+
+/**
  * Get the current call depth excluding root frame
  */
 WY_INLINE wy_uword wy_fiber_frame_depth_f(wy_fiber* self)
@@ -134,10 +153,21 @@ WY_INLINE wy_uword wy_fiber_frame_depth_f(wy_fiber* self)
  */
 WY_INLINE wy_error wy_fiber_push_continuation(wy_fiber* self, wy_exec_fn fn, wy_uword result_count)
 {
-    if (self == WY_NULL || fn == WY_NULL) { return WY_ERR_INVAL; }
-    if (self->pending != WY_NULL) { return WY_ERR_BUSY; }
+    if (self == WY_NULL || wy_exec_fn_is_empty(&fn)) { return WY_ERR_INVAL; }
+    if (!wy_exec_fn_is_empty(&self->pending)) { return WY_ERR_BUSY; }
 
     return wy_fiber_push_frame_f(self, fn, result_count);
+}
+
+/**
+ * Push a frame whose continuation is the C function `fn`
+ *
+ * @see wy_fiber_push_continuation
+ */
+WY_INLINE wy_error wy_fiber_push_continuation_c_call(wy_fiber* self, wy_exec_fn_c_call fn, wy_uword result_count)
+{
+    if (fn == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_push_continuation(self, wy_exec_fn_create(fn, wy_primitive_null()), result_count);
 }
 
 /**
@@ -157,10 +187,10 @@ WY_INLINE wy_error wy_fiber_push_continuation(wy_fiber* self, wy_exec_fn fn, wy_
  */
 WY_INLINE wy_error wy_fiber_exec_continue_f(wy_fiber* self, wy_exec_fn continuation, wy_exec_fn fn, const wy_value* args, wy_uword arg_count, wy_uword result_count)
 {
-    WY_ASSERT(self != WY_NULL && continuation != WY_NULL && fn != WY_NULL);
+    WY_ASSERT(self != WY_NULL && !wy_exec_fn_is_empty(&continuation) && !wy_exec_fn_is_empty(&fn));
     WY_ASSERT(args != WY_NULL || arg_count == 0);
 
-    if (self->pending != WY_NULL) { return WY_ERR_BUSY; }
+    if (!wy_exec_fn_is_empty(&self->pending)) { return WY_ERR_BUSY; }
 
     wy_error last_error = wy_fiber_push_frame_f(self, continuation, result_count);
     if (last_error != WY_ERR_NONE) { return last_error; }
@@ -176,6 +206,16 @@ WY_INLINE wy_error wy_fiber_exec_continue_f(wy_fiber* self, wy_exec_fn continuat
     return last_error;
 }
 
+/**
+ * Call the C function `fn`, resuming at the C function `continuation`
+ *
+ * @see wy_fiber_exec_continue_f
+ */
+WY_INLINE wy_error wy_fiber_exec_continue_c_call_f(wy_fiber* self, wy_exec_fn_c_call continuation, wy_exec_fn_c_call fn, const wy_value* args, wy_uword arg_count, wy_uword result_count)
+{
+    if (continuation == WY_NULL || fn == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_fiber_exec_continue_f(self, wy_exec_fn_create(continuation, wy_primitive_null()), wy_exec_fn_create(fn, wy_primitive_null()), args, arg_count, result_count);
+}
 
 WY_END_DECLS
 
