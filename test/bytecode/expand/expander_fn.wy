@@ -1,0 +1,3 @@
+# Answers a function: not tree-shaped data, must be refused at the boundary.
+fn expand_tree(tree, scope):
+    return fn(x): x

@@ -72,10 +72,13 @@ fn list_head(ls, n):
 # Get the nth tail of a pair list (0 unmodified)
 fn list_tail(ll, n: int):
     cur := ll
-    for i in range(0, n):
+    i := 0
+    # (a `for i in range(0, n)` loop never iterates on the C VM: epic 6 gap)
+    while i < n:
         if not (cur is pair):
             return error("index out of range")
         cur = cdr(cur)
+        i = i + 1
     return cur
 
 # Get the nth field of a pair list

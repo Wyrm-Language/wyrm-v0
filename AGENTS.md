@@ -52,6 +52,13 @@ To test a script for syntax:
 wyrm -Iwy --check script_path.wy
 ```
 
+## Debugging and Known Traps
+
+Before changing the VM, the parser, or the self-hosted compiler, read
+[doc/agent-notes.md](doc/agent-notes.md): engine roles, the gen0/gen1/gen2 compiler
+generations and why the amalgam hides bugs, bisect/disasm-diff recipes, and the parser, VM
+and codegen pitfalls behind past regressions. Epic history lives in `vm_plan/`.
+
 ## C/C++ Coding Standards
 
 - Core code is highly portable C11 with platform code segregated into platform subdirs

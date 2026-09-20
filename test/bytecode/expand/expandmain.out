@@ -1,0 +1,11 @@
+((a . (b . nil)) . ((a . (b . nil)) . nil))
+5000 5000
+([1, s, sym, 2.5, true, (1, 2), nil] . ([1, s, sym, 2.5, true, (1, 2), nil] . nil))
+cannot cross the expansion boundary: function
+expansion is not re-entrant
+expander module 'expander_none' has no expand_tree
+@boomdec: value is not callable
+expansion scope failed to load (expansion VMs have no host modules, e.g. std::io): import failed: 'scope_io' -> 'std::io' (error 7)
+cannot load expander module 'no_such_module' (error 7)
+cannot cross the expansion boundary: function
+done

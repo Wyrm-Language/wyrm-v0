@@ -12,11 +12,12 @@
 #include <wyrm/opcode_names.h>
 #include <wyrm/platform/hosted/cmachine.h>
 #include <wyrm/platform/hosted/import_fs.h>
+#include <wyrm/platform/hosted/expand_native.h>
 #include <wyrm/platform/hosted/io_native.h>
 #include <wyrm/slot.h>
 #include <wyrm/string.h>
 
-enum { WY_MAIN_STACK_LEN = 4096, WY_MAIN_FRAME_COUNT = 256, WY_MAIN_MAX_INCLUDE = 64 };
+enum { WY_MAIN_STACK_LEN = 1u << 16, WY_MAIN_FRAME_COUNT = 4096, WY_MAIN_MAX_INCLUDE = 64 };
 
 static void io_write_stdout_(wy_context* context, const char* bytes, wy_uword len, void* ud)
 {
@@ -227,6 +228,11 @@ int main(int argc, char** argv)
 
     if (wy_io_module_install(context) != WY_ERR_NONE) {
         fprintf(stderr, "wyrm: failed to install std::io\n");
+        return 1;
+    }
+
+    if (wy_expand_module_install(context) != WY_ERR_NONE) {
+        fprintf(stderr, "wyrm: failed to install std::expand\n");
         return 1;
     }
 

@@ -12,12 +12,13 @@ images. In practice the port is deterministic, so the report also records
 whether the stronger bar - byte-identical trees (the epic's original
 `diff -r`) - came free. Exit status is nonzero when neither bar holds.
 
-INTERIM PROVENANCE DELTA (epic 10 M7 re-cut, removed by epic 10a M5):
-the ported compiler cannot expand decorators, and parser.wy has 86
-`@accept` sites. So parser.wy is NOT in SELF_SOURCES; a parser.wyc built
-by pypoc (in a scratch copy, never in wy/) is placed into every
-generation's tree. The fixed point therefore covers the 20 decorator-free
-modules; gen2 == gen3 is the bar (gen1 == gen2 recorded if free).
+Epic 10a M5: every self-source is compiled by the port, including
+wyrm/parser.wy (86 `@accept` sites, expanded in throwaway VMs by
+wyrm/compiler/expand.wy) and the expander itself. The interim "pypoc builds
+parser.wyc" arrangement of epic 10 M7 is retired; the only pypoc-built code
+is generation 0 (the amalgam driver). gen0's expansion support (wyrm/_dsl.wy,
+wyrm/ast.wy) is rebuilt by gen0 itself (run_corpus_sweep.build_expander) so
+its tree shape is the port's.
 
 Skipped entirely when pypoc/.venv is absent.
 """
@@ -30,7 +31,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from run_corpus_sweep import build_amalgam, ROOT, WYRM
+from run_corpus_sweep import build_amalgam, build_expander, ROOT, WYRM
 
 # The compiler's own sources, relative to wy/ - everything the driver
 # amalgam concatenates, plus the package marker, the package root, and
@@ -53,12 +54,15 @@ SELF_SOURCES = [
     "wyrm/compiler/functions.wy",
     "wyrm/compiler/classes.wy",
     "wyrm/compiler/verify.wy",
+    "wyrm/compiler/predefined.wy",
+    "wyrm/compiler/expand.wy",
     "wyrm/compiler/module.wy",
+    "wyrm/compiler/expansion.wy",
+    "wyrm/parser.wy",
     "wyrm/compiler.wy",
     "wyrm/__init__.wy",
     "wyrm/tools/compiler_main.wy",
 ]
-
 
 def ensure_dirs(tree, rels):
     for rel in rels:
@@ -78,35 +82,33 @@ def compile_tree(driver_wyc, extra_include, out_tree, src_root):
     # `wyrm/` is a second root: the sources use package-relative imports
     # (`import bjson::*` in image.wy), which the C VM resolves as top-level
     # names, so the sibling modules must be findable from inside the package.
+    # out_tree is on the path last: parser.wy's decorator expansion loads
+    # the modules it imports (tokenizer, ...) from the tree being built,
+    # which SELF_SOURCES orders ahead of it.
     args = [WYRM, "-I" + extra_include, "-I" + os.path.join(extra_include, "wyrm"),
-            "-I" + os.path.join(extra_include, "wyrm", "compiler"), driver_wyc,
+            "-I" + os.path.join(extra_include, "wyrm", "compiler"),
+            "-I" + out_tree, "-I" + os.path.join(out_tree, "wyrm"), driver_wyc,
             "--mirror", src_root, out_tree] + SELF_SOURCES
     r = subprocess.run(args, capture_output=True, text=True, timeout=600)
     sys.stdout.write(r.stdout)
     if r.returncode != 0:
         print(r.stderr, file=sys.stderr)
         sys.exit("self-compile: generation failed (exit %d)" % r.returncode)
+    # Epic 10a M0: the port compiles strictly now. A STUB line is a body
+    # that failed to lower and stubbed anyway - only a `@template`
+    # definition may stub (TSTUB; the expected set is _dsl.wy's two
+    # `this`-using plain-fn templates), so a bare STUB fails the
+    # generation.
+    stubs = [line for line in r.stdout.splitlines() if line.startswith("STUB ")]
+    if stubs:
+        for line in stubs:
+            print("unexpected stub: " + line, file=sys.stderr)
+        sys.exit("self-compile: strict compile produced a non-template stub")
+    tstubs = [line for line in r.stdout.splitlines() if line.startswith("TSTUB ")]
+    for line in tstubs:
+        print("  (template stub: %s)" % line.strip())
     root_package_alias(out_tree)
     return out_tree
-
-
-def build_pypoc_parser(work):
-    """pypoc-built parser.wyc, compiled from a scratch copy of parser.wy."""
-    scratch = os.path.join(work, "pypoc_parser")
-    os.makedirs(os.path.join(scratch, "wyrm"), exist_ok=True)
-    src = os.path.join(scratch, "wyrm", "parser.wy")
-    shutil.copyfile(os.path.join(ROOT, "wy", "wyrm", "parser.wy"), src)
-    from run_corpus_sweep import PYPOC_WYRM
-    r = subprocess.run([PYPOC_WYRM, "-I" + os.path.join(ROOT, "wy"),
-                        "--build-bc", src], capture_output=True, text=True)
-    if r.returncode != 0:
-        print(r.stdout, r.stderr, file=sys.stderr)
-        sys.exit("self-compile: pypoc parser.wyc failed to build")
-    return os.path.join(scratch, "wyrm", "parser.wyc")
-
-
-def install_parser(tree, parser_wyc):
-    shutil.copyfile(parser_wyc, os.path.join(tree, "wyrm", "parser.wyc"))
 
 
 def collect_wycs(tree):
@@ -137,15 +139,13 @@ def main():
         out2 = os.path.join(work, "gen2")
 
         # Generation 1: the pypoc-compiled amalgam driver.
-        parser_wyc = build_pypoc_parser(work)
+        build_expander(work, gen1_driver)
         compile_tree(gen1_driver, work, out1, wy_root)
-        install_parser(out1, parser_wyc)
 
         # Generation 2: generation 1's own compiler_main, on the C VM,
         # importing generation 1's module tree, compiling the same sources.
         gen2_entry = os.path.join(out1, "wyrm", "tools", "compiler_main.wyc")
         compile_tree(gen2_entry, out1, out2, wy_root)
-        install_parser(out2, parser_wyc)
 
         w1 = collect_wycs(out1)
         w2 = collect_wycs(out2)
@@ -180,7 +180,6 @@ def main():
         out3 = os.path.join(work, "gen3")
         gen3_entry = os.path.join(out2, "wyrm", "tools", "compiler_main.wyc")
         compile_tree(gen3_entry, out2, out3, wy_root)
-        install_parser(out3, parser_wyc)
         w3 = collect_wycs(out3)
         gen23_diff = [name for name in sorted(set(w2) & set(w3))
                       if not filecmp.cmp(w2[name], w3[name], shallow=False)]

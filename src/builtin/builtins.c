@@ -1,12 +1,14 @@
 #include <wyrm/builtins.h>
 
 #include <wyrm/bytes.h>
+#include <wyrm/bound_msg.h>
 #include <wyrm/class.h>
 #include <wyrm/context.h>
 #include <wyrm/coroutine.h>
 #include <wyrm/dict.h>
 #include <wyrm/error.h>
 #include <wyrm/image.h>
+#include <wyrm/instance.h>
 #include <wyrm/list.h>
 #include <wyrm/machine.h>
 #include <wyrm/message.h>
@@ -18,6 +20,8 @@
 #include <wyrm/tuple.h>
 #include <wyrm/value.h>
 #include <wyrm/vm.h>
+
+#include "../vm_internal.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -1080,7 +1084,7 @@ static wy_exec_state builtin_send_exec_(wy_context* context, wy_primitive c_data
  * Module assembly
  * ------------------------------------------------------------------------- */
 
-enum { WY_BUILTINS_LEAF_COUNT = 24, WY_BUILTINS_EXEC_COUNT = 2, WY_BUILTINS_CLASS_COUNT = 5,
+enum { WY_BUILTINS_LEAF_COUNT = 27, WY_BUILTINS_EXEC_COUNT = 2, WY_BUILTINS_CLASS_COUNT = 5,
     /* +1 for the bare `nil` slot, +1 for the `range` prelude coroutine (M4),
      * +1 for the bare `TreeBase` class (M5: decorators fixture registers
      * messages typed on it, wyrm_builtins.py's TREE_BASE_CLASS). */
@@ -1261,6 +1265,97 @@ static wy_error builtin_error_message_(wy_context* context, wy_value* args, wy_u
     return err;
 }
 
+/**
+ * `tree_box(x)`: wrap the sexpr `x` in a `TreeBase` instance (its one
+ * `__tree` slot), the receiver a decorator message is dispatched on.
+ */
+static wy_error builtin_tree_box_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (nres == 0) { return WY_ERR_NONE; }
+    wy_instance* inst = WY_NULL;
+    wy_error err = wy_instance_new_f(context, context->tree_base_class, &inst);
+    if (err != WY_ERR_NONE) { return err; }
+    inst->slots[0] = args[0];
+    out[0] = wy_value_object(WY_TYPE_TAG_INSTANCE, (wy_object*) inst);
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+/**
+ * `sexpr(x)`: the tree a `TreeBase` box carries; anything else passes
+ * through unchanged (so it is the identity on a tree that already is one).
+ */
+static wy_error builtin_sexpr_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (nres == 0) { return WY_ERR_NONE; }
+    wy_value x = args[0];
+    if (x.type == WY_TYPE_TAG_INSTANCE) {
+        wy_instance* inst = (wy_instance*) x.data.gc_object;
+        if (inst->cls == context->tree_base_class) { x = inst->slots[0]; }
+    }
+    out[0] = x;
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
+/**
+ * `bind_message(scope, recv, name)`: dynamic message lookup by name. Finds
+ * `name` (a symbol or string) in the message table of module `scope`
+ * (adopted by its imports), resolves the overload for `recv` and answers the
+ * bound message `recv ! name` without calling it (exactly `getmsg`); the
+ * wyrm caller then calls it with ordinary arguments. Answers an error value
+ * when the name is not visible in `scope` or no overload matches.
+ */
+static wy_error builtin_bind_message_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (nres == 0) { return WY_ERR_NONE; }
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    if (args[0].type != WY_TYPE_TAG_MODULE) { return WY_ERR_BAD_TYPE; }
+    wy_module* scope = (wy_module*) args[0].data.gc_object;
+
+    wy_symbol name;
+    if (args[2].type == WY_TYPE_TAG_SYMBOL) {
+        name = args[2].data.symtab_entry;
+    } else if (args[2].type == WY_TYPE_TAG_STR) {
+        wy_error err = wy_context_intern(context, args[2].data.str->str, args[2].data.str->len, &name);
+        if (err != WY_ERR_NONE) { return err; }
+    } else {
+        return WY_ERR_BAD_TYPE;
+    }
+
+    wy_message* msg = WY_NULL;
+    wy_error err = wy_module_message_lookup_f(context, scope, name, &msg);
+    if (err != WY_ERR_NONE) { return err; }
+    if (msg == WY_NULL) {
+        return write_error_value_(context, "bind_message: no such message in scope", &out[0]);
+    }
+
+    wy_value recv = args[1];
+    const wy_value* receivers = &recv;
+    wy_uword n = 1;
+    if (recv.type == WY_TYPE_TAG_TUPLE) {
+        wy_tuple* tup = (wy_tuple*) recv.data.gc_object;
+        receivers = (tup->count > 0) ? (const wy_value*) tup->items : WY_NULL;
+        n = tup->count;
+    }
+    if (n == 0 || n > WY_DISPATCH_MAX_RECEIVERS) {
+        return write_error_value_(context, "bind_message: bad receiver count", &out[0]);
+    }
+    const wy_overload* ov = WY_NULL;
+    char fault_msg[256];
+    if (wy_dispatch_resolve_f(msg, receivers, n, WY_NULL, &ov, fault_msg, sizeof(fault_msg)) != WY_ERR_NONE) {
+        return write_error_value_(context, fault_msg, &out[0]);
+    }
+    wy_bound_msg* bm = WY_NULL;
+    err = wy_bound_msg_new_f(context, recv, msg, ov->body, &bm);
+    if (err != WY_ERR_NONE) { return err; }
+    out[0] = wy_value_object(WY_TYPE_TAG_BOUND_MSG, (wy_object*) bm);
+    return WY_ERR_NONE;
+}
+
 static const builtin_leaf_entry_ leaf_builtins_[] = {
     { "println",   0, 255, builtin_println_ },
     { "print",     0, 255, builtin_print_ },
@@ -1286,6 +1381,9 @@ static const builtin_leaf_entry_ leaf_builtins_[] = {
     { "remove",    2, 2,   builtin_remove_ },
     { "len",       1, 1,   builtin_len_ },
     { "bytes",     1, 1,   bytes_construct_ },
+    { "tree_box",  1, 1,   builtin_tree_box_ },
+    { "sexpr",     1, 1,   builtin_sexpr_ },
+    { "bind_message", 3, 3, builtin_bind_message_ },
 };
 
 static const builtin_exec_entry_ exec_builtins_[] = {
@@ -1527,6 +1625,19 @@ wy_error wy_builtins_new(wy_context* context, wy_module** out)
         err = wy_class_new(context, &cls);
         if (err != WY_ERR_NONE) { return err; }
         wy_class_set_name_f(cls, (wy_primitive) { .symtab_entry = sym });
+
+        /* The one `__tree` slot carrying the boxed sexpr (tree_box/sexpr). */
+        wy_symbol tree_sym;
+        err = wy_context_intern(context, "__tree", 6, &tree_sym);
+        if (err != WY_ERR_NONE) { return err; }
+        cls->slots = wy_context_gc_alloc(context, sizeof(wy_class_slot));
+        if (cls->slots == WY_NULL) { return WY_ERR_NOMEM; }
+        cls->slots[0].name = tree_sym;
+        cls->slots[0].default_value = wy_value_nil();
+        cls->slots[0].getter = wy_value_unset();
+        cls->slots[0].setter = wy_value_unset();
+        cls->slot_count = 1;
+        context->tree_base_class = cls;
 
         module->globals[slot] = wy_value_object(WY_TYPE_TAG_CLASS, (wy_object*) cls);
         err = wy_slot_dict_add_entry(&module->exports, sym, slot);

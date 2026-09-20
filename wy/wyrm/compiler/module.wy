@@ -18,10 +18,17 @@
 # 1. No decorator expansion. module.py's `_expand_decorators` runs real
 #    wyrm code over the sexpr tree before lowering (see the prereport's
 #    item 6: not `_dsl.wy`'s machinery, a `wyrm_eval_parse_tree`-equivalent
-#    is new infrastructure). A `decorated` node reaching the top-level walk
-#    here is refused with `unsupported` - same as every other construct
-#    this port has no lowering for; `decorators.wy` is already REFUSED in
-#    test/bytecode/manifest.txt, so the deferral is precedented.
+#    is new infrastructure). Epic 10a M0 added the slice of it that needs
+#    no evaluation at all: predefined.wy's pre-pass rewrites `@template X`
+#    to a `'template` wrapper before the walk, and the wrapper handlers
+#    here and in statements.wy hand the marking down to the definition's
+#    frame so `_compile_or_stub` can stub a body that will not lower. Any
+#    other `decorated` node reaching the top-level walk is still refused
+#    with `unsupported` - same as every other construct this port has no
+#    lowering for; `decorators.wy` is already REFUSED in
+#    test/bytecode/manifest.txt, so the deferral is precedented. M3
+#    replaces the pre-pass with a real lookup (scope first, the built-in
+#    as fallback) so shadowing works.
 #
 # 2. No message promotion. module.py's `_collect_promotions`/`_emit_promotion`
 #    register a plain top-level `fn name` as the wildcard overload of a
@@ -64,6 +71,7 @@ import wyrm::compiler::statements::*
 import wyrm::compiler::functions::*
 import wyrm::compiler::classes::*
 import wyrm::compiler::handlers::*
+import wyrm::compiler::predefined::*
 import wyrm::compiler::verify::*
 
 # ---------------------------------------------------------------------------
@@ -230,10 +238,55 @@ fn _declare_module_names(body, module: ModuleContext) -> nil | error:
                 index6 := module ! declare_global((_field(node, 1) catch nil))
                 if index6 is error:
                     return index6
+        elif kind == 'template:
+            # predefined.wy's rewrite (epic 10a M0): a template-wrapped
+            # definition keeps the same binding it would have had bare -
+            # a dispatched `fn [T]` binds no global, a plain
+            # `fn`/`co` name does (recursion, forward references, value
+            # calls) - so the branch mirrors fn_def's exactly, one wrapper
+            # field down.
+            inner := (_field(node, 1) catch nil)
+            inner_kind := node_kind(inner)
+            if (inner_kind == 'fn_def) or (inner_kind == 'co_def):
+                if (_field(inner, 2) catch nil) is nil:
+                    inner_name := (_field(inner, 1) catch nil)
+                    index7 := module ! declare_global(inner_name)
+                    if index7 is error:
+                        return index7
     for name in own_declared_names(body):
         index5 := module ! declare_global(name)
         if index5 is error:
             return index5
+    return nil
+
+# ---------------------------------------------------------------------------
+# the definition index (`foo::$ast` reads it - module.py's
+# _collect_definitions, over wyrm shapes)
+
+# Index every fn, co and class this module defines, by name. Built from the
+# rewritten tree - after predefined.wy's pre-pass, so a `@template`
+# definition is indexed as what the marking wrapped, the tree its binding
+# would hold (10a M0's stand-in for module.py's "built from the expanded
+# tree"; M3 will index what real expansion left behind). Nested definitions
+# count: the walk is the same whole-tree one module.py's `program.walk()`
+# is. First spelling wins (`setdefault`), matching pypoc.
+#
+# The index is compile-time state only - nothing is serialized - and it is
+# what makes `::$ast` cheap for everyone else: a module that never says
+# `::$ast` pays one dict, and only referenced trees are ever materialized
+# (expressions.wy's `_astref`, at the reference site).
+fn _collect_definitions(body, module: ModuleContext) -> nil | error:
+    for node in walk_all_body(body):
+        kind := node_kind(node)
+        if kind == 'template:
+            node = (_field(node, 1) catch nil)
+            kind = node_kind(node)
+        if (kind == 'fn_def) or (kind == 'co_def) or (kind == 'class_def):
+            name := (_field(node, 1) catch nil)
+            if not (name is nil):
+                key := str(name)
+                if not (key in module.definitions):
+                    module.definitions[key] = node
     return nil
 
 # ---------------------------------------------------------------------------
@@ -383,8 +436,8 @@ fn _bind_imported_names(pending: list, module: ModuleContext) -> nil | error:
 # A plain top-level `fn`/`co`: a function entry plus, in init, a closure
 # over it stored into the module global of its name. The promotion half of
 # pypoc's `_fn_def` is not ported (deviation 2).
-fn _plain_fn_toplevel(node, module: ModuleContext) -> nil | error:
-    r := compile_function(node, module)
+fn _plain_fn_toplevel(node, module: ModuleContext, tolerant: bool = false) -> nil | error:
+    r := compile_function(node, module, nil, 0, nil, tolerant)
     if r is error:
         return r
     index := r[0]
@@ -400,24 +453,13 @@ fn _plain_fn_toplevel(node, module: ModuleContext) -> nil | error:
         return e
     return _emit_pairable(init, 'gset, gidx, reg)
 
-# `fn $name(...)`: the DSL's TreeBase-method shorthand (parser.wy's
-# `@accept`-generated matchers call them as `this ! $name(...)`). The
-# parser produces a plain fn_def whose name carries the `$`; the tree
-# below retargets it as a dispatched fn on TreeBase so `this` and the
-# message registration work exactly like an explicit `fn [TreeBase]`.
-fn _treebase_fn_toplevel(node, module: ModuleContext) -> nil | error:
-    fn_name := (_field(node, 1) catch nil)
-    dispatched := $['fn_def, fn_name, $['TreeBase], (_field(node, 3) catch nil),
-                    (_field(node, 4) catch nil), (_field(node, 5) catch nil)]
-    return compile_dispatched_fn_toplevel(dispatched, module)
-
-fn _fn_toplevel(node, module: ModuleContext, extra) -> nil | error:
+fn _fn_toplevel(node, module: ModuleContext, extra, tolerant: bool = false) -> nil | error:
     if (_field(node, 2) catch nil) is nil:
-        fn_name := (_field(node, 1) catch nil)
-        if (fn_name is sym) and (str(fn_name)[0] == 36):
-            return _treebase_fn_toplevel(node, module)
-        return _plain_fn_toplevel(node, module)
-    return compile_dispatched_fn_toplevel(node, module)
+        # A `$`-prefixed name is an ordinary function (parser.wy's `$_mk_*`
+        # callbacks are called by name, as in pypoc); the old
+        # "TreeBase-method shorthand" is gone.
+        return _plain_fn_toplevel(node, module, tolerant)
+    return compile_dispatched_fn_toplevel(node, module, tolerant)
 
 # Imports were hoisted and emitted before the walk; nothing is left to do
 # where the statement actually appears.
@@ -429,9 +471,26 @@ fn _import_toplevel(node, module: ModuleContext, extra) -> nil | error:
 fn _class_toplevel(node, module: ModuleContext, extra) -> nil | error:
     return compile_class_toplevel(node, module)
 
+# A `'template` wrapper (predefined.wy's rewrite of `@template X`, epic 10a
+# M0). The marking is handed down to fn/co definitions so their frames
+# compile tolerantly - a body that will not lower stubs instead of failing
+# the module - and everything else compiles exactly as written: a class
+# body's methods have no stub path to mark yet, and a template on a plain
+# statement relieves nothing (outside a function body a lowering failure is
+# a refusal either way).
+fn _template_toplevel(node, module: ModuleContext, extra) -> nil | error:
+    inner := (_field(node, 1) catch nil)
+    kind := node_kind(inner)
+    if (kind == 'fn_def) or (kind == 'co_def):
+        return _fn_toplevel(inner, module, extra, true)
+    if kind == 'class_def:
+        return _class_toplevel(inner, module, extra)
+    return compile_statement(inner, module.init_ctx)
+
 register_toplevel(['class_def], _class_toplevel)
 register_toplevel(['fn_def, 'co_def], _fn_toplevel)
 register_toplevel(['import, 'import_static], _import_toplevel)
+register_toplevel(['template], _template_toplevel)
 
 # ---------------------------------------------------------------------------
 # statics (module.py's _flush_statics)
@@ -515,16 +574,44 @@ fn _assemble(module: ModuleContext) -> dict | error:
 # ---------------------------------------------------------------------------
 # the entry point
 
+# ---------------------------------------------------------------------------
+# decorator expansion hook (epic 10a M3/M4)
+#
+# The module being compiled never executes. When its tree still holds a
+# `'decorated` node after the predefined-decorator pre-pass, `compile_module`
+# hands the statements to the caller's `expander` (wyrm::compiler::expansion's
+# `expand_decorators` for the real thing: it compiles a scope module of the
+# module's imports and runs std::expand). The hook keeps this file free of
+# std::expand and wyrm::image, which pypoc's interpreter cannot import.
+
+# Does any `'decorated` node remain in `node`? Walks pair chains iteratively,
+# recursing only into elements, so depth follows tree nesting, not list length.
+fn _has_decorated(node) -> bool:
+    if node is pair:
+        if car(node) == 'decorated:
+            return true
+        cur := node
+        while cur is pair:
+            if _has_decorated(car(cur)):
+                return true
+            cur = cdr(cur)
+        return false
+    if (node is list) or (node is tuple):
+        for x in node:
+            if _has_decorated(x):
+                return true
+    return false
+
 # Compile a parsed program into a finished module image (the dict
-# `image.wy`'s `to_wyc` serializes), verifying it first unless `check` is
-# false. `stub_unlowered` decides what happens to a function body that will
-# not lower: with it on (the default) the body becomes a trapping stub and
-# the module still compiles, with the reason recorded on the image; with it
-# off the whole module is refused. Anything outside a function body is a
-# refusal either way.
+# image.wy's `to_wyc` serializes), verifying it first unless `check` is
+# false. Lowering is strict since 10a M0: a function body that will not
+# lower fails the whole module, unless the definition is under a
+# `@template` marking (predefined.wy's rewrite) - then the body becomes a
+# trapping stub with the reason recorded on the image. Anything outside a
+# function body is a refusal either way.
 fn compile_module(program_node, module_name: str, source_file = nil, check: bool = true,
                   slot_optimization: bool = false, emit_debug: bool = false,
-                  stub_unlowered: bool = true) -> dict | error:
+                  stub_unlowered: bool = false, expander = nil) -> dict | error:
     module := ModuleContext(module_name, source_file)
     module.slot_optimization = slot_optimization
     module.stub_unlowered = stub_unlowered
@@ -532,9 +619,31 @@ fn compile_module(program_node, module_name: str, source_file = nil, check: bool
     if node_kind(program_node) != 'module:
         return error("compile_module needs a 'module node")
 
+    # Predefined decorators first (epic 10a M0): `@template X` becomes a
+    # `'template` wrapper before the declare pass or the walk reads the
+    # tree, so every later stage sees one shape.
+    rewritten := expand_predefined_decorators(body)
+    if rewritten is error:
+        return rewritten
+    body = rewritten
+
+    # Decorators that remain (anything but a lone `@template`, which the
+    # pre-pass consumed) expand before lowering, by the caller's expander.
+    # Modules without any pay nothing.
+    if _has_decorated(body):
+        if expander is nil:
+            return error("'" + module_name + "' has decorators but no expander was supplied (see wyrm::compiler::expansion)")
+        expanded := expander(body, module_name)
+        if expanded is error:
+            return expanded
+        body = cdr(expanded)
+
     d := _declare_module_names(body, module)
     if d is error:
         return d
+    c := _collect_definitions(body, module)
+    if c is error:
+        return c
     pending := _hoist_imports(body, module)
     if pending is error:
         return pending

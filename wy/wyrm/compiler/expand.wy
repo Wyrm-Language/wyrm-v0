@@ -1,0 +1,243 @@
+# wy/wyrm/compiler/expand.wy - epic 10a M3
+#
+# The decorator expander. It does NOT run in the compiling VM: `std::expand`
+# (src/platform/hosted/expand_native.c) creates a throwaway machine, loads a
+# "scope" module (only the compiling module's imports), loads this module and
+# calls `expand_tree(tree, scope)` there. Only tree-shaped data crosses in and
+# out. See doc/addendum-decorator-expansion.md for the language rules and
+# vm_plan/epic_10a.md (D1-D10) for the design.
+#
+# What it does: walk the module tree outside-in, in source order. A
+# `$['decorated, decorators, stmt]` node applies its OUTERMOST decorator to the
+# rest as an ordinary message send (`bind_message` finds the decorator among
+# the scope's messages: a `fn [TreeBase] name(...)` imported by the module) and
+# replaces the node with the answer, then keeps walking the answer until no
+# `'decorated` remains. Each decorator is handed its operand RAW: an inner
+# decorator is still a `'decorated` node inside it, and `sexpr(this)` does not
+# expand it (unlike pypoc's, which expands on the way to encoding). A
+# decorator that must see the expanded inner tree has no `macroexpand` yet -
+# a known gap recorded in vm_plan/epic_10a_report.md; none of this repo's
+# decorators (`@accept`, `@template`) nests.
+#
+# Arguments are FORMS, not values (D9): a pure literal argument arrives as its
+# value, anything else as a TreeBase box of its tree.
+#
+# Pure wyrm, no host access: everything here must work in an expansion VM,
+# which has no `std::io` and no other host module.
+
+# The decorator currently being applied: [name] - the host reads it to name a
+# decorator that faulted instead of answering.
+_STATE := [nil]
+
+# Expansions performed so far this call, against a runaway decorator that
+# answers another application of itself.
+_EXPANSIONS := [0]
+_MAX_EXPANSIONS := 1000000
+
+# Kinds that sit in statement position (ast.wy's tables). A decorated node is
+# a statement when what it decorates is one of these.
+_STATEMENT_KINDS := ['expr_stmt, 'define, 'define_values, 'set, 'if_set,
+    'set_values, 'static, 'if, 'while, 'for, 'return, 'yield, 'yield_from,
+    'break, 'continue, 'pass, 'fn_def, 'co_def, 'class_def, 'slot_def,
+    'import, 'import_static, 'defer, 'template]
+
+# Answer of _literal for an argument that is not a literal.
+_NOT_LITERAL := '__not_a_literal__
+
+fn _ex_kind(node):
+    if node is pair:
+        return car(node)
+    if node is sym:
+        return node
+    return nil
+
+fn _ex_field(node, index: int):
+    cur := node
+    i := 0
+    while i < index:
+        if not (cur is pair):
+            return nil
+        cur = cdr(cur)
+        i = i + 1
+    if not (cur is pair):
+        return nil
+    return car(cur)
+
+# The elements of a list-shaped value (a pair list, native list or tuple,
+# whatever the parser produced); nil is empty.
+fn _ex_items(value):
+    out := []
+    if value is pair:
+        cur := value
+        while cur is pair:
+            out ! append(car(cur))
+            cur = cdr(cur)
+    elif value is list:
+        for x in value:
+            out ! append(x)
+    elif value is tuple:
+        for x in value:
+            out ! append(x)
+    return out
+
+# A pair list of `items`, ending in `tail`.
+fn _ex_pairs(items, tail):
+    result := tail
+    i := len(items)
+    while i > 0:
+        i = i - 1
+        result = cons(items[i], result)
+    return result
+
+# Is this decorated node in statement position? Judged by what it finally
+# decorates (peeling stacked decorators), as pypoc does.
+fn _ex_is_statement(node) -> bool:
+    inner := _ex_field(node, 2)
+    while _ex_kind(inner) == 'decorated:
+        inner = _ex_field(inner, 2)
+    return _ex_kind(inner) in _STATEMENT_KINDS
+
+# ---------------------------------------------------------------------------
+# arguments: literal value, or a tree box
+
+fn _ex_literal(arg):
+    kind := _ex_kind(arg)
+    if kind == 'true:
+        return true
+    if kind == 'false:
+        return false
+    if kind == 'nil:
+        return nil
+    if kind == 'int or kind == 'float or kind == 'str or kind == 'sym:
+        return _ex_field(arg, 1)
+    if kind == 'neg:
+        v := _ex_literal(_ex_field(arg, 1))
+        if v is int or v is float:
+            return 0 - v
+        return _NOT_LITERAL
+    if kind == 'array or kind == 'tuple:
+        vals := []
+        for item in _ex_items(cdr(arg)):
+            v := _ex_literal(item)
+            if v == _NOT_LITERAL:
+                return _NOT_LITERAL
+            vals ! append(v)
+        if kind == 'tuple:
+            return tuple(*vals)
+        return vals
+    return _NOT_LITERAL
+
+fn _ex_arg_value(arg):
+    v := _ex_literal(arg)
+    if v == _NOT_LITERAL:
+        return tree_box(arg)
+    return v
+
+# ---------------------------------------------------------------------------
+# applying one decorator
+
+fn _ex_decorator_error(name, message):
+    return error("@" + str(name) + ": " + message)
+
+# Apply `dec` (a `$['decorator, name, args]` node) to the raw `operand` tree.
+# Answers the new tree, or an error value.
+fn _ex_apply(dec, operand, scope):
+    name := _ex_field(dec, 1)
+    args := _ex_field(dec, 2)
+    _STATE[0] = name
+    vals := []
+    for a in _ex_items(args):
+        vals ! append(_ex_arg_value(a))
+    bound := bind_message(scope, tree_box(operand), name)
+    if bound is error:
+        # `@template` is predefined and shadowable (D7): the built-in only
+        # answers when the scope has no decorator of that name.
+        if name == 'template:
+            return $['template, operand]
+        return _ex_decorator_error(name,
+            str(error_message(bound)) + " (the decorator's module must be imported in a form that brings its messages into scope, e.g. `import m::*`)")
+    answer := bound(*vals)
+    if answer is error:
+        return _ex_decorator_error(name, str(error_message(answer)))
+    return sexpr(answer)
+
+# ---------------------------------------------------------------------------
+# the walk
+
+# Expand one `'decorated` node completely: apply its outermost decorator to
+# the rest, coerce the answer to the node's position, then walk the answer
+# (which expands any decorator it contains or produced).
+fn _ex_decorated(node, scope):
+    decs := _ex_items(_ex_field(node, 1))
+    stmt := _ex_field(node, 2)
+    if len(decs) == 0:
+        return _walk(stmt, scope)
+    as_statement := _ex_is_statement(node)
+    operand := stmt
+    # A decorator on an expression statement is handed the expression itself
+    # (as pypoc's does); the answer is re-wrapped below.
+    if len(decs) == 1 and _ex_kind(stmt) == 'expr_stmt:
+        operand = _ex_field(stmt, 1)
+    if len(decs) > 1:
+        rest := []
+        i := 1
+        while i < len(decs):
+            rest ! append(decs[i])
+            i = i + 1
+        operand = $['decorated, _ex_pairs(rest, nil), stmt]
+
+    _EXPANSIONS[0] = _EXPANSIONS[0] + 1
+    if _EXPANSIONS[0] > _MAX_EXPANSIONS:
+        return _ex_decorator_error(_ex_field(decs[0], 1), "expansion did not terminate")
+    answer := _ex_apply(decs[0], operand, scope)
+    if answer is error:
+        return answer
+
+    kind := _ex_kind(answer)
+    if kind != 'decorated:
+        is_stmt := kind in _STATEMENT_KINDS
+        if as_statement and not is_stmt:
+            answer = $['expr_stmt, answer]
+        elif (not as_statement) and is_stmt:
+            return _ex_decorator_error(_ex_field(decs[0], 1),
+                "answered a " + str(kind) + " where an expression was required")
+    return _walk(answer, scope)
+
+fn _ex_walk_pairs(node, scope):
+    items := []
+    cur := node
+    while cur is pair:
+        r := _walk(car(cur), scope)
+        if r is error:
+            return r
+        items ! append(r)
+        cur = cdr(cur)
+    return _ex_pairs(items, cur)
+
+fn _walk(node, scope):
+    if node is pair:
+        if car(node) == 'decorated:
+            return _ex_decorated(node, scope)
+        return _ex_walk_pairs(node, scope)
+    if node is list:
+        out := []
+        for x in node:
+            r := _walk(x, scope)
+            if r is error:
+                return r
+            out ! append(r)
+        return out
+    if node is tuple:
+        out := []
+        for x in node:
+            r := _walk(x, scope)
+            if r is error:
+                return r
+            out ! append(r)
+        return tuple(*out)
+    return node
+
+# Entry point called by std::expand: `tree` fully expanded, or an error value.
+fn expand_tree(tree, scope):
+    _EXPANSIONS[0] = 0
+    return _walk(tree, scope)

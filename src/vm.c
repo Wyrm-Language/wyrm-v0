@@ -425,6 +425,28 @@ static wy_error construct_on_call_f(wy_context* ctx, wy_class* cls, const wy_val
 
 /** `trap`'s message by code (wyc-format.md §6.1, interp.py TRAP_CODES). */
 /**
+ * The positional arguments of a `call_va`/`msg_va` window: a tuple (what the
+ * reference compiler joins for `f(a, *rest)`) or a plain list (what both
+ * compilers pass for a bare `f(*xs)`). The items are only read.
+ */
+static bool va_positional_f(wy_value posv, wy_value** items, wy_uword* count)
+{
+    if (posv.type == WY_TYPE_TAG_TUPLE) {
+        wy_tuple* tup = (wy_tuple*) posv.data.gc_object;
+        *items = (tup->count > 0) ? (wy_value*) tup->items : WY_NULL;
+        *count = tup->count;
+        return true;
+    }
+    if (posv.type == WY_TYPE_TAG_LIST) {
+        wy_list* list = (wy_list*) posv.data.gc_object;
+        *items = (list->count > 0) ? list->items : WY_NULL;
+        *count = list->count;
+        return true;
+    }
+    return false;
+}
+
+/**
  * The receiver(s) for a message send/bind (design_c_vm.md §7): `recv`
  * itself for ordinary single dispatch, or a TUPLE's items for multiple
  * dispatch. `*out_receivers` points into `*recv` (single) or the tuple's
@@ -1620,15 +1642,15 @@ reload:;
             wy_value kwv = L[base + 2];
 
             if (callee.type == WY_TYPE_TAG_CLASS) {
-                if (posv.type != WY_TYPE_TAG_TUPLE) {
+                wy_value* args = WY_NULL;
+                wy_uword argc = 0;
+                if (!va_positional_f(posv, &args, &argc)) {
                     fr->ip = next_ip;
                     fault_v = fault_value_f(ctx, "call_va: expected a positional tuple");
                     goto do_fault;
                 }
-                wy_tuple* tup = (wy_tuple*) posv.data.gc_object;
-                wy_value* args = (tup->count > 0) ? (wy_value*) tup->items : WY_NULL;
                 wy_value result;
-                wy_error err = try_construct_error_f(ctx, callee, args, tup->count, &result);
+                wy_error err = try_construct_error_f(ctx, callee, args, argc, &result);
                 if (err != WY_ERR_UNBOUND) {
                     if (err != WY_ERR_NONE) {
                         fr->ip = next_ip;
@@ -1653,7 +1675,7 @@ reload:;
                 bool pushed = false;
                 wy_value instance_v = wy_value_nil();
                 char fault_msg[WY_VM_CALL_FAULT_MSG];
-                err = construct_on_call_f(ctx, (wy_class*) callee.data.gc_object, args, tup->count,
+                err = construct_on_call_f(ctx, (wy_class*) callee.data.gc_object, args, argc,
                     (kwargs != WY_NULL && kwargs->count > 0) ? kwargs : WY_NULL, &L[base], nres,
                     &pushed, &instance_v, fault_msg, sizeof(fault_msg));
                 if (err != WY_ERR_NONE) {
@@ -1669,12 +1691,51 @@ reload:;
                 goto reload;
             }
 
+            if (callee.type == WY_TYPE_TAG_BOUND_MSG) {
+                /* `bound(*args, **kw)` on a stored `recv ! name`: same push
+                 * as the plain CALL case, arguments taken from the joined
+                 * tuple/dict (bind_message's answer, epic 10a). */
+                wy_value* bargs = WY_NULL;
+                wy_uword bargc = 0;
+                if (!va_positional_f(posv, &bargs, &bargc)) {
+                    fr->ip = next_ip;
+                    fault_v = fault_value_f(ctx, "call_va: expected a positional tuple");
+                    goto do_fault;
+                }
+                if (kwv.type != WY_TYPE_TAG_TABLE && kwv.type != WY_TYPE_TAG_NIL) {
+                    fr->ip = next_ip;
+                    fault_v = fault_value_f(ctx, "call_va: expected a keyword dict");
+                    goto do_fault;
+                }
+                wy_bound_msg* bm = (wy_bound_msg*) callee.data.gc_object;
+                wy_dict* bkw = (kwv.type == WY_TYPE_TAG_TABLE) ? (wy_dict*) kwv.data.gc_object : WY_NULL;
+                const wy_value* receivers; wy_uword n;
+                dispatch_receivers_f(&bm->receiver, &receivers, &n);
+                wy_uword tcount = dispatch_this_count_f(bm->body, n);
+                fr->ip = next_ip;
+                char bfault_msg[WY_VM_CALL_FAULT_MSG];
+                wy_error berr = push_bytecode_call_bind_f(ctx, (wy_function*) bm->body.data.gc_object,
+                    tcount, receivers, bargs, bargc,
+                    (bkw != WY_NULL && bkw->count > 0) ? bkw : WY_NULL,
+                    &L[base], nres, WY_RET_WINDOW, bfault_msg, sizeof(bfault_msg));
+                if (berr != WY_ERR_NONE) {
+                    fault_v = fault_value_f(ctx, push_fault_text_f(berr, bfault_msg));
+                    goto do_fault;
+                }
+                fb->current_frame->dispatch_msg = bm->msg;
+                fb->current_frame->dispatch_body = bm->body;
+                fb->current_frame->flags |= WY_FRAME_FLAG_METHOD;
+                goto reload;
+            }
+
             if (callee.type != WY_TYPE_TAG_FUNCTION && callee.type != WY_TYPE_TAG_NATIVE) {
                 fr->ip = next_ip;
                 fault_v = fault_value_f(ctx, "value is not callable");
                 goto do_fault;
             }
-            if (posv.type != WY_TYPE_TAG_TUPLE) {
+            wy_value* args = WY_NULL;
+            wy_uword argc = 0;
+            if (!va_positional_f(posv, &args, &argc)) {
                 fr->ip = next_ip;
                 fault_v = fault_value_f(ctx, "call_va: expected a positional tuple");
                 goto do_fault;
@@ -1684,11 +1745,7 @@ reload:;
                 fault_v = fault_value_f(ctx, "call_va: expected a keyword dict");
                 goto do_fault;
             }
-            wy_tuple* tup = (wy_tuple*) posv.data.gc_object;
             wy_dict* kwargs = (kwv.type == WY_TYPE_TAG_TABLE) ? (wy_dict*) kwv.data.gc_object : WY_NULL;
-            /* A leaf native only reads its arguments; the tuple is not
-             * mutated here (wy_vm_call_leaf_f's signature predates const). */
-            wy_value* args = (tup->count > 0) ? (wy_value*) tup->items : WY_NULL;
 
             if (callee.type == WY_TYPE_TAG_NATIVE) {
                 wy_native* native = (wy_native*) callee.data.gc_object;
@@ -1698,7 +1755,7 @@ reload:;
                     fault_v = fault_value_f(ctx, "call_va: native keyword calls are not supported");
                     goto do_fault;
                 }
-                wy_error err = wy_vm_call_leaf_f(ctx, native, args, tup->count, &L[base], nres);
+                wy_error err = wy_vm_call_leaf_f(ctx, native, args, argc, &L[base], nres);
                 if (err != WY_ERR_NONE) {
                     fr->ip = next_ip;
                     char fail_msg[128];
@@ -1713,7 +1770,7 @@ reload:;
             fr->ip = next_ip;
             char fault_msg[WY_VM_CALL_FAULT_MSG];
             wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) callee.data.gc_object,
-                0, WY_NULL, args, tup->count,
+                0, WY_NULL, args, argc,
                 (kwargs != WY_NULL && kwargs->count > 0) ? kwargs : WY_NULL,
                 &L[base], nres, WY_RET_WINDOW, fault_msg, sizeof(fault_msg));
             if (err != WY_ERR_NONE) {
@@ -1790,7 +1847,9 @@ reload:;
             wy_value posv = L[base + 1];
             wy_value kwv = L[base + 2];
 
-            if (posv.type != WY_TYPE_TAG_TUPLE) {
+            wy_value* args = WY_NULL;
+            wy_uword argc = 0;
+            if (!va_positional_f(posv, &args, &argc)) {
                 fr->ip = next_ip;
                 fault_v = fault_value_f(ctx, "msg_va: expected a positional tuple");
                 goto do_fault;
@@ -1800,9 +1859,7 @@ reload:;
                 fault_v = fault_value_f(ctx, "msg_va: expected a keyword dict");
                 goto do_fault;
             }
-            wy_tuple* tup = (wy_tuple*) posv.data.gc_object;
             wy_dict* kwargs = (kwv.type == WY_TYPE_TAG_TABLE) ? (wy_dict*) kwv.data.gc_object : WY_NULL;
-            wy_value* args = (tup->count > 0) ? (wy_value*) tup->items : WY_NULL;
 
             wy_message* msg = WY_NULL;
             wy_error m_err = wy_module_resolve_message_f(ctx, mod, message_idx, &msg);
@@ -1841,7 +1898,7 @@ reload:;
                 fr->ip = next_ip;
                 char fault_msg2[WY_VM_CALL_FAULT_MSG];
                 wy_error err = dispatch_native_body_f(ctx, (wy_native*) body.data.gc_object,
-                    receivers, n, args, tup->count, &L[base], nres, fault_msg2, sizeof(fault_msg2));
+                    receivers, n, args, argc, &L[base], nres, fault_msg2, sizeof(fault_msg2));
                 if (err != WY_ERR_NONE) {
                     fault_v = fault_value_f(ctx, fault_msg2);
                     goto do_fault;
@@ -1853,7 +1910,7 @@ reload:;
             fr->ip = next_ip;
             char fault_msg2[WY_VM_CALL_FAULT_MSG];
             wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) body.data.gc_object,
-                dispatch_this_count_f(body, n), receivers, args, tup->count,
+                dispatch_this_count_f(body, n), receivers, args, argc,
                 (kwargs != WY_NULL && kwargs->count > 0) ? kwargs : WY_NULL,
                 &L[base], nres, WY_RET_WINDOW, fault_msg2, sizeof(fault_msg2));
             if (err != WY_ERR_NONE) {

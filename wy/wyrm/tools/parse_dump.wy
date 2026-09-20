@@ -1,0 +1,11 @@
+# Parse the file named by the first argument with wy/wyrm's own parser and
+# print the resulting tree. (Formerly `__main` at the foot of parser.wy,
+# moved out in epic 10a: parser.wy must not import std::io, because its
+# decorators are expanded in an expansion VM that has no host modules.)
+import std::io::*
+import wyrm::parser::*
+
+f := open(car(__ARGS), "r")
+content := f!readall()
+program := Parser(content)!program()
+println(program)

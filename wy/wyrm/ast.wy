@@ -27,38 +27,108 @@ fn n_set_values(targets: pair, value: pair) -> pair:
 #     'unop unary ops
 #     'binop binary ops
 #     'call
+# ---------------------------------------------------------------------------
+# Tree shapes (epic 10a). Two producers exist: pypoc's compiler (`'fn`,
+# `$['name, x]`, `'msg`, lists as native `[...]`) and this repo's own parser
+# (`'fn_def`, bare-symbol names, `'message`, pair lists). The DSL in _dsl.wy
+# runs under whichever built it and must read and write THAT shape, so every
+# shape-dependent read/build goes through this file. The shape is detected
+# from a template of this very module: `::$ast` yields a `'fn` tree when
+# pypoc compiled it and a `'fn_def` tree when the port did.
+fn _shape_probe():
+    pass
+
+WY_SHAPE := car(sexpr(_shape_probe::$ast)) == 'fn_def
+
+# Pair list of `items` (a native list or pair list); nil stays nil. The port's
+# trees hold pair lists where pypoc's hold native lists.
+fn _s_plist(items):
+    if items is list:
+        return chain(items)
+    return items
+
+# The elements of a list-shaped field as a native list (either shape).
+fn s_items(field) -> list:
+    out := []
+    if field is list:
+        for x in field:
+            out ! append(x)
+    else:
+        cur := field
+        while cur is pair:
+            out ! append(car(cur))
+            cur = cdr(cur)
+    return out
+
+# The kind of a node; a bare symbol is a name reference in the port's trees.
+fn s_kind(node):
+    if node is pair:
+        return car(node)
+    if WY_SHAPE and (node is sym):
+        return 'name
+    return nil
+
 fn s_op_name(e):
     return cadr(e)
 
-# Unary Target
 fn s_unary_target(e):
-    # Current form: ('unop [OP] target)
+    # pypoc: ('unop OP target); port: ('invert target)
+    if WY_SHAPE:
+        return cadr(e)
     return caddr(e)
 
-# Binary op lhs
 fn s_binop_lhs(e):
     # Current form ('binop [OP] LHS RHS)
     return caddr(e)
 
-# Binary op rhs
 fn s_binop_rhs(e):
     # Current form ('binop [OP] LHS RHS)
     return car(cdddr(e))
 
-# Return true if literal is type name and name matches
+# A reference to the identifier `name`?
 fn s_is_name_match(literal, name) -> bool:
+    if WY_SHAPE:
+        return (literal is sym) and (literal == name)
     return ((car(literal) == 'name) and (cadr(literal) == name)) catch false
 
+# The identifier a name reference spells.
 fn s_get_name(literal) -> sym:
+    if WY_SHAPE and (literal is sym):
+        return literal
     if car(literal) != 'name:
         return error("name expected")
     return cadr(literal)
 
-fn s_call_target(call) -> pair:
-    return s_op_name(call)
+# The callee of a call node (a name reference).
+fn s_call_target(call):
+    return cadr(call)
 
-fn s_call_args(call) -> pair:
-    return caddr(call)
+# The arguments of a call node, as a native list.
+fn s_call_args(call) -> list:
+    return s_items(caddr(call))
+
+# `~x`: pypoc ('unop ~ x), port ('invert x).
+fn s_is_drop(node) -> bool:
+    if not (node is pair):
+        return false
+    if WY_SHAPE:
+        return car(node) == 'invert
+    if car(node) == 'unop and s_op_name(node) == '~:
+        return true
+    return false
+
+# `$[a, b, ...]`: pypoc ('pairlist [a, b, ...]), port ('list a b ...).
+fn s_is_pairlist(node) -> bool:
+    if not (node is pair):
+        return false
+    if WY_SHAPE:
+        return car(node) == 'list
+    return car(node) == 'pairlist
+
+fn s_pairlist_items(node) -> list:
+    if WY_SHAPE:
+        return s_items(cdr(node))
+    return s_items(cadr(node))
 
 _FN_NAME := 1
 _FN_RESULTS := 2
@@ -67,11 +137,15 @@ _FN_KWARGS := 4
 _FN_PARAMS := 5
 _FN_DISPATCH := 6
 _FN_BODY := 7
-# Get body from function
-fn s_fn_body(e):
-    return car(list_tail(sexpr(e), _FN_BODY))
+# The port's 'fn_def: (fn_def name dispatch params ret_type body)
+_FN_DEF_BODY := 5
 
-# Given function node, return new sexpr with replaced body
+fn s_fn_body(e):
+    tree := sexpr(e)
+    if car(tree) == 'fn_def:
+        return car(list_tail(tree, _FN_DEF_BODY))
+    return car(list_tail(tree, _FN_BODY))
+
 fn s_fn_with_body(node, body) -> pair:
     return $['fn, field(node, _FN_NAME), field(node, _FN_RESULTS), field(node, _FN_REST),
              field(node, _FN_KWARGS), field(node, _FN_PARAMS), field(node, _FN_DISPATCH), body]
@@ -323,6 +397,19 @@ fn test_parse(s: str) -> pair:
 #                                         `@decorator` line at once instead
 #                                         of nesting one 'decorated per
 #                                         decorator)
+# template   -> (tree)                   no pypoc kind (epic 10a M0: the
+#                                         predefined `@template` decorator's
+#                                         rewrite - `$['template, X]` wrapping
+#                                         the decorated statement X, wrapper
+#                                         removed by compiler/predefined.wy's
+#                                         pre-pass for the sole or innermost
+#                                         decorator). Produced by decoration,
+#                                         never by parsing, so parser-truth
+#                                         checks against pypoc's sexpr.py are
+#                                         unaffected: pypoc's `@template` is a
+#                                         pass-through that never emits it
+#                                         (`_decorator_template` answers the
+#                                         tree unchanged).
 #
 # -- Modules and imports ------------------------------------------------------
 # (wyrm's import shape is structurally different from pypoc's: pypoc has one
@@ -369,6 +456,8 @@ fn test_parse(s: str) -> pair:
 # on the wyrm poc code, and that's really broken.
 # ---------------------------
 NIL_EXPR := $['nil]
+if WY_SHAPE:
+    NIL_EXPR = 'nil
 
 fn mk_sym(s: sym) -> pair:
     return $['sym, s]
@@ -382,43 +471,114 @@ fn mk_type(s: sym) -> pair:
 fn mk_binop(lhs: pair, op: sym, rhs: pair):
     return $['binop, op, lhs, rhs]
 
-fn mk_name(name: sym) -> pair:
+# A reference to the identifier `name`.
+fn mk_name(name: sym):
+    if WY_SHAPE:
+        return name
     return $['name, name]
 
+# A call of the callee expression `target` (already a node) on `args`.
+fn mk_call_expr(target, args):
+    if WY_SHAPE:
+        return $['call, target, _s_plist(args)]
+    return $['call, target, args]
+
 fn mk_call(func: sym, args: list) -> pair:
-    return $['call, mk_name(func), args]
+    return mk_call_expr(mk_name(func), args)
 
 fn mk_expr_stmt(stmt: pair) -> pair:
     return $['expr_stmt, stmt]
 
 fn mk_do(block):
+    if WY_SHAPE:
+        return $['do, _s_plist(block)]
     return $['do, block]
 
 fn mk_if(cond, then_block, else_block):
+    if WY_SHAPE:
+        # (if cond body elifs else)
+        return $['if, cond, _s_plist(then_block), nil, _s_plist(else_block)]
     return $['if, cond, then_block, else_block]
 
 fn mk_or(lhs, rhs):
     return $['or, lhs, rhs]
 
+# `lhs is <typename>`
+fn mk_is_type(lhs, typename: sym):
+    if WY_SHAPE:
+        return $['is, lhs, mk_type(typename)]
+    return $['is, lhs, [mk_type(typename)]]
+
 fn mk_is(lhs, rhs):
     return $['is, lhs, rhs]
 
-# @brief Build expansion of template function AST
-#
+# `obj[idx]`
+fn mk_index(obj, idx):
+    return $['index, obj, idx]
+
+# `this ! name()`: a send of the bare message `name` to `this`, no arguments.
+fn mk_this_send(name: sym):
+    if WY_SHAPE:
+        return $['message, 'this, name, nil, 'send]
+    return $['msg, $['name, 'this], name, []]
+
+# The identifier-name positions of these nodes are not references, so a
+# template substitution must leave them alone (the port's names are bare
+# symbols: `tok.kind` must not lose its `kind` when a hole is named `kind`).
+# attr and message fields name members.
+fn _s_subst(node, hole, repl):
+    if node is sym:
+        if node == hole:
+            return repl
+        return node
+    if node is list:
+        out := []
+        for x in node:
+            out ! append(_s_subst(x, hole, repl))
+        return out
+    if not (node is pair):
+        return node
+    head := car(node)
+    if head == 'sym or head == 'str or head == 'int or head == 'float or head == 'char or head == 'type:
+        return node
+    if head == 'attr:
+        # (attr obj name)
+        return $['attr, _s_subst(cadr(node), hole, repl), caddr(node)]
+    if head == 'message:
+        # (message target name args send)
+        return $['message, _s_subst(cadr(node), hole, repl), caddr(node),
+                 _s_subst_tail(car(cdddr(node)), hole, repl), car(cdr(cdddr(node)))]
+    # Any other pair - a node or a list of nodes/names alike; a kind symbol
+    # never equals a hole, so every element (the head too) is substituted.
+    return _s_subst_tail(node, hole, repl)
+
+# The rest of a node's fields (or a list of nodes): each element substituted,
+# cells rebuilt, without treating a cell's first element as a node head.
+fn _s_subst_tail(cells, hole, repl):
+    if cells is pair:
+        return cons(_s_subst(car(cells), hole, repl), _s_subst_tail(cdr(cells), hole, repl))
+    return _s_subst(cells, hole, repl)
+
+# `tree` with every reference to `hole` replaced by `repl`.
+fn s_substitute(tree, hole, repl):
+    if WY_SHAPE:
+        return _s_subst(tree, hole, repl)
+    return replace(fn(node) { s_is_name_match(node, hole) }, repl, tree)
+
 # Given a template function, substitute the given arguments
 # and return a newly created pair list suitable for
 # s_fn_with_body or a general block.
 fn mk_expand_n(tmpl_ast, *subs) -> pair:
     body := s_fn_body(sexpr(tmpl_ast))
     out := []
-    for stmt in body:
+    for stmt in s_items(body):
         expanded := stmt
         for sub in subs:
             hole := try (car(sub) catch sub[0])
             repl := try (cdr(sub) catch sub[1])
-            expanded = replace(fn(node) { s_is_name_match(node, hole) }, repl, expanded)
+            expanded = s_substitute(expanded, hole, repl)
         out ! append(expanded)
-    return $['do, out]
+    return mk_do(out)
 
 # @brief Build expansion of template function AST (1 type)
 fn mk_expand(tmpl_ast, name, replace) -> pair:

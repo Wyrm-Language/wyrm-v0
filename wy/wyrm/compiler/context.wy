@@ -42,6 +42,8 @@
 #    a wyrm program cannot introspect a Python interpreter, so BUILTIN_NAMES
 #    below is that list, frozen. Regenerate it with:
 #      pypoc/.venv/bin/python -c "from wypoc.completion import interpreter_names as n; print(sorted(n()[0]))"
+#    Builtins only this repo's C VM defines are added by hand afterwards
+#    (sorted in place): bind_message, error_message, tree_box.
 #
 # 4. Only `init` lives inside each class body; every other method is a
 #    top-level `fn [ClassName] name(...)` (wy/wyrm/parser.wy's idiom).  A
@@ -103,10 +105,10 @@ BUILTIN_NAMES := ["$set_car", "$set_cdr", "OSError", "OutOfMemory",
     "__sock_listen", "__sock_recv", "__sock_recvfrom", "__sock_send",
     "__sock_sendto", "__term_isatty", "__term_raw_disable",
     "__term_raw_enable", "__term_read_key", "__term_size", "__write",
-    "bool", "bytes", "car", "cdr", "cons", "copy", "end", "error", "exit",
-    "float", "help", "int", "len", "macroexpand", "next", "nil", "nreverse",
+    "bind_message", "bool", "bytes", "car", "cdr", "cons", "copy", "end",
+    "error", "error_message", "exit", "float", "help", "int", "len", "macroexpand", "next", "nil", "nreverse",
     "pair", "parse", "print", "println", "range", "resolve", "reverse",
-    "send", "sexpr", "str", "sym", "tuple", "__ARGS"]
+    "send", "sexpr", "str", "sym", "tree_box", "tuple", "__ARGS"]
 
 # ---------------------------------------------------------------------------
 # pack_pairable (opcodes.py's, see note 2 in the header comment)
@@ -565,6 +567,13 @@ class FnContext:
     slot scopes: list
     slot scope_stack: list
     slot top_body
+    # Epic 10a M0: set on the frame of a definition compiled under a
+    # `@template` marking - a body that will not lower becomes a trapping
+    # stub (reason recorded) instead of failing the module, even in strict
+    # mode. Consulted only by fn/co definitions (`_compile_or_stub`);
+    # nested definitions start their own frames with it false, so the flag
+    # cannot leak past the definition it was set for.
+    slot tolerant: bool
 
     fn init(module, name: str, params: list | nil = nil,
             captures: list | nil = nil, this_count: int = 0,
@@ -600,6 +609,7 @@ class FnContext:
         this.scopes = []
         this.scope_stack = []
         this.top_body = nil
+        this.tolerant = false
         declared := _or_empty(params)
         captured := _or_empty(captures)
         offset := 0
@@ -1080,7 +1090,9 @@ class ModuleContext:
     # `fn name(...)` - message promotion.
     slot promoted_arities: dict
     # Whether a function body that will not lower becomes a trapping stub
-    # rather than failing the whole module.
+    # rather than failing the whole module. False (strict) since 10a M0:
+    # only a definition under a `@template` marking stubs, via its frame's
+    # own `tolerant` flag - not by turning this on for the whole module.
     slot stub_unlowered: bool
     # context.py calls this `init`; a wyrm class's own constructor owns that
     # name, so the module-init frame is `init_ctx` here.
@@ -1103,7 +1115,7 @@ class ModuleContext:
         this.emit_debug = true
         this.definitions = {}
         this.promoted_arities = {}
-        this.stub_unlowered = true
+        this.stub_unlowered = false
         this.init_ctx = FnContext(this, "<init>", nil, nil, 0, true, nil)
         this.pending = []
 

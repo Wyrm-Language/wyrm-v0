@@ -85,15 +85,15 @@
 #    calls through `set_body_compiler`'s one-shot hook instead (see below);
 #    `_lambda` is still stubbed, for M4 to close the same way.
 #
-# 8. `foo::$ast` (`_ast_ref`) has no grammar support (`::$` is not a token
-#    wy/wyrm's tokenizer produces at all) and decorator expansion
-#    (`frame.module.definitions`, populated by module.wy's decorator pass) is
-#    out of scope before M5/M6, so no dispatch case exists for it and it is
-#    not implemented. `emit_value` - the constant-materializing primitive
-#    `_ast_ref` would call - IS implemented in full below, for M5+ to reuse,
-#    and is simpler here than in pypoc: a wy/wyrm tree node already *is* the
-#    native sexpr-shaped value (pair lists of syms/literals), so there is no
-#    `sexpr.encode()` step to run first - `emit_value` takes the node itself.
+# 8. `foo::$ast` (`_ast_ref`) has no grammar of its own: `$` is a legal
+#    identifier character, so `foo::$ast` parses as an ordinary
+#    `'qualified_name` whose leaf segment spells `$ast`, and it is the
+#    lowering (`_scope`) that decides - by that leaf spelling - that this
+#    names a definition's tree rather than a scope hop. The tree comes from
+#    `frame.module.definitions`, populated by module.wy's declare pass
+#    (10a M0; M3 will record post-expansion trees there instead), and is
+#    materialized only at a reference site, via `emit_value` - the same
+#    tree-constant path `$[...]` literals use.
 #
 # 9. `_scope`'s free-global/class-static shortcut is checked once, against
 #    the whole flattened `qualified_name` path, then folds the remaining
@@ -1058,6 +1058,14 @@ fn _scope(node, frame: FnContext, dst):
         rest = cdr(rest)
     if len(parts) == 0:
         return error("empty qualified name")
+    # `name::$ast` (epic 10a M0): the leaf spelling marks a definition-tree
+    # reference, not a scope hop. `$ast` is an ordinary name to the parser
+    # (`$` is a legal identifier character), so the decision belongs here,
+    # where the whole path is in hand, and is taken only when a module
+    # actually says `::$ast` - a module that never does records nothing and
+    # pays nothing.
+    if parts[len(parts) - 1] == AST_FIELD:
+        return _astref(parts, frame, dst)
     first := sym(parts[0])
     if (frame ! lookup(first)) is nil:
         gidx := (frame.module) ! class_static(parts)
@@ -1097,6 +1105,30 @@ fn _scope(node, frame: FnContext, dst):
         reg = target
         i = i + 1
     return reg
+
+# ---------------------------------------------------------------------------
+# `name::$ast` - see deviation 8. `AST_FIELD` is the leaf spelling; `_astref`
+# resolves it against `module.definitions` and materializes the tree.
+
+AST_FIELD := "$ast"
+
+# `name::$ast` - the tree of the definition `name` names, as a value
+# (pypoc's `_ast_ref`, resolved against `module.definitions`; the same
+# "describes the definition, not the binding" rule its docstring records -
+# a local variable could never hold a tree, so no lexical scope is consulted
+# here). Only a two-component path names a definition: `a::b::$ast` has a
+# scope hop in the middle, and trees do not live in scopes. The tree is
+# emitted at the reference site through `emit_value` - the same
+# tree-constant path `$[...]` literals take - so it is built only for the
+# definitions a module actually reaches for.
+fn _astref(parts: list, frame: FnContext, dst):
+    if len(parts) != 2:
+        return error("`::$ast` needs the name of a definition in this module")
+    name := parts[0]
+    definition := (frame.module.definitions[name] catch nil)
+    if definition is nil:
+        return error("`" + name + "::$ast` names no fn, co or class defined in this module; a compiled module carries no trees to reach across")
+    return emit_value(definition, frame, dst)
 
 # ---------------------------------------------------------------------------
 # coroutines (spec 7.1)
@@ -1319,10 +1351,11 @@ fn compile_va(frame: FnContext, nres: int, op, callee_node, args, reloc, receive
     return window
 
 # ---------------------------------------------------------------------------
-# constant materialization - see deviation 8. `_ast_ref` itself is not
-# implemented (no grammar support for `::$ast` exists to dispatch to it),
-# but `emit_value` is the general primitive M5+ will want for it and for
-# slotreg/parameter constant defaults.
+# constant materialization - see deviation 8. `_astref` (above) resolves
+# `name::$ast` and lands here: `emit_value` is the tree-constant primitive,
+# and is simpler here than in pypoc because a wy/wyrm tree node already *is*
+# the native sexpr-shaped value (pair lists of syms/literals) - there is no
+# `sexpr.encode()` step to run first, `value` is taken as-is.
 
 fn _emit_sequence(items: list, frame: FnContext, dst, op) -> int | error:
     reg := _target(frame, dst)

@@ -1,0 +1,52 @@
+# wy/wyrm/compiler/expansion.wy - epic 10a M4
+#
+# The decorator-expansion driver `compile_module` calls (its `expander`
+# argument) when a tree still holds a `'decorated` node. It lives outside
+# module.wy so that module.wy stays importable by pypoc's interpreter (this
+# file needs the C VM's `std::expand` and wyrm::image).
+#
+# The module being compiled never executes. Its own top-level imports are
+# compiled into a "scope" module; `std::expand::expand` (a throwaway VM, see
+# src/platform/hosted/expand_native.c) loads that scope, runs
+# wyrm::compiler::expand there on the tree and answers the fully expanded
+# tree. See doc/addendum-decorator-expansion.md and vm_plan/epic_10a.md.
+#
+# Requirements on the caller's include path: the `.wyc` images of
+# wyrm::compiler::expand and of every module the compiled module imports (the
+# expansion VM resolves them through the parent's import hook).
+
+import std::expand
+import wyrm::image::*
+import wyrm::compiler::context::*
+import wyrm::compiler::analysis::*
+import wyrm::compiler::module::*
+
+fn _ex_pairs_from(items):
+    result := nil
+    i := len(items)
+    while i > 0:
+        i = i - 1
+        result = cons(items[i], result)
+    return result
+
+# `body`: the statements of the module being compiled. Answers the expanded
+# `$['module, ...]` tree, or an error value naming the module.
+fn expand_decorators(body, module_name: str):
+    imports := []
+    for stmt in body:
+        kind := node_kind(stmt)
+        if (kind == 'import) or (kind == 'import_static):
+            imports ! append(stmt)
+    scope_img := compile_module(cons('module, _ex_pairs_from(imports)), "__expand_scope__")
+    if scope_img is error:
+        return error("decorator expansion of '" + module_name + "': its imports do not compile: "
+            + str(error_message(scope_img)))
+    blob := to_wyc(scope_img)
+    if blob is error:
+        return error("decorator expansion of '" + module_name + "': cannot serialize its imports")
+    expanded := std::expand::expand(cons('module, body), blob, "wyrm::compiler::expand")
+    if expanded is error:
+        return error("decorator expansion of '" + module_name + "' failed: " + str(error_message(expanded)))
+    if node_kind(expanded) != 'module:
+        return error("decorator expansion of '" + module_name + "' failed: the result is not a module tree")
+    return expanded

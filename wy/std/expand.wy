@@ -1,0 +1,6 @@
+# Stub so pypoc's tree-walking interpreter can `import std::expand` (the
+# compiler's module.wy does). The real module is a C VM host module
+# (src/platform/hosted/expand_native.c) registered before any import is
+# resolved, so on the C VM this file is never loaded.
+fn expand(tree, scope, entry):
+    return error("std::expand is only available on the C VM")

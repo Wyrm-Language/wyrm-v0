@@ -12,6 +12,7 @@
 #include <wyrm/link.h>
 #include <wyrm/list.h>
 #include <wyrm/module.h>
+#include <wyrm/platform/hosted/expand_native.h>
 #include <wyrm/platform/hosted/io_native.h>
 #include <wyrm/string.h>
 #include <test_common/test_context_fixture.h>
@@ -60,7 +61,9 @@ wy_error fixture_import(wy_context* ctx, const char* path, wy_uword len,
     for (std::size_t pos = 0; (pos = relative.find("::", pos)) != std::string::npos;) {
         relative.replace(pos, 2, "/");
     }
-    auto storage = read_binary_file(root + "/" + relative + ".wyc");
+    std::string file = root + "/" + relative + ".wyc";
+    if (!std::ifstream(file, std::ios::binary).good()) { return WY_ERR_UNBOUND; }
+    auto storage = read_binary_file(file);
     *out = static_cast<wy_u8*>(wy_context_gc_alloc(ctx, storage.size()));
     if (*out == nullptr) { return WY_ERR_NOMEM; }
     std::memcpy(*out, storage.data(), storage.size());
@@ -114,6 +117,7 @@ std::string run_fixture(const std::string& name, wy_uword gc_threshold)
     REQUIRE_EQ(wy_builtins_new(context, &builtins), WY_ERR_NONE);
     context->builtins = builtins;
     REQUIRE_EQ(wy_io_module_install(context), WY_ERR_NONE);
+    REQUIRE_EQ(wy_expand_module_install(context), WY_ERR_NONE);
 
     std::vector<wy_u8> storage = read_binary_file(std::string(WY_TEST_BYTECODE_DIR) + "/" + name + ".wyc");
     wy_module* module = WY_NULL;
@@ -131,6 +135,12 @@ std::string run_fixture(const std::string& name, wy_uword gc_threshold)
     {
         wy_list* args = WY_NULL;
         REQUIRE_EQ(wy_list_new(context, 0, &args), WY_ERR_NONE);
+        if (name.rfind("expand/", 0) == 0) {
+            /* expand fixtures locate their sibling images through __ARGS[0]. */
+            wy_string* dir = WY_NULL;
+            REQUIRE_EQ(wy_string_new(context, import_root.data(), import_root.size(), &dir), WY_ERR_NONE);
+            REQUIRE_EQ(wy_list_push(context, args, wy_value_object(WY_TYPE_TAG_STR, (wy_object*) dir)), WY_ERR_NONE);
+        }
         REQUIRE_EQ(seed_global(context, module, "__ARGS", wy_value_object(WY_TYPE_TAG_LIST, (wy_object*) args)),
             WY_ERR_NONE);
     }
@@ -141,6 +151,10 @@ std::string run_fixture(const std::string& name, wy_uword gc_threshold)
         REQUIRE_EQ(result, WY_ERR_NONE);
     }
 
+    if (name.rfind("expand/", 0) == 0) {
+        /* Every expansion VM must be freed completely. */
+        CHECK_EQ(wy_expand_leaked_bytes(), 0u);
+    }
     return captured;
 }
 
@@ -179,6 +193,10 @@ TEST_SUITE("golden")
     TEST_CASE("two_module shapes_main") { check_fixture("two_module/shapes_main"); }
     TEST_CASE("two_module dunder_name") { check_fixture("two_module/dunder_name"); }
     TEST_CASE("two_module dunder_name_main") { check_fixture("two_module/dunder_name_main"); }
+    TEST_CASE("template") { check_fixture("template"); }
+    TEST_CASE("template gcstress") { check_fixture_gcstress("template"); }
+    TEST_CASE("expand treemain") { check_fixture("expand/treemain"); }
+    TEST_CASE("expand expandmain") { check_fixture("expand/expandmain"); }
     TEST_CASE("wildcard paint") { check_fixture("wildcard/paint"); }
     TEST_CASE("wildcard palette") { check_fixture("wildcard/palette"); }
     TEST_CASE("decorators decorated") { check_fixture("decorators/decorated"); }
@@ -219,6 +237,8 @@ TEST_SUITE("golden-gcstress")
     TEST_CASE("two_module shapes_main") { check_fixture_gcstress("two_module/shapes_main"); }
     TEST_CASE("two_module dunder_name") { check_fixture_gcstress("two_module/dunder_name"); }
     TEST_CASE("two_module dunder_name_main") { check_fixture_gcstress("two_module/dunder_name_main"); }
+    TEST_CASE("expand treemain") { check_fixture_gcstress("expand/treemain"); }
+    TEST_CASE("expand expandmain") { check_fixture_gcstress("expand/expandmain"); }
     TEST_CASE("wildcard paint") { check_fixture_gcstress("wildcard/paint"); }
     TEST_CASE("wildcard palette") { check_fixture_gcstress("wildcard/palette"); }
     TEST_CASE("decorators decorated") { check_fixture_gcstress("decorators/decorated"); }

@@ -175,7 +175,7 @@ fn _emit_pairable(frame: FnContext, op, primary: int = 0, secondary: int = 0) ->
 # names]`. `enclosing` is the frame this definition sits in, if any; the
 # names its body reads from that frame become its captures, in
 # first-encounter order (analysis.wy's `free_names`).
-fn compile_function(node, module, name = nil, flags: int = 0, enclosing = nil) -> list | error:
+fn compile_function(node, module, name = nil, flags: int = 0, enclosing = nil, tolerant: bool = false) -> list | error:
     dispatch_node := (_field(node, 2) catch nil)
     if not (dispatch_node is nil):
         return error("the bytecode compiler does not support dispatch on a class target (`frame [T] name`) yet")
@@ -189,7 +189,7 @@ fn compile_function(node, module, name = nil, flags: int = 0, enclosing = nil) -
     # first field is the send type); boundary_params unwraps both shapes.
     params := boundary_params(node)
     body := (_field(node, 5) catch nil)
-    return compile_callable(module, fn_name, params, body, nil, f, enclosing, [], nil)
+    return compile_callable(module, fn_name, params, body, nil, f, enclosing, [], nil, tolerant)
 
 # ---------------------------------------------------------------------------
 # parameters
@@ -458,17 +458,23 @@ fn _make_stub(frame: FnContext) -> nil:
 # function keeps its table entry and its body becomes a `trap`, which is
 # exactly what calling it is: unreachable code reached.
 #
-# The reason is recorded on the image; nothing is swallowed.
-# `module.stub_unlowered = false` turns this off, propagating the `error`
-# instead - what a test suite wants so a genuine compiler gap still fails
-# loudly (see deviation 2).
+# Two independent knobs decide that outcome (epic 10a M0):
+#   - `frame.tolerant` - set on a definition under a `@template` marking.
+#     A template's code may never be run, so it stubs even in strict mode,
+#     with the lowering refusal recorded as the reason.
+#   - `module.stub_unlowered` - the module-wide default, false (strict)
+#     since 10a M0: a lowering failure outside a template is a compile
+#     error, which is what keeps the confusion stub-everything hid from
+#     coming back.
+# The reason is recorded on the image either way; nothing is swallowed
+# silently.
 fn _compile_or_stub(frame: FnContext, names: list, captures: list, body, module) -> str | nil | error:
     outcome := _try_compile(frame, names, captures, body)
     if outcome is error:
-        if not module.stub_unlowered:
-            return outcome
-        _make_stub(frame)
-        return str(outcome)
+        if frame.tolerant or module.stub_unlowered:
+            _make_stub(frame)
+            return str(outcome)
+        return outcome
     return nil
 
 # ---------------------------------------------------------------------------
@@ -479,7 +485,7 @@ fn _compile_or_stub(frame: FnContext, names: list, captures: list, body, module)
 # Shared by `fn` definitions, lambdas, `defer` blocks and (M5's) class
 # methods - all of them a body that runs in a frame of its own over a P
 # frame of `this` values, parameters and captures, in that order (spec 1).
-fn compile_callable(module, name: str, params, body, pos, flags: int = 0, enclosing = nil, dispatch: list | nil = nil, this_class = nil) -> list | error:
+fn compile_callable(module, name: str, params, body, pos, flags: int = 0, enclosing = nil, dispatch: list | nil = nil, this_class = nil, tolerant: bool = false) -> list | error:
     spec := param_spec(params, module)
     if spec is error:
         return spec
@@ -496,6 +502,7 @@ fn compile_callable(module, name: str, params, body, pos, flags: int = 0, enclos
     frame := FnContext(module, name, names, captures, len(dispatch_list), false, this_class)
     frame.cells = _cells(names, body, captures, enclosing)
     frame.is_coroutine = (f & FN_COROUTINE) != 0
+    frame.tolerant = tolerant
     ds := _declare_statics(frame, name, body, module)
     if ds is error:
         return ds
@@ -519,7 +526,11 @@ fn compile_callable(module, name: str, params, body, pos, flags: int = 0, enclos
         return reason
     entry := module.image.functions[index]
     if not (reason is nil):
-        (module.image.unlowered) ! append([name, reason])
+        # The third field says why the stub is allowed to exist: a
+        # `@template` definition (frame.tolerant) stubs even in strict
+        # mode, and compiler_main's report - and the self-compile scripts'
+        # stub assertion - key on that distinction.
+        (module.image.unlowered) ! append([name, reason, frame.tolerant])
     entry["nlocals"] = frame.high
     entry["nresults"] = frame.max_results
     entry["uses"] = _copy_list(frame.uses)
@@ -573,13 +584,13 @@ fn emit_closure(frame: FnContext, index: int, captures: list, dst) -> nil | erro
 # closure in `dst`. `boundary_params`/`boundary_body` (analysis.wy) already
 # know each of those kinds' field layout, including `co_lambda`'s
 # `co_params` wrapper, so this works unmodified for all four.
-fn compile_closure_expr(node, frame: FnContext, dst, name) -> int | error:
+fn compile_closure_expr(node, frame: FnContext, dst, name, tolerant: bool = false) -> int | error:
     params := boundary_params(node)
     body := boundary_body(node)
     f := 0
     if node_kind(node) == 'co_lambda:
         f = FN_COROUTINE
-    result := compile_callable(frame.module, str(name), params, body, nil, f, frame, [], nil)
+    result := compile_callable(frame.module, str(name), params, body, nil, f, frame, [], nil, tolerant)
     if result is error:
         return result
     index := result[0]
@@ -590,14 +601,16 @@ fn compile_closure_expr(node, frame: FnContext, dst, name) -> int | error:
     return dst
 
 # A nested `fn name(...)`/`co name(...)` statement: build the closure, bind
-# the name.
-fn compile_nested_fn(node, frame: FnContext, pos = nil) -> nil | error:
+# the name. `tolerant` is a template marking handed down by statements.wy's
+# `'template` handler (epic 10a M0); an ordinary nested definition defaults
+# to strict.
+fn compile_nested_fn(node, frame: FnContext, pos = nil, tolerant: bool = false) -> nil | error:
     mark := frame ! mark()
     reg := frame ! push()
     if reg is error:
         return reg
     name := (_field(node, 1) catch nil)
-    e := compile_closure_expr(node, frame, reg, name)
+    e := compile_closure_expr(node, frame, reg, name, tolerant)
     if e is error:
         return e
     e2 := store_reg(name, reg, frame)

@@ -1,0 +1,8 @@
+# Faults while "applying a decorator": std::expand must name it from _STATE[0]
+# (the convention wyrm/compiler/expand.wy follows) in the error it answers.
+_STATE := [nil]
+
+fn expand_tree(tree, scope):
+    _STATE[0] = 'boomdec
+    f := 5
+    return f()

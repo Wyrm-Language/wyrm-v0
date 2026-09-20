@@ -45,6 +45,8 @@ void wy_context_init_s(wy_context* self)
     self->builtins = WY_NULL;
     self->error_class = WY_NULL;
     self->stop_iteration_class = WY_NULL;
+    self->tree_base_class = WY_NULL;
+    self->expansion = false;
     self->fiber_list = WY_NULL;
     self->co_stack_len = WY_CONTEXT_CO_STACK_LEN_DEFAULT;
     self->co_frame_count = WY_CONTEXT_CO_FRAME_COUNT_DEFAULT;

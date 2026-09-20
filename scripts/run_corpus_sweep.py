@@ -29,8 +29,7 @@ PYPOC_WYRM = os.path.join(ROOT, "pypoc", ".venv", "bin", "wyrm")
 MANIFEST = os.path.join(ROOT, "test", "bytecode", "manifest.txt")
 
 # Concatenation order: std shards, serialization/front end, compiler
-# modules, driver main. parser.wy's `# Simple Demo` tail is dropped: it
-# runs under __name__ == "__main__" with no __ARGS and would crash.
+# modules, driver main.
 AMALGAM_FILES = [
     "wy/std/pairs.wy",
     "wy/std/ctype.wy",
@@ -50,7 +49,9 @@ AMALGAM_FILES = [
     "wy/wyrm/compiler/functions.wy",
     "wy/wyrm/compiler/classes.wy",
     "wy/wyrm/compiler/verify.wy",
+    "wy/wyrm/compiler/predefined.wy",
     "wy/wyrm/compiler/module.wy",
+    "wy/wyrm/compiler/expansion.wy",
     "wy/wyrm/tools/compiler_main.wy",
 ]
 
@@ -72,9 +73,7 @@ EXPECTED_DIVERGES = {
     "samples/eval_modules": "import std::io::println as alias: wy_link_import has no parent-then-member fallback",
     "samples/eval_signals": "REFUSED upstream: `signal` in a class body is not lowered (8.5)",
     "samples/lexical": "REFUSED upstream: `with` has been removed from the language",
-    "decorators/decorated": "REFUSED upstream: decorator expansion is unported infrastructure",
-    "decorators/declib": "REFUSED upstream: decorator expansion is unported infrastructure",
-    "samples/decolib": "REFUSED upstream: decorator expansion is unported infrastructure",
+    "decorators/decorated": "pypoc's declib builds pypoc's 8-field 'fn node; the port's parser emits 'fn_def (see expand/wydecorated, its port-shaped twin)",
 }
 
 
@@ -83,8 +82,6 @@ def build_amalgam(workdir):
     out = []
     for rel in AMALGAM_FILES:
         text = open(os.path.join(ROOT, rel)).read()
-        if rel.endswith("parser.wy"):
-            text = text.split("# Simple Demo")[0]
         for line in text.splitlines(keepends=True):
             if re.match(STRIP_IMPORT, line):
                 continue
@@ -144,6 +141,35 @@ def build_amalgam(workdir):
     return os.path.join(workdir, "wyrm_compiler.wyc")
 
 
+def build_expander(workdir, driver_wyc):
+    """Epic 10a M3: compile the decorator expander (wy/wyrm/compiler/expand.wy)
+    into <workdir>/wyrm/compiler/expand.wyc, where a throwaway expansion VM's
+    import hook finds it. pypoc cannot build it (it does not know the C VM's
+    tree_box/bind_message builtins), but the expander has no decorators, so
+    the decorator-free gen0 driver compiles it."""
+    out = os.path.join(workdir, "wyrm", "compiler")
+    os.makedirs(out, exist_ok=True)
+    src = os.path.join(ROOT, "wy", "wyrm", "compiler", "expand.wy")
+    r = subprocess.run([WYRM, "-I" + workdir, driver_wyc, out, src],
+                       capture_output=True, text=True, timeout=300)
+    if r.returncode != 0 or not os.path.exists(os.path.join(out, "expand.wyc")):
+        print(r.stdout, r.stderr, file=sys.stderr)
+        sys.exit("corpus sweep: the expander failed to compile")
+
+    # The decorators an expansion VM runs (wyrm/_dsl.wy and its helper
+    # wyrm/ast.wy) must be built by the PORT, not pypoc: their tree shape
+    # follows the compiler that built them (ast.wy's WY_SHAPE), and the
+    # operands they receive here are the port's. Both are decorator-free, so
+    # the gen0 driver compiles them over pypoc's copies.
+    wyrm_out = os.path.join(workdir, "wyrm")
+    for rel in ("wy/wyrm/ast.wy", "wy/wyrm/_dsl.wy"):
+        r = subprocess.run([WYRM, "-I" + workdir, driver_wyc, wyrm_out, os.path.join(ROOT, rel)],
+                           capture_output=True, text=True, timeout=300)
+        if r.returncode != 0 or ("OK " + os.path.basename(rel)[:-3]) not in r.stdout:
+            print(r.stdout, r.stderr, file=sys.stderr)
+            sys.exit("corpus sweep: %s failed to compile with the port" % rel)
+
+
 def manifest_rows():
     rows = []
     for line in open(MANIFEST):
@@ -171,6 +197,7 @@ def main():
 
     with tempfile.TemporaryDirectory(dir="/tmp") as work:
         driver_wyc = build_amalgam(work)
+        build_expander(work, driver_wyc)
 
         # The corpus: every manifest row with a source and a compiled
         # reference. Sources live under pypoc/test/bytecode/; the sweep
@@ -189,6 +216,15 @@ def main():
             expected_out[src] = (
                 os.path.join(ROOT, "test", "bytecode", out_rel) if out_rel else None
             )
+        # Port-only fixtures authored in this repo (test/bytecode/expand):
+        # decorators written against the self-hosted parser's tree shapes.
+        # wydeclib compiles first: wydecorated's expansion loads it from
+        # out_dir. wydecorated has a hand-authored .out.
+        for stem_name in ("wydeclib", "wydecorated"):
+            path = os.path.join(ROOT, "test", "bytecode", "expand", stem_name + ".wy")
+            sources.append(path)
+            out = os.path.join(ROOT, "test", "bytecode", "expand", stem_name + ".out")
+            expected_out[path] = out if os.path.exists(out) else None
         # shapes.wy (the corelib module eval_modules imports) joins the
         # corpus so that import resolves; it has no .out of its own.
         shapes = os.path.join(ROOT, "pypoc", "wypoc", "corelib", "shapes.wy")
@@ -196,11 +232,23 @@ def main():
             sources.append(shapes)
             expected_out[shapes] = None
 
-        args = [WYRM, "-I" + work, driver_wyc, out_dir] + sources
+        # out_dir is on the path too: a decorated fixture's expansion loads
+        # its decorator module (compiled earlier in this same run) from there.
+        args = [WYRM, "-I" + work, "-I" + out_dir, driver_wyc, out_dir] + sources
         r = subprocess.run(args, capture_output=True, text=True, timeout=600)
         sys.stdout.write(r.stdout)
         if r.returncode != 0:
             print(r.stderr, file=sys.stderr)
+
+        # Epic 10a M0: the driver compiles strictly now. A STUB line is a
+        # body that failed to lower and stubbed anyway - only a `@template`
+        # definition may stub (reported as TSTUB), so a bare STUB is a
+        # failure however green the runs look.
+        stub_lines = [line for line in r.stdout.splitlines()
+                      if line.startswith("STUB ")]
+        stub_failures = len(stub_lines)
+        for line in stub_lines:
+            print("unexpected stub: " + line, file=sys.stderr)
 
         def stem(path):
             base = os.path.basename(path)
@@ -252,8 +300,8 @@ def main():
 
         print(f"\ncorpus sweep: {len(verdicts)} fixtures, "
               f"{sum(1 for _, v, _ in verdicts if v == 'matches')} matches, "
-              f"{failures} unexpected failure(s)")
-        return 1 if failures else 0
+              f"{failures + stub_failures} unexpected failure(s)")
+        return 1 if (failures or stub_failures) else 0
 
 
 def rel_of(src):

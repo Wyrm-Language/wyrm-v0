@@ -1,0 +1,2 @@
+# A scope whose import needs a capability the expansion VM does not have.
+import std::io

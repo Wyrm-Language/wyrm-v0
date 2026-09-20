@@ -1,0 +1,41 @@
+# Epic 10a M2: std::expand end to end. The golden harness seeds __ARGS with
+# this fixture's directory (the only fixture directory that gets a non-empty
+# __ARGS); expand's child VM resolves the entry module through the harness's
+# own import hook, the same way the parent does.
+import std::io
+import std::expand
+
+dir := __ARGS[0]
+
+fn read_image(path: str):
+    h := std::io::open(path, "rb")
+    b := std::io::read_bytes(h, 1000000)
+    std::io::close(h)
+    return b
+
+scope := read_image(dir + "/scope.wyc")
+scope_io := read_image(dir + "/scope_io.wyc")
+
+r := std::expand::expand(cons('a, cons('b, nil)), scope, "expander_ok")
+println(r)
+
+# Deep and wide trees survive the round trip.
+big := nil
+i := 0
+while i < 5000:
+    big = cons(i, big)
+    i = i + 1
+r2 := std::expand::expand(big, scope, "expander_ok")
+println(len(car(r2)), len(car(cdr(r2))))
+
+t := std::expand::expand([1, "s", 'sym, 2.5, true, (1, 2), nil], scope, "expander_ok")
+println(t)
+
+println(error_message(std::expand::expand(nil, scope, "expander_fn")))
+println(std::expand::expand(nil, scope, "expander_nested"))
+println(error_message(std::expand::expand(nil, scope, "expander_none")))
+println(error_message(std::expand::expand(nil, scope, "expander_boom")))
+println(error_message(std::expand::expand(nil, scope_io, "expander_ok")))
+println(error_message(std::expand::expand(nil, scope, "no_such_module")))
+println(error_message(std::expand::expand(fn(x): x, scope, "expander_ok")))
+println("done")

@@ -38,6 +38,7 @@ import wyrm::compiler::functions::*
 import wyrm::compiler::classes::*
 import wyrm::compiler::verify::*
 import wyrm::compiler::module::*
+import wyrm::compiler::expansion::*
 
 fn basename(path: str) -> str:
     last := 0
@@ -67,24 +68,30 @@ fn compile_one(out_dir: str, path: str) -> bool:
     if tree is error:
         println("REFUSED " + name + " (parse)")
         return false
-    # stub_unlowered=true (pypoc's default): a body that will not lower
-    # becomes a trapping stub with the reason recorded, so modules whose
-    # never-called `::$ast` templates use `this` (wy/wyrm/_dsl.wy) still
-    # compile. Genuine refusals outside function bodies still refuse.
-    img := compile_module(tree, name, path, true, false, false, true)
+    # Strict lowering (epic 10a M0 default): a body that will not lower
+    # fails the module - except under a `@template` marking, which stubs
+    # tolerantly with the reason recorded. The old stub-everything default
+    # (stub_unlowered=true) is gone: what it hid is exactly what 10a M0
+    # exists to make explicit.
+    img := compile_module(tree, name, path, true, false, false, false, expand_decorators)
     if img is error:
         println("REFUSED " + name + " (compile: " + str(error_message(img)) + ")")
         return false
     # Stub report (epic 10 M7 / 10a scan item 1): every body that would
     # not lower and became a trapping stub, with the lowering refusal as
     # the reason. compile_module records these on the image's "unlowered"
-    # key (never serialized); printing them here is what makes gen 1's
-    # trap-stub functions visible instead of silent.
+    # key (never serialized) as [name, reason, is_template]. TSTUB marks a
+    # `@template` definition - allowed to stub in strict mode; a bare STUB
+    # is a lowering failure the strict default should have refused, and
+    # the self-compile scripts treat one as a failure.
     stubs := img["unlowered"] catch nil
     if stubs is nil:
         stubs = []
     for entry in stubs:
-        println("STUB " + name + "::" + str(entry[0]) + " (" + str(entry[1]) + ")")
+        if entry[2]:
+            println("TSTUB " + name + "::" + str(entry[0]) + " (template: " + str(entry[1]) + ")")
+        else:
+            println("STUB " + name + "::" + str(entry[0]) + " (" + str(entry[1]) + ")")
     blob := to_wyc(img)
     if blob is error:
         println("REFUSED " + name + " (serialize)")

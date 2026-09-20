@@ -975,6 +975,37 @@ The primary use case would be rewriting functions:
     fn modify_func():
         ...
 
+**`@template`.** `@template` is a predefined decorator marking its operand as a
+*template*: a tree written to be quoted, whose code may never be run. It may be shadowed
+like any decorator. A template is compiled exactly as the same tree would be without the
+decoration, except that if it cannot be lowered, no diagnostic is issued and the code is
+replaced by a trap that raises the recorded reason if it is executed. `name::$ast` yields
+the tree of a definition, with any `@template` marking removed and after other decorators
+have expanded. It is available for definitions in the same module; a compiled module
+supplies a tree only if it retained one. Everything not marked is lowered strictly.
+
+**`name::$ast`.** The `::$ast` suffix on a definition's name answers the definition's tree
+as a value - the sexpr-shaped data (symbols, literals, lists and pair lists) the compiler
+itself parsed, with any `@template` marking removed and after other decorators have
+expanded. `::` rather than `.` because this resolves a *name* statically in a namespace:
+the runtime value of `foo` is a closure, which is not the thing being asked for. The tree
+is resolved at compile time against the definitions of the module being compiled, and is
+materialized only where a `::$ast` reference actually appears - a module that never says
+`::$ast` records nothing. A name that is not a fn, co or class defined in this module has
+no tree to reach: nothing across a module boundary is resolved at compile time, and a
+compiled dependency carries no trees at all. `$ast` is the first of a reserved `$`-family
+(`$name`, `$line`, `$doc` are not built); any other `$field` is a compile error rather
+than a silently different meaning.
+
+    fn twice(x):
+        return x * 2
+
+    t := twice::$ast      # the tree of `twice`, as data
+
+    @template
+    fn tpl(n):
+        return n + 1      # may use tree-only constructs; never called directly
+
 
 ## Core Features
 

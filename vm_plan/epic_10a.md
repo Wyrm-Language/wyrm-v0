@@ -8,18 +8,28 @@ keep their names.
 ## Goal
 
 Make decorators real compile-time macros, the way Lisp does it, in the self-hosted compiler
-running on the C VM. After parsing a module, the compiler creates a **dynamic expansion
-context** (a live scope inside the same `wy_context`), loads what the module imports into it,
-and runs each decorator (`fn [TreeBase] name(...)` messages) against the decorated tree in
-that context, replacing the tree with the decorator's answer until no decorator remains.
-Only then does lowering run. The mechanism is a small **eval primitive in the C API,
-exposed to wyrm**; the compiler stays in wyrm.
+running on the C VM. After parsing a module, the compiler hands the tree to a **temporary,
+isolated expansion VM** (its own machine, context, heap and module registry - never the
+compiling VM's). The child loads what the module imports, normally, from their compiled
+images, and runs each decorator (`fn [TreeBase] name(...)` messages) against the decorated
+tree, replacing the tree with the decorator's answer until no decorator remains. The
+expanded tree is copied back into the parent and the child is destroyed. Only then does
+lowering run. The mechanism is a small **`expand` primitive in the C API, exposed to wyrm**;
+the compiler and the expander stay in wyrm.
+
+Language-level wording for all of this is in `doc/addendum-decorator-expansion.md`
+(proposed spec text; fold into `doc/language-spec.md` when M3 lands).
+
+**The module being compiled is not part of the execution path.** It is still a tree. Only
+its imports (already compiled, already expanded) execute, inside the child. Nothing of the
+compiling VM's state - globals, fibers, module registry, counters - is visible to a
+decorator, and nothing a decorator does can pollute it.
 
 The Python POC's version (`compiler_bc/module.py::_expand_decorators` calling
 `wyrm_eval_parse_tree.expand_decorators`) is the reference for *behaviour*, not for
 *structure*: it exists only inside pypoc's tree-walking interpreter, executes only top-level
-imports, and cannot see definitions from the module being compiled. Where they disagree the
-Lisp model here wins (decision D1 below).
+imports, and cannot see definitions from the module being compiled. Behaviour matches
+pypoc on that point (decision D1 below); the isolation (D8) is new.
 
 **Exit criterion:**
 ```sh
@@ -28,6 +38,27 @@ Lisp model here wins (decision D1 below).
 python3 scripts/run_corpus_sweep.py      # 20/20 (decorators/decorated no longer refused)
 python3 scripts/run_selfcompile.py       # fixed point over ALL 21 self-sources incl. parser.wy
 ```
+
+## Implementation status and deltas (2026-09-20; see epic_10a_report.md)
+
+M0-M5 are implemented (report, "M5 landed": `ast.wy` owns the tree shape). Where the code differs from the text below, the code wins:
+
+- The dynamic-send primitive is a LEAF `bind_message(scope, recv, name)` answering a bound
+  message (the VM already calls `bound_msg` values); `send` was taken (coroutines) and no
+  exec native was needed. `tree_box`/`sexpr` are leaf builtins; `TreeBase` has a `__tree` slot.
+- The expansion primitive is `std::expand::expand(tree, scope_image, entry)` (a hosted module),
+  not a builtin `expand` (that name is the list builtin). The child reuses the parent's
+  import hook, so the parent does not pre-collect the import closure; the expander and the
+  decorator modules must be `.wyc` images on the compile's `-I` path.
+- `eval_module`/`module_get`/`std::eval` and the exec-native inline-init item are gone (D9).
+- `compile_module` takes an `expander` callback (wired by `compiler_main.wy` to
+  `wyrm::compiler::expansion::expand_decorators`) instead of calling `std::expand` itself, so
+  module.wy stays importable by pypoc's interpreter.
+- Same-module decorator use is refused (D1); `macroexpand` is specified (D2) but NOT yet
+  provided, and `sexpr(this)` does not expand nested decorators (no repo decorator nests).
+- A lone `@template` is still rewritten by the M0 pre-pass without consulting the scope
+  (shadowing is honoured only for the cases the expander sees: outer/inner positions).
+- `f(*xs)` (call_va/msg_va) now accepts a native list positional; call_va calls bound messages.
 
 ## Evaluation of the "eval in the C API" option (2026-09-18)
 
@@ -44,49 +75,84 @@ What already exists and is reused unchanged:
 - The ported compiler itself: it turns a tree into image bytes on the C VM today.
 
 What is missing (this epic):
-1. **Running a freshly compiled fragment from wyrm code.** The compiler can produce bytes;
-   nothing can load and initialise them mid-execution. `wy_module_run_init` /
-   `wy_vm_call_sync` are host-only (design rule: no C recursion from natives), so this must
-   be an **exec native** that pushes the init frame inline like `IMPORT` does, not a leaf
-   native that calls back into the VM.
+0. **The `expand` primitive** (host side, callable from wyrm in the *top-level* VM only):
+   `expand(tree, imports) -> tree | error`. `imports` is the transitive closure of the
+   module's imports as compiled images, resolved by the parent (the compiler already finds
+   `.wyc` files on the include path); the child never reads a file. `expand` creates a fresh
+   VM and context flagged as an expansion VM with an **allow-list native table** (D10),
+   loads and initialises `imports` **host-side** (`wy_module_load_bytes`, register, link,
+   `wy_module_run_init` on the child - host calls on a different VM, so no inline-init exec
+   native is needed), copies `tree` in, calls the expander entry (`expand.wy`, an ordinary
+   image loaded the same way) with a host sync call on the child, copies the resulting tree
+   out, destroys the child. Called inside an expansion VM it returns an error ("expansion
+   is not re-entrant"): nesting depth is fixed at 1. Only tree-shaped data crosses: nil,
+   bool, numbers, str, symbol, pairs, tuples; anything else returned by a decorator is a D5
+   error. The copy is iterative (no recursion).
+1. **No code generation in the child.** Under D1/D9 the module being compiled never
+   executes and decorator arguments are trees or literal values, so the child needs neither
+   the compiler nor `eval_module`/fragment loading. This retires the exec-native inline-init
+   piece the earlier plan carried; `send` (below) is the only new exec native.
 2. **Dynamic message send by name** (`send(recv, 'name, args...)`) - decorators are looked up
    by the name in `@name(...)`, which is data at expansion time. Another exec native wrapping
    the existing `WY_OP_MSG_VA` dispatch.
-3. **Reading a scope's bindings by name** (`module_get`) - leaf native over
-   `wy_link_scope_member`.
+3. (Dropped: `module_get` / `eval_module` are no longer needed, see 1.)
 4. **A real `TreeBase`.** The C VM's is a bare class with no slots (epic 5/M5). Decorators
    receive `this` as a TreeBase box around the tree and call `sexpr(this)`; needs the
    `__tree` slot plus `tree_box(sexpr)` / `sexpr(x)` builtins. In the wyrm-in-wyrm front end the
    tree already *is* the sexpr (parser.wy emits pair lists), so both are trivial.
 
-Rejected alternative: a general "eval source text" in C. C has no compiler; it would either
-embed one (circular) or call back into wyrm. The primitive is "evaluate compiled code in a
-scope"; source-to-code stays in wyrm.
+Rejected alternatives: a general "eval source text" in C (C has no compiler; it would embed
+one or call back into wyrm), and evaluating module code or decorator arguments in the
+expansion VM (needs the compiler in the child and an inline-init exec native; unnecessary
+under D9).
 
-Cost/risk: moderate. The exec-native/inline-init shape is the only design-sensitive part
-(coroutine/fiber trampolines are the precedent: `next`/`send` in `builtins.c`). Everything
-else is glue.
+Cost/risk: moderate. The new pieces are `expand` (VM lifecycle, tree copy, allow-list
+natives) and `send` (an exec native; coroutine/fiber trampolines are the precedent:
+`next`/`send` in `builtins.c`). Everything else is glue.
 
-## Decisions (D1 needs the user's confirmation before M3)
+## Decisions (D1 and D8 confirmed by the user 2026-09-19)
 
-- **D1 (proposed):** the expansion scope contains (a) the module's imports, executed for real
-  and in order, as pypoc does, **plus (b) top-level definitions** (`fn`, `fn [T]`, `class`,
-  constant `static`s) that precede the form being expanded, evaluated as they are passed -
-  so a decorator defined earlier in the same file works, like `defmacro` earlier in a Lisp
-  file. Other top-level statements (calls, prints) are walked but not executed, as in pypoc.
-  If the user wants pypoc's stricter imports-only rule, drop (b); nothing else changes.
+- **D1 (final 2026-09-19):** the expansion VM contains **only the module's imports**, run
+  for real from their compiled images, as pypoc does. The module being compiled never
+  executes: a decorator must come from an import, not from a definition earlier in the same
+  file. The module's own top-level statements are walked as data only. An explicit
+  compile-time marker (Lisp's `eval-when`) is designed-for but out of scope.
+- **D9 (2026-09-19): arguments are forms.** `@name(a, b) stmt` passes `a` and `b`
+  unevaluated. A pure literal (number, string, symbol, list/tuple literal of literals) is
+  delivered as its value, so `@add_value(5)` with `v: int` works; any other argument is
+  delivered as a tree (`TreeBase`); a parameter annotated `TreeBase` gets the tree even for a
+  literal. Literal folding is a small pure tree evaluator inside `expand.wy`. No compile or
+  execution of module code is involved. (M3 detail: the annotation check needs the resolved
+  message's parameter types; if that is not introspectable, fall back to "literal -> value,
+  else tree" and record it in the report.)
+- **D8 (2026-09-19): isolated, single-level expansion VM.** Each module compile creates one
+  temporary top-level machine and context, runs all of that module's expansion in it, copies
+  the result tree out and destroys it. Never a grandchild: `expand` is illegal inside an
+  expansion VM. The expander walks forms in source order and `macroexpand`s a form fully
+  before anything is derived from it. The child contains no compiler, so it cannot re-enter
+  expansion by accident. Consequences: no leaked registrations, no shared counters (`_next_accept_site_id`
+  restarts per module compile - confirm that site ids need only be unique within a module),
+  an obvious place to add resource limits later (out of scope here).
 - **D2:** outside-in expansion with `macroexpand`, matching pypoc: a decorator is handed its
   operand raw and may call `macroexpand(tree)` to force an inner decorator. `macroexpand` is
-  seeded into the scope with `wy_link_seed_global`.
+  an ordinary wyrm function of the child's expander (it finds `'decorated` nodes, looks the
+  decorator up in the child's scope, sends, recurses); it is seeded into the scope with
+  `wy_link_seed_global`. Nothing calls back into the parent.
 - **D3:** no hygiene (same as pypoc); `gensym` is out of scope.
 - **D4:** expansion is deterministic. `_dsl.wy`'s `_next_accept_site_id` counter fixes packrat
   site ids at expansion time, so expansion order must be fixed (source order, outside-in) or
   the self-compile fixed point will not converge.
 - **D5:** expansion errors are compile errors that name the decorator and the tree, not VM
   faults. Eval failure inside the scope returns an error value to the wyrm caller.
-- **D6:** fragments are ordinary modules named `__expand__::N`, with `__name__` set to that;
-  each wildcard-imports the previous fragment plus the module's imports. No mutable/growing
-  module is introduced.
+- **D6 (retired 2026-09-19):** there are no fragment modules (`__expand__::N`); D9 removed
+  them. Number kept so references stay valid.
+- **D10 (2026-09-19): no ambient authority.** The parent supplies import images; the child's
+  native table is an allow-list of pure operations (arithmetic, strings, collections,
+  symbols, trees, `send`, `macroexpand` support, `tree_box`/`sexpr`) with **no file,
+  network, process, environment, clock or random natives and no I/O modules**. An imported
+  module whose init needs a missing native fails to load with a D5 error naming the module
+  and the capability. Also serves D4 (determinism) and `hosted=false`. Resource limits
+  (memory, steps) are out of scope but the VM-per-module shape allows them.
 - **D7 (`@template`, decided 2026-09-18):** `@template` is a *predefined, shadowable*
   decorator, not a reserved name. Its default implementation wraps the operand tree as
   `$['template, <tree>]`; the compiler's special behaviour is keyed on that **`'template`
@@ -118,8 +184,9 @@ else is glue.
    decorator receives, how its answer is decoded, statement vs expression position.
 4. `grep -n "decorat" wy/wyrm/parser.wy` for the sexpr shape: `$['decorated, decs, stmt]`,
    `$['decorator, name, args]`.
-5. Read how `WY_OP_IMPORT` pushes init inline (`src/vm.c` ~846) and how `next`/`send`
-   (`builtins.c`) switch fibers; both are the templates for the exec natives.
+5. Read how `next`/`send` (`builtins.c`) switch fibers (the template for the `send` exec
+   native), how `wy_vm`/`wy_context` are created and destroyed from host code (the template
+   for `expand`), and how natives are registered into a context (the allow-list, D10).
 6. Read the `decorators` corpus fixture and `test/wy/test_dsl.wy` (what already works under
    the tree-walker).
 
@@ -214,26 +281,40 @@ defines `fn [TreeBase] twice()` and a driver that boxes a tree and sends `twice`
 
 Acceptance: the fixture prints the rewritten tree; `meson test` green.
 
-### M2 - `eval_module`, `module_get`, `std::eval` (Sonnet; may fan out with M1's doctests)
+### M2 - `expand` primitive and the expansion native allow-list (Opus)
 
-Exec native `eval_module(image: bytes, name: str, parent: module | nil) -> module`: load,
-register, link (wildcard from `parent`), push init inline, answer the module. Leaf natives
-`module_get(m, name)` / `module_has(m, name)`. Expose all three plus `send` and `tree_box`/
-`sexpr` as `std::eval` (hosted) so the compiler and user macros import one place. Errors
-come back as error values.
+**`expand(tree, imports) -> tree | error`** per "What is missing" item 0: fresh VM and
+context, expansion flag, allow-list native table (D10), host-side load/link/init of the
+import images, iterative tree copy-in/copy-out over the allowed data kinds, non-re-entrant
+error, child destroyed on every path (success, error, decorator fault).
 
-Acceptance: golden fixture reads a `.wyc` from disk into `bytes`, `eval_module`s it, reads a
-global through `module_get`, and calls a function from it; gcstress suite included.
+Acceptance (doctests, plus a tiny golden fixture with a hand-written expander entry):
+- copy fidelity (shapes, sharing, long lists, deep nesting) and rejection of non-tree
+  results (D5 error naming the decorator);
+- the re-entrancy error;
+- no registrations, globals or counters visible in the parent afterwards, and a decorator
+  library's counter restarts per call;
+- an import needing a disallowed native (file/clock/random) fails with the capability named;
+- allocator accounting returns to baseline on success and on every error path; gcstress.
+
+Model split: Opus for `expand`; Sonnet for doctests. Standalone (not `std::eval`):
+`eval_module`, `module_get` and a `std::eval` module are dropped from this epic.
 
 ### M3 - `wy/wyrm/compiler/expand.wy` (Opus)
 
-The expansion pass per D1-D6: ordered top-level walk, scope construction (imports, then
-definitions as fragments compiled through `compile_module` and loaded with `eval_module`),
-decorator application (evaluate arguments as a fragment expression, box, `send`, decode,
-repeat), nested/expression-position decorators, `macroexpand`. Also unstubs
-`compiler_main.wy`'s reporting (scan item 1).
+The expander, per D1-D10, a normal wyrm module run **entirely inside the child VM** with one
+entry point called by `expand`: ordered outside-in walk over the tree, decorator lookup by
+name in the child's scope (predefined `template` as fallback, so shadowing works, replacing
+M0's pre-pass), argument delivery per D9 (literal fold, else tree box), `send`, decode the
+answer, repeat until no `'decorated` remains, nested and expression-position decorators,
+`macroexpand`. It imports nothing but pure support modules. Also: parent-side wiring that
+collects the import closure's images for `expand`; fold `doc/addendum-decorator-expansion.md`
+into `doc/language-spec.md`; unstub `compiler_main.wy`'s reporting (scan item 1).
 
-Acceptance: `decorators/decorated` compiles through the port and matches its `.out`.
+Acceptance: `decorators/decorated` compiles through the port and matches its `.out`; a test
+each for: argument as literal value, as tree, `TreeBase`-annotated literal; a decorator
+answering a non-tree; a decorator from a module needing I/O (fails naming the capability);
+`macroexpand` of an inner decorator.
 
 ### M4 - Wire into `compile_module`; corpus and `_dsl` green (Sonnet)
 
@@ -250,28 +331,37 @@ into `meson test` (skip without `pypoc/.venv` until epic 11 lifts that).
 
 ## Risks
 
-- **Exec-native inline init is the one design-sensitive piece** (fiber state while a module
-  init frame is pushed under a native). Mitigation: M1 is Opus, copies the `IMPORT`/`next`
-  precedents, and gcstress-runs the golden fixtures.
-- **Scope leakage.** Fragment modules stay registered in the context. Mitigation: name them
-  under `__expand__::`, and discard the scope's registrations when a compile finishes (add
-  `wy_context_module_unregister` if the scan finds none).
+- **`send` as an exec native** is the one fiber-sensitive piece (dispatch under a native).
+  Mitigation: copy the `next`/`send` trampoline precedent and gcstress the golden fixture.
+- **Allow-list too small or too large (D10).** Too small: a legitimate import (a pure helper
+  whose init touches a missing native) fails. Too large: an I/O path leaks in. Mitigation:
+  derive the list from what `_dsl.wy` and its imports actually use, add a test that asserts
+  the child has none of the I/O natives, and fail loudly, naming the capability.
+- **Import closure.** The parent must supply *all* transitive import images, in link order,
+  and they must match what the compiled module will link against at run time. Mitigation:
+  reuse the compiler's existing import resolution; test a two-level import.
+- **Scope leakage** is removed by construction (D8): the expansion VM is destroyed after
+  each module compile. Residual risk is `expand`'s teardown on error paths and the tree copy
+  (unsupported value kinds, sharing/cycles): covered by M2's acceptance.
 - **Non-determinism breaks the fixed point** (D4). Mitigation: a dedicated test that expands the same
   module twice in one process and in two processes and diffs the trees.
-- **Same-module definitions have side effects** if they read module state at definition time.
-  Mitigation: D1 evaluates only definition forms; document the rule in `doc/language-spec.md`'s
+- **Decorators must come from imports** (D1). Document the rule in `doc/language-spec.md`'s
   Decorators section (the spec currently says only "the compiler calls the defined decorator
-  function").
-- **Compile-time execution of arbitrary code** (same trust model as pypoc). Recorded; no
-  sandbox this epic.
+  function"). Check that no self-source defines and uses a decorator in the same file.
+- **Compile-time execution of arbitrary code** from imports (same trust model as pypoc), now
+  contained by D8 (isolated VM) and D10 (no ambient authority), but with no resource limits
+  this epic.
 
 ## Out of scope
 
-Hygiene/gensym; cross-module `::$ast` and block-form `@template` (see D7/M0); a REPL; runtime `eval` of source text in user programs; caching expansion
-results; changing decorator authoring syntax.
+Hygiene/gensym; cross-module `::$ast` and block-form `@template` (see D7/M0); a REPL;
+runtime `eval` of source text in user programs; caching expansion results; changing
+decorator authoring syntax; `eval_module`/`module_get`/`std::eval`; an `eval-when`-style
+compile-time marker; resource limits on the expansion VM.
 
 ## Report
 
 `vm_plan/epic_10a_report.md` per README template. Record: D1's final wording as implemented,
 whether byte-identity vs pypoc's `parser.wyc` (`--strip`) held or which sections differ and
-why, and the size of the exec-native change.
+why, the size of the `expand` and `send` changes, and how D9's parameter-annotation check was
+resolved.

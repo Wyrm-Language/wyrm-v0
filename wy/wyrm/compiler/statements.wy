@@ -910,6 +910,22 @@ fn _defer(node, frame: FnContext, result):
         return error("`defer` needs functions.wy's compile_defer (M4); import wyrm::compiler::functions before compiling a module with `defer`")
     return _defer_compiler(node, frame)
 
+# A `'template` wrapper around a statement (predefined.wy's rewrite of
+# `@template X`, epic 10a M0): a nested definition compiles with the
+# marking handed down - its body may stub instead of failing the module -
+# and anything else compiles exactly as written, because the marking only
+# relieves a *lowering failure*; it does not change what the statement
+# means. (The toplevel counterpart lives in module.wy, which owns the
+# definition-entry paths; this is the same handler one frame down.)
+fn _template_stmt(node, frame: FnContext, result):
+    inner := (_field(node, 1) catch nil)
+    kind := node_kind(inner)
+    if (kind == 'fn_def) or (kind == 'co_def):
+        if _nested_fn_compiler is nil:
+            return error("nested `fn`/`co` definitions need functions.wy's compile_nested_fn (M4); import wyrm::compiler::functions before compiling a module with nested definitions")
+        return _nested_fn_compiler(inner, frame, nil, true)
+    return compile_statement(inner, frame, result)
+
 # ---------------------------------------------------------------------------
 # registration - handlers.wy's registries, populated at module load
 
@@ -930,6 +946,7 @@ register_statement(['yield], _yield_stmt)
 register_statement(['static], _static_decl)
 register_statement(['fn_def, 'co_def], _nested_fn)
 register_statement(['defer], _defer)
+register_statement(['template], _template_stmt)
 
 register_expression(['if], _if_expr)
 

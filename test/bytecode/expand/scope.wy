@@ -1,0 +1,3 @@
+# Epic 10a M2: the "scope" module `expand` loads in the child VM - just the
+# compiling module's imports, here one wildcard import of treelib.
+import treelib::*

@@ -1,0 +1,7 @@
+a
+a
+42
+(a . (a . nil))
+(a . (7 . nil))
+bind_message: no such message in scope
+no overload of 'twice' matches 1 receiver(s)

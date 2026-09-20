@@ -1,0 +1,5 @@
+# Entry module for std::expand: `expand_tree(tree, scope)` answers the tree
+# doubled by treelib's `twice` decorator, found through the scope's messages.
+fn expand_tree(tree, scope):
+    b := bind_message(scope, tree_box(tree), 'twice)
+    return sexpr(b())

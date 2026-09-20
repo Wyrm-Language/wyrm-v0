@@ -1,0 +1,119 @@
+# Epic 10a M0: templates (`@template`, `::$ast`, strict lowering).
+#
+# Structural checks against compile_module (the port of compiler_bc/
+# module.py), one per M0 behaviour:
+#
+#   - a `@template` definition using `this` compiles under the strict
+#     default, stubbed tolerantly, with the reason recorded as a TEMPLATE
+#     stub (the third field of the image's "unlowered" entry);
+#   - the same definition unmarked is a compile error - strict is the
+#     default, and stub-everything stays gone;
+#   - a template that lowers is byte-shape-identical to the same function
+#     unmarked (same table entry, same code): the marking relieves a
+#     lowering failure, it does not change what compiles;
+#   - `g::$ast` lowers to the definition's tree, and no free global named
+#     "g::$ast" is created (the pre-M0 lowering read it as an ordinary
+#     qualified name - a never-filled global, the latent bug this pins);
+#   - `::$ast` errors name the problem: unknown definition, non-name
+#     operand, quoted-data trap;
+#   - an `@template` under an outer decorator is still refused (the
+#     pre-pass peels only the innermost decorator; real expansion is M3).
+import wyrm::parser::*
+import wyrm::compiler::context::*
+import wyrm::compiler::module::*
+
+fn check(what: str, got, want):
+    if got == want:
+        println("PASS " + what)
+    else:
+        println("FAIL " + what + " got " + str(got) + " want " + str(want))
+        exit(1)
+
+fn check_true(what: str, got):
+    if got:
+        println("PASS " + what)
+    else:
+        println("FAIL " + what + " got " + str(got))
+        exit(1)
+
+fn expect_fail(what: str, tree, fragment: str):
+    r := compile_module(tree, "m")
+    if r is error:
+        if not _has_text(str(r), fragment):
+            println("FAIL " + what + " refused but says: " + str(r))
+            exit(1)
+        println("PASS " + what)
+    else:
+        println("FAIL " + what + " was accepted")
+        exit(1)
+
+# The one string primitive both engines give `str` is `substr` (a codepoint
+# count), so substring membership is a scan.
+fn _has_text(hay: str, needle: str) -> bool:
+    n := len(hay)
+    m := len(needle)
+    i := 0
+    while i + m <= n:
+        if hay ! substr(i, m) == needle:
+            return true
+        i = i + 1
+    return false
+
+fn parse(src: str):
+    tree := Parser(src)!program()
+    if tree is error:
+        println("FAIL parse: " + str(tree))
+        exit(1)
+    return tree
+
+# --- 1. a `@template` fn using `this` compiles, stubbed as a template ----
+img := compile_module(parse("@template\nfn uses_this():\n    return this\n\nfn caller():\n    return 0\n"), "m")
+if img is error:
+    println("FAIL template-with-this refused: " + str(img))
+    exit(1)
+stubs := img["unlowered"] catch []
+check_true("template-with-this compiles with one stub", len(stubs) == 1)
+check("template stub is named after the definition", stubs[0][0], "uses_this")
+check_true("template stub is marked as a template", stubs[0][2])
+
+# --- 2. the same definition unmarked is a compile error ------------------
+expect_fail("unmarked-this is refused (strict default)",
+            parse("fn uses_this():\n    return this\n"), "this")
+
+# --- 3. a template that lowers compiles exactly as unmarked --------------
+plain := compile_module(parse("fn f(x):\n    return x * 2\n"), "m")
+marked := compile_module(parse("@template\nfn f(x):\n    return x * 2\n"), "m")
+if (plain is error) or (marked is error):
+    println("FAIL lowering-template round trip: " + str(plain) + " / " + str(marked))
+    exit(1)
+pf := plain["functions"][0]
+mf := marked["functions"][0]
+check("template fn lowers to the same entry", mf, pf)
+check_true("lowering template records no stub", len(marked["unlowered"] catch []) == 0)
+
+# --- 4. `g::$ast` lowers to the tree; no bogus free global ---------------
+tree_img := compile_module(parse("fn g(x):\n    return x\n\nfn uses():\n    t := g::$ast\n    return t\n"), "m")
+if tree_img is error:
+    println("FAIL astref compile: " + str(tree_img))
+    exit(1)
+frees := tree_img["free"] catch {}
+check_true("astref creates no free global for the spelling",
+           not ("g::$ast" in frees))
+check_true("astref materializes the definition kind symbol",
+           "fn_def" in (tree_img["symbols"] catch []))
+
+# --- 5. `::$ast` errors --------------------------------------------------
+expect_fail("astref on an unknown name",
+            parse("fn uses():\n    t := h::$ast\n    return t\n"), "names no fn, co or class")
+expect_fail("astref on a multi-segment path",
+            parse("fn g(x):\n    return x\n\nfn uses():\n    t := g::x::$ast\n    return t\n"),
+            "needs the name of a definition")
+expect_fail("astref on a non-definition name",
+            parse("n := 5\n\nfn uses():\n    t := n::$ast\n    return t\n"),
+            "names no fn, co or class")
+
+# --- 6. an outer decorator still refuses (M3) ----------------------------
+expect_fail("outer decorator around a template is refused",
+            parse("@outer\n@template\nfn f():\n    return 1\n"), "decorator")
+
+println("test_compiler_templates: done")

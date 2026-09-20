@@ -1,0 +1,9 @@
+# Epic 10a M1: TreeBase box, sexpr(), and dynamic message binding by name
+# (bind_message). C-VM-only natives, so there is no pypoc-run `.out`; the
+# `.out` next to this file is authored by hand.
+fn [TreeBase] twice():
+    s := sexpr(this)
+    return tree_box(cons(s, cons(s, nil)))
+
+fn [TreeBase] plus(n):
+    return tree_box(cons(sexpr(this), cons(n, nil)))

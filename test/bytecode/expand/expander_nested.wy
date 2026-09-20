@@ -1,0 +1,6 @@
+# Tries to start a second expansion from inside the expansion VM.
+import std::expand
+
+fn expand_tree(tree, scope):
+    r := std::expand::expand(tree, bytes(0), "expander_ok")
+    return error_message(r)

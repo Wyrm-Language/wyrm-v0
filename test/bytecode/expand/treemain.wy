@@ -1,0 +1,16 @@
+import treelib
+import treelib::*
+
+t := tree_box('a)
+println(sexpr(t))
+println(sexpr(sexpr(t)))
+println(sexpr(42))
+
+b := bind_message(treelib, t, 'twice)
+println(sexpr(b()))
+c := bind_message(treelib, t, "plus")
+println(sexpr(c(7)))
+d := bind_message(treelib, t, 'nosuch)
+println(error_message(d))
+e := bind_message(treelib, 5, 'twice)
+println(error_message(e))

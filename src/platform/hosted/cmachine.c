@@ -16,15 +16,23 @@ wy_machine* wy_cmachine_new(void)
 }
 
 
-void wy_cmachine_destroy(wy_machine* machine)
+wy_uword wy_cmachine_destroy_residual(wy_machine* machine)
 {
-    if (machine == WY_NULL) { return; }
+    if (machine == WY_NULL) { return 0; }
 
     wy_allocator* machine_allocator = machine->allocator;
     wy_machine_finalize_f(machine);
 
     wy_allocator_free(machine_allocator, machine);
+    wy_uword residual = ((wy_allocator_cmem*) machine_allocator)->active_size;
     wy_allocator_cmem_destroy((wy_allocator_cmem*) machine_allocator);
+    return residual;
+}
+
+
+void wy_cmachine_destroy(wy_machine* machine)
+{
+    (void) wy_cmachine_destroy_residual(machine);
 }
 
 

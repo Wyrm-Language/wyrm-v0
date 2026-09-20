@@ -52,6 +52,8 @@ struct wy_context
     wy_class* error_class;     /**< the base `error` class; NULL until wy_builtins_new installs it */
     wy_class* stop_iteration_class;  /**< the `StopIteration` class; NULL until wy_builtins_new installs it */
     wy_class* os_error_class;  /**< the `OSError` class; NULL until wy_builtins_new installs it */
+    bool expansion;            /**< true for the throwaway VM `std::expand` creates (epic 10a D8/D10) */
+    wy_class* tree_base_class; /**< the `TreeBase` class (one `__tree` slot); NULL until wy_builtins_new installs it */
     wy_fiber* fiber_list;      /**< intrusive list of root/independent fibers (design_c_vm.md §3's
                                  * "context's fiber list"); a coroutine's own private fiber is never
                                  * linked here, only reachable via its owning wy_coroutine - see

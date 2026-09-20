@@ -421,7 +421,7 @@ fn _static(member, class_name, module: ModuleContext) -> list | error:
 # from outside any class body. It is not a module global: init registers it
 # against the message identity and the types it dispatches on, via
 # `reg_msg` with a closure and a tuple of the type slots' current values.
-fn compile_dispatched_fn_toplevel(node, module: ModuleContext) -> nil | error:
+fn compile_dispatched_fn_toplevel(node, module: ModuleContext, tolerant: bool = false) -> nil | error:
     fn_name := (_field(node, 1) catch nil)
     targets := (_field(node, 2) catch nil)
     dispatch := []
@@ -452,7 +452,7 @@ fn compile_dispatched_fn_toplevel(node, module: ModuleContext) -> nil | error:
         flags = flags | FN_COROUTINE
     params := (_field(node, 3) catch nil)
     body := (_field(node, 5) catch nil)
-    r := compile_callable(module, str(fn_name) + "!", params, body, nil, flags, nil, dispatch, this_class)
+    r := compile_callable(module, str(fn_name) + "!", params, body, nil, flags, nil, dispatch, this_class, tolerant)
     if r is error:
         return r
     index := r[0]

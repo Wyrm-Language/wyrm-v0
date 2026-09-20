@@ -1,7 +1,6 @@
 import wyrm::tokenizer::*
 import wyrm::decode::*
 import wyrm::ast
-import std::io::*
 import std::pairs::*
 import wyrm::ast::*
 
@@ -1527,13 +1526,3 @@ fn [Parser] do_expr():
 #      postfix_expr       .  ()  []  !  ::   (tightest)
 
 #    All binary_expr and logical_expr levels are left-associative. *)
-
-fn __main():
-    f := open(car(__ARGS), "r")
-    content := f!readall()
-    program := Parser(content)!program()
-    println(program)
-
-# Simple Demo
-if __name__ == "__main__":
-    __main()
