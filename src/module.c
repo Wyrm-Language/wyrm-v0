@@ -953,10 +953,45 @@ static wy_error children_iter_next(wy_context* context, wy_object* object, wy_wo
 
         if (phase == 1) {
             wy_uword idx = wa->data[1].uword;
-            if (idx >= self->static_count) { return WY_ERR_STOP_ITERATION; }
+            if (idx >= self->static_count) {
+                wa->data[0].uword = 2;
+                wa->data[1].uword = 0;
+                continue;
+            }
             wa->data[1].uword = idx + 1;
             if (wy_value_is_gc_ref_f(self->statics[idx])) {
                 *child = self->statics[idx].data.gc_object;
+                return WY_ERR_NONE;
+            }
+            continue;
+        }
+
+        if (phase == 2) {
+            /* Realised classes (epic 4/M1): module->classes[] is the only
+             * reference once a class value drops out of every live
+             * register, so it must be a GC root or a cached class can be
+             * collected out from under wy_class_realise_f's cache check. */
+            wy_uword idx = wa->data[1].uword;
+            if (idx >= self->class_count) {
+                wa->data[0].uword = 3;
+                wa->data[1].uword = 0;
+                continue;
+            }
+            wa->data[1].uword = idx + 1;
+            if (self->classes != WY_NULL && self->classes[idx] != WY_NULL) {
+                *child = (wy_object*) self->classes[idx];
+                return WY_ERR_NONE;
+            }
+            continue;
+        }
+
+        if (phase == 3) {
+            /* message_table (epic 4/M2) transitively holds every wy_message
+             * this module has bound; tracing the dict alone keeps them all
+             * alive without walking messages[].bound separately. */
+            wa->data[0].uword = 4;
+            if (self->message_table != WY_NULL) {
+                *child = (wy_object*) self->message_table;
                 return WY_ERR_NONE;
             }
             continue;

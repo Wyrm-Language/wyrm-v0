@@ -7,6 +7,7 @@ test_cwyrm_sources = files(
     'test_bytecode_golden.cpp',
     'test_class.cpp',
     'test_context.cpp',
+    'test_dispatch.cpp',
     'test_fiber.cpp',
     'test_headers_sync.cpp',
     'test_heap_objects.cpp',

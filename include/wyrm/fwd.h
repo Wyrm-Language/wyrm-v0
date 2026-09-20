@@ -52,7 +52,6 @@ typedef struct wy_object wy_object;
 typedef struct wy_object_type wy_object_type;
 typedef struct wy_pair wy_pair;
 typedef union  wy_primitive wy_primitive;
-typedef struct wy_prototype wy_prototype;
 typedef struct wy_stack wy_stack;
 typedef struct wy_string wy_string;
 typedef struct wy_value wy_value;

@@ -1159,8 +1159,8 @@ TEST_SUITE("wvm milestone 1") {
         REQUIRE_EQ(wy_context_intern(c, "OutOfMemory", 11, &oom_sym), WY_ERR_NONE);
         wy_uword error_slot = wy_slot_dict_get(&builtins->exports, error_sym);
         wy_uword oom_slot = wy_slot_dict_get(&builtins->exports, oom_sym);
-        REQUIRE_NE(error_slot, WY_BAD_SLOT);
-        REQUIRE_NE(oom_slot, WY_BAD_SLOT);
+        REQUIRE_NE(error_slot, WY_SLOT_INVALID);
+        REQUIRE_NE(oom_slot, WY_SLOT_INVALID);
         wy_value error_class = builtins->globals[error_slot];
         wy_value oom_class = builtins->globals[oom_slot];
         REQUIRE_EQ(error_class.type, WY_TYPE_TAG_CLASS);
@@ -1382,5 +1382,151 @@ TEST_SUITE("vm defers and fault unwinding") {
         wy_value out[1];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 1, 0, WY_NULL, 0, out, 0), WY_ERR_FAULT);
         CHECK_EQ(fault_message(ctx.get_fiber_ptr()), "defer_reg: not a function");
+    }
+}
+
+TEST_SUITE("vm construct-on-call and message identities") {
+    // main: gget G0 (the class) -> L0; call L0() nres=1; return L0.
+    const wy_u32 construct_code[] = {
+        /* 0 main */
+        enc1(WY_OP_GGET, 0, 0),
+        enc2a(WY_OP_CALL, 0, 0), enc2b(1, 0),
+        enc1(WY_OP_RETURN, 1, 0),
+        /* 4 init(): this = P0; setattr(this, symbols[0], statics[0]); return */
+        enc1(WY_OP_LCONST, 1, 0),
+        enc2a(WY_OP_SETATTR, 0, 0x8000), enc2b(0, 1),
+        enc1(WY_OP_RETURN, 0, 0),
+    };
+
+    TEST_CASE("a class with a zero-arg init that sets a slot: calling it produces an instance with that slot set") {
+        test_fiber_fixture ctx;
+        wy_context* context = ctx.get_context_ptr();
+
+        wy_symbol x_sym = "x";
+        const wy_value statics[] = { wy_value_word(42) };
+        wy_module* module = make_code_module(context, construct_code, std::size(construct_code),
+            { proto_at(context, "main", 0, 1, 0), proto_at(context, "init!", 4, 2, 0) },
+            statics, 1, &x_sym, 1);
+        give_globals(context, module, 1);
+
+        wy_class* cls = WY_NULL;
+        REQUIRE_EQ(wy_class_new(context, &cls), WY_ERR_NONE);
+        cls->module = module;
+        cls->slots = (wy_class_slot*) wy_context_gc_alloc(context, sizeof(wy_class_slot));
+        cls->slots[0] = wy_class_slot { x_sym, wy_value_unset(), wy_value_unset(), wy_value_unset() };
+        cls->slot_count = 1;
+        wy_function* init_fn = WY_NULL;
+        REQUIRE_EQ(wy_function_new(context, module, &module->functions[1], WY_NULL, 0, &init_fn), WY_ERR_NONE);
+        cls->init = wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) init_fn);
+        module->globals[0] = wy_value_object(WY_TYPE_TAG_CLASS, (wy_object*) cls);
+
+        wy_value out[1];
+        REQUIRE_EQ(run_fn0(context, module, WY_NULL, 0, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(out[0].type, WY_TYPE_TAG_INSTANCE);
+        auto* inst = (wy_instance*) out[0].data.gc_object;
+        CHECK_EQ(inst->cls, cls);
+        CHECK_EQ(inst->slots[0].data.word, 42);
+    }
+
+    TEST_CASE("a class with no init: calling it produces an instance with defaults untouched, no fault") {
+        test_fiber_fixture ctx;
+        wy_context* context = ctx.get_context_ptr();
+
+        wy_symbol x_sym = "x";
+        // Only functions[0] (main) is used; there is no init function at all.
+        wy_module* module = make_code_module(context,
+            construct_code, 4 /* just the main body, words 0..3 */,
+            { proto_at(context, "main", 0, 1, 0) }, WY_NULL, 0, &x_sym, 1);
+        give_globals(context, module, 1);
+
+        wy_class* cls = WY_NULL;
+        REQUIRE_EQ(wy_class_new(context, &cls), WY_ERR_NONE);
+        cls->module = module;
+        cls->slots = (wy_class_slot*) wy_context_gc_alloc(context, sizeof(wy_class_slot));
+        cls->slots[0] = wy_class_slot { x_sym, wy_value_word(7), wy_value_unset(), wy_value_unset() };
+        cls->slot_count = 1;
+        // cls->init stays Unset (wy_class_new's default).
+        module->globals[0] = wy_value_object(WY_TYPE_TAG_CLASS, (wy_object*) cls);
+
+        wy_value out[1];
+        REQUIRE_EQ(run_fn0(context, module, WY_NULL, 0, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(out[0].type, WY_TYPE_TAG_INSTANCE);
+        auto* inst = (wy_instance*) out[0].data.gc_object;
+        CHECK_EQ(inst->cls, cls);
+        CHECK_EQ(inst->slots[0].data.word, 7);  // untouched default, not clobbered
+    }
+
+    TEST_CASE("a class with no init faults if called with an argument") {
+        test_fiber_fixture ctx;
+        wy_context* context = ctx.get_context_ptr();
+        // main: gget G0 -> L0; call L0(L1=3) nres=1; return L0.
+        const wy_u32 code[] = {
+            enc1(WY_OP_GGET, 0, 0),
+            enc1(WY_OP_I8, 3, 1),
+            enc2a(WY_OP_CALL, 1, 0), enc2b(1, 0),
+            enc1(WY_OP_RETURN, 1, 0),
+        };
+        wy_module* module = make_code_module(context, code, std::size(code),
+            { proto_at(context, "main", 0, 2, 0) });
+        give_globals(context, module, 1);
+
+        wy_class* cls = WY_NULL;
+        REQUIRE_EQ(wy_class_new(context, &cls), WY_ERR_NONE);
+        module->globals[0] = wy_value_object(WY_TYPE_TAG_CLASS, (wy_object*) cls);
+
+        wy_value out[1] = { wy_value_word(99) };
+        REQUIRE_EQ(run_fn0(context, module, WY_NULL, 0, out, 1), WY_ERR_FAULT);
+        CHECK(fault_message(ctx.get_fiber_ptr()).find("no applicable 'init'") != std::string::npos);
+    }
+
+    TEST_CASE("reg_msg registers an overload, resolved and cached through module->message_table") {
+        test_fiber_fixture ctx;
+        wy_context* context = ctx.get_context_ptr();
+
+        wy_symbol greet_sym = "greet";
+        // main: closure L0 <- functions[1] (0 caps); tuple L1 <- () (0 types);
+        // reg_msg messages[0] <- (L1, L0); return.
+        const wy_u32 code[] = {
+            /* 0 main */
+            enc2a(WY_OP_CLOSURE, 0, 0), enc2b(1, 0),
+            enc2a(WY_OP_TUPLE, 0, 1), enc2b(0, 0),
+            enc2a(WY_OP_REG_MSG, 0, 0), enc2b(0, 1),
+            enc1(WY_OP_RETURN, 0, 0),
+            /* 5 greeted() */
+            enc1(WY_OP_RETURN, 0, 0),
+        };
+        wy_module* module = make_code_module(context, code, std::size(code),
+            { proto_at(context, "main", 0, 2, 0), proto_at(context, "greeted!", 5, 0, 0) });
+
+        wy_message_ref ref {};
+        ref.path_len = 1;
+        ref.path = (wy_u16*) wy_context_gc_alloc(context, sizeof(wy_u16));
+        ref.path[0] = 0;
+        ref.bound = WY_NULL;
+        module->messages = (wy_message_ref*) wy_context_gc_alloc(context, sizeof(wy_message_ref));
+        module->messages[0] = ref;
+        module->message_count = 1;
+        module->symbols = (wy_symbol*) wy_context_gc_alloc(context, sizeof(wy_symbol));
+        module->symbols[0] = greet_sym;
+        module->symbol_count = 1;
+
+        wy_value out[1];
+        REQUIRE_EQ(run_fn0(context, module, WY_NULL, 0, out, 0), WY_ERR_NONE);
+
+        wy_message* msg = WY_NULL;
+        REQUIRE_EQ(wy_module_resolve_message_f(context, module, 0, &msg), WY_ERR_NONE);
+        REQUIRE_NE(msg, WY_NULL);
+        CHECK_EQ(msg->name, greet_sym);
+        REQUIRE_EQ(msg->overload_count, 1u);
+        CHECK_EQ(msg->overloads[0].arity, 0);
+        CHECK_EQ(msg->overloads[0].body.type, WY_TYPE_TAG_FUNCTION);
+        CHECK_EQ(((wy_function*) msg->overloads[0].body.data.gc_object)->proto, &module->functions[1]);
+        CHECK_EQ(module->messages[0].bound, msg);  // bound on first read, cached
+
+        // A second registration on the same message identity appends, it
+        // doesn't replace.
+        wy_value another_body = wy_value_object(WY_TYPE_TAG_FUNCTION, msg->overloads[0].body.data.gc_object);
+        REQUIRE_EQ(wy_message_add_overload_f(context, msg, 0, WY_NULL, another_body), WY_ERR_NONE);
+        CHECK_EQ(msg->overload_count, 2u);
     }
 }

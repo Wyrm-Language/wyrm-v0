@@ -33,7 +33,7 @@ samples/eval_defer_with_do.wy	-	-	REFUSED	`with` has been removed from the langu
 samples/eval_error_handling.wy	test/bytecode/samples/eval_error_handling.wyc	test/bytecode/samples/eval_error_handling.out	matches	
 samples/eval_functions.wy	test/bytecode/samples/eval_functions.wyc	test/bytecode/samples/eval_functions.out	matches	
 samples/eval_io.wy	-	-	REFUSED	a fragment: `path` comes from the test harness
-samples/eval_messages.wy	test/bytecode/samples/eval_messages.wyc	test/bytecode/samples/eval_messages.out	DIVERGES	message promotion: the interpreter turns a plain `fn describe()` into the wildcard overload of the message `describe` becomes, so a receiver with no specific overload still dispatches. The compiler emits no `reg_msg` for the plain function, so the compiled message has only the typed arm - see doc/llm-bytecode.md §9.
+samples/eval_messages.wy	test/bytecode/samples/eval_messages.wyc	test/bytecode/samples/eval_messages.out	matches	
 samples/eval_modules.wy	test/bytecode/samples/eval_modules.wyc	test/bytecode/samples/eval_modules.out	matches	
 samples/eval_range.wy	test/bytecode/samples/eval_range.wyc	test/bytecode/samples/eval_range.out	matches	
 samples/eval_signals.wy	-	-	REFUSED	`signal` in a class body is not lowered (§8.5)

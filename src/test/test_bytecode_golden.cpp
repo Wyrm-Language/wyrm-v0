@@ -114,6 +114,8 @@ TEST_SUITE("golden")
     TEST_CASE("closures") { check_fixture("closures"); }
     TEST_CASE("collections") { check_fixture("collections"); }
     TEST_CASE("errors") { check_fixture("errors"); }
+    TEST_CASE("classes") { check_fixture("classes"); }
+    TEST_CASE("messages") { check_fixture("messages"); }
 }
 
 TEST_SUITE("golden-gcstress")
@@ -128,4 +130,6 @@ TEST_SUITE("golden-gcstress")
     TEST_CASE("closures") { check_fixture_gcstress("closures"); }
     TEST_CASE("collections") { check_fixture_gcstress("collections"); }
     TEST_CASE("errors") { check_fixture_gcstress("errors"); }
+    TEST_CASE("classes") { check_fixture_gcstress("classes"); }
+    TEST_CASE("messages") { check_fixture_gcstress("messages"); }
 }

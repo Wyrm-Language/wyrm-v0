@@ -5,6 +5,7 @@
 #include <wyrm.h>
 #include <wyrm/dict.h>
 #include <wyrm/error.h>
+#include <wyrm/instance.h>
 #include <wyrm/list.h>
 #include <wyrm/op.h>
 #include <wyrm/pair.h>
@@ -164,15 +165,6 @@ wy_error wy_vm_binop_f(wy_context* ctx, wy_u8 op, wy_value lhs, wy_value rhs, wy
     return make_error_value_f(ctx, "unsupported operand types", out);
 }
 
-static bool is_ancestor(wy_class* cls, wy_class* target)
-{
-    while (cls) {
-        if (cls == target) return true;
-        cls = cls->super;
-    }
-    return false;
-}
-
 /**
  * `is` (wyc-format.md §6.3): `a2` names a primitive type by string, a class
  * value, or a tuple of either.
@@ -215,13 +207,12 @@ wy_error wy_vm_is_f(wy_context* ctx, wy_value value, wy_value type_operand, wy_v
         wy_class* target = (wy_class*) type_operand.data.gc_object;
         if (value.type == WY_TYPE_TAG_ERROR && value.data.gc_object) {
             wy_error_obj* err = (wy_error_obj*) value.data.gc_object;
-            *out = wy_value_bool(is_ancestor(err->cls, target));
+            *out = wy_value_bool(wy_class_is_ancestor_f(err->cls, target));
             return WY_ERR_NONE;
         }
         if (value.type == WY_TYPE_TAG_INSTANCE && value.data.gc_object) {
-             /* Instances not yet defined, but header-cast is safe for future */
-             wy_class* cls = ((wy_class**) value.data.gc_object)[0]; // Placeholder
-             *out = wy_value_bool(is_ancestor(cls, target));
+             wy_instance* inst = (wy_instance*) value.data.gc_object;
+             *out = wy_value_bool(wy_class_is_ancestor_f(inst->cls, target));
              return WY_ERR_NONE;
         }
         *out = wy_value_bool(false);

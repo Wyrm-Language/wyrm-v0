@@ -5,8 +5,10 @@
 
 #include <wyrm.h>
 #include <wyrm/error.h>
+#include <wyrm/bound_msg.h>
 #include <wyrm/dict.h>
 #include <wyrm/function.h>
+#include <wyrm/instance.h>
 #include <wyrm/iter.h>
 #include <wyrm/list.h>
 #include <wyrm/native.h>
@@ -103,7 +105,9 @@ static bool binding_kwarg_consumed_f(const wy_symbol* consumed, wy_uword n, wy_s
  * (the caller turns it into a fault value). Other errors (STACK_OVERFLOW,
  * NOMEM) return without touching `fault_msg`.
  */
-static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn, const wy_value* args, wy_uword argc,
+static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn,
+    wy_uword this_count, const wy_value* this_values,
+    const wy_value* args, wy_uword argc,
     wy_dict* kwargs, wy_value* ret_dst, wy_uword nres, wy_ret_kind ret_kind,
     char* fault_msg, wy_uword fault_msg_size)
 {
@@ -112,25 +116,30 @@ static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn, cons
     const bool has_kwargs = (proto->flags & WY_FN_KWARGS) != 0;
     const wy_uword plain = (wy_uword) proto->nparams
         - (has_varargs ? 1u : 0u) - (has_kwargs ? 1u : 0u);
-    const wy_uword p_count = (wy_uword) proto->nparams + fn->ncaps;
+    const wy_uword p_count = this_count + (wy_uword) proto->nparams + fn->ncaps;
     const wy_uword total = p_count + proto->nlocals;
     const wy_symbol fname = (proto->name != WY_NULL) ? proto->name : "<init>";
 
     wy_fiber* fiber = ctx->current_fiber;
     WY_ASSERT(proto->nparams == 0 || proto->params != WY_NULL);
+    WY_ASSERT(this_count == 0 || this_values != WY_NULL);
 
     wy_frame* new_frame = fiber->current_frame + 1;
     if (!WY_MEM_INFO_TOP_NOT_AT_END(wy_frame, new_frame, &fiber->frame_memory)) { return WY_ERR_STACK_OVERFLOW; }
     if (wy_stack_capacity_remaining_f(&fiber->value_stack) < total) { return WY_ERR_STACK_OVERFLOW; }
 
     if (!has_varargs && !has_kwargs && kwargs == WY_NULL && argc == proto->nparams) {
-        /* The common shape: the whole P frame is a straight copy. */
+        /* The common shape: the whole P frame is a straight copy. `this`
+         * values (design_c_vm.md §7's "P0..P(t-1)") always precede the
+         * declared parameters, which is why a plain call - this_count == 0 -
+         * needs no special case here. */
         wy_value* p = fiber->value_stack.top;
         wy_value* l = p + p_count;
         fiber->value_stack.top = l + proto->nlocals;
 
-        for (wy_uword i = 0; i < argc; i++) { p[i] = args[i]; }
-        for (wy_uword i = 0; i < fn->ncaps; i++) { p[argc + i] = fn->caps[i]; }
+        for (wy_uword i = 0; i < this_count; i++) { p[i] = this_values[i]; }
+        for (wy_uword i = 0; i < argc; i++) { p[this_count + i] = args[i]; }
+        for (wy_uword i = 0; i < fn->ncaps; i++) { p[this_count + argc + i] = fn->caps[i]; }
         for (wy_uword i = 0; i < proto->nlocals; i++) { l[i] = wy_value_unset(); }
 
         wy_memset(new_frame, 0, sizeof(wy_frame));
@@ -161,6 +170,7 @@ static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn, cons
     wy_uword nconsumed = 0;
     wy_uword taken = 0;
     wy_uword pslot = 0;
+    for (wy_uword i = 0; i < this_count; i++) { p[pslot++] = this_values[i]; }
 
     for (wy_uword i = 0; i < plain; i++) {
         const wy_param* pm = &proto->params[i];
@@ -312,7 +322,134 @@ static const char* push_fault_text_f(wy_error err, const char* fault_msg)
     }
 }
 
+/**
+ * Construct-on-call for a CLASS callee (design_c_vm.md §7): `new_instance`,
+ * find the applicable `init` (`wy_class_find_init_f`), and either push it
+ * with `WY_RET_CONSTRUCT` (`aux` set to the instance once the push
+ * succeeds) or, when there's no applicable `init`, hand back the instance
+ * directly if the call took no arguments.
+ *
+ * Only called once `try_construct_error_f` has ruled out the `error` class
+ * special case (`WY_ERR_UNBOUND`).
+ *
+ * @param out_pushed set to true iff a frame was pushed (caller must `goto
+ *   reload`); false means `*out_value` is the fully-constructed instance
+ *   and the caller should write it and fall through like an ordinary call.
+ * @return WY_ERR_NONE, WY_ERR_NOMEM, WY_ERR_ARITY (fault_msg filled either
+ *   by this function - no applicable `init` but arguments were given - or
+ *   by push_bytecode_call_bind_f - init's own parameter binding failed),
+ *   or whatever else push_bytecode_call_bind_f returns.
+ */
+static wy_error construct_on_call_f(wy_context* ctx, wy_class* cls, const wy_value* args, wy_uword argc,
+    wy_dict* kwargs, wy_value* ret_dst, wy_uword nres, bool* out_pushed, wy_value* out_value,
+    char* fault_msg, wy_uword fault_msg_size)
+{
+    wy_instance* inst = WY_NULL;
+    wy_error err = wy_instance_new_f(ctx, cls, &inst);
+    if (err != WY_ERR_NONE) { return err; }
+    wy_value inst_v = wy_value_object(WY_TYPE_TAG_INSTANCE, (wy_object*) inst);
+
+    wy_value init = wy_class_find_init_f(cls);
+    if (wy_value_is_unset(init)) {
+        if (argc > 0 || (kwargs != WY_NULL && kwargs->count > 0)) {
+            snprintf(fault_msg, fault_msg_size, "%s(...) takes no arguments (no applicable 'init')",
+                (cls->name != WY_NULL) ? cls->name : "<class>");
+            return WY_ERR_ARITY;
+        }
+        *out_pushed = false;
+        *out_value = inst_v;
+        return WY_ERR_NONE;
+    }
+
+    /* init's declared parameters are bound after the instance, which
+     * occupies P0 outside the ordinary parameter list (design_c_vm.md §7's
+     * "this values in P0..P(t-1)"; confirmed against the reference compiler,
+     * compiler_bc/functions.py's `this_count` - a method's `params` never
+     * include an implicit `self`). */
+    err = push_bytecode_call_bind_f(ctx, (wy_function*) init.data.gc_object, 1, &inst_v,
+        args, argc, kwargs, ret_dst, nres, WY_RET_CONSTRUCT, fault_msg, fault_msg_size);
+    if (err != WY_ERR_NONE) { return err; }
+
+    ctx->current_fiber->current_frame->aux = inst_v;
+    *out_pushed = true;
+    return WY_ERR_NONE;
+}
+
 /** `trap`'s message by code (wyc-format.md §6.1, interp.py TRAP_CODES). */
+/**
+ * The receiver(s) for a message send/bind (design_c_vm.md §7): `recv`
+ * itself for ordinary single dispatch, or a TUPLE's items for multiple
+ * dispatch. `*out_receivers` points into `*recv` (single) or the tuple's
+ * own storage (multiple) - never allocates.
+ */
+static void dispatch_receivers_f(const wy_value* recv, const wy_value** out_receivers, wy_uword* out_n)
+{
+    if (recv->type == WY_TYPE_TAG_TUPLE) {
+        wy_tuple* tup = (wy_tuple*) recv->data.gc_object;
+        *out_receivers = (tup->count > 0) ? (const wy_value*) tup->items : WY_NULL;
+        *out_n = tup->count;
+        return;
+    }
+    *out_receivers = recv;
+    *out_n = 1;
+}
+
+/**
+ * Resolve `msg` against `receivers[0..n)`: the single-INSTANCE fast path
+ * (design_c_vm.md §7) when it can apply, else the general ranking.
+ * `wy_dispatch_single_instance_f`'s `msg_map` walk only sees overloads a
+ * `class` op registered for that exact class hierarchy - not one a
+ * standalone `reg_msg` added constrained to one of those classes - so a
+ * miss there falls through to the general resolver rather than faulting,
+ * to stay correct in that (currently untested, no corpus fixture exercises
+ * it) case.
+ */
+static wy_error dispatch_body_f(wy_message* msg, const wy_value* receivers, wy_uword n, wy_value* out_body,
+    char* fault_msg, wy_uword fault_msg_size)
+{
+    if (n == 1 && receivers[0].type == WY_TYPE_TAG_INSTANCE && !msg->has_wildcard_or_ptype_arity1) {
+        wy_instance* inst = (wy_instance*) receivers[0].data.gc_object;
+        if (wy_dispatch_single_instance_f(msg, inst, out_body) == WY_ERR_NONE) {
+            return WY_ERR_NONE;
+        }
+    }
+    const wy_overload* ov = WY_NULL;
+    wy_error err = wy_dispatch_resolve_f(msg, receivers, n, WY_NULL, &ov, fault_msg, fault_msg_size);
+    if (err != WY_ERR_NONE) { return err; }
+    *out_body = ov->body;
+    return WY_ERR_NONE;
+}
+
+/**
+ * How many of `receivers[0..n)` a chosen overload's `body` actually wants
+ * in `P0..P(t-1)`: its own `ndispatch` (design_c_vm.md §7's "this values"),
+ * capped to `n` for safety against a malformed image.
+ *
+ * This is *not* always `n`: a promoted plain function (llm-bytecode.md §9's
+ * message promotion, epic 4/M4 - a wildcard-arity overload whose body is an
+ * ordinary `fn name(...)`, compiled with no reserved receiver slots at all)
+ * has `ndispatch == 0` even though the *overload* it fills has arity `n` -
+ * the receiver(s) exist for ranking purposes only and are discarded, never
+ * bound to a P slot, exactly like the reference's wildcard-overload call
+ * (`register_overload`'s promoted copy binds no `this` name at all).
+ */
+static wy_uword dispatch_this_count_f(wy_value body, wy_uword n)
+{
+    wy_uword t = ((wy_function*) body.data.gc_object)->proto->ndispatch;
+    return (t < n) ? t : n;
+}
+
+/** Fault text for a bad `wy_module_resolve_message_f`/`reg_msg` result. */
+static const char* message_fault_text_f(wy_error err)
+{
+    switch (err) {
+    case WY_ERR_NOSUPPORT: return "qualified message paths are not supported yet";
+    case WY_ERR_RANGE:     return "bad message index";
+    case WY_ERR_AMBIGUOUS: return "ambiguous overload";
+    default:               return "out of memory";
+    }
+}
+
 static wy_value trap_fault_value_f(wy_context* ctx, wy_u8 code)
 {
     if (code == 0) { return fault_value_f(ctx, "unreachable code reached - or a function body the compiler could not lower"); }
@@ -654,6 +791,142 @@ reload:;
             break;
         }
 
+        case WY_OP_GETATTR: {
+            /* Property namespace (wyc-format.md §6.3): a2 is a symbol-table
+             * index, not a register. Only INSTANCE receivers are supported
+             * this milestone; other receivers consult a per-tag property
+             * table that starts empty (design_c_vm.md §7), so they fault. */
+            wy_value obj = *wy_vm_reg_f(fr, a1);
+            if (a2 >= mod->symbol_count) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "getattr: bad symbol index");
+                goto do_fault;
+            }
+            wy_symbol name = mod->symbols[a2];
+
+            if (obj.type != WY_TYPE_TAG_INSTANCE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "getattr: unsupported receiver type");
+                goto do_fault;
+            }
+            wy_instance* inst = (wy_instance*) obj.data.gc_object;
+            wy_uword idx;
+            wy_class_slot* slot = wy_class_find_slot_f(inst->cls, name, &idx);
+            if (slot == WY_NULL) {
+                fr->ip = next_ip;
+                char msg[WY_VM_CALL_FAULT_MSG];
+                snprintf(msg, sizeof(msg), "getattr: no such property '%s'", name);
+                fault_v = fault_value_f(ctx, msg);
+                goto do_fault;
+            }
+            bool virtual_slot = !wy_value_is_unset(slot->getter) || !wy_value_is_unset(slot->setter);
+            if (!virtual_slot) {
+                *wy_vm_reg_f(fr, a0) = inst->slots[idx];
+                ip = next_ip;
+                break;
+            }
+            if (wy_value_is_unset(slot->getter)) {
+                fr->ip = next_ip;
+                char msg[WY_VM_CALL_FAULT_MSG];
+                snprintf(msg, sizeof(msg), "getattr: property '%s' has no getter", name);
+                fault_v = fault_value_f(ctx, msg);
+                goto do_fault;
+            }
+            fr->ip = next_ip;
+            char fault_msg[WY_VM_CALL_FAULT_MSG];
+            wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) slot->getter.data.gc_object,
+                1, &obj, WY_NULL, 0, WY_NULL, wy_vm_reg_f(fr, a0), 1, WY_RET_WINDOW,
+                fault_msg, sizeof(fault_msg));
+            if (err != WY_ERR_NONE) {
+                fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
+                goto do_fault;
+            }
+            goto reload;
+        }
+        case WY_OP_SETATTR: {
+            wy_value obj = *wy_vm_reg_f(fr, a0);
+            if (a1 >= mod->symbol_count) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "setattr: bad symbol index");
+                goto do_fault;
+            }
+            wy_symbol name = mod->symbols[a1];
+            wy_value src = *wy_vm_reg_f(fr, a2);
+
+            if (obj.type != WY_TYPE_TAG_INSTANCE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "setattr: unsupported receiver type");
+                goto do_fault;
+            }
+            wy_instance* inst = (wy_instance*) obj.data.gc_object;
+            wy_uword idx;
+            wy_class_slot* slot = wy_class_find_slot_f(inst->cls, name, &idx);
+            if (slot == WY_NULL) {
+                fr->ip = next_ip;
+                char msg[WY_VM_CALL_FAULT_MSG];
+                snprintf(msg, sizeof(msg), "setattr: no such property '%s'", name);
+                fault_v = fault_value_f(ctx, msg);
+                goto do_fault;
+            }
+            bool virtual_slot = !wy_value_is_unset(slot->getter) || !wy_value_is_unset(slot->setter);
+            if (!virtual_slot) {
+                inst->slots[idx] = src;
+                ip = next_ip;
+                break;
+            }
+            if (wy_value_is_unset(slot->setter)) {
+                fr->ip = next_ip;
+                char msg[WY_VM_CALL_FAULT_MSG];
+                snprintf(msg, sizeof(msg), "setattr: property '%s' has no setter", name);
+                fault_v = fault_value_f(ctx, msg);
+                goto do_fault;
+            }
+            fr->ip = next_ip;
+            char fault_msg[WY_VM_CALL_FAULT_MSG];
+            wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) slot->setter.data.gc_object,
+                1, &obj, &src, 1, WY_NULL, WY_NULL, 0, WY_RET_DISCARD,
+                fault_msg, sizeof(fault_msg));
+            if (err != WY_ERR_NONE) {
+                fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
+                goto do_fault;
+            }
+            goto reload;
+        }
+        case WY_OP_GETSLOT: {
+            wy_value obj = *wy_vm_reg_f(fr, a1);
+            if (obj.type != WY_TYPE_TAG_INSTANCE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "getslot: not an instance");
+                goto do_fault;
+            }
+            wy_instance* inst = (wy_instance*) obj.data.gc_object;
+            if (a2 >= inst->cls->slot_count) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "getslot: slot index out of range");
+                goto do_fault;
+            }
+            *wy_vm_reg_f(fr, a0) = inst->slots[a2];
+            ip = next_ip;
+            break;
+        }
+        case WY_OP_SETSLOT: {
+            wy_value obj = *wy_vm_reg_f(fr, a0);
+            if (obj.type != WY_TYPE_TAG_INSTANCE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "setslot: not an instance");
+                goto do_fault;
+            }
+            wy_instance* inst = (wy_instance*) obj.data.gc_object;
+            if (a1 >= inst->cls->slot_count) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "setslot: slot index out of range");
+                goto do_fault;
+            }
+            inst->slots[a1] = *wy_vm_reg_f(fr, a2);
+            ip = next_ip;
+            break;
+        }
+
         case WY_OP_NEW_PRIMITIVE: {
             wy_value out = wy_value_nil();
             wy_error err = WY_ERR_NONE;
@@ -859,6 +1132,47 @@ reload:;
             break;
         }
 
+        case WY_OP_CLASS: {
+            /* a1 is a *class* operand: an index into classes[], not a
+             * register (wyc-format.md §5.3). Realisation is idempotent and
+             * cached in mod->classes[a1] (wy_class_realise_f). */
+            if (a1 >= mod->class_count) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "class: bad class index");
+                goto do_fault;
+            }
+            wy_class* cls = WY_NULL;
+            wy_error c_err = wy_class_realise_f(ctx, mod, a1, &cls);
+            if (c_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx,
+                    c_err == WY_ERR_BAD_TYPE ? "class: superclass slot is not a class" : "class: realisation failed");
+                goto do_fault;
+            }
+            *wy_vm_reg_f(fr, a0) = wy_value_object(WY_TYPE_TAG_CLASS, (wy_object*) cls);
+            ip = next_ip;
+            break;
+        }
+
+        case WY_OP_NEW_INSTANCE: {
+            wy_value clsv = *wy_vm_reg_f(fr, a1);
+            if (clsv.type != WY_TYPE_TAG_CLASS) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "new_instance: not a class");
+                goto do_fault;
+            }
+            wy_instance* inst = WY_NULL;
+            wy_error c_err = wy_instance_new_f(ctx, (wy_class*) clsv.data.gc_object, &inst);
+            if (c_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "out of memory");
+                goto do_fault;
+            }
+            *wy_vm_reg_f(fr, a0) = wy_value_object(WY_TYPE_TAG_INSTANCE, (wy_object*) inst);
+            ip = next_ip;
+            break;
+        }
+
         case WY_OP_CALL: {
             wy_uword base = a0, argc = f, nres = a1;
             wy_value callee = L[base];
@@ -878,16 +1192,31 @@ reload:;
                     ip = next_ip;
                     break;
                 }
+
                 fr->ip = next_ip;
-                fault_v = fault_value_f(ctx, "value is not callable");
-                goto do_fault;
+                bool pushed = false;
+                wy_value instance_v = wy_value_nil();
+                char fault_msg[WY_VM_CALL_FAULT_MSG];
+                err = construct_on_call_f(ctx, (wy_class*) callee.data.gc_object, &L[base + 1], argc,
+                    WY_NULL, &L[base], nres, &pushed, &instance_v, fault_msg, sizeof(fault_msg));
+                if (err != WY_ERR_NONE) {
+                    fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
+                    goto do_fault;
+                }
+                if (!pushed) {
+                    *wy_vm_reg_f(fr, base) = instance_v;
+                    for (wy_uword i = 1; i < nres; i++) { *wy_vm_reg_f(fr, base + i) = wy_value_nil(); }
+                    ip = next_ip;
+                    break;
+                }
+                goto reload;
             }
 
             if (callee.type == WY_TYPE_TAG_FUNCTION) {
                 fr->ip = next_ip;
                 char fault_msg[WY_VM_CALL_FAULT_MSG];
                 wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) callee.data.gc_object,
-                    &L[base + 1], argc, WY_NULL, &L[base], nres, WY_RET_WINDOW,
+                    0, WY_NULL, &L[base + 1], argc, WY_NULL, &L[base], nres, WY_RET_WINDOW,
                     fault_msg, sizeof(fault_msg));
                 if (err != WY_ERR_NONE) {
                     fault_v = fault_value_f(ctx,
@@ -919,6 +1248,29 @@ reload:;
                  * reserved slot themselves). */
                 ip = next_ip;
                 break;
+            }
+
+            if (callee.type == WY_TYPE_TAG_BOUND_MSG) {
+                /* `recv ! name` stored and called later (wyc-format.md
+                 * §6.3): the receiver(s) and overload were already
+                 * resolved at `getmsg` time. */
+                wy_bound_msg* bm = (wy_bound_msg*) callee.data.gc_object;
+                const wy_value* receivers; wy_uword n;
+                dispatch_receivers_f(&bm->receiver, &receivers, &n);
+                wy_uword tcount = dispatch_this_count_f(bm->body, n);
+                fr->ip = next_ip;
+                char fault_msg[WY_VM_CALL_FAULT_MSG];
+                wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) bm->body.data.gc_object,
+                    tcount, receivers, &L[base + 1], argc, WY_NULL, &L[base], nres, WY_RET_WINDOW,
+                    fault_msg, sizeof(fault_msg));
+                if (err != WY_ERR_NONE) {
+                    fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
+                    goto do_fault;
+                }
+                fb->current_frame->dispatch_msg = bm->msg;
+                fb->current_frame->dispatch_body = bm->body;
+                fb->current_frame->flags |= WY_FRAME_FLAG_METHOD;
+                goto reload;
             }
 
             fr->ip = next_ip;
@@ -957,6 +1309,32 @@ reload:;
                     ip = next_ip;
                     break;
                 }
+
+                if (kwv.type != WY_TYPE_TAG_TABLE && kwv.type != WY_TYPE_TAG_NIL) {
+                    fr->ip = next_ip;
+                    fault_v = fault_value_f(ctx, "call_va: expected a keyword dict");
+                    goto do_fault;
+                }
+                wy_dict* kwargs = (kwv.type == WY_TYPE_TAG_TABLE) ? (wy_dict*) kwv.data.gc_object : WY_NULL;
+
+                fr->ip = next_ip;
+                bool pushed = false;
+                wy_value instance_v = wy_value_nil();
+                char fault_msg[WY_VM_CALL_FAULT_MSG];
+                err = construct_on_call_f(ctx, (wy_class*) callee.data.gc_object, args, tup->count,
+                    (kwargs != WY_NULL && kwargs->count > 0) ? kwargs : WY_NULL, &L[base], nres,
+                    &pushed, &instance_v, fault_msg, sizeof(fault_msg));
+                if (err != WY_ERR_NONE) {
+                    fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
+                    goto do_fault;
+                }
+                if (!pushed) {
+                    *wy_vm_reg_f(fr, base) = instance_v;
+                    for (wy_uword i = 1; i < nres; i++) { *wy_vm_reg_f(fr, base + i) = wy_value_nil(); }
+                    ip = next_ip;
+                    break;
+                }
+                goto reload;
             }
 
             if (callee.type != WY_TYPE_TAG_FUNCTION && callee.type != WY_TYPE_TAG_NATIVE) {
@@ -1002,7 +1380,7 @@ reload:;
             fr->ip = next_ip;
             char fault_msg[WY_VM_CALL_FAULT_MSG];
             wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) callee.data.gc_object,
-                args, tup->count,
+                0, WY_NULL, args, tup->count,
                 (kwargs != WY_NULL && kwargs->count > 0) ? kwargs : WY_NULL,
                 &L[base], nres, WY_RET_WINDOW, fault_msg, sizeof(fault_msg));
             if (err != WY_ERR_NONE) {
@@ -1011,6 +1389,237 @@ reload:;
                 goto do_fault;
             }
             goto reload;
+        }
+
+        case WY_OP_MSG: {
+            wy_uword base = a0, argc = f, message_idx = a1, nres = a2;
+            wy_value recv = *wy_vm_reg_f(fr, base);
+
+            wy_message* msg = WY_NULL;
+            wy_error m_err = wy_module_resolve_message_f(ctx, mod, message_idx, &msg);
+            if (m_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, message_fault_text_f(m_err));
+                goto do_fault;
+            }
+
+            const wy_value* receivers; wy_uword n;
+            dispatch_receivers_f(&recv, &receivers, &n);
+            if (n == 0 || n > WY_DISPATCH_MAX_RECEIVERS) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "msg: bad receiver count");
+                goto do_fault;
+            }
+
+            wy_value body;
+            char fault_msg[WY_VM_CALL_FAULT_MSG];
+            wy_error d_err = dispatch_body_f(msg, receivers, n, &body, fault_msg, sizeof(fault_msg));
+            if (d_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, fault_msg);
+                goto do_fault;
+            }
+
+            fr->ip = next_ip;
+            char fault_msg2[WY_VM_CALL_FAULT_MSG];
+            wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) body.data.gc_object,
+                dispatch_this_count_f(body, n), receivers, &L[base + 1], argc, WY_NULL, &L[base], nres,
+                WY_RET_WINDOW, fault_msg2, sizeof(fault_msg2));
+            if (err != WY_ERR_NONE) {
+                fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg2));
+                goto do_fault;
+            }
+            fb->current_frame->dispatch_msg = msg;
+            fb->current_frame->dispatch_body = body;
+            fb->current_frame->flags |= WY_FRAME_FLAG_METHOD;
+            goto reload;
+        }
+
+        case WY_OP_MSG_VA: {
+            wy_uword base = a0, message_idx = a1, nres = a2;
+            wy_value recv = L[base];
+            wy_value posv = L[base + 1];
+            wy_value kwv = L[base + 2];
+
+            if (posv.type != WY_TYPE_TAG_TUPLE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "msg_va: expected a positional tuple");
+                goto do_fault;
+            }
+            if (kwv.type != WY_TYPE_TAG_TABLE && kwv.type != WY_TYPE_TAG_NIL) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "msg_va: expected a keyword dict");
+                goto do_fault;
+            }
+            wy_tuple* tup = (wy_tuple*) posv.data.gc_object;
+            wy_dict* kwargs = (kwv.type == WY_TYPE_TAG_TABLE) ? (wy_dict*) kwv.data.gc_object : WY_NULL;
+            wy_value* args = (tup->count > 0) ? (wy_value*) tup->items : WY_NULL;
+
+            wy_message* msg = WY_NULL;
+            wy_error m_err = wy_module_resolve_message_f(ctx, mod, message_idx, &msg);
+            if (m_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, message_fault_text_f(m_err));
+                goto do_fault;
+            }
+
+            const wy_value* receivers; wy_uword n;
+            dispatch_receivers_f(&recv, &receivers, &n);
+            if (n == 0 || n > WY_DISPATCH_MAX_RECEIVERS) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "msg_va: bad receiver count");
+                goto do_fault;
+            }
+
+            wy_value body;
+            char fault_msg[WY_VM_CALL_FAULT_MSG];
+            wy_error d_err = dispatch_body_f(msg, receivers, n, &body, fault_msg, sizeof(fault_msg));
+            if (d_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, fault_msg);
+                goto do_fault;
+            }
+
+            fr->ip = next_ip;
+            char fault_msg2[WY_VM_CALL_FAULT_MSG];
+            wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) body.data.gc_object,
+                dispatch_this_count_f(body, n), receivers, args, tup->count,
+                (kwargs != WY_NULL && kwargs->count > 0) ? kwargs : WY_NULL,
+                &L[base], nres, WY_RET_WINDOW, fault_msg2, sizeof(fault_msg2));
+            if (err != WY_ERR_NONE) {
+                fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg2));
+                goto do_fault;
+            }
+            fb->current_frame->dispatch_msg = msg;
+            fb->current_frame->dispatch_body = body;
+            fb->current_frame->flags |= WY_FRAME_FLAG_METHOD;
+            goto reload;
+        }
+
+        case WY_OP_GETMSG: {
+            wy_value recv = *wy_vm_reg_f(fr, a1);
+
+            wy_message* msg = WY_NULL;
+            wy_error m_err = wy_module_resolve_message_f(ctx, mod, a2, &msg);
+            if (m_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, message_fault_text_f(m_err));
+                goto do_fault;
+            }
+
+            const wy_value* receivers; wy_uword n;
+            dispatch_receivers_f(&recv, &receivers, &n);
+            if (n == 0 || n > WY_DISPATCH_MAX_RECEIVERS) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "getmsg: bad receiver count");
+                goto do_fault;
+            }
+
+            /* getmsg always resolves through the general ranking (interp.py
+             * OP_GETMSG calls resolve_overload directly), never the
+             * single-INSTANCE fast path - a bound message is rare enough
+             * that there is no hot path to protect here. */
+            const wy_overload* ov = WY_NULL;
+            char fault_msg[WY_VM_CALL_FAULT_MSG];
+            wy_error d_err = wy_dispatch_resolve_f(msg, receivers, n, WY_NULL, &ov, fault_msg, sizeof(fault_msg));
+            if (d_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, fault_msg);
+                goto do_fault;
+            }
+
+            wy_bound_msg* bm = WY_NULL;
+            if (wy_bound_msg_new_f(ctx, recv, msg, ov->body, &bm) != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "out of memory");
+                goto do_fault;
+            }
+            *wy_vm_reg_f(fr, a0) = wy_value_object(WY_TYPE_TAG_BOUND_MSG, (wy_object*) bm);
+            ip = next_ip;
+            break;
+        }
+
+        case WY_OP_SUPER: {
+            wy_uword base = a0, argc = f, nres = a1;
+            wy_uword t = (fr->proto != WY_NULL) ? fr->proto->ndispatch : 0;
+            if (fr->dispatch_msg == WY_NULL || t == 0) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "super: not inside a message dispatch");
+                goto do_fault;
+            }
+
+            wy_u16 exclude[WY_DISPATCH_MAX_RECEIVERS];
+            if (wy_dispatch_body_distance_f(fr->dispatch_msg, fr->dispatch_body, fr->p, t, exclude) != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "super: current overload not found");
+                goto do_fault;
+            }
+
+            const wy_overload* ov = WY_NULL;
+            char fault_msg[WY_VM_CALL_FAULT_MSG];
+            wy_error d_err = wy_dispatch_resolve_f(fr->dispatch_msg, fr->p, t, exclude, &ov, fault_msg, sizeof(fault_msg));
+            if (d_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, fault_msg);
+                goto do_fault;
+            }
+
+            wy_message* dispatch_msg = fr->dispatch_msg;
+            wy_uword push_t = dispatch_this_count_f(ov->body, t);
+            fr->ip = next_ip;
+            char fault_msg2[WY_VM_CALL_FAULT_MSG];
+            wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) ov->body.data.gc_object,
+                push_t, fr->p, &L[base], argc, WY_NULL, &L[base], nres, WY_RET_WINDOW,
+                fault_msg2, sizeof(fault_msg2));
+            if (err != WY_ERR_NONE) {
+                fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg2));
+                goto do_fault;
+            }
+            fb->current_frame->dispatch_msg = dispatch_msg;
+            fb->current_frame->dispatch_body = ov->body;
+            fb->current_frame->flags |= WY_FRAME_FLAG_METHOD;
+            goto reload;
+        }
+
+        case WY_OP_REG_MSG: {
+            /* a0 is a *message* operand: an index into messages[], not a
+             * register (wyc-format.md §5.3), resolved/bound on first use. */
+            wy_value closure = *wy_vm_reg_f(fr, a1);
+            if (closure.type != WY_TYPE_TAG_FUNCTION) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "reg_msg: not a function");
+                goto do_fault;
+            }
+            wy_value types_v = *wy_vm_reg_f(fr, a2);
+            if (types_v.type != WY_TYPE_TAG_TUPLE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "reg_msg: expected a types tuple");
+                goto do_fault;
+            }
+            wy_tuple* types_tup = (wy_tuple*) types_v.data.gc_object;
+            if (types_tup->count > WY_OVERLOAD_MAX_ARITY) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "reg_msg: too many parameters");
+                goto do_fault;
+            }
+            wy_message* msg = WY_NULL;
+            wy_error m_err = wy_module_resolve_message_f(ctx, mod, a0, &msg);
+            if (m_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, (m_err == WY_ERR_NOSUPPORT)
+                    ? "reg_msg: qualified message paths are not supported yet"
+                    : "reg_msg: bad message index");
+                goto do_fault;
+            }
+            m_err = wy_message_add_overload_f(ctx, msg, (wy_u16) types_tup->count,
+                (types_tup->count > 0) ? (wy_value*) types_tup->items : WY_NULL, closure);
+            if (m_err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "out of memory");
+                goto do_fault;
+            }
+            ip = next_ip;
+            break;
         }
 
         case WY_OP_DEFER_REG: {
@@ -1053,7 +1662,7 @@ do_return: {
     if (defer_pop_runnable_f(fr, false, result0, &closure)) {
         char fault_msg[WY_VM_CALL_FAULT_MSG];
         wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) closure.data.gc_object,
-            WY_NULL, 0, WY_NULL, WY_NULL, 0, WY_RET_DISCARD, fault_msg, sizeof(fault_msg));
+            0, WY_NULL, WY_NULL, 0, WY_NULL, WY_NULL, 0, WY_RET_DISCARD, fault_msg, sizeof(fault_msg));
         if (err != WY_ERR_NONE) {
             /* A defer that cannot even start fails the frame; the rest of
              * its defers still run, as on-error ones. */
@@ -1069,9 +1678,16 @@ do_return: {
         break;
     case WY_RET_DISCARD:
         break;
+    case WY_RET_CONSTRUCT: {
+        /* design_c_vm.md §7: an error result[0] replaces the instance,
+         * anything else (including no results at all) keeps it. */
+        wy_value out = wy_value_is_error(result0) ? result0 : fr->aux;
+        wy_vm_backfill_f(fr->ret_dst, fr->ret_nres, &out, 1);
+        break;
+    }
     default:
-        /* RESERVED/CONSTRUCT/IMPORT/COROUTINE are not produced by a
-         * BYTECODE frame push yet (epic 4+). */
+        /* RESERVED/IMPORT/COROUTINE are not produced by a BYTECODE frame
+         * push yet (epic 4+). */
         break;
     }
     fb->value_stack.top = fr->p;
@@ -1101,7 +1717,7 @@ do_unwind: {
     while (defer_pop_runnable_f(fr, true, wy_value_nil(), &closure)) {
         char fault_msg[WY_VM_CALL_FAULT_MSG];
         wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) closure.data.gc_object,
-            WY_NULL, 0, WY_NULL, WY_NULL, 0, WY_RET_DISCARD, fault_msg, sizeof(fault_msg));
+            0, WY_NULL, WY_NULL, 0, WY_NULL, WY_NULL, 0, WY_RET_DISCARD, fault_msg, sizeof(fault_msg));
         if (err == WY_ERR_NONE) { goto reload; }
         /* No room (the fault may itself be a stack overflow): this defer
          * is lost, the original fault stands, and outer frames - which
@@ -1127,7 +1743,7 @@ wy_error wy_vm_call_sync(wy_context* ctx, wy_value callee, const wy_value* args,
     if (callee.type != WY_TYPE_TAG_FUNCTION) { return WY_ERR_BAD_TYPE; }
 
     char fault_msg[WY_VM_CALL_FAULT_MSG];
-    wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) callee.data.gc_object, args, argc, WY_NULL,
+    wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) callee.data.gc_object, 0, WY_NULL, args, argc, WY_NULL,
         out, nres, WY_RET_WINDOW, fault_msg, sizeof(fault_msg));
     if (err == WY_ERR_ARITY) {
         /* The parameters wouldn't bind (a missing required argument, a too

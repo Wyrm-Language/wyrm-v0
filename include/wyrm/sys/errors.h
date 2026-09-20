@@ -38,6 +38,7 @@ enum wy_error {
     WY_ERR_LINK,          ///< Module linking/loading failed after a well-formed image parsed
     WY_ERR_FAULT,         ///< A fiber unwound with an unhandled fault; see fiber->fault
     WY_ERR_ARITY,         ///< Wrong argument count for a callable
+    WY_ERR_AMBIGUOUS,     ///< Multiple equally-specific matches (message dispatch ranking)
 };
 
 #ifndef __cplusplus
