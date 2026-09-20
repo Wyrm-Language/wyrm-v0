@@ -359,9 +359,9 @@ TEST_SUITE("builtins") {
         REQUIRE_EQ(wy_vm_call_leaf_f(ctx, len_native, &improper_v, 1, &out, 1), WY_ERR_BAD_TYPE);
     }
 
-    TEST_CASE("range(begin, end) is a bare-name coroutine needing no import (epic 5 M4)") {
+    TEST_CASE("range(begin, end) is a bare-name native iterator needing no import") {
         // Hand-packed the same way test_coroutine.cpp does (no compiler in
-        // this repo): L0 <- call range(0, 3); then next(L0) three times
+        // this test): L0 <- call range(0, 3); then next(L0) three times
         // (0, 1, 2), then a fourth time observing StopIteration.
         test_fiber_fixture fix;
         auto* ctx = fix.get_context_ptr();
@@ -370,7 +370,7 @@ TEST_SUITE("builtins") {
         ctx->builtins = builtins;
 
         wy_value range_fn = builtin_value(ctx, builtins, "range");
-        REQUIRE_EQ(range_fn.type, WY_TYPE_TAG_FUNCTION);
+        REQUIRE_EQ(range_fn.type, WY_TYPE_TAG_NATIVE);  // a native leaf, not compiled bytecode
         wy_value next_native = builtin_value(ctx, builtins, "next");
 
         const wy_u32 code[] = {
@@ -379,7 +379,7 @@ TEST_SUITE("builtins") {
             enc1(WY_OP_I8, 3, 2),                         // L2 <- 3 (end)
             enc2a(WY_OP_CALL, 2, 0), enc2b(1, 0),         // L0 <- range(L1, L2), argc=2 nres=1
             enc1(WY_OP_LCONST, 10, 1),                    // L10 <- next native (static 1)
-            enc1(WY_OP_MOVE, 0, 11),                      // L11 <- L0 (coroutine)
+            enc1(WY_OP_MOVE, 0, 11),                      // L11 <- L0 (the range iterator)
             enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),        // L10 <- next(L11)
             enc1(WY_OP_MOVE, 10, 3),                      // L3 <- result 1
             enc1(WY_OP_LCONST, 10, 1), enc1(WY_OP_MOVE, 0, 11),

@@ -5,7 +5,7 @@ import os
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PARSER_WY = os.path.join(SCRIPT_DIR, "..", "wy", "wyrm", "parser.wy")
+PARSER_WY = os.path.join(SCRIPT_DIR, "..", "src", "embed", "wyrm", "parser.wy")
 
 
 INCLUDE_PREFIX = "#>>include:"

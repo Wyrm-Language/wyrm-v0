@@ -56,18 +56,15 @@ test_fixtures = custom_target('test_fixtures',
 hello_1_c = custom_target('hello_1_c',
     input: files('../../test/corpus/hello_1.wy'),
     output: 'hello_1.c',
-    command: [wyrm_exe, '-I' + project_root / 'wy', '--build-bc', '-o', '@OUTDIR@',
+    command: [wyrm_exe, '--build-bc', '-o', '@OUTDIR@',
               '--emit', 'c', '@INPUT@'],
 )
 
-test_cwyrm_embedded_sources = [hello_1_c] + files(
-    '../wyrm/embedded/embedded_images.c',
-    '../wyrm/embedded/wyrm_builtins_table.c',
-)
+test_cwyrm_embedded_sources = [hello_1_c] + embed_sources
 
 test_cwyrm_exe = executable('test_cwyrm',
     test_cwyrm_sources + extra_test_sources + test_cwyrm_embedded_sources,
-    include_directories: [cwyrm_lib_inc] + extra_test_inc,
+    include_directories: [cwyrm_lib_inc, embed_inc] + extra_test_inc,
     dependencies: [doctest_dep, wyrmxx_lib_dep] + extra_test_deps,
     link_with: [cwyrm_lib, wyrmxx_lib],
     cpp_args: [

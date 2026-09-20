@@ -9,6 +9,7 @@
 #include <wyrm/error.h>
 #include <wyrm/image.h>
 #include <wyrm/instance.h>
+#include <wyrm/iter.h>
 #include <wyrm/list.h>
 #include <wyrm/machine.h>
 #include <wyrm/message.h>
@@ -994,6 +995,22 @@ static wy_error bytes_unpack_f64_(wy_context* context, wy_value* args, wy_uword 
     return WY_ERR_NONE;
 }
 
+/* `range(begin, end)` - the integers begin, begin+1, ..., end-1 (exclusive
+ * end; empty when begin >= end), as an iterator: `for x in range(a, b)`
+ * and `next(r)` both work on it. Native, so a for-loop over it never
+ * switches fibers. Arguments must be integers. */
+static wy_error builtin_range_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (args[0].type != WY_TYPE_TAG_WORD || args[1].type != WY_TYPE_TAG_WORD) { return WY_ERR_BAD_TYPE; }
+    wy_iterator* it = WY_NULL;
+    wy_error err = wy_iterator_new_range(context, args[0].data.word, args[1].data.word, &it);
+    if (err != WY_ERR_NONE) { return err; }
+    if (nres > 0) { out[0] = wy_value_object(WY_TYPE_TAG_ITER, (wy_object*) it); }
+    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    return WY_ERR_NONE;
+}
+
 /* -------------------------------------------------------------------------
  * Coroutine natives: `next`/`send` (design_c_vm.md §3). Both are exec
  * natives - they may switch `ctx->current_fiber` onto the coroutine's own
@@ -1032,8 +1049,20 @@ static wy_exec_state builtin_next_exec_(wy_context* context, wy_primitive c_data
     WY_UNUSED(c_data);
     wy_fiber* fiber = context->current_fiber;
     wy_value co_v = *wy_fiber_value_n(fiber, 0);
+    if (co_v.type == WY_TYPE_TAG_ITER) {
+        /* An iterator (e.g. range(...)): step it in place, no fiber switch. */
+        wy_value item;
+        wy_error err = wy_iterator_next(context, (wy_iterator*) co_v.data.gc_object, &item);
+        if (err == WY_ERR_STOP_ITERATION) {
+            item = coroutine_stop_iteration_value_(context);
+        } else if (err != WY_ERR_NONE) {
+            return coroutine_fault_(context, fiber, "next: iterator failed");
+        }
+        wy_context_set_result(context, 0, item);
+        return WY_EXEC_DONE;
+    }
     if (co_v.type != WY_TYPE_TAG_COROUTINE) {
-        return coroutine_fault_(context, fiber, "next: argument is not a coroutine");
+        return coroutine_fault_(context, fiber, "next: argument is not a coroutine or iterator");
     }
     wy_coroutine* co = wy_coroutine_innermost_f((wy_coroutine*) co_v.data.gc_object);
     if (co->state == WY_CO_DONE) {
@@ -1084,21 +1113,14 @@ static wy_exec_state builtin_send_exec_(wy_context* context, wy_primitive c_data
  * Module assembly
  * ------------------------------------------------------------------------- */
 
-enum { WY_BUILTINS_LEAF_COUNT = 27, WY_BUILTINS_EXEC_COUNT = 2, WY_BUILTINS_CLASS_COUNT = 5,
-    /* +1 for the bare `nil` slot, +1 for the `range` prelude coroutine (M4),
-     * +1 for the bare `TreeBase` class (M5: decorators fixture registers
-     * messages typed on it, wyrm_builtins.py's TREE_BASE_CLASS). */
-    WY_BUILTINS_COUNT = WY_BUILTINS_LEAF_COUNT + WY_BUILTINS_EXEC_COUNT + WY_BUILTINS_CLASS_COUNT + 1 + 1 + 1 };
+enum { WY_BUILTINS_LEAF_COUNT = 28, WY_BUILTINS_EXEC_COUNT = 2, WY_BUILTINS_CLASS_COUNT = 5,
+    /* +1 for the bare `nil` slot, +1 for the bare `TreeBase` class (M5:
+     * decorators fixture registers messages typed on it,
+     * wyrm_builtins.py's TREE_BASE_CLASS). */
+    WY_BUILTINS_COUNT = WY_BUILTINS_LEAF_COUNT + WY_BUILTINS_EXEC_COUNT + WY_BUILTINS_CLASS_COUNT + 1 + 1,
+    /* Room for wy_builtins_add (host natives such as the std::io set). */
+    WY_BUILTINS_CAPACITY = WY_BUILTINS_COUNT + 16 };
 
-/* Compiled from test/bytecode/embedded/range.wy the same way
- * test/bytecode/embedded/hello_1.c is generated (scripts/build_corpus.py's
- * build_embedded_c, run by hand for this one-off prelude - it is not one of
- * the fixtures that script regenerates automatically). A real .wyc image so
- * `range` is an ordinary coroutine function, not a native leaf/exec type:
- * design_c_vm.md's M4 note says a first-class iterable is easiest once
- * classes/coroutines work, and the reference (pypoc/wypoc/corelib/prelude.wy)
- * defines it in wyrm source for the same reason. */
-extern const wy_module_image range_1_image;
 
 typedef struct builtin_exec_entry_
 {
@@ -1384,6 +1406,7 @@ static const builtin_leaf_entry_ leaf_builtins_[] = {
     { "tree_box",  1, 1,   builtin_tree_box_ },
     { "sexpr",     1, 1,   builtin_sexpr_ },
     { "bind_message", 3, 3, builtin_bind_message_ },
+    { "range",     2, 2,   builtin_range_ },
 };
 
 static const builtin_exec_entry_ exec_builtins_[] = {
@@ -1499,6 +1522,25 @@ static const builtin_class_entry_ error_classes_[] = {
     { "StopIteration",  true },
 };
 
+wy_error wy_builtins_add(wy_context* context, const char* name, wy_value value)
+{
+    if (context == WY_NULL || name == WY_NULL || context->builtins == WY_NULL) { return WY_ERR_INVAL; }
+    wy_module* module = context->builtins;
+    if (module->global_count >= WY_BUILTINS_CAPACITY) { return WY_ERR_NOMEM; }
+
+    wy_symbol sym;
+    wy_error err = wy_context_intern(context, name, wy_strlen_f(name), &sym);
+    if (err != WY_ERR_NONE) { return err; }
+    if (wy_slot_dict_get(&module->exports, sym) != WY_SLOT_INVALID) { return WY_ERR_INVAL; }
+
+    wy_uword slot = module->global_count;
+    module->globals[slot] = value;
+    err = wy_slot_dict_add_entry(&module->exports, sym, slot);
+    if (err != WY_ERR_NONE) { return err; }
+    module->global_count = slot + 1;
+    return WY_ERR_NONE;
+}
+
 wy_error wy_builtins_new(wy_context* context, wy_module** out)
 {
     if (context == WY_NULL || out == WY_NULL) { return WY_ERR_INVAL; }
@@ -1507,26 +1549,28 @@ wy_error wy_builtins_new(wy_context* context, wy_module** out)
     if (module == WY_NULL) { return WY_ERR_NOMEM; }
     module->state = WY_MODULE_BUILTIN;
 
+    /* Spare capacity beyond WY_BUILTINS_COUNT is for wy_builtins_add: host
+     * extensions (e.g. the std::io natives) appended after construction. */
     module->global_count = WY_BUILTINS_COUNT;
-    module->globals = wy_context_gc_alloc(context, sizeof(wy_value) * WY_BUILTINS_COUNT);
-    module->fill_layer = wy_context_gc_alloc(context, sizeof(wy_u8) * WY_BUILTINS_COUNT);
-    module->fill_source = wy_context_gc_alloc(context, sizeof(wy_symbol) * WY_BUILTINS_COUNT);
+    module->globals = wy_context_gc_alloc(context, sizeof(wy_value) * WY_BUILTINS_CAPACITY);
+    module->fill_layer = wy_context_gc_alloc(context, sizeof(wy_u8) * WY_BUILTINS_CAPACITY);
+    module->fill_source = wy_context_gc_alloc(context, sizeof(wy_symbol) * WY_BUILTINS_CAPACITY);
     if (module->globals == WY_NULL || module->fill_layer == WY_NULL || module->fill_source == WY_NULL) {
         return WY_ERR_NOMEM;
     }
-    for (wy_uword i = 0; i < WY_BUILTINS_COUNT; i++) {
+    for (wy_uword i = 0; i < WY_BUILTINS_CAPACITY; i++) {
         module->globals[i] = wy_value_unset();
         module->fill_layer[i] = 0;
         module->fill_source[i] = WY_NULL;
     }
 
     wy_allocator* allocator = wy_context_get_machine(context)->allocator;
-    wy_error err = wy_slot_dict_expand_f(&module->exports, allocator, WY_BUILTINS_COUNT * 2);
+    wy_error err = wy_slot_dict_expand_f(&module->exports, allocator, WY_BUILTINS_CAPACITY * 2);
     if (err != WY_ERR_NONE) { return err; }
 
     /* Root `module` now: globals/fill_layer/fill_source/exports are all
-     * consistent from here on, and the range prelude's wy_module_run_init
-     * below runs real bytecode, which can hit a GC safepoint. Without this,
+     * consistent from here on, and the allocations below can hit a GC
+     * safepoint. Without this,
      * `module` is unreachable (context->builtins is still whatever it was
      * before this call) until the caller assigns the return value - too
      * late once the VM has already run. Setting it here is a harmless
@@ -1640,37 +1684,6 @@ wy_error wy_builtins_new(wy_context* context, wy_module** out)
         context->tree_base_class = cls;
 
         module->globals[slot] = wy_value_object(WY_TYPE_TAG_CLASS, (wy_object*) cls);
-        err = wy_slot_dict_add_entry(&module->exports, sym, slot);
-        if (err != WY_ERR_NONE) { return err; }
-        slot++;
-    }
-
-    {
-        /* Load the compiled `range` prelude as an ordinary module, run its
-         * one-time init (defines the coroutine function and gsets it into
-         * that module's own global 0), then copy the resulting function
-         * value into a builtins slot so bare `range(...)` resolves through
-         * the same layer-3 fill_from_builtins path as `println`/`str` -
-         * no `import` required (epic_5.md M4's "builtin-adjacent module"). */
-        wy_module* range_module = WY_NULL;
-        err = wy_module_load_image(context, &range_1_image, &range_module);
-        if (err != WY_ERR_NONE) { return err; }
-        /* Root range_module before running its init, for the same GC-safety
-         * reason as context->builtins above: an unregistered, unreferenced
-         * module is invisible to the root scan while its own bytecode runs. */
-        err = wy_context_module_register(context, range_module, WY_NULL);
-        if (err != WY_ERR_NONE) { return err; }
-        err = wy_module_run_init(context, range_module);
-        if (err != WY_ERR_NONE) { return err; }
-
-        wy_symbol sym;
-        err = wy_context_intern(context, "range", 5, &sym);
-        if (err != WY_ERR_NONE) { return err; }
-
-        wy_uword range_slot = wy_slot_dict_get(&range_module->exports, sym);
-        WY_ASSERT(range_slot != WY_SLOT_INVALID);
-
-        module->globals[slot] = range_module->globals[range_slot];
         err = wy_slot_dict_add_entry(&module->exports, sym, slot);
         if (err != WY_ERR_NONE) { return err; }
         slot++;

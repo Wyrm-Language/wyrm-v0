@@ -5,20 +5,22 @@
 # parse, compile_module strict, the decorator expander on) and writes the
 # static wy_module_image C array via wyrm::image's to_c(), plus the generated
 # table .c and the unity-include .c that meson compiles. Output goes to
-# src/wyrm/embedded/ via scripts/regen_builtins.py; the files are checked in,
+# src/embed/ (each image .c beside its .wy source) via
+# scripts/regen_builtins.py; the files are checked in,
 # so neither the build nor meson test ever needs a compiler or Python to
 # produce them.
 #
 # Run it against a self-compiled compiler tree (see regen_builtins.py):
 #
 #     ./buildDir/src/wyrm/wyrm -I<tree> -I<tree>/wyrm -I<tree>/wyrm/compiler \
-#         <tree-out>/wyrm/tools/embed_build.wyd <wy-src-root> <out-dir>
+#         <tree-out>/wyrm/tools/embed_build.wyd <src/embed root> <out-dir>
 #
 # Every embedded image is .wyd provenance: the wyrm-hosted compiler built it
 # (the gen0 amalgam that bootstraps the tree is pypoc's, but it is not
-# embedded). std::io and std::expand are host modules installed by
-# src/wyrm/main.c and are deliberately absent: a table-sourced std::io would
-# break the expansion VM's "no host modules" rule (epic 10a D10).
+# embedded), and so is std::io (over the host natives). std::expand stays a
+# host module installed by src/wyrm/main.c and is deliberately absent. An
+# expansion VM (epic 10a D10) imports the embedded std::io fine but has no
+# `__open`/`__read`/... natives, so it still cannot do any I/O.
 
 import std::io
 import wyrm::parser::*
@@ -27,12 +29,12 @@ import wyrm::compiler::expansion::*
 import wyrm::image::*
 import wyrm::opcodes::*
 
-# The embed list: [path relative to wy/, virtual import path]. The order is
+# The embed list: [path relative to src/embed/, virtual import path]. The order is
 # the table's row order. These are SELF_SOURCES (run_selfcompile.py) - the
 # package marker wyrm/__init__.wy and the wyrm::compiler aggregator are
 # embedded too: the import opcode resolves every path prefix in turn, so
 # `import wyrm::compiler::module` needs `wyrm` and `wyrm::compiler` rows.
-EMBED := [["std/ctype.wy", "std::ctype"], ["std/pairs.wy", "std::pairs"], ["wyrm/_dsl.wy", "wyrm::_dsl"], ["wyrm/ast.wy", "wyrm::ast"], ["wyrm/bjson.wy", "wyrm::bjson"], ["wyrm/decode.wy", "wyrm::decode"], ["wyrm/image.wy", "wyrm::image"], ["wyrm/opcodes.wy", "wyrm::opcodes"], ["wyrm/parser.wy", "wyrm::parser"], ["wyrm/tokenizer.wy", "wyrm::tokenizer"], ["wyrm/compiler/analysis.wy", "wyrm::compiler::analysis"], ["wyrm/compiler/classes.wy", "wyrm::compiler::classes"], ["wyrm/compiler/context.wy", "wyrm::compiler::context"], ["wyrm/compiler/expand.wy", "wyrm::compiler::expand"], ["wyrm/compiler/expansion.wy", "wyrm::compiler::expansion"], ["wyrm/compiler/expressions.wy", "wyrm::compiler::expressions"], ["wyrm/compiler/functions.wy", "wyrm::compiler::functions"], ["wyrm/compiler/handlers.wy", "wyrm::compiler::handlers"], ["wyrm/compiler/module.wy", "wyrm::compiler::module"], ["wyrm/compiler/predefined.wy", "wyrm::compiler::predefined"], ["wyrm/compiler/statements.wy", "wyrm::compiler::statements"], ["wyrm/compiler/verify.wy", "wyrm::compiler::verify"], ["wyrm/compiler.wy", "wyrm::compiler"], ["wyrm/tools/compile_source.wy", "wyrm::tools::compile_source"], ["wyrm/tools/compiler_main.wy", "wyrm::tools::compiler_main"], ["wyrm/__init__.wy", "wyrm"]]
+EMBED := [["std/ctype.wy", "std::ctype"], ["std/io.wy", "std::io"], ["std/pairs.wy", "std::pairs"], ["wyrm/_dsl.wy", "wyrm::_dsl"], ["wyrm/ast.wy", "wyrm::ast"], ["wyrm/bjson.wy", "wyrm::bjson"], ["wyrm/decode.wy", "wyrm::decode"], ["wyrm/image.wy", "wyrm::image"], ["wyrm/opcodes.wy", "wyrm::opcodes"], ["wyrm/parser.wy", "wyrm::parser"], ["wyrm/tokenizer.wy", "wyrm::tokenizer"], ["wyrm/compiler/analysis.wy", "wyrm::compiler::analysis"], ["wyrm/compiler/classes.wy", "wyrm::compiler::classes"], ["wyrm/compiler/context.wy", "wyrm::compiler::context"], ["wyrm/compiler/expand.wy", "wyrm::compiler::expand"], ["wyrm/compiler/expansion.wy", "wyrm::compiler::expansion"], ["wyrm/compiler/expressions.wy", "wyrm::compiler::expressions"], ["wyrm/compiler/functions.wy", "wyrm::compiler::functions"], ["wyrm/compiler/handlers.wy", "wyrm::compiler::handlers"], ["wyrm/compiler/module.wy", "wyrm::compiler::module"], ["wyrm/compiler/predefined.wy", "wyrm::compiler::predefined"], ["wyrm/compiler/statements.wy", "wyrm::compiler::statements"], ["wyrm/compiler/verify.wy", "wyrm::compiler::verify"], ["wyrm/compiler.wy", "wyrm::compiler"], ["wyrm/tools/compile_source.wy", "wyrm::tools::compile_source"], ["wyrm/tools/compiler_main.wy", "wyrm::tools::compiler_main"], ["wyrm/__init__.wy", "wyrm"]]
 
 # Package-relative spellings (image.wy imports `bjson::*`/`opcodes::*`, not
 # wyrm::bjson): extra table rows pointing at the same images.
@@ -54,20 +56,11 @@ fn stem(name: str) -> str:
         return substr(name, 0, n - 3)
     return name
 
-# "wyrm/compiler/module.wy" -> "wyrm_compiler_module" (the .c file stem; the
+# "wyrm/compiler/module.wy" -> "wyrm/compiler/module" (the .c path, relative to
+# the embed root, minus extension: each image lands beside its source; the
 # image symbol inside comes from to_c and is the module's own stem).
 fn c_file_stem(rel: str) -> str:
-    out := ""
-    i := 0
-    n := len(rel)
-    while i < n:
-        if rel[i] == 47:  # '/'
-            out = out + "_"
-        else:
-            if i < n - 3:  # drop the trailing ".wy" (every EMBED path ends in it)
-                out = out + substr(rel, i, 1)
-        i = i + 1
-    return out
+    return substr(rel, 0, len(rel) - 3)  # every EMBED path ends in ".wy"
 
 fn join_lines(lines: list) -> str:
     out := ""
@@ -81,12 +74,12 @@ fn join_lines(lines: list) -> str:
     return out + "\n"
 
 fn write_text(path: str, text: str) -> bool:
-    h := std::io::open(path, "wb")
-    if h is error:
+    f := std::io::open(path, "wb")
+    if f is error:
         println("EMBED-FAIL " + path + " (open for write)")
         return false
-    w := std::io::write(h, text)
-    std::io::close(h)
+    w := f!write(text)
+    f!close()
     if w is error:
         println("EMBED-FAIL " + path + " (write)")
         return false
@@ -97,9 +90,11 @@ fn write_text(path: str, text: str) -> bool:
 fn embed_one(src_root: str, out_dir: str, rel: str):
     path := src_root + "/" + rel
     name := stem(basename(rel))
-    h := std::io::open(path, "r")
-    src := std::io::read(h, 10000000)
-    std::io::close(h)
+    f := std::io::open(path, "r")
+    if f is error:
+        return error("unreadable")
+    src := f!readall()
+    f!close()
     if src is error:
         return error("unreadable")
     tree := Parser(src)!program()
@@ -118,7 +113,7 @@ fn embed_one(src_root: str, out_dir: str, rel: str):
 
 args := __ARGS
 if len(args) != 2:
-    println("usage: embed_build.wyd <wy-src-root> <out-dir>")
+    println("usage: embed_build.wyd <embed-src-root> <out-dir>")
 else:
     q := _char_from_cp(34)  # wy strings have no \" escape; image.wy does the same dance
     src_root := args[0]

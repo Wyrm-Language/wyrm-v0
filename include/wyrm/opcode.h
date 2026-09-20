@@ -1,6 +1,6 @@
 /* wyrm bytecode opcodes. Originally adopted from pypoc's compiler; this
  * repository now owns the instruction set and edits it in place. Keep
- * opcode_names.h and wy/wyrm/opcodes.wy (the compiler's copy of the table)
+ * opcode_names.h and src/embed/wyrm/opcodes.wy (the compiler's copy of the table)
  * in step with any change. doc/llm-bytecode.md section 3 is the prose.
  *
  * Instruction encoding (section 2), little-endian:

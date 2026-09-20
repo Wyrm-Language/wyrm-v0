@@ -15,12 +15,37 @@ wy_error wy_iterator_new(wy_context* context, wy_value source, wy_iterator** out
 {
     if (context == WY_NULL || out == WY_NULL) { return WY_ERR_INVAL; }
 
+    if (source.type == WY_TYPE_TAG_ITER) {
+        *out = (wy_iterator*) source.data.gc_object;
+        return WY_ERR_NONE;
+    }
+
     wy_iterator* self = wy_context_gc_alloc(context, sizeof(wy_iterator));
     if (self == WY_NULL) { return WY_ERR_NOMEM; }
 
     self->source = source;
     self->current = source;
     self->state = 0;
+    self->limit = 0;
+    self->is_range = false;
+
+    wy_context_object_init_header_f(context, &self->object, &wy_iterator_type);
+    *out = self;
+    return WY_ERR_NONE;
+}
+
+wy_error wy_iterator_new_range(wy_context* context, wy_word begin, wy_word end, wy_iterator** out)
+{
+    if (context == WY_NULL || out == WY_NULL) { return WY_ERR_INVAL; }
+
+    wy_iterator* self = wy_context_gc_alloc(context, sizeof(wy_iterator));
+    if (self == WY_NULL) { return WY_ERR_NOMEM; }
+
+    self->source = wy_value_nil();
+    self->current = wy_value_word(begin);
+    self->state = 0;
+    self->limit = end;
+    self->is_range = true;
 
     wy_context_object_init_header_f(context, &self->object, &wy_iterator_type);
     *out = self;
@@ -29,6 +54,14 @@ wy_error wy_iterator_new(wy_context* context, wy_value source, wy_iterator** out
 
 wy_error wy_iterator_next(wy_context* context, wy_iterator* self, wy_value* out)
 {
+    if (self->is_range) {
+        wy_word v = self->current.data.word;
+        if (v >= self->limit) { return WY_ERR_STOP_ITERATION; }
+        *out = self->current;
+        self->current = wy_value_word(v + 1);  /* v < limit, so no overflow */
+        return WY_ERR_NONE;
+    }
+
     wy_value src = self->source;
 
     if (src.type == WY_TYPE_TAG_LIST) {

@@ -39,7 +39,7 @@ of it actually lives. Epic 1's own map (loader-only) follows below it.
 | `pypoc/` | Nested checkout (own git history, gitignored) of the Python proof-of-concept compiler and reference VM. Source of truth for the opcode set and the `.wyc` format. |
 | `pypoc/doc/wyc-format.md` | **Normative** format spec: container (§2), BSON subset (§4), instruction encoding (§5), opcode set (§6), load sequence (§7), section schemas (§8). |
 | `scripts/setup_pypoc.sh` | Creates/updates `pypoc/.venv`, installs `.[dev,lsp]`, runs pypoc's own test suite. Idempotent. |
-| `include/wyrm/opcode.h` | The 88-opcode v1 instruction set, encoding macros (`WYRM_OP`, `WYRM_F`, `WYRM_A0/A1/A2`, `WYRM_OP_WORDS`). Originally adopted from pypoc; maintained here now. Keep `opcode_names.h` and `wy/wyrm/opcodes.wy` in step with any change. |
+| `include/wyrm/opcode.h` | The 88-opcode v1 instruction set, encoding macros (`WYRM_OP`, `WYRM_F`, `WYRM_A0/A1/A2`, `WYRM_OP_WORDS`). Originally adopted from pypoc; maintained here now. Keep `opcode_names.h` and `src/embed/wyrm/opcodes.wy` in step with any change. |
 | `include/wyrm/opcode_names.h` | `wy_opcode_names[256]`, indexed by raw opcode byte, for the disassembler. Hand-maintained alongside `opcode.h`. |
 | `include/wyrm/image.h` | `wy_section_ref`, `WY_SEC_*` ids, `wy_module_image` (a container's sections, zero-copy). Originally adopted from pypoc; maintained here now. |
 | `include/wyrm/image_loader.h`, `src/image.c` | `wy_image_from_bytes`: parses the container (magic/version/directory/bounds/alignment) into a `wy_module_image`. Declared separately from `image.h`, which carries only the descriptors a generated `.c` image needs. |
@@ -91,7 +91,7 @@ Testing). The C++ golden/loader tests run `.wyd` images that
 
 ```
 meson compile -C buildDir
-mkdir -p /tmp/h && ./buildDir/src/wyrm/wyrm -Iwy --build-bc -o /tmp/h test/corpus/hello.wy
+mkdir -p /tmp/h && ./buildDir/src/wyrm/wyrm --build-bc -o /tmp/h test/corpus/hello.wy
 ./buildDir/src/wyrm/wyrm /tmp/h/hello.wyd --sections          # section summary
 ./buildDir/src/wyrm/wyrm /tmp/h/hello.wyd --disasm            # one line per instruction
 ./buildDir/src/wyrm/wyrm /tmp/h/hello.wyd                     # runs it: prints "Hello World"
@@ -141,3 +141,25 @@ latter).
 - **`wy_vm_call_continue`** (natives calling back into the VM) is declared
   but returns `WY_ERR_NOSUPPORT` unconditionally - needed once epic 3+
   gives natives a reason to re-enter bytecode (e.g. `__iter__` dispatch).
+
+## Embedding `std::io`
+
+`std::io` is a compiled-in module (`src/embed/std/io.wy`, image in the builtin
+table) written over pypoc's `__open`/`__read`/`__write`/`__lseek`/`__dup2`/
+`__close`/`__flush` builtins and `__STDIN`/`__STDOUT`/`__STDERR`. libcwyrm does
+not provide them; the executable does (`src/embed/std/io_native.c`). An
+embedder that links the same sources and wants `import std::io` to work must,
+per context:
+
+1. `wy_builtins_new(ctx, &b); ctx->builtins = b;`
+2. `wy_io_natives_install(ctx)` (`src/embed/std/io_native.h`) - this adds the
+   names to the builtins via `wy_builtins_add`, which has 16 spare slots and
+   must run before any module is linked against the builtins.
+3. Resolve `std::io` through an import hook that falls back to the builtin
+   table (`wyrm_builtin_modules`, `src/embed/builtins.h`), as `src/wyrm/main.c`
+   and the golden test harness do.
+
+A context that skips step 2 can import `std::io` but not do I/O. Expansion VMs
+skip it on purpose and their import hook also refuses `std::io`. `__write` to fd
+1 goes through `ctx->io.write` when the host set one, so captured output covers
+`File` writes and `println`.

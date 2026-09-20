@@ -1,5 +1,5 @@
 # test/wy/test_compiler_analysis.wy - epic 10 M1 acceptance driver for
-# wy/wyrm/compiler/analysis.wy.
+# src/embed/wyrm/compiler/analysis.wy.
 #
 # Every expected answer below was taken from pypoc's own
 # `wypoc/compiler_bc/analysis.py` run over the *same* source text, via
@@ -15,7 +15,7 @@
 # exercises is the one M2+ will really see.
 #
 # Run by scripts/run_wy_tests.py (meson's `wy-tests`), i.e. under pypoc's
-# tree-walking interpreter: `pypoc/.venv/bin/wyrm -Iwy test/wy/test_compiler_analysis.wy`.
+# tree-walking interpreter: `pypoc/.venv/bin/wyrm -Isrc/embed -Iwy test/wy/test_compiler_analysis.wy`.
 
 import wyrm::parser::*
 import wyrm::compiler::analysis::*

@@ -188,8 +188,8 @@ fn compile_fixture(what: str, module_node, module: ModuleContext, path: str):
         println("FAIL: " + what + " to_wyc errored")
         return
     handle := std::io::open(path, "wb")
-    std::io::write(handle, blob)
-    std::io::close(handle)
+    handle!write(blob)
+    handle!close()
     println("PASS: " + what + " compiled, wrote " + path)
     return
 

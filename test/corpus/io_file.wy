@@ -1,0 +1,34 @@
+# std::io's File API (the one std/io.wy, over the host natives on the C VM):
+# open/read/readall/write/seek/tell/close, the helper functions, binary mode,
+# and an open failure answering an error value.
+import std::io
+
+path := "io_file.tmp"
+
+w := std::io::open(path, "w")
+println(w!write("hello\nworld\n"))
+w!close()
+
+r := std::io::open(path, "r")
+println(r!readall())
+r!close()
+
+std::io::write_file(path, "abcdef")
+println(std::io::read_file(path))
+
+f := std::io::open(path, "r")
+println(f!read(2))
+println(f!tell())
+f!seek(0, 0)
+println(f!readall())
+f!close()
+
+b := std::io::open(path, "rb")
+data := b!read_bytes(3)
+println(len(data))
+b!close()
+
+missing := std::io::open("/nonexistent-dir/x", "r")
+println(missing is error)
+
+std::io::println("a", 1, "b")

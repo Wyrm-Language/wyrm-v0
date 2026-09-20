@@ -142,6 +142,8 @@ pkgconfig.generate(cwyrm_lib,
     version:     meson.project_version(),
 )
 
+subdir('embed')
+
 if not wy_opt.disabled()
     subdir('wyrm')
 endif

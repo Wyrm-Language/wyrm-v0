@@ -8,9 +8,9 @@ import std::expand
 dir := __ARGS[0]
 
 fn read_image(path: str):
-    h := std::io::open(path, "rb")
-    b := std::io::read_bytes(h, 1000000)
-    std::io::close(h)
+    f := std::io::open(path, "rb")
+    b := f!read_bytes(1000000)
+    f!close()
     return b
 
 scope := read_image(dir + "/scope.wyd")

@@ -21,7 +21,7 @@ def main():
             continue
         path = os.path.join(SAMPLES_DIR, name)
         result = subprocess.run(
-            wyrm + ["-m", "wyrm::parser", path],
+            wyrm + ["-m", "wyrm::tools::parse_dump", path],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,

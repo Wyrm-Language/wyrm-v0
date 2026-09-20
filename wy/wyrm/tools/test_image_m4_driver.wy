@@ -71,8 +71,8 @@ fn build_hello_image() -> dict:
 
 fn _write(path: str, text: str):
     handle := std::io::open(path, "wb")
-    std::io::write(handle, text)
-    std::io::close(handle)
+    handle!write(text)
+    handle!close()
 
 fn main():
     img := build_hello_image()

@@ -10,7 +10,8 @@ in order:
 
 $WYRM_FLAGS overrides the interpreter's leading arguments (shell-split, `~`
 expanded), e.g.  WYRM=/bin/wyrm WYRM_FLAGS="-I~/wy" scripts/run_wy_tests.py
-When unset it defaults to `-I<repo>/wy`. Set it empty for no flags.
+When unset it defaults to `-I<repo>/src/embed -I<repo>/wy`. Set it empty for
+no flags.
 
 The build tree under test is $WYRM_BUILD_DIR (default <repo>/buildDir), which
 meson sets to its own tree for the tests it runs.
@@ -23,7 +24,11 @@ import shutil
 SKIP = 77  # meson's "skipped" exit code
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Import roots for wyrm sources: src/embed holds the modules compiled into the
+# binary (std::*, wyrm::*), wy/ the tools and drivers that are not.
+EMBED_ROOT = os.path.join(REPO_ROOT, "src", "embed")
 WY_ROOT = os.path.join(REPO_ROOT, "wy")
+SOURCE_ROOTS = [EMBED_ROOT, WY_ROOT]
 PYPOC_WYRM = os.path.join(REPO_ROOT, "pypoc", ".venv", "bin", "wyrm")
 BUILD_DIR = os.environ.get("WYRM_BUILD_DIR") or os.path.join(REPO_ROOT, "buildDir")
 LOCAL_WYRM = os.path.join(BUILD_DIR, "src", "wyrm", "wyrm")
@@ -51,7 +56,7 @@ def reference_wyrm():
     if "WYRM_FLAGS" in os.environ:
         flags = [_expand(t) for t in shlex.split(os.environ["WYRM_FLAGS"])]
     else:
-        flags = ["-I" + WY_ROOT]
+        flags = ["-I" + r for r in SOURCE_ROOTS]
     return [exe] + flags
 
 
@@ -59,7 +64,8 @@ def local_wyrm():
     """The build tree's own binary argv prefix, or None when not built."""
     if not os.path.isfile(LOCAL_WYRM):
         return None
-    return [LOCAL_WYRM, "-I" + WY_ROOT]
+    # No -I: the std/wyrm modules come from the binary's own embedded table.
+    return [LOCAL_WYRM]
 
 
 def require_reference(tool):

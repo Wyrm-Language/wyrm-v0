@@ -66,11 +66,11 @@ fn build_bc(src: str, name: str, path: str, out_dir: str, emit: list):
 
 # Write one artifact and report it; answers nil or an error value.
 fn _write_out(path: str, data):
-    h := std::io::open(path, "wb")
-    if h is error:
+    f := std::io::open(path, "wb")
+    if f is error:
         return error("cannot open " + path + " for writing")
-    w := std::io::write(h, data)
-    std::io::close(h)
+    w := f!write(data)
+    f!close()
     if w is error:
         return error("cannot write " + path)
     println("wyrm: wrote " + path)

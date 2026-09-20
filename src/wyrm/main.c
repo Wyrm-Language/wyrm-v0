@@ -18,12 +18,12 @@
 #include <wyrm/platform/hosted/import_cache.h>
 #include <wyrm/platform/hosted/import_fs.h>
 #include <wyrm/platform/hosted/expand_native.h>
-#include <wyrm/platform/hosted/io_native.h>
+#include "../embed/std/io_native.h"
 #include <wyrm/slot.h>
 #include <wyrm/string.h>
 #include <wyrm/vm.h>
 
-#include "embedded/builtins.h"
+#include "../embed/builtins.h"
 
 enum { WY_MAIN_STACK_LEN = 1u << 16, WY_MAIN_FRAME_COUNT = 4096, WY_MAIN_MAX_INCLUDE = 64 };
 
@@ -288,11 +288,12 @@ static wy_error compile_on_scratch_(void* ud, wy_context* requester, const char*
         ctx->builtins = builtins;
         /* std package + std::expand: compile_source imports the decorator
          * expander (wyrm::compiler::expansion), whose imports need both.
-         * std::io too: build_bc writes its artifacts through it. This is
+         * The std::io natives too: build_bc writes its artifacts through the
+         * embedded std::io, which is written over them. This is
          * the compile worker, not the security boundary - an expansion
          * child spawned for decorators installs its own minimal module
          * set and stays io-free (D10). */
-        err = wy_io_module_install(ctx);
+        err = wy_io_natives_install(ctx);
         if (err == WY_ERR_NONE) { err = wy_expand_module_install(ctx); }
     }
     if (err != WY_ERR_NONE) { *msg = "cannot initialise the compile machine"; goto done; }
@@ -635,8 +636,8 @@ int main(int argc, char** argv)
     }
     context->builtins = builtins;
 
-    if (wy_io_module_install(context) != WY_ERR_NONE) {
-        fprintf(stderr, "wyrm: failed to install std::io\n");
+    if (wy_io_natives_install(context) != WY_ERR_NONE) {
+        fprintf(stderr, "wyrm: failed to install the std::io natives\n");
         return 1;
     }
 

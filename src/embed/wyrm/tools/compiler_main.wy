@@ -60,9 +60,12 @@ fn stem(name: str) -> str:
 
 fn compile_one(out_dir: str, path: str) -> bool:
     name := stem(basename(path))
-    h := std::io::open(path, "r")
-    src := std::io::read(h, 1000000)
-    std::io::close(h)
+    f := std::io::open(path, "r")
+    if f is error:
+        println("REFUSED " + name + " (unreadable)")
+        return false
+    src := f!readall()
+    f!close()
     if src is error:
         println("REFUSED " + name + " (unreadable)")
         return false
@@ -99,9 +102,12 @@ fn compile_one(out_dir: str, path: str) -> bool:
         println("REFUSED " + name + " (serialize)")
         return false
     out := out_dir + "/" + name + ".wyd"
-    h2 := std::io::open(out, "wb")
-    std::io::write(h2, blob)
-    std::io::close(h2)
+    f2 := std::io::open(out, "wb")
+    if f2 is error:
+        println("REFUSED " + name + " (cannot write)")
+        return false
+    f2!write(blob)
+    f2!close()
     println("OK " + name)
     return true
 

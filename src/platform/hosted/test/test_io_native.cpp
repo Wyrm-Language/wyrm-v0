@@ -15,7 +15,7 @@
 #include <wyrm/module.h>
 #include <wyrm/native.h>
 #include <wyrm/opcode.h>
-#include <wyrm/platform/hosted/io_native.h>
+#include <std/io_native.h>
 #include <wyrm/slot.h>
 #include <wyrm/string.h>
 #include <wyrm/vm.h>
@@ -23,7 +23,7 @@
 #include <test_common/test_fiber_fixture.h>
 
 /**
- * `std::io` natives (epic 5 M4): open/read/write/lseek/dup2/close/flush as
+ * The natives under std/io.wy (`__open`, `__read`, ...; epic 5 M4): open/read/write/lseek/dup2/close/flush as
  * exec natives over real POSIX fds (pypoc/wypoc/wyrm_io.py's reference
  * semantics). Every call is hand-packed bytecode (no compiler in this repo)
  * driven through wy_vm_call_sync, the same convention test_coroutine.cpp
@@ -162,11 +162,11 @@ TEST_SUITE("io_native")
         REQUIRE_EQ(wy_context_module_register(ctx, io, nullptr), WY_ERR_NONE);
 
         temp_file tf;
-        wy_value open_fn = native_value(ctx, io, "open");
-        wy_value write_fn = native_value(ctx, io, "write");
-        wy_value read_fn = native_value(ctx, io, "read");
-        wy_value lseek_fn = native_value(ctx, io, "lseek");
-        wy_value close_fn = native_value(ctx, io, "close");
+        wy_value open_fn = native_value(ctx, io, "__open");
+        wy_value write_fn = native_value(ctx, io, "__write");
+        wy_value read_fn = native_value(ctx, io, "__read");
+        wy_value lseek_fn = native_value(ctx, io, "__lseek");
+        wy_value close_fn = native_value(ctx, io, "__close");
 
         auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+")}, 1);
         REQUIRE_EQ(opened[0].type, WY_TYPE_TAG_WORD);
@@ -189,7 +189,7 @@ TEST_SUITE("io_native")
         CHECK_EQ(closed[0].data.word, 0);
     }
 
-    TEST_CASE("epic 7 M4: write accepts bytes and read_bytes round-trips binary data") {
+    TEST_CASE("epic 7 M4: write accepts bytes and read on a b-mode handle answers bytes") {
         test_fiber_fixture fix;
         wy_context* ctx = fix.get_context_ptr();
         wy_module* builtins = WY_NULL;
@@ -200,11 +200,11 @@ TEST_SUITE("io_native")
         REQUIRE_EQ(wy_context_module_register(ctx, io, nullptr), WY_ERR_NONE);
 
         temp_file tf;
-        wy_value open_fn = native_value(ctx, io, "open");
-        wy_value write_fn = native_value(ctx, io, "write");
-        wy_value read_bytes_fn = native_value(ctx, io, "read_bytes");
-        wy_value lseek_fn = native_value(ctx, io, "lseek");
-        wy_value close_fn = native_value(ctx, io, "close");
+        wy_value open_fn = native_value(ctx, io, "__open");
+        wy_value write_fn = native_value(ctx, io, "__write");
+        wy_value read_bytes_fn = native_value(ctx, io, "__read");
+        wy_value lseek_fn = native_value(ctx, io, "__lseek");
+        wy_value close_fn = native_value(ctx, io, "__close");
 
         // Includes a NUL and a high (non-ASCII, non-UTF-8) byte - exactly
         // the case a str-only write/read pair can't carry losslessly.
@@ -245,7 +245,7 @@ TEST_SUITE("io_native")
         REQUIRE_EQ(wy_io_module_new(ctx, &io), WY_ERR_NONE);
         REQUIRE_EQ(wy_context_module_register(ctx, io, nullptr), WY_ERR_NONE);
 
-        wy_value open_fn = native_value(ctx, io, "open");
+        wy_value open_fn = native_value(ctx, io, "__open");
         auto opened = call_native(ctx, open_fn,
             {str_value(ctx, "/nonexistent/wyrm-io-native-test-path"), str_value(ctx, "r")}, 1);
         CHECK(is_os_error(ctx, opened[0]));
@@ -262,12 +262,12 @@ TEST_SUITE("io_native")
         REQUIRE_EQ(wy_context_module_register(ctx, io, nullptr), WY_ERR_NONE);
 
         temp_file tf;
-        wy_value open_fn = native_value(ctx, io, "open");
-        wy_value dup2_fn = native_value(ctx, io, "dup2");
-        wy_value write_fn = native_value(ctx, io, "write");
-        wy_value read_fn = native_value(ctx, io, "read");
-        wy_value close_fn = native_value(ctx, io, "close");
-        wy_value lseek_fn = native_value(ctx, io, "lseek");
+        wy_value open_fn = native_value(ctx, io, "__open");
+        wy_value dup2_fn = native_value(ctx, io, "__dup2");
+        wy_value write_fn = native_value(ctx, io, "__write");
+        wy_value read_fn = native_value(ctx, io, "__read");
+        wy_value close_fn = native_value(ctx, io, "__close");
+        wy_value lseek_fn = native_value(ctx, io, "__lseek");
 
         auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+")}, 1);
         wy_word handle = opened[0].data.word;
@@ -297,9 +297,9 @@ TEST_SUITE("io_native")
         REQUIRE_EQ(wy_context_module_register(ctx, io, nullptr), WY_ERR_NONE);
 
         temp_file tf;
-        wy_value open_fn = native_value(ctx, io, "open");
-        wy_value flush_fn = native_value(ctx, io, "flush");
-        wy_value close_fn = native_value(ctx, io, "close");
+        wy_value open_fn = native_value(ctx, io, "__open");
+        wy_value flush_fn = native_value(ctx, io, "__flush");
+        wy_value close_fn = native_value(ctx, io, "__close");
 
         auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+")}, 1);
         wy_word handle = opened[0].data.word;
@@ -311,16 +311,27 @@ TEST_SUITE("io_native")
         call_native(ctx, close_fn, {wy_value_word(handle)}, 1);
     }
 
-    TEST_CASE("wy_io_module_install registers the module under import path std::io") {
+    TEST_CASE("wy_io_natives_install adds the __ natives to the builtins, and only there") {
         test_fiber_fixture fix;
         wy_context* ctx = fix.get_context_ptr();
-        REQUIRE_EQ(wy_io_module_install(ctx), WY_ERR_NONE);
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(ctx, &builtins), WY_ERR_NONE);
+        ctx->builtins = builtins;
 
-        wy_string* path = WY_NULL;
-        REQUIRE_EQ(wy_string_strdup(ctx, "std::io", &path), WY_ERR_NONE);
-        wy_module* found = WY_NULL;
-        REQUIRE_EQ(wy_link_import(ctx, path, &found), WY_ERR_NONE);
-        REQUIRE_NE(found, WY_NULL);
-        CHECK_EQ(found->state, WY_MODULE_BUILTIN);
+        auto has = [&](const char* name) {
+            wy_symbol sym = WY_NULL;
+            REQUIRE_EQ(wy_context_intern(ctx, name, std::strlen(name), &sym), WY_ERR_NONE);
+            return wy_slot_dict_get(&ctx->builtins->exports, sym) != WY_SLOT_INVALID;
+        };
+        CHECK_FALSE(has("__open"));  // a context nobody extended has no I/O
+
+        REQUIRE_EQ(wy_io_natives_install(ctx), WY_ERR_NONE);
+        for (const char* name : {"__open", "__read", "__write", "__lseek", "__dup2", "__close", "__flush",
+                                 "__STDIN", "__STDOUT", "__STDERR"}) {
+            CAPTURE(name);
+            CHECK(has(name));
+        }
+        // Installing twice is refused (the names exist), not silently doubled.
+        CHECK_EQ(wy_io_natives_install(ctx), WY_ERR_INVAL);
     }
 }

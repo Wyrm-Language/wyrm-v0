@@ -1,6 +1,6 @@
 
 platform_hosted = {
-    'sources'      : files('allocator_cmem.c', 'cmachine.c', 'import_cache.c', 'import_fs.c', 'io_native.c', 'expand_native.c'),
+    'sources'      : files('allocator_cmem.c', 'cmachine.c', 'import_cache.c', 'import_fs.c', 'expand_native.c'),
     'inc'          : [],
     'deps'         : [dependency('threads')],
     'public_inc'   : [],

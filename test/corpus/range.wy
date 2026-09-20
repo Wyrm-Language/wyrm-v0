@@ -1,0 +1,12 @@
+r := range(2, 5)
+println(next(r))
+for x in r:
+    println(x)
+println(next(r) is error)
+n := 0
+for a in range(3, 3):
+    n = n + 1
+println(n)
+for a in range(0, 2):
+    for b in range(0, 2):
+        println(a * 10 + b)

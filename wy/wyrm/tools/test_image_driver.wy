@@ -91,8 +91,8 @@ fn main():
         println("FAIL: to_wyc errored: " + str(encoded))
         return
     handle := std::io::open(OUT_PATH, "wb")
-    std::io::write(handle, encoded)
-    std::io::close(handle)
+    handle!write(encoded)
+    handle!close()
     println("wrote hello image to " + OUT_PATH)
 
 main()

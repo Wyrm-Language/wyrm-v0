@@ -1,4 +1,4 @@
-#include <wyrm/platform/hosted/io_native.h>
+#include "io_native.h"
 
 #include <wyrm/builtins.h>
 #include <wyrm/bytes.h>
@@ -36,6 +36,29 @@ static bool copy_cstr_(wy_string* s, char* buf, wy_uword buf_size)
     wy_memcpy(buf, s->str, s->len);
     buf[s->len] = '\0';
     return true;
+}
+
+/**
+ * Descriptors opened in binary mode ("rb", "wb", "r+b", ...). `__read` answers
+ * a bytes value for these and a str otherwise, which is how the one std/io.wy
+ * (written for pypoc, whose `__read` behaves the same way) implements
+ * `read_bytes` as `bytes(__read(handle, n))`. A bitmap over the low fds; a
+ * descriptor above the range is simply treated as text mode.
+ */
+enum { WY_IO_BINARY_FDS = 1024 };
+static wy_u8 io_binary_fds_[WY_IO_BINARY_FDS / 8];
+
+static void io_set_binary_(int fd, bool binary)
+{
+    if (fd < 0 || fd >= WY_IO_BINARY_FDS) { return; }
+    if (binary) { io_binary_fds_[fd / 8] |= (wy_u8) (1u << (fd % 8)); }
+    else { io_binary_fds_[fd / 8] &= (wy_u8) ~(1u << (fd % 8)); }
+}
+
+static bool io_is_binary_(wy_word fd)
+{
+    if (fd < 0 || fd >= WY_IO_BINARY_FDS) { return false; }
+    return (io_binary_fds_[fd / 8] >> (fd % 8)) & 1u;
 }
 
 /** `mode` is an open()-style mode string ("r", "w", "a", "r+", "w+", "a+",
@@ -155,6 +178,7 @@ static wy_exec_state io_open_exec_(wy_context* context, wy_primitive c_data)
     if (fd < 0) {
         if (os_error_value_(context, errno, &result) != WY_ERR_NONE) { return native_fault_(context, "open: out of memory building OSError"); }
     } else {
+        io_set_binary_(fd, mode_str->len > 0 && mode_str->str[mode_str->len - 1] == 'b');
         result = wy_value_word(fd);
     }
     wy_context_set_result(context, 0, result);
@@ -213,6 +237,10 @@ static bool read_into_buffer_(wy_context* context, wy_word handle, wy_word size,
     return true;
 }
 
+/**
+ * `__read(handle, size)`: `size` bytes, or everything to EOF when negative.
+ * A str for a text-mode handle, a bytes value for one opened with a "b" mode.
+ */
 static wy_exec_state io_read_exec_(wy_context* context, wy_primitive c_data)
 {
     WY_UNUSED(c_data);
@@ -225,40 +253,21 @@ static wy_exec_state io_read_exec_(wy_context* context, wy_primitive c_data)
     wy_uword total = 0;
     if (!read_into_buffer_(context, handle, size, &buf, &total)) { return WY_EXEC_DONE; }
 
-    wy_string* result_str = WY_NULL;
-    wy_error err = wy_string_new(context, buf, total, &result_str);
-    wy_allocator_free(allocator, buf);
-    if (err != WY_ERR_NONE) { return native_fault_(context, "read: out of memory building result"); }
-    wy_context_set_result(context, 0, wy_value_object(WY_TYPE_TAG_STR, (wy_object*) result_str));
-    return WY_EXEC_DONE;
-}
-
-/**
- * Epic 7 M4: a `std::io::read_bytes(handle, size) -> bytes` native, direct
- * counterpart to `read`, for a handle opened in binary mode. Registered
- * directly under `std::io` (not a compiled `.wy` File wrapper) for the
- * same reason `println` was in epic 5/M6: the C VM does not load/compile
- * `.wy` corelib sources yet (no compiler exists in this repo until epics
- * 9-11), so `wy/std/io.wy`'s File.read_bytes (epic 7/M2) is pypoc-only
- * for now.
- */
-static wy_exec_state io_read_bytes_exec_(wy_context* context, wy_primitive c_data)
-{
-    WY_UNUSED(c_data);
-    wy_word handle, size;
-    if (!arg_word_(context, 0, &handle) || !arg_word_(context, 1, &size)) {
-        return native_fault_(context, "read_bytes: handle and size must be integers");
+    wy_value result;
+    if (io_is_binary_(handle)) {
+        wy_bytes* result_bytes = WY_NULL;
+        wy_error err = wy_bytes_new(context, (const wy_u8*) buf, total, &result_bytes);
+        wy_allocator_free(allocator, buf);
+        if (err != WY_ERR_NONE) { return native_fault_(context, "read: out of memory building result"); }
+        result = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) result_bytes);
+    } else {
+        wy_string* result_str = WY_NULL;
+        wy_error err = wy_string_new(context, buf, total, &result_str);
+        wy_allocator_free(allocator, buf);
+        if (err != WY_ERR_NONE) { return native_fault_(context, "read: out of memory building result"); }
+        result = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) result_str);
     }
-    wy_allocator* allocator = wy_context_get_machine(context)->allocator;
-    char* buf = WY_NULL;
-    wy_uword total = 0;
-    if (!read_into_buffer_(context, handle, size, &buf, &total)) { return WY_EXEC_DONE; }
-
-    wy_bytes* result_bytes = WY_NULL;
-    wy_error err = wy_bytes_new(context, (const wy_u8*) buf, total, &result_bytes);
-    wy_allocator_free(allocator, buf);
-    if (err != WY_ERR_NONE) { return native_fault_(context, "read_bytes: out of memory building result"); }
-    wy_context_set_result(context, 0, wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) result_bytes));
+    wy_context_set_result(context, 0, result);
     return WY_EXEC_DONE;
 }
 
@@ -270,6 +279,15 @@ static wy_exec_state io_write_exec_(wy_context* context, wy_primitive c_data)
     wy_uword data_len = 0;
     if (!arg_word_(context, 0, &handle) || !arg_data_(context, 1, &data, &data_len)) {
         return native_fault_(context, "write: handle must be an integer, data a string or bytes");
+    }
+    /* stdout goes through the context's output hook when the host set one -
+     * the same sink the bare `println` builtin uses - so an embedder (or a
+     * test) that captures output sees File/println writes too. Without a
+     * hook it is the real descriptor. */
+    if (handle == 1 && context->io.write != WY_NULL) {
+        context->io.write(context, (const char*) data, data_len, context->io.ud);
+        wy_context_set_result(context, 0, wy_value_word((wy_word) data_len));
+        return WY_EXEC_DONE;
     }
     wy_uword total = 0;
     while (total < data_len) {
@@ -328,6 +346,7 @@ static wy_exec_state io_close_exec_(wy_context* context, wy_primitive c_data)
     wy_word handle;
     if (!arg_word_(context, 0, &handle)) { return native_fault_(context, "close: handle must be an integer"); }
     int rc = close((int) handle);
+    io_set_binary_((int) handle, false);
     wy_value result;
     if (rc < 0) {
         if (os_error_value_(context, errno, &result) != WY_ERR_NONE) { return native_fault_(context, "close: out of memory building OSError"); }
@@ -367,42 +386,25 @@ typedef struct io_exec_entry_
     wy_exec_fn_c_call fn;
 } io_exec_entry_;
 
+/* The names are pypoc's own builtins (wypoc/wyrm_builtins.py), which is what
+ * the one std/io.wy is written against. */
 static const io_exec_entry_ io_exec_natives_[] = {
-    { "open",  2, 2, io_open_exec_ },
-    { "read",  2, 2, io_read_exec_ },
-    { "read_bytes", 2, 2, io_read_bytes_exec_ },
-    { "write", 2, 2, io_write_exec_ },
-    { "lseek", 3, 3, io_lseek_exec_ },
-    { "dup2",  2, 2, io_dup2_exec_ },
-    { "close", 1, 1, io_close_exec_ },
-    { "flush", 1, 1, io_flush_exec_ },
+    { "__open",  2, 2, io_open_exec_ },
+    { "__read",  2, 2, io_read_exec_ },
+    { "__write", 2, 2, io_write_exec_ },
+    { "__lseek", 3, 3, io_lseek_exec_ },
+    { "__dup2",  2, 2, io_dup2_exec_ },
+    { "__close", 1, 1, io_close_exec_ },
+    { "__flush", 1, 1, io_flush_exec_ },
 };
 
-typedef struct io_leaf_entry_
-{
-    const char* name;
-    wy_u8 min_argc;
-    wy_u8 max_argc;
-    wy_native_leaf_fn fn;
-} io_leaf_entry_;
-
-/*
- * `println` under `std::io` (`std::io::println`): some samples import
- * `std::io` and call `std::io::println` directly rather than the bare
- * builtin (e.g. eval_closures.wy, eval_modules.wy) - the reference's
- * corelib/std/io.wy wrapper exposes it there too. Reuses the exact same
- * rendering as the bare `println` (src/builtin/builtins.c) rather than a
- * second implementation or an embedded `io.wy` wrapper, per epic 5/M4's
- * "seven natives exported directly under std::io" scope call.
- */
-static const io_leaf_entry_ io_leaf_natives_[] = {
-    { "println", 0, 255, wy_builtin_println_body_f },
+static const struct { const char* name; wy_word value; } io_consts_[] = {
+    { "__STDIN", 0 }, { "__STDOUT", 1 }, { "__STDERR", 2 },
 };
 
 enum { WY_IO_EXEC_COUNT = sizeof(io_exec_natives_) / sizeof(io_exec_natives_[0]),
-    WY_IO_LEAF_COUNT = sizeof(io_leaf_natives_) / sizeof(io_leaf_natives_[0]),
-    WY_IO_NATIVE_COUNT = WY_IO_EXEC_COUNT + WY_IO_LEAF_COUNT, WY_IO_CONST_COUNT = 3,
-    WY_IO_GLOBAL_COUNT = WY_IO_NATIVE_COUNT + WY_IO_CONST_COUNT };
+    WY_IO_CONST_COUNT = sizeof(io_consts_) / sizeof(io_consts_[0]),
+    WY_IO_GLOBAL_COUNT = WY_IO_EXEC_COUNT + WY_IO_CONST_COUNT };
 
 wy_error wy_io_module_new(wy_context* context, wy_module** out)
 {
@@ -445,28 +447,11 @@ wy_error wy_io_module_new(wy_context* context, wy_module** out)
         slot++;
     }
 
-    for (wy_uword i = 0; i < WY_IO_LEAF_COUNT; i++) {
-        const io_leaf_entry_* entry = &io_leaf_natives_[i];
-        wy_symbol sym;
-        err = wy_context_intern(context, entry->name, wy_strlen_f(entry->name), &sym);
-        if (err != WY_ERR_NONE) { return err; }
-        wy_native* native = WY_NULL;
-        err = wy_native_leaf_new(context, sym, entry->min_argc, entry->max_argc, entry->fn, &native);
-        if (err != WY_ERR_NONE) { return err; }
-        module->globals[slot] = wy_value_object(WY_TYPE_TAG_NATIVE, (wy_object*) native);
-        err = wy_slot_dict_add_entry(&module->exports, sym, slot);
-        if (err != WY_ERR_NONE) { return err; }
-        slot++;
-    }
-
-    static const struct { const char* name; wy_word value; } consts[WY_IO_CONST_COUNT] = {
-        { "STDIN", 0 }, { "STDOUT", 1 }, { "STDERR", 2 },
-    };
     for (wy_uword i = 0; i < WY_IO_CONST_COUNT; i++) {
         wy_symbol sym;
-        err = wy_context_intern(context, consts[i].name, wy_strlen_f(consts[i].name), &sym);
+        err = wy_context_intern(context, io_consts_[i].name, wy_strlen_f(io_consts_[i].name), &sym);
         if (err != WY_ERR_NONE) { return err; }
-        module->globals[slot] = wy_value_word(consts[i].value);
+        module->globals[slot] = wy_value_word(io_consts_[i].value);
         err = wy_slot_dict_add_entry(&module->exports, sym, slot);
         if (err != WY_ERR_NONE) { return err; }
         slot++;
@@ -477,50 +462,19 @@ wy_error wy_io_module_new(wy_context* context, wy_module** out)
     return WY_ERR_NONE;
 }
 
-/**
- * wypoc's compiler_bc emits an implicit `import std` ahead of `import
- * std::io` for any dotted import path (the parent package, same as
- * Python's `import a.b` also binding bare `a`) - see the "std" static
- * string and its own `import`/`gset` pair ahead of "std::io"'s in a
- * compiled script's init code. There is no real content behind that
- * parent: it exists only so the ancestor import resolves. Register an
- * empty BUILTIN module under "std" so wy_link_import's already-registered
- * check finds it and never reaches the (real) filesystem hook for a
- * package that has no `std.wyc` of its own.
- */
-static wy_error install_std_package_(wy_context* context)
+wy_error wy_io_natives_install(wy_context* context)
 {
-    wy_module* module = wy_module_new_f(context);
-    if (module == WY_NULL) { return WY_ERR_NOMEM; }
-    module->state = WY_MODULE_BUILTIN;
+    if (context == WY_NULL || context->builtins == WY_NULL) { return WY_ERR_INVAL; }
 
-    wy_string* path = WY_NULL;
-    wy_error err = wy_string_strdup(context, "std", &path);
-    if (err != WY_ERR_NONE) { return err; }
-    module->import_path = path;
-    err = wy_context_intern(context, "std", 3, &module->name);
+    wy_module* holder = WY_NULL;
+    wy_error err = wy_io_module_new(context, &holder);
     if (err != WY_ERR_NONE) { return err; }
 
-    return wy_context_module_register(context, module, WY_NULL);
-}
-
-wy_error wy_io_module_install(wy_context* context)
-{
-    if (context == WY_NULL) { return WY_ERR_INVAL; }
-
-    wy_error err = install_std_package_(context);
-    if (err != WY_ERR_NONE) { return err; }
-
-    wy_module* module = WY_NULL;
-    err = wy_io_module_new(context, &module);
-    if (err != WY_ERR_NONE) { return err; }
-
-    wy_string* path = WY_NULL;
-    err = wy_string_strdup(context, "std::io", &path);
-    if (err != WY_ERR_NONE) { return err; }
-    module->import_path = path;
-    err = wy_context_intern(context, "std::io", wy_strlen_f("std::io"), &module->name);
-    if (err != WY_ERR_NONE) { return err; }
-
-    return wy_context_module_register(context, module, WY_NULL);
+    for (wy_uword slot = 0; slot < WY_IO_GLOBAL_COUNT; slot++) {
+        const char* name = slot < WY_IO_EXEC_COUNT ? io_exec_natives_[slot].name
+                                                    : io_consts_[slot - WY_IO_EXEC_COUNT].name;
+        err = wy_builtins_add(context, name, holder->globals[slot]);
+        if (err != WY_ERR_NONE) { return err; }
+    }
+    return WY_ERR_NONE;
 }

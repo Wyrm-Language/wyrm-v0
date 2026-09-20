@@ -1,7 +1,7 @@
 # Notes for automated agents: traps, method, and past regressions
 
 Distilled from epics 7-10 (see `vm_plan/epic_N_report.md` for full detail). Read this before
-touching `src/vm*.c`, `wy/wyrm/*.wy`, or the self-hosted compiler.
+touching `src/vm*.c`, `src/embed/wyrm/*.wy`, or the self-hosted compiler.
 
 ## Engines and which one is the reference
 
@@ -10,7 +10,7 @@ touching `src/vm*.c`, `wy/wyrm/*.wy`, or the self-hosted compiler.
 | pypoc tree-walker (`wyrm_eval_parse_tree.py`) | **Semantic reference** (stays long term). Where engines disagree, match this. |
 | pypoc bytecode compiler + VM | Being retired; bug-compatible only where cheap. |
 | This repo's C VM (`buildDir/src/wyrm/wyrm`) | Compiles and runs `.wy` in-process (epic 11: builtin module table + `__wycache__` .wyd cache); runs `.wyc`/`.wyd` directly. Self-sufficient - no Python. |
-| Ported compiler (`wy/wyrm/compiler/*.wy`) | Runs on the C VM, compiled by pypoc (gen0) or by itself (gen1+). |
+| Ported compiler (`src/embed/wyrm/compiler/*.wy`) | Runs on the C VM, compiled by pypoc (gen0) or by itself (gen1+). |
 
 - Always use `pypoc/.venv/bin/wyrm`, never `~/tools/bin/wyrm` (stale checkout).
 - Bar for the compiler port is *functional*, not byte-identical with pypoc.
@@ -19,11 +19,11 @@ touching `src/vm*.c`, `wy/wyrm/*.wy`, or the self-hosted compiler.
 
 ## Generations of the self-hosted compiler
 
-- **gen0 / stage0** = the compiler images embedded in the binary (`src/wyrm/embedded/`,
+- **gen0 / stage0** = the compiler images embedded in the binary (`src/embed/**.c`,
   committed). pypoc is no longer involved. (History: gen0 used to be a pypoc-compiled
   *amalgam* of all compiler modules concatenated into one module; that driver and
   `run_corpus_sweep.py` are gone.)
-- **gen1** = stage0 compiling the current `wy/` sources into separate `.wyd` modules
+- **gen1** = stage0 compiling the current `src/embed/` sources into separate `.wyd` modules
   (`compiler_main.wy` run in-process by the binary). Output tree first on the import path,
   so decorator expansion loads this compiler's own tree shapes.
 - **gen2** = gen1 compiling them again. Bar: gen1 == gen2 byte-for-byte, then the fresh
@@ -66,7 +66,7 @@ Symptom -> usual cause seen so far:
 | argument arrives as the receiver object | receiver temporaries not freed before message args |
 | works in gen0, fails in gen1 | amalgam-only name resolution (see above) |
 
-## Parser pitfalls (wy/wyrm/parser.wy)
+## Parser pitfalls (src/embed/wyrm/parser.wy)
 
 - Grammar is packrat with `@accept`; block-form `if/while/for` are *primaries*. A block ends
   at DEDENT with no NEWLINE token, so anything postfix (`(`, `[`) at the start of the next
@@ -79,7 +79,7 @@ Symptom -> usual cause seen so far:
   not `$[kind]` nodes. `recv ! m()` (`'send`, args nil) differs from `recv ! m` (`'bound`).
 - Parser tests must include mixed-operator, trailing-comma and block-then-`(` cases; earlier
   suites did not and three bugs shipped.
-- `pos` fields do not exist on wy/wyrm nodes; error messages have no source positions.
+- `pos` fields do not exist on src/embed/wyrm nodes; error messages have no source positions.
 
 ## C VM traps
 
@@ -99,7 +99,8 @@ Symptom -> usual cause seen so far:
 - Imported `fn [T]` messages are adopted at import time (`wy_link_adopt_messages`).
 - Natives must not use `wy_vm_call_sync` (no C recursion).
 - `int(str)` uses strtol base autodetection (leading 0 = octal), unlike Python.
-- `for i in range(...)` zero-iteration gap and `f(x, *rest)` in `call_va` are known, unfixed.
+- `f(x, *rest)` in `call_va` is a known, unfixed gap. (`range` is now a native iterator; the old
+  coroutine-prelude gap where `for i in range(...)` never iterated is gone.)
 
 ## Codegen pitfalls (shared by pypoc and the port)
 
@@ -113,7 +114,7 @@ Symptom -> usual cause seen so far:
   recorded reason. Stubs are silent unless `compiler_main` prints them (it does: `STUB ...`).
   A new unexpected stub is a bug; the expected set is decorators and `_dsl` templates.
 
-## wy authoring gotchas (for files in `wy/`)
+## wy authoring gotchas (for files in `src/embed/` and `wy/`)
 
 - Dict literals must fit on one physical line. Default parameter values must be literals
   (use `x: list | nil = nil`). `fn`/`f` cannot be identifiers.
@@ -144,13 +145,15 @@ Symptom -> usual cause seen so far:
 ## Decorator expansion (epic 10a)
 
 - Decorators are expanded in a **throwaway VM** (`std::expand::expand`,
-  `src/platform/hosted/expand_native.c`); the expander is `wy/wyrm/compiler/expand.wy`. The child
+  `src/platform/hosted/expand_native.c`); the expander is `src/embed/wyrm/compiler/expand.wy`. The child
   reuses the parent's import hook *including the builtin module table* (epic 11), so the
   expander and the whole compiler tier resolve with no file on disk; decorator modules the
   compiled module imports resolve from `-I` roots (`.wy` sources compile through the .wyd
   cache on a scratch machine; `.wyc`/`.wyd` load directly). The scope module holds *all* of a
-  module's imports, so a module with decorators cannot import `std::io` (or any host module;
-  the builtin table deliberately omits `std::io`/`std::expand` so this stays true).
+  module's imports, so a module with decorators cannot import `std::io` (or any host module).
+  `std::io` is an embedded module now, so this is enforced by the expansion child's import hook
+  (`expand_child_import_` refuses `std::io`) and by the child having no `__open`/... natives;
+  `std::expand` stays a host module absent from the builtin table.
 - C code holding values across VM runs in ANY context must root them
   (`wy_context_root_push_f`): module init runs GC safepoints. An unrooted copied-in tree was
   freed mid-expansion (5000-element list came back length 1).
@@ -158,8 +161,9 @@ Symptom -> usual cause seen so far:
   bare-symbol names, `'message`, pair lists). `ast.wy` owns the difference (`WY_SHAPE`, detected from
   a probe template, so it follows the compiler that built the module); `_dsl.wy` must only read and
   build trees through its `s_*`/`mk_*` helpers. A raw `$['name, x]` in `_dsl.wy` is a bug.
-- `for i in range(...)` never iterates on the C VM (epic 6 gap): use `while` in code that must run
-  there (as `std::pairs::list_tail` now does). `fn $name` is an ordinary function, not a TreeBase method.
+- `range(a, b)` is a native iterator (an `ITER` value; `for` and `next()` accept it). Older
+  `.wy` written around the former zero-iteration gap (e.g. `std::pairs::list_tail`'s `while`)
+  can go back to `for`. `fn $name` is an ordinary function, not a TreeBase method.
 - Builtins the C VM adds (`tree_box`, `bind_message`, `error_message`) are unknown to pypoc
   and must be listed in `compiler/context.wy` BUILTIN_NAMES for the port. pypoc cannot compile
   a module that uses them; fixtures that do are compiled by the port and have hand-written

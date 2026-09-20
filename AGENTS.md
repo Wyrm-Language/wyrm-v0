@@ -53,7 +53,7 @@ Wyrm logic all follows the syntax defined in [language-spec.md](doc/language-spe
 and grammar specified in [grammar.md](doc/grammar.md).
 
 The in-repo binary is self-sufficient: it compiles and runs `.wy` scripts
-with no Python and no external wyrm installation (the compiler, the `wy/`
+with no Python and no external wyrm installation (the compiler, the `src/embed/`
 library modules, and the front end are embedded in the binary). Prefer it
 over any `wyrm` in user `$PATH` -- a pre-existing installation may be an
 older, divergent variant of the language. pypoc (a nested checkout) is
@@ -72,9 +72,9 @@ Tests check behavior, plus our own compiler's self-consistency:
 - C++ golden/loader/image/link tests run `.wyd` fixtures that a meson custom
   target (`scripts/build_fixtures.py`) compiles from `test/corpus` with the
   build tree's own compiler on every build.
-- `selfcompile`: gen1 (the binary's stage0 compiles current `wy/`) == gen2
+- `selfcompile`: gen1 (the binary's stage0 compiles current `src/embed/`) == gen2
   byte-for-byte, and the result equals the committed stage0 in
-  `src/wyrm/embedded/`. After changing `wy/` compiler sources, regenerate
+  `src/embed/**.c`. After changing `src/embed/` sources, regenerate
   stage0 with `python3 scripts/regen_builtins.py` and commit.
 - `wy-tests`, `scripts/check_parser_truth.py`: run under the external wyrm.
 
@@ -94,13 +94,13 @@ Scripts resolve imports through `-I` roots, then the embedded builtin
 modules. To run a script:
 
 ```sh
-./buildDir/src/wyrm/wyrm -Iwy script_path.wy
+./buildDir/src/wyrm/wyrm script_path.wy
 ```
 
 To test a script for syntax:
 
 ```sh
-./buildDir/src/wyrm/wyrm -Iwy --check script_path.wy
+./buildDir/src/wyrm/wyrm --check script_path.wy
 ```
 
 ## Debugging and Known Traps

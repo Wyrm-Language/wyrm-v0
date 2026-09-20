@@ -5,6 +5,7 @@
 /* Image symbols, defined in embedded_images.c's translation units: */
 
 extern const wy_module_image ctype_image;
+extern const wy_module_image io_image;
 extern const wy_module_image pairs_image;
 extern const wy_module_image _dsl_image;
 extern const wy_module_image ast_image;
@@ -33,6 +34,7 @@ extern const wy_module_image __init___image;
 
 const wy_import_fs_builtin wyrm_builtin_modules[] = {
     { "std::ctype", &ctype_image },
+    { "std::io", &io_image },
     { "std::pairs", &pairs_image },
     { "wyrm::_dsl", &_dsl_image },
     { "wyrm::ast", &ast_image },
@@ -62,4 +64,4 @@ const wy_import_fs_builtin wyrm_builtin_modules[] = {
     { "opcodes", &opcodes_image },
 };
 
-const wy_uword wyrm_builtin_module_count = 28;
+const wy_uword wyrm_builtin_module_count = 29;

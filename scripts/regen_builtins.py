@@ -2,10 +2,13 @@
 """Epic 11 M1: regenerate the checked-in builtin module table sources.
 
 The wyrm binary embeds the ported compiler and the library modules it needs
-as static wy_module_image C sources under src/wyrm/embedded/. They are
-checked in - the build never produces them - so this script is the only way
-they change, and meson test fails when they drift from wy/ (run_selfcompile
-calls check_tree after its fixed point).
+as static wy_module_image C sources under src/embed/, each `<name>.c` beside
+its `<name>.wy` (src/embed/std, src/embed/wyrm, ...), plus the generated
+table and unity files at the src/embed root. They are checked in - the build
+never produces them - so this script is the only way they change, and meson
+test fails when they drift from the sources (run_selfcompile calls
+check_tree after its fixed point). Hand-written natives beside a module
+(`<name>_native.c`) are not generated and are never touched.
 
 Flow (no pypoc: the binary's own embedded compiler is stage0):
 
@@ -38,7 +41,8 @@ from run_selfcompile import gen1_tree, tree_roots as _tree_roots
 ROOT = wytest_env.REPO_ROOT
 WYRM = wytest_env.LOCAL_WYRM
 
-EMBEDDED_DIR = os.path.join(ROOT, "src", "wyrm", "embedded")
+EMBEDDED_DIR = wytest_env.EMBED_ROOT
+ROOT_GENERATED = ("embedded_images.c", "wyrm_builtins_table.c")
 
 
 def tree_roots(tree):
@@ -63,8 +67,11 @@ def emit_from_tree(tree, out_dir):
             print(r.stdout, r.stderr, file=sys.stderr)
             sys.exit("regen_builtins: embed_build failed to compile")
         embed_build = os.path.join(scratch, "embed_build.wyd")
+        # embed_build writes <out>/<dir>/<name>.c and does not create dirs.
+        for sub_dir in EMBED_DIRS:
+            os.makedirs(os.path.join(out_dir, sub_dir), exist_ok=True)
         r = subprocess.run(
-            [WYRM] + tree_roots(tree) + [embed_build, wy_root, out_dir],
+            [WYRM] + tree_roots(tree) + [embed_build, EMBEDDED_DIR, out_dir],
             capture_output=True, text=True, timeout=600)
         sys.stdout.write(r.stdout)
         if r.returncode != 0 or "embed_build: done" not in r.stdout \
@@ -75,8 +82,24 @@ def emit_from_tree(tree, out_dir):
         shutil.rmtree(scratch, ignore_errors=True)
 
 
-def generated_files(out_dir):
-    return sorted(f for f in os.listdir(out_dir) if f.endswith(".c"))
+EMBED_DIRS = ("std", "wyrm", os.path.join("wyrm", "compiler"), os.path.join("wyrm", "tools"))
+
+
+def generated_files(root, all_c=False):
+    """Paths (relative to root) of the generated C sources under it: the two
+    root-level files, and every `<name>.c` that has a `<name>.wy` beside it.
+    Hand-written `*_native.c` files have no such sibling and are excluded.
+    all_c: treat every .c as generated (a fresh emit dir has no .wy beside)."""
+    found = []
+    for dirpath, _dirs, files in os.walk(root):
+        for f in files:
+            if not f.endswith(".c"):
+                continue
+            full = os.path.join(dirpath, f)
+            rel = os.path.relpath(full, root)
+            if all_c or rel in ROOT_GENERATED or os.path.exists(full[:-2] + ".wy"):
+                found.append(rel)
+    return sorted(found)
 
 
 def check_tree(tree):
@@ -85,7 +108,7 @@ def check_tree(tree):
     out = tempfile.mkdtemp(prefix="regen_check_", dir="/tmp")
     try:
         emit_from_tree(tree, out)
-        fresh = generated_files(out)
+        fresh = generated_files(out, all_c=True)
         checked_in = generated_files(EMBEDDED_DIR)
         ok = True
         for name in sorted(set(fresh) | set(checked_in)):
@@ -98,10 +121,10 @@ def check_tree(tree):
                 print("embedded images: %s is checked in but no longer generated" % name)
                 ok = False
             elif not filecmp.cmp(new, old, shallow=False):
-                print("embedded images: %s is stale (wy/ moved since it was generated)" % name)
+                print("embedded images: %s is stale (its source or the compiler moved since it was generated)" % name)
                 ok = False
         if ok:
-            print("embedded images: %d files up to date with wy/" % len(fresh))
+            print("embedded images: %d files up to date with src/embed" % len(fresh))
         else:
             print("embedded images: STALE - run scripts/regen_builtins.py and commit")
         return ok
@@ -137,8 +160,9 @@ def main():
         out = tempfile.mkdtemp(prefix="regen_emit_", dir="/tmp")
         emit_from_tree(tree, out)
         os.makedirs(EMBEDDED_DIR, exist_ok=True)
-        names = generated_files(out)
+        names = generated_files(out, all_c=True)
         for name in names:
+            os.makedirs(os.path.dirname(os.path.join(EMBEDDED_DIR, name)), exist_ok=True)
             shutil.copyfile(os.path.join(out, name), os.path.join(EMBEDDED_DIR, name))
         print("regen_builtins: wrote %d files to %s" % (len(names), EMBEDDED_DIR))
         print("now: meson compile -C buildDir && meson test -C buildDir, then commit")

@@ -22,7 +22,6 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CORPUS = os.path.join(REPO, "test", "corpus")
-WY_ROOT = os.path.join(REPO, "wy")
 
 
 def sources():
@@ -52,7 +51,7 @@ def main():
         src = os.path.join(CORPUS, rel)
         dest = os.path.join(out_dir, os.path.dirname(rel))
         os.makedirs(dest, exist_ok=True)
-        cmd = [wyrm, "-I" + WY_ROOT, "-I" + os.path.dirname(src), "-I" + CORPUS,
+        cmd = [wyrm, "-I" + os.path.dirname(src), "-I" + CORPUS,
                "--cache-dir", os.path.join(out_dir, ".cache"),
                "--build-bc", "-o", dest, "--emit", "wyd", src]
         p = subprocess.run(cmd, capture_output=True, text=True)

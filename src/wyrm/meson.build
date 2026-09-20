@@ -1,12 +1,11 @@
 # Epic 11 M1: the builtin module table (embedded compiler + library images)
 # is tool payload, not libcwyrm payload: the generated sources are checked in
-# under embedded/ and compiled into the wyrm executable (and into test_cwyrm)
-# only. embedded_images.c is a unity include of every image translation unit,
-# so a regen never touches this file.
+# under ../embed/ (each `<module>.c` beside its `<module>.wy`; see
+# ../embed/meson.build for the source list, which also carries the natives
+# like std/io_native.c) and compiled into the wyrm executable (and into
+# test_cwyrm) only.
 wyrm_exe = executable('wyrm',
-    files('main.c',
-          'embedded/embedded_images.c',
-          'embedded/wyrm_builtins_table.c'),
+    files('main.c'), embed_sources,
     dependencies: [cwyrm_lib_dep],
     install: true,
 )

@@ -21,9 +21,19 @@ WY_BEGIN_DECLS
 wy_error wy_builtins_new(wy_context* context, wy_module** out);
 
 /**
+ * Append a global to `context->builtins` (which must already be set): the
+ * host's way to extend the bare-name layer - e.g. the std::io natives
+ * (`__open`, `__read`, ...) that the embedded std/io.wy is written over. Only
+ * contexts the host chooses to extend see the name (an expansion VM does not).
+ * Must run before any module is linked against the builtins. WY_ERR_INVAL if
+ * the name already exists, WY_ERR_NOMEM when the spare capacity is used up.
+ */
+wy_error wy_builtins_add(wy_context* context, const char* name, wy_value value);
+
+/**
  * The shared body behind bare `println` (space-joined `format_value_f`
  * rendering of each arg, trailing "\n", writes through `context->io.write`)
- * - exposed so `std::io::println` (src/platform/hosted/io_native.c) can
+ * - exposed so the embedded std/io.wy (and any host code) can
  * reuse the exact same rendering rather than duplicating it, since this VM
  * already has its own `println`/`print` design distinct from the reference
  * corelib/std/io.wy wrapper (epic 5/M4's report).

@@ -18,7 +18,7 @@ Scheme-inspired but with Python-like offside-rule syntax. See
 coroutines, decorators, native-code blocks) describe the *intended* language;
 the C implementation currently covers only the low-level runtime substrate
 (context/fiber/stack/gc/module plumbing) and a handful of opcodes. The `.wy`
-sources under `wy/` are a self-hosted tokenizer/parser/compiler written *in*
+sources under `src/embed/` are a self-hosted tokenizer/parser/compiler written *in*
 the language itself, used to bootstrap — they are not yet wired to the C
 loader (see "Bytecode / VM state" below).
 
@@ -59,8 +59,9 @@ failure. Trust `meson compile`, not the editor's live diagnostics.
 ### Layering
 
 ```
-wy/*.wy                    <- language written in itself (bootstrap compiler,
-                               stdlib), not yet consumed by the C runtime
+src/embed/**/*.wy          <- language written in itself (compiler, stdlib), compiled
+                               into the binary; each .c image sits beside its .wy
+wy/                        <- wyrm tools/drivers that are not embedded
 include/wyrmxx, src/wyrmxx <- C++ bindings/wrapper layer over the C core
 include/wyrm, src/*.c      <- the C core ("libcwyrm"): object model, VM,
                                allocators, gc, module/bytecode container
@@ -93,7 +94,7 @@ src/platform/*                "hosted" = standard C11 malloc/free); platform/*
   `include/wyrm/bson.h`) — **it expects already-compiled bytecode, not
   `.wy` source text.** There is currently no C-side compiler; `main.c`
   passing a raw script file to `wy_module_load` will fail the magic-header
-  check. The `.wy`-language self-hosted compiler under `wy/wyrm/` (tokenizer
+  check. The `.wy`-language self-hosted compiler under `src/embed/wyrm/` (tokenizer
   → parser → ast → compiler → decode) is the intended producer of that
   container format, but nothing currently drives it from the C side — see
   AGENTS.md's note to prefer an external, already-built `wyrm` install for
@@ -183,11 +184,11 @@ fixtures built from `test/corpus`, output captured via `ctx->io.write` and
 diffed against the corpus's committed `.out`.
 
 Practical implication (since epic 11): `wyrm` is self-sufficient. A `.wy`
-script compiles in-process — the front end, the compiler, and the `wy/`
+script compiles in-process — the front end, the compiler, and the `src/embed/`
 library modules are embedded in the binary as the builtin module table
-(`src/wyrm/embedded/`, resolution order: `-I` roots (`.wy` through the
+(`src/embed/`, resolution order: `-I` roots (`.wy` through the
 `.wyd` cache, then precompiled `.wyd`/`.wyc`), then the table) — and then
-runs: `./buildDir/src/wyrm/wyrm -Iwy test/corpus/hello.wy` prints
+runs: `./buildDir/src/wyrm/wyrm test/corpus/hello.wy` prints
 `Hello World` with no Python and no external wyrm on the machine.
 `--check`, `--build-bc`, `-m`, `--cache-dir`, and `-v` round out the CLI
 (exit codes: 0 ok, 1 compile/run failure, 2 usage). pypoc remains the
@@ -217,9 +218,9 @@ directories* register into the build (`sources`, `inc`, `deps`,
 `public_inc`, `test_sources`, ...). Don't confuse this with the runtime
 `wy_module` bytecode container.
 
-### Language front-end (`wy/` and `test/wy`, `test/samples`)
+### Language front-end (`src/embed/`, `wy/`, `test/wy`, `test/samples`)
 
-`wy/wyrm/{tokenizer,parser,ast,compiler,decode,_dsl}.wy` is a self-hosted
+`src/embed/wyrm/{tokenizer,parser,ast,compiler,decode,_dsl}.wy` is a self-hosted
 front end written in the Wyrm language itself, per the bootstrap philosophy
 in AGENTS.md ("prefer the default 'wyrm' in user `$PATH`... this repo's own
 implementation may be incomplete/experimental"). `test/wy/*.wy` exercises the

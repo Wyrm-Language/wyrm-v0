@@ -2,11 +2,11 @@
 """Self-compile fixed point for the wyrm compiler, on the C VM. No pypoc.
 
 Generation 0 is stage0: the compiler images embedded in the binary under
-test (src/wyrm/embedded/, committed; regenerate with scripts/regen_builtins.py
-after a wy/ change - that regeneration is the "regenerate the stage0
+test (src/embed/**.c, committed; regenerate with scripts/regen_builtins.py
+after a src/embed change - that regeneration is the "regenerate the stage0
 reference" step).
 Generation 1: the binary compiles the compiler's own current sources
-(running wy/wyrm/tools/compiler_main.wy in-process, itself compiled by
+(running src/embed/wyrm/tools/compiler_main.wy in-process, itself compiled by
 stage0) into a mirror tree (out1).
 Generation 2: generation 1's own compiled entry point
 (out1/wyrm/tools/compiler_main.wyd), running on the C VM, compiles the
@@ -15,8 +15,8 @@ same sources again (out2).
 Bar: byte-identical trees (gen1 == gen2), or failing that the weaker
 functional fixed point (gen2 == gen3). Then the convergence check against
 stage0: what the fresh tree emits for the embedded builtin table must equal
-the committed src/wyrm/embedded/ sources byte-for-byte
-(regen_builtins.check_tree), so a wy/ change that is not folded back into
+the committed src/embed/ sources byte-for-byte
+(regen_builtins.check_tree), so a src/embed change that is not folded back into
 stage0 fails here.
 
 Every self-source is compiled, including wyrm/parser.wy (86 `@accept` sites,
@@ -38,9 +38,9 @@ import wytest_env
 ROOT = wytest_env.REPO_ROOT
 WYRM = wytest_env.LOCAL_WYRM
 
-# The compiler's own sources, relative to wy/ - everything the driver
-# amalgam concatenates, plus the package marker, the package root, and
-# the entry point itself.
+# The compiler's own sources, relative to src/embed/ - the front end and
+# compiler modules, plus the package marker, the package root, and the entry
+# point itself.
 SELF_SOURCES = [
     "std/pairs.wy",
     "std/ctype.wy",
@@ -82,11 +82,11 @@ def root_package_alias(tree):
 
 
 def wy_roots():
-    """Source import roots for running the compiler from wy/ (the sources
-    use package-relative imports, so `wyrm/` and `wyrm/compiler/` are roots
-    too)."""
-    wy = os.path.join(ROOT, "wy")
-    return [wy, os.path.join(wy, "wyrm"), os.path.join(wy, "wyrm", "compiler")]
+    """Source import roots for running the compiler from src/embed/ (the
+    sources use package-relative imports, so `wyrm/` and `wyrm/compiler/` are
+    roots too)."""
+    embed = wytest_env.EMBED_ROOT
+    return [embed, os.path.join(embed, "wyrm"), os.path.join(embed, "wyrm", "compiler")]
 
 
 def tree_roots(tree):
@@ -152,8 +152,8 @@ def collect_wycs(tree):
 
 
 def check_embedded_images(tree):
-    """Epic 11 M1: the checked-in builtin table sources (src/wyrm/embedded/)
-    must match what this fresh tree's compiler produces from wy/ - the meson
+    """Epic 11 M1: the checked-in builtin table sources (src/embed/)
+    must match what this fresh tree's compiler produces from src/embed/ - the meson
     staleness check for the embedded images. Runs after the fixed point so a
     drifted embed list fails the test, not just the build."""
     import regen_builtins
@@ -161,11 +161,11 @@ def check_embedded_images(tree):
 
 
 def gen1_tree(work):
-    """Generation 1: the binary's embedded stage0 compiles the current wy/
+    """Generation 1: the binary's embedded stage0 compiles the current src/embed
     sources (running compiler_main.wy in-process). Returns the tree."""
     out1 = os.path.join(work, "gen1")
-    compile_tree(os.path.join(ROOT, "wy", "wyrm", "tools", "compiler_main.wy"),
-                 wy_roots(), out1, os.path.join(ROOT, "wy"),
+    compile_tree(os.path.join(wytest_env.EMBED_ROOT, "wyrm", "tools", "compiler_main.wy"),
+                 wy_roots(), out1, wytest_env.EMBED_ROOT,
                  cache_dir=os.path.join(work, "cache"))
     return out1
 
@@ -181,7 +181,7 @@ def main():
     if keep:
         os.makedirs(keep, exist_ok=True)
     with cm as work:
-        wy_root = os.path.join(ROOT, "wy")
+        wy_root = wytest_env.EMBED_ROOT
         out1 = gen1_tree(work)
         out2 = os.path.join(work, "gen2")
 

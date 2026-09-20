@@ -109,6 +109,14 @@ fn _constant_value(node):
     kind := node_kind(node)
     if (kind == 'str) or (kind == 'int) or (kind == 'float) or (kind == 'char):
         return (_field(node, 1) catch nil)
+    if kind == 'neg:
+        # A negated numeric literal (`-1`) is still a constant.
+        inner := (_field(node, 1) catch nil)
+        if inner is sym:
+            return error("not a constant")
+        inner_kind := node_kind(inner)
+        if (inner_kind == 'int) or (inner_kind == 'float):
+            return 0 - (_field(inner, 1) catch 0)
     return error("not a constant")
 
 # ---------------------------------------------------------------------------

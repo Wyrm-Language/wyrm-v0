@@ -40,8 +40,8 @@ fn compile_and_write(what: str, module_node, path: str) -> nil:
         println("FAIL: " + what + " did not serialize")
         return
     h := std::io::open(path, "wb")
-    std::io::write(h, blob)
-    std::io::close(h)
+    h!write(blob)
+    h!close()
     println("OK " + what + " -> " + path)
     return
 

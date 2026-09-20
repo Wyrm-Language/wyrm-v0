@@ -53,5 +53,7 @@ frame!append(out)
 frame!append(0)
 
 handle := std::io::open("bytes_header.bin", "wb")
-std::io::write(handle, frame)
-std::io::close(handle)
+
+handle!write(frame)
+
+handle!close()

@@ -18,7 +18,7 @@
 #include <wyrm/value.h>
 #include <test_common/test_fiber_fixture.h>
 
-#include "../wyrm/embedded/builtins.h"
+#include "../embed/builtins.h"
 
 namespace {
 
@@ -438,7 +438,7 @@ TEST_SUITE("link") {
 
 TEST_SUITE("builtin_table") {
     // Epic 11 M1: the embedded compiler + library images, consulted by the
-    // hosted import hook after every -I root misses (src/wyrm/embedded/).
+    // hosted import hook after every -I root misses (src/embed/).
 
     static wy_import_fs_search_path table_search_path()
     {

@@ -10,10 +10,10 @@ ROOT="$2"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 cp "$ROOT/test/corpus/hello.wy" "$WORK/hello.wy"
-"$WYRM" -I"$ROOT/wy" --build-bc -o "$WORK" --emit wyd "$WORK/hello.wy" >/dev/null
+"$WYRM" --build-bc -o "$WORK" --emit wyd "$WORK/hello.wy" >/dev/null
 mkdir "$WORK/img" && mv "$WORK/hello.wyd" "$WORK/img/hello.wyd"
 a=$("$WYRM" "$WORK/img/hello.wyd")
-b=$("$WYRM" -I"$ROOT/wy" "$ROOT/test/corpus/hello.wy")
+b=$("$WYRM" "$ROOT/test/corpus/hello.wy")
 if [ "$a" != "$b" ]; then
     echo "wy-entry: .wy output differs from .wyd output" >&2
     exit 1
@@ -26,7 +26,7 @@ if env -i PATH="$WORK/bin" /bin/sh -c 'command -v python3 >/dev/null 2>&1 || com
     echo "wy-entry: cannot prove Python is unreachable on the stripped PATH" >&2
     exit 1
 fi
-OUT3=$(env -i PATH="$WORK/bin" "$WYRM" -I"$ROOT/wy" "$ROOT/test/corpus/hello.wy")
+OUT3=$(env -i PATH="$WORK/bin" "$WYRM" "$ROOT/test/corpus/hello.wy")
 [ "$OUT3" = "Hello World" ]
 
 echo "wy-entry: $b (also runs under a Python-free PATH)"

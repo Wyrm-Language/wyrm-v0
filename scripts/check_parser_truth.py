@@ -3,7 +3,7 @@
 
 Epic 8 M4's comparing golden runner. For every `.wy` in
 test/samples/parser/, parses it with the self-hosted wyrm parser
-(the external wyrm, see wytest_env.py, run with -m wyrm::parser,
+(the external wyrm, see wytest_env.py, run with -m wyrm::tools::parse_dump,
 matching update_sample_parser_truth.py's invocation) and diffs the output against
 the committed `.ast` file. Exits non-zero with a unified diff on any
 mismatch, or if a `.wy` is missing its `.ast` counterpart.
@@ -39,7 +39,7 @@ def main():
             continue
 
         result = subprocess.run(
-            wyrm + ["-m", "wyrm::parser", wy_path],
+            wyrm + ["-m", "wyrm::tools::parse_dump", wy_path],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,

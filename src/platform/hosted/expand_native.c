@@ -85,6 +85,29 @@ static const char* type_name_(wy_value v)
  * tuple. On WY_ERR_INVAL `why` says which value was refused (or that the
  * tree is too large / cyclic).
  */
+/**
+ * The import hook an expansion VM gets: the parent's (so the compiled-in
+ * library modules and -I roots resolve), except `std::io`, which is refused
+ * (epic 10a D10: an expansion VM has no host I/O). The embedded std::io is an
+ * ordinary module, so without this an expansion scope could import it - it
+ * would still lack the `__open`/`__read`/... natives, but the import itself
+ * must fail so a scope's use of it is caught at load.
+ */
+typedef struct expand_hook_chain_
+{
+    wy_import_hook hook;
+    void* ud;
+} expand_hook_chain_;
+
+static wy_error expand_child_import_(wy_context* ctx, const char* path, wy_uword len,
+    wy_u8** out, wy_uword* out_len, const wy_module_image** out_image, void* ud)
+{
+    const expand_hook_chain_* chain = (const expand_hook_chain_*) ud;
+    if (len == 7 && wy_memcmp(path, "std::io", 7) == 0) { return WY_ERR_UNBOUND; }
+    if (chain->hook == WY_NULL) { return WY_ERR_UNBOUND; }
+    return chain->hook(ctx, path, len, out, out_len, out_image, chain->ud);
+}
+
 static wy_error copy_tree_(wy_context* from, wy_context* to, wy_value src, wy_value* out, char* why, wy_uword why_size)
 {
     WY_UNUSED(from);
@@ -256,6 +279,7 @@ static wy_error expand_run_(wy_context* parent, wy_value tree, wy_bytes* scope_i
     wy_value* fn_slot = WY_NULL;
     wy_u8* image_copy = WY_NULL;
     wy_value args[2];
+    expand_hook_chain_ chain = { parent->import_hook, parent->import_ud };
 
     ctx->expansion = true;
     /* Everything the C code holds across VM runs (module init runs GC
@@ -267,8 +291,8 @@ static wy_error expand_run_(wy_context* parent, wy_value tree, wy_bytes* scope_i
         err = WY_ERR_NOMEM;
         goto done;
     }
-    ctx->import_hook = parent->import_hook;
-    ctx->import_ud = parent->import_ud;
+    ctx->import_hook = expand_child_import_;
+    ctx->import_ud = &chain;
 
     wy_fiber* fiber = wy_fiber_create(ctx, WY_EXPAND_STACK_LEN, WY_EXPAND_FRAME_COUNT);
     if (fiber == WY_NULL || wy_context_attach_fiber(ctx, fiber) != WY_ERR_NONE) {
@@ -280,7 +304,7 @@ static wy_error expand_run_(wy_context* parent, wy_value tree, wy_bytes* scope_i
     if (err != WY_ERR_NONE) { snprintf(msg, msg_size, "cannot build expansion builtins"); goto done; }
     ctx->builtins = builtins;
     /* No std::io and no host modules: `std::expand` alone, answering the
-     * re-entrancy error. */
+     * re-entrancy error (and no I/O natives in the builtins). */
     err = wy_expand_module_install(ctx);
     if (err != WY_ERR_NONE) { snprintf(msg, msg_size, "cannot install expansion modules"); goto done; }
 

@@ -13,7 +13,8 @@
 #include <wyrm/list.h>
 #include <wyrm/module.h>
 #include <wyrm/platform/hosted/expand_native.h>
-#include <wyrm/platform/hosted/io_native.h>
+#include <std/io_native.h>
+#include "../embed/builtins.h"
 #include <wyrm/string.h>
 #include <test_common/test_context_fixture.h>
 
@@ -56,7 +57,7 @@ void capture_write_(wy_context*, const char* bytes, wy_uword len, void* ud)
 }
 
 wy_error fixture_import(wy_context* ctx, const char* path, wy_uword len,
-    wy_u8** out, wy_uword* out_len, const wy_module_image**, void* ud)
+    wy_u8** out, wy_uword* out_len, const wy_module_image** out_image, void* ud)
 {
     auto& root = *static_cast<std::string*>(ud);
     std::string relative(path, len);
@@ -64,7 +65,18 @@ wy_error fixture_import(wy_context* ctx, const char* path, wy_uword len,
         relative.replace(pos, 2, "/");
     }
     std::string file = root + "/" + relative + ".wyd";
-    if (!std::ifstream(file, std::ios::binary).good()) { return WY_ERR_UNBOUND; }
+    if (!std::ifstream(file, std::ios::binary).good()) {
+        /* Not a fixture: the compiled-in library modules (std::io, ...),
+         * exactly as the CLI's import hook falls back to its builtin table. */
+        for (wy_uword i = 0; i < wyrm_builtin_module_count; i++) {
+            if (std::strlen(wyrm_builtin_modules[i].path) == len
+                && std::memcmp(wyrm_builtin_modules[i].path, path, len) == 0) {
+                *out_image = wyrm_builtin_modules[i].image;
+                return WY_ERR_NONE;
+            }
+        }
+        return WY_ERR_UNBOUND;
+    }
     auto storage = read_binary_file(file);
     *out = static_cast<wy_u8*>(wy_context_gc_alloc(ctx, storage.size()));
     if (*out == nullptr) { return WY_ERR_NOMEM; }
@@ -118,7 +130,7 @@ std::string run_fixture(const std::string& name, wy_uword gc_threshold)
     wy_module* builtins = WY_NULL;
     REQUIRE_EQ(wy_builtins_new(context, &builtins), WY_ERR_NONE);
     context->builtins = builtins;
-    REQUIRE_EQ(wy_io_module_install(context), WY_ERR_NONE);
+    REQUIRE_EQ(wy_io_natives_install(context), WY_ERR_NONE);
     REQUIRE_EQ(wy_expand_module_install(context), WY_ERR_NONE);
 
     std::vector<wy_u8> storage = read_binary_file(std::string(WY_TEST_FIXTURE_DIR) + "/" + name + ".wyd");
@@ -195,6 +207,7 @@ TEST_SUITE("golden")
     TEST_CASE("two_module shapes_main") { check_fixture("two_module/shapes_main"); }
     TEST_CASE("two_module dunder_name") { check_fixture("two_module/dunder_name"); }
     TEST_CASE("two_module dunder_name_main") { check_fixture("two_module/dunder_name_main"); }
+    TEST_CASE("range") { check_fixture("range"); }
     TEST_CASE("template") { check_fixture("template"); }
     TEST_CASE("template gcstress") { check_fixture_gcstress("template"); }
     TEST_CASE("expand treemain") { check_fixture("expand/treemain"); }
@@ -205,6 +218,7 @@ TEST_SUITE("golden")
     /* Every DIVERGES row of test/corpus/manifest.txt is absent: no fixture
      * is built for it. Add its case here when the row flips to matches. */
     TEST_CASE("samples/eval_assignments") { check_fixture("samples/eval_assignments"); }
+    TEST_CASE("samples/eval_closures") { check_fixture("samples/eval_closures"); }
     TEST_CASE("samples/eval_control_flow") { check_fixture("samples/eval_control_flow"); }
     TEST_CASE("samples/eval_functions") { check_fixture("samples/eval_functions"); }
     TEST_CASE("samples/eval_range") { check_fixture("samples/eval_range"); }
@@ -212,6 +226,7 @@ TEST_SUITE("golden")
 
 TEST_SUITE("golden-gcstress")
 {
+    TEST_CASE("range") { check_fixture_gcstress("range"); }
     TEST_CASE("hello") { check_fixture_gcstress("hello"); }
     TEST_CASE("hello_1") { check_fixture_gcstress("hello_1"); }
     TEST_CASE("hello_2") { check_fixture_gcstress("hello_2"); }
@@ -237,6 +252,7 @@ TEST_SUITE("golden-gcstress")
     TEST_CASE("wildcard palette") { check_fixture_gcstress("wildcard/palette"); }
     TEST_CASE("samples/eval_args") { check_fixture_gcstress("samples/eval_args"); }
     TEST_CASE("samples/eval_assignments") { check_fixture_gcstress("samples/eval_assignments"); }
+    TEST_CASE("samples/eval_closures") { check_fixture_gcstress("samples/eval_closures"); }
     TEST_CASE("samples/eval_control_flow") { check_fixture_gcstress("samples/eval_control_flow"); }
     TEST_CASE("samples/eval_functions") { check_fixture_gcstress("samples/eval_functions"); }
     TEST_CASE("samples/eval_range") { check_fixture_gcstress("samples/eval_range"); }

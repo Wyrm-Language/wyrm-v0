@@ -6,12 +6,12 @@
 static const uint8_t compiler_main_header[] = {
     0x2F, 0x00, 0x00, 0x00, 0x02, 0x6E, 0x00, 0x0E, 0x00, 0x00, 0x00, 0x63,
     0x6F, 0x6D, 0x70, 0x69, 0x6C, 0x65, 0x72, 0x5F, 0x6D, 0x61, 0x69, 0x6E,
-    0x00, 0x10, 0x76, 0x00, 0x01, 0x00, 0x00, 0x00, 0x10, 0x67, 0x00, 0x19,
+    0x00, 0x10, 0x76, 0x00, 0x01, 0x00, 0x00, 0x00, 0x10, 0x67, 0x00, 0x16,
     0x00, 0x00, 0x00, 0x10, 0x6C, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00,
 };
 
 static const uint8_t compiler_main_statics[] = {
-    0x83, 0x03, 0x00, 0x00, 0x02, 0x30, 0x00, 0x04, 0x00, 0x00, 0x00, 0x73,
+    0x9B, 0x03, 0x00, 0x00, 0x02, 0x30, 0x00, 0x04, 0x00, 0x00, 0x00, 0x73,
     0x74, 0x64, 0x00, 0x02, 0x31, 0x00, 0x08, 0x00, 0x00, 0x00, 0x73, 0x74,
     0x64, 0x3A, 0x3A, 0x69, 0x6F, 0x00, 0x02, 0x32, 0x00, 0x05, 0x00, 0x00,
     0x00, 0x77, 0x79, 0x72, 0x6D, 0x00, 0x02, 0x33, 0x00, 0x0C, 0x00, 0x00,
@@ -73,24 +73,30 @@ static const uint8_t compiler_main_statics[] = {
     0x72, 0x69, 0x61, 0x6C, 0x69, 0x7A, 0x65, 0x29, 0x00, 0x02, 0x33, 0x34,
     0x00, 0x02, 0x00, 0x00, 0x00, 0x2F, 0x00, 0x02, 0x33, 0x35, 0x00, 0x05,
     0x00, 0x00, 0x00, 0x2E, 0x77, 0x79, 0x64, 0x00, 0x02, 0x33, 0x36, 0x00,
-    0x03, 0x00, 0x00, 0x00, 0x77, 0x62, 0x00, 0x02, 0x33, 0x37, 0x00, 0x04,
-    0x00, 0x00, 0x00, 0x4F, 0x4B, 0x20, 0x00, 0x02, 0x33, 0x38, 0x00, 0x49,
+    0x03, 0x00, 0x00, 0x00, 0x77, 0x62, 0x00, 0x02, 0x33, 0x37, 0x00, 0x10,
+    0x00, 0x00, 0x00, 0x20, 0x28, 0x63, 0x61, 0x6E, 0x6E, 0x6F, 0x74, 0x20,
+    0x77, 0x72, 0x69, 0x74, 0x65, 0x29, 0x00, 0x02, 0x33, 0x38, 0x00, 0x04,
+    0x00, 0x00, 0x00, 0x4F, 0x4B, 0x20, 0x00, 0x02, 0x33, 0x39, 0x00, 0x49,
     0x00, 0x00, 0x00, 0x75, 0x73, 0x61, 0x67, 0x65, 0x3A, 0x20, 0x77, 0x79,
     0x72, 0x6D, 0x5F, 0x63, 0x6F, 0x6D, 0x70, 0x69, 0x6C, 0x65, 0x72, 0x2E,
     0x77, 0x79, 0x63, 0x20, 0x5B, 0x2D, 0x2D, 0x6D, 0x69, 0x72, 0x72, 0x6F,
     0x72, 0x20, 0x3C, 0x73, 0x72, 0x63, 0x2D, 0x72, 0x6F, 0x6F, 0x74, 0x3E,
     0x5D, 0x20, 0x3C, 0x6F, 0x75, 0x74, 0x2D, 0x64, 0x69, 0x72, 0x3E, 0x20,
     0x3C, 0x66, 0x69, 0x78, 0x74, 0x75, 0x72, 0x65, 0x2E, 0x77, 0x79, 0x3E,
-    0x2E, 0x2E, 0x2E, 0x00, 0x02, 0x33, 0x39, 0x00, 0x01, 0x00, 0x00, 0x00,
-    0x00, 0x02, 0x34, 0x30, 0x00, 0x09, 0x00, 0x00, 0x00, 0x2D, 0x2D, 0x6D,
-    0x69, 0x72, 0x72, 0x6F, 0x72, 0x00, 0x02, 0x34, 0x31, 0x00, 0x14, 0x00,
+    0x2E, 0x2E, 0x2E, 0x00, 0x02, 0x34, 0x30, 0x00, 0x01, 0x00, 0x00, 0x00,
+    0x00, 0x02, 0x34, 0x31, 0x00, 0x09, 0x00, 0x00, 0x00, 0x2D, 0x2D, 0x6D,
+    0x69, 0x72, 0x72, 0x6F, 0x72, 0x00, 0x02, 0x34, 0x32, 0x00, 0x14, 0x00,
     0x00, 0x00, 0x63, 0x6F, 0x6D, 0x70, 0x69, 0x6C, 0x65, 0x72, 0x5F, 0x6D,
     0x61, 0x69, 0x6E, 0x3A, 0x20, 0x64, 0x6F, 0x6E, 0x65, 0x00, 0x00,
 };
 
 static const uint8_t compiler_main_symbols[] = {
-    0x14, 0x00, 0x00, 0x00, 0x02, 0x30, 0x00, 0x08, 0x00, 0x00, 0x00, 0x70,
-    0x72, 0x6F, 0x67, 0x72, 0x61, 0x6D, 0x00, 0x00,
+    0x3D, 0x00, 0x00, 0x00, 0x02, 0x30, 0x00, 0x08, 0x00, 0x00, 0x00, 0x72,
+    0x65, 0x61, 0x64, 0x61, 0x6C, 0x6C, 0x00, 0x02, 0x31, 0x00, 0x06, 0x00,
+    0x00, 0x00, 0x63, 0x6C, 0x6F, 0x73, 0x65, 0x00, 0x02, 0x32, 0x00, 0x08,
+    0x00, 0x00, 0x00, 0x70, 0x72, 0x6F, 0x67, 0x72, 0x61, 0x6D, 0x00, 0x02,
+    0x33, 0x00, 0x06, 0x00, 0x00, 0x00, 0x77, 0x72, 0x69, 0x74, 0x65, 0x00,
+    0x00,
 };
 
 static const uint8_t compiler_main_functions[] = {
@@ -124,7 +130,7 @@ static const uint8_t compiler_main_functions[] = {
     0x75, 0x74, 0x5F, 0x64, 0x69, 0x72, 0x00, 0x00, 0x03, 0x32, 0x00, 0x10,
     0x00, 0x00, 0x00, 0x02, 0x6E, 0x00, 0x04, 0x00, 0x00, 0x00, 0x72, 0x65,
     0x6C, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x10,
-    0x63, 0x00, 0xF0, 0x01, 0x00, 0x00, 0x10, 0x66, 0x00, 0x00, 0x00, 0x00,
+    0x63, 0x00, 0x0A, 0x02, 0x00, 0x00, 0x10, 0x66, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00,
 };
 
@@ -133,9 +139,15 @@ static const uint8_t compiler_main_classes[] = {
 };
 
 static const uint8_t compiler_main_messages[] = {
-    0x1C, 0x00, 0x00, 0x00, 0x03, 0x30, 0x00, 0x14, 0x00, 0x00, 0x00, 0x04,
+    0x61, 0x00, 0x00, 0x00, 0x03, 0x30, 0x00, 0x14, 0x00, 0x00, 0x00, 0x04,
     0x70, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x10, 0x30, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x03, 0x31, 0x00, 0x14, 0x00, 0x00, 0x00, 0x04, 0x70,
+    0x00, 0x0C, 0x00, 0x00, 0x00, 0x10, 0x30, 0x00, 0x01, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x03, 0x32, 0x00, 0x14, 0x00, 0x00, 0x00, 0x04, 0x70, 0x00,
+    0x0C, 0x00, 0x00, 0x00, 0x10, 0x30, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x03, 0x33, 0x00, 0x14, 0x00, 0x00, 0x00, 0x04, 0x70, 0x00, 0x0C,
+    0x00, 0x00, 0x00, 0x10, 0x30, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00,
 };
 
 static const uint8_t compiler_main_exports[] = {
@@ -151,25 +163,20 @@ static const uint8_t compiler_main_exports[] = {
 };
 
 static const uint8_t compiler_main_free[] = {
-    0xE0, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x65, 0x6E, 0x00, 0x0B, 0x00, 0x00,
+    0xA5, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x65, 0x6E, 0x00, 0x0B, 0x00, 0x00,
     0x00, 0x10, 0x73, 0x75, 0x62, 0x73, 0x74, 0x72, 0x00, 0x0C, 0x00, 0x00,
     0x00, 0x10, 0x73, 0x74, 0x64, 0x3A, 0x3A, 0x69, 0x6F, 0x3A, 0x3A, 0x6F,
-    0x70, 0x65, 0x6E, 0x00, 0x0D, 0x00, 0x00, 0x00, 0x10, 0x73, 0x74, 0x64,
-    0x3A, 0x3A, 0x69, 0x6F, 0x3A, 0x3A, 0x72, 0x65, 0x61, 0x64, 0x00, 0x0E,
-    0x00, 0x00, 0x00, 0x10, 0x73, 0x74, 0x64, 0x3A, 0x3A, 0x69, 0x6F, 0x3A,
-    0x3A, 0x63, 0x6C, 0x6F, 0x73, 0x65, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x10,
-    0x70, 0x72, 0x69, 0x6E, 0x74, 0x6C, 0x6E, 0x00, 0x10, 0x00, 0x00, 0x00,
-    0x10, 0x50, 0x61, 0x72, 0x73, 0x65, 0x72, 0x00, 0x11, 0x00, 0x00, 0x00,
-    0x10, 0x63, 0x6F, 0x6D, 0x70, 0x69, 0x6C, 0x65, 0x5F, 0x6D, 0x6F, 0x64,
-    0x75, 0x6C, 0x65, 0x00, 0x12, 0x00, 0x00, 0x00, 0x10, 0x65, 0x78, 0x70,
-    0x61, 0x6E, 0x64, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x72, 0x61, 0x74, 0x6F,
-    0x72, 0x73, 0x00, 0x13, 0x00, 0x00, 0x00, 0x10, 0x73, 0x74, 0x72, 0x00,
-    0x14, 0x00, 0x00, 0x00, 0x10, 0x65, 0x72, 0x72, 0x6F, 0x72, 0x5F, 0x6D,
-    0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x00, 0x15, 0x00, 0x00, 0x00, 0x10,
-    0x74, 0x6F, 0x5F, 0x77, 0x79, 0x63, 0x00, 0x16, 0x00, 0x00, 0x00, 0x10,
-    0x73, 0x74, 0x64, 0x3A, 0x3A, 0x69, 0x6F, 0x3A, 0x3A, 0x77, 0x72, 0x69,
-    0x74, 0x65, 0x00, 0x17, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x5F, 0x41, 0x52,
-    0x47, 0x53, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00,
+    0x70, 0x65, 0x6E, 0x00, 0x0D, 0x00, 0x00, 0x00, 0x10, 0x70, 0x72, 0x69,
+    0x6E, 0x74, 0x6C, 0x6E, 0x00, 0x0E, 0x00, 0x00, 0x00, 0x10, 0x50, 0x61,
+    0x72, 0x73, 0x65, 0x72, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x10, 0x63, 0x6F,
+    0x6D, 0x70, 0x69, 0x6C, 0x65, 0x5F, 0x6D, 0x6F, 0x64, 0x75, 0x6C, 0x65,
+    0x00, 0x10, 0x00, 0x00, 0x00, 0x10, 0x65, 0x78, 0x70, 0x61, 0x6E, 0x64,
+    0x5F, 0x64, 0x65, 0x63, 0x6F, 0x72, 0x61, 0x74, 0x6F, 0x72, 0x73, 0x00,
+    0x11, 0x00, 0x00, 0x00, 0x10, 0x73, 0x74, 0x72, 0x00, 0x12, 0x00, 0x00,
+    0x00, 0x10, 0x65, 0x72, 0x72, 0x6F, 0x72, 0x5F, 0x6D, 0x65, 0x73, 0x73,
+    0x61, 0x67, 0x65, 0x00, 0x13, 0x00, 0x00, 0x00, 0x10, 0x74, 0x6F, 0x5F,
+    0x77, 0x79, 0x63, 0x00, 0x14, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x5F, 0x41,
+    0x52, 0x47, 0x53, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00,
 };
 
 static const uint32_t compiler_main_code[] = {
@@ -251,7 +258,7 @@ static const uint32_t compiler_main_code[] = {
     0x00050043,                /* 005C  gset g5 <- L0   (compile_one) */
     0x000000A8, 0x00030000,    /* 005D  closure L0 <- fn#3, 0 caps */
     0x00060043,                /* 005F  gset g6 <- L0   (compile_one_mirror) */
-    0x00180042,                /* 0060  gget L0 <- g24   (__ARGS) */
+    0x00150042,                /* 0060  gget L0 <- g21   (__ARGS) */
     0x00070043,                /* 0061  gset g7 <- L0   (args) */
     0x000B0042,                /* 0062  gget L0 <- g11   (len) */
     0x00070142,                /* 0063  gget L1 <- g7   (args) */
@@ -259,18 +266,18 @@ static const uint32_t compiler_main_code[] = {
     0x00010140,                /* 0066  i8 L1 <- 1 */
     0x00020091, 0x00000001,    /* 0067  lt L2 <- L0 < L1 */
     0x0005024B,                /* 0069  jf L2, +5 */
-    0x00100042,                /* 006A  gget L0 <- g16   (println) */
-    0x00260146,                /* 006B  lconst L1 <- static#38   ("usage: wyrm_compiler.wyc [--mirror <src-root>] <out-dir> <fixture.wy>...") */
+    0x000E0042,                /* 006A  gget L0 <- g14   (println) */
+    0x00270146,                /* 006B  lconst L1 <- static#39   ("usage: wyrm_compiler.wyc [--mirror <src-root>] <out-dir> <fixture.wy>...") */
     0x000001A0, 0x00010000,    /* 006C  call base=L0 argc=1 nres=1 */
     0x0048004F,                /* 006E  jmp +72 */
     0x00000040,                /* 006F  i8 L0 <- 0 */
     0x00080043,                /* 0070  gset g8 <- L0 */
-    0x00270046,                /* 0071  lconst L0 <- static#39   ("") */
+    0x00280046,                /* 0071  lconst L0 <- static#40   ("") */
     0x00090043,                /* 0072  gset g9 <- L0 */
     0x00070042,                /* 0073  gget L0 <- g7   (args) */
     0x00010040,                /* 0074  i8 L1 <- 0 */
     0x00020098, 0x00000001,    /* 0075  getidx L2 <- L0[L1] */
-    0x00280346,                /* 0077  lconst L3 <- static#40   ("--mirror") */
+    0x00290346,                /* 0077  lconst L3 <- static#41   ("--mirror") */
     0x0004008F, 0x00020003,    /* 0078  eq L4 <- L2 == L3 */
     0x0007044B,                /* 007A  jf L4, +7 */
     0x00070142,                /* 007B  gget L1 <- g7   (args) */
@@ -294,7 +301,7 @@ static const uint32_t compiler_main_code[] = {
     0x00020091, 0x00000001,    /* 0091  lt L2 <- L0 < L1 */
     0x001F024B,                /* 0093  jf L2, +31 */
     0x00090042,                /* 0094  gget L0 <- g9 */
-    0x00270146,                /* 0095  lconst L1 <- static#39   ("") */
+    0x00280146,                /* 0095  lconst L1 <- static#40   ("") */
     0x0002008F, 0x00000001,    /* 0096  eq L2 <- L0 == L1 */
     0x000A024B,                /* 0098  jf L2, +10 */
     0x00050042,                /* 0099  gget L0 <- g5   (compile_one) */
@@ -318,8 +325,8 @@ static const uint32_t compiler_main_code[] = {
     0x00000085, 0x00010002,    /* 00AF  add L0 <- L1 + L2 */
     0x00080043,                /* 00B1  gset g8 <- L0 */
     0xFFD9004F,                /* 00B2  jmp -39 */
-    0x00100042,                /* 00B3  gget L0 <- g16   (println) */
-    0x00290146,                /* 00B4  lconst L1 <- static#41   ("compiler_main: done") */
+    0x000E0042,                /* 00B3  gget L0 <- g14   (println) */
+    0x002A0146,                /* 00B4  lconst L1 <- static#42   ("compiler_main: done") */
     0x000001A0, 0x00010000,    /* 00B5  call base=L0 argc=1 nres=1 */
     0x00000002,                /* 00B7  return count=0 */
     0x00000040,                /* 00B8  i8 L0 <- 0 */
@@ -383,211 +390,230 @@ static const uint32_t compiler_main_code[] = {
     0x00130C46,                /* 0103  lconst L12 <- static#19   ("r") */
     0x000A02A0, 0x00010000,    /* 0104  call base=L10 argc=2 nres=1 */
     0x00010A41,                /* 0106  move L1 <- L10 */
-    0x000E0A42,                /* 0107  gget L10 <- g14   (std::io::read) */
-    0x000B0141,                /* 0108  move L11 <- L1 */
-    0x000C00C0, 0x000F4240,    /* 0109  i32 L12 <- 1000000 */
-    0x000A02A0, 0x00010000,    /* 010B  call base=L10 argc=2 nres=1 */
-    0x00020A41,                /* 010D  move L2 <- L10 */
-    0x000F0A42,                /* 010E  gget L10 <- g15   (std::io::close) */
-    0x000B0141,                /* 010F  move L11 <- L1 */
-    0x000A01A0, 0x00010000,    /* 0110  call base=L10 argc=1 nres=1 */
-    0x00140A46,                /* 0112  lconst L10 <- static#20   ("error") */
-    0x000B0097, 0x0002000A,    /* 0113  is L11 <- L2 is L10 */
-    0x000C0B4B,                /* 0115  jf L11, +12 */
-    0x00100A42,                /* 0116  gget L10 <- g16   (println) */
-    0x00150B46,                /* 0117  lconst L11 <- static#21   ("REFUSED ") */
-    0x000C0085, 0x000B0000,    /* 0118  add L12 <- L11 + L0 */
-    0x00160D46,                /* 011A  lconst L13 <- static#22   (" (unreadable)") */
-    0x000E0085, 0x000C000D,    /* 011B  add L14 <- L12 + L13 */
-    0x000B0E41,                /* 011D  move L11 <- L14 */
-    0x000A01A0, 0x00010000,    /* 011E  call base=L10 argc=1 nres=1 */
-    0x000A0004,                /* 0120  lbool L10 <- 0 */
-    0x000A0102,                /* 0121  return L10 count=1 */
-    0x00110B42,                /* 0122  gget L11 <- g17   (Parser) */
-    0x000C0241,                /* 0123  move L12 <- L2 */
-    0x000B01A0, 0x00010000,    /* 0124  call base=L11 argc=1 nres=1 */
-    0x000A0B41,                /* 0126  move L10 <- L11 */
-    0x000A00A2, 0x00000001,    /* 0127  msg base=L10 argc=0 msg#0 nres=1   (program) */
-    0x00030A41,                /* 0129  move L3 <- L10 */
-    0x00140A46,                /* 012A  lconst L10 <- static#20   ("error") */
-    0x000B0097, 0x0003000A,    /* 012B  is L11 <- L3 is L10 */
-    0x000C0B4B,                /* 012D  jf L11, +12 */
-    0x00100A42,                /* 012E  gget L10 <- g16   (println) */
-    0x00150B46,                /* 012F  lconst L11 <- static#21   ("REFUSED ") */
-    0x000C0085, 0x000B0000,    /* 0130  add L12 <- L11 + L0 */
-    0x00170D46,                /* 0132  lconst L13 <- static#23   (" (parse)") */
-    0x000E0085, 0x000C000D,    /* 0133  add L14 <- L12 + L13 */
-    0x000B0E41,                /* 0135  move L11 <- L14 */
-    0x000A01A0, 0x00010000,    /* 0136  call base=L10 argc=1 nres=1 */
-    0x000A0004,                /* 0138  lbool L10 <- 0 */
-    0x000A0102,                /* 0139  return L10 count=1 */
-    0x00120A42,                /* 013A  gget L10 <- g18   (compile_module) */
-    0x000B0341,                /* 013B  move L11 <- L3 */
-    0x000C0041,                /* 013C  move L12 <- L0 */
-    0x000D8141,                /* 013D  move L13 <- P1 */
-    0x000E0104,                /* 013E  lbool L14 <- 1 */
-    0x000F0004,                /* 013F  lbool L15 <- 0 */
-    0x00100004,                /* 0140  lbool L16 <- 0 */
-    0x00110004,                /* 0141  lbool L17 <- 0 */
-    0x00131242,                /* 0142  gget L18 <- g19   (expand_decorators) */
-    0x000A08A0, 0x00010000,    /* 0143  call base=L10 argc=8 nres=1 */
-    0x00040A41,                /* 0145  move L4 <- L10 */
-    0x00140A46,                /* 0146  lconst L10 <- static#20   ("error") */
-    0x000B0097, 0x0004000A,    /* 0147  is L11 <- L4 is L10 */
-    0x00180B4B,                /* 0149  jf L11, +24 */
-    0x00100A42,                /* 014A  gget L10 <- g16   (println) */
-    0x00150B46,                /* 014B  lconst L11 <- static#21   ("REFUSED ") */
-    0x000C0085, 0x000B0000,    /* 014C  add L12 <- L11 + L0 */
-    0x00180D46,                /* 014E  lconst L13 <- static#24   (" (compile: ") */
-    0x000E0085, 0x000C000D,    /* 014F  add L14 <- L12 + L13 */
-    0x00140F42,                /* 0151  gget L15 <- g20   (str) */
-    0x00151042,                /* 0152  gget L16 <- g21   (error_message) */
-    0x00110441,                /* 0153  move L17 <- L4 */
-    0x001001A0, 0x00010000,    /* 0154  call base=L16 argc=1 nres=1 */
-    0x000F01A0, 0x00010000,    /* 0156  call base=L15 argc=1 nres=1 */
-    0x00100085, 0x000E000F,    /* 0158  add L16 <- L14 + L15 */
-    0x00191146,                /* 015A  lconst L17 <- static#25   (")") */
-    0x00120085, 0x00100011,    /* 015B  add L18 <- L16 + L17 */
-    0x000B1241,                /* 015D  move L11 <- L18 */
-    0x000A01A0, 0x00010000,    /* 015E  call base=L10 argc=1 nres=1 */
-    0x000A0004,                /* 0160  lbool L10 <- 0 */
-    0x000A0102,                /* 0161  return L10 count=1 */
-    0x001A0A46,                /* 0162  lconst L10 <- static#26   ("unlowered") */
-    0x00050098, 0x0004000A,    /* 0163  getidx L5 <- L4[L10] */
-    0x0001054E,                /* 0165  jnerr L5, +1 */
-    0x00050003,                /* 0166  lnil L5 */
-    0x001B0A46,                /* 0167  lconst L10 <- static#27   ("nil") */
-    0x000B0097, 0x0005000A,    /* 0168  is L11 <- L5 is L10 */
-    0x00020B4B,                /* 016A  jf L11, +2 */
-    0x00050082, 0x000A0000,    /* 016B  list L5 <- L10, 0 items */
-    0x000A00AE, 0x00050000,    /* 016D  iter L10 <- L5 */
-    0x000900AF, 0x000A004A,    /* 016F  itnext L9 <- L10, done +74 */
-    0x000B0240,                /* 0171  i8 L11 <- 2 */
-    0x000C0098, 0x0009000B,    /* 0172  getidx L12 <- L9[L11] */
-    0x00230C4B,                /* 0174  jf L12, +35 */
-    0x00100B42,                /* 0175  gget L11 <- g16   (println) */
-    0x001C0C46,                /* 0176  lconst L12 <- static#28   ("TSTUB ") */
-    0x000D0085, 0x000C0000,    /* 0177  add L13 <- L12 + L0 */
-    0x001D0E46,                /* 0179  lconst L14 <- static#29   ("::") */
-    0x000F0085, 0x000D000E,    /* 017A  add L15 <- L13 + L14 */
-    0x00141042,                /* 017C  gget L16 <- g20   (str) */
-    0x00110040,                /* 017D  i8 L17 <- 0 */
-    0x00120098, 0x00090011,    /* 017E  getidx L18 <- L9[L17] */
-    0x00111241,                /* 0180  move L17 <- L18 */
-    0x001001A0, 0x00010000,    /* 0181  call base=L16 argc=1 nres=1 */
-    0x00110085, 0x000F0010,    /* 0183  add L17 <- L15 + L16 */
-    0x001E1246,                /* 0185  lconst L18 <- static#30   (" (template: ") */
-    0x00130085, 0x00110012,    /* 0186  add L19 <- L17 + L18 */
-    0x00141442,                /* 0188  gget L20 <- g20   (str) */
-    0x00150140,                /* 0189  i8 L21 <- 1 */
-    0x00160098, 0x00090015,    /* 018A  getidx L22 <- L9[L21] */
-    0x00151641,                /* 018C  move L21 <- L22 */
-    0x001401A0, 0x00010000,    /* 018D  call base=L20 argc=1 nres=1 */
-    0x00150085, 0x00130014,    /* 018F  add L21 <- L19 + L20 */
-    0x00191646,                /* 0191  lconst L22 <- static#25   (")") */
-    0x00170085, 0x00150016,    /* 0192  add L23 <- L21 + L22 */
-    0x000C1741,                /* 0194  move L12 <- L23 */
-    0x000B01A0, 0x00010000,    /* 0195  call base=L11 argc=1 nres=1 */
-    0x0022004F,                /* 0197  jmp +34 */
-    0x00100B42,                /* 0198  gget L11 <- g16   (println) */
-    0x001F0C46,                /* 0199  lconst L12 <- static#31   ("STUB ") */
-    0x000D0085, 0x000C0000,    /* 019A  add L13 <- L12 + L0 */
-    0x001D0E46,                /* 019C  lconst L14 <- static#29   ("::") */
-    0x000F0085, 0x000D000E,    /* 019D  add L15 <- L13 + L14 */
-    0x00141042,                /* 019F  gget L16 <- g20   (str) */
-    0x00110040,                /* 01A0  i8 L17 <- 0 */
-    0x00120098, 0x00090011,    /* 01A1  getidx L18 <- L9[L17] */
-    0x00111241,                /* 01A3  move L17 <- L18 */
-    0x001001A0, 0x00010000,    /* 01A4  call base=L16 argc=1 nres=1 */
-    0x00110085, 0x000F0010,    /* 01A6  add L17 <- L15 + L16 */
-    0x00201246,                /* 01A8  lconst L18 <- static#32   (" (") */
-    0x00130085, 0x00110012,    /* 01A9  add L19 <- L17 + L18 */
-    0x00141442,                /* 01AB  gget L20 <- g20   (str) */
-    0x00150140,                /* 01AC  i8 L21 <- 1 */
-    0x00160098, 0x00090015,    /* 01AD  getidx L22 <- L9[L21] */
-    0x00151641,                /* 01AF  move L21 <- L22 */
-    0x001401A0, 0x00010000,    /* 01B0  call base=L20 argc=1 nres=1 */
-    0x00150085, 0x00130014,    /* 01B2  add L21 <- L19 + L20 */
-    0x00191646,                /* 01B4  lconst L22 <- static#25   (")") */
-    0x00170085, 0x00150016,    /* 01B5  add L23 <- L21 + L22 */
-    0x000C1741,                /* 01B7  move L12 <- L23 */
-    0x000B01A0, 0x00010000,    /* 01B8  call base=L11 argc=1 nres=1 */
-    0xFFB4004F,                /* 01BA  jmp -76 */
-    0x00160A42,                /* 01BB  gget L10 <- g22   (to_wyc) */
-    0x000B0441,                /* 01BC  move L11 <- L4 */
-    0x000A01A0, 0x00010000,    /* 01BD  call base=L10 argc=1 nres=1 */
-    0x00060A41,                /* 01BF  move L6 <- L10 */
-    0x00140A46,                /* 01C0  lconst L10 <- static#20   ("error") */
-    0x000B0097, 0x0006000A,    /* 01C1  is L11 <- L6 is L10 */
-    0x000C0B4B,                /* 01C3  jf L11, +12 */
-    0x00100A42,                /* 01C4  gget L10 <- g16   (println) */
-    0x00150B46,                /* 01C5  lconst L11 <- static#21   ("REFUSED ") */
-    0x000C0085, 0x000B0000,    /* 01C6  add L12 <- L11 + L0 */
-    0x00210D46,                /* 01C8  lconst L13 <- static#33   (" (serialize)") */
-    0x000E0085, 0x000C000D,    /* 01C9  add L14 <- L12 + L13 */
-    0x000B0E41,                /* 01CB  move L11 <- L14 */
-    0x000A01A0, 0x00010000,    /* 01CC  call base=L10 argc=1 nres=1 */
-    0x000A0004,                /* 01CE  lbool L10 <- 0 */
-    0x000A0102,                /* 01CF  return L10 count=1 */
-    0x00220A46,                /* 01D0  lconst L10 <- static#34   ("/") */
-    0x000B0085, 0x8000000A,    /* 01D1  add L11 <- P0 + L10 */
-    0x000C0085, 0x000B0000,    /* 01D3  add L12 <- L11 + L0 */
-    0x00230D46,                /* 01D5  lconst L13 <- static#35   (".wyd") */
-    0x00070085, 0x000C000D,    /* 01D6  add L7 <- L12 + L13 */
-    0x000D0A42,                /* 01D8  gget L10 <- g13   (std::io::open) */
-    0x000B0741,                /* 01D9  move L11 <- L7 */
-    0x00240C46,                /* 01DA  lconst L12 <- static#36   ("wb") */
-    0x000A02A0, 0x00010000,    /* 01DB  call base=L10 argc=2 nres=1 */
-    0x00080A41,                /* 01DD  move L8 <- L10 */
-    0x00170A42,                /* 01DE  gget L10 <- g23   (std::io::write) */
-    0x000B0841,                /* 01DF  move L11 <- L8 */
-    0x000C0641,                /* 01E0  move L12 <- L6 */
-    0x000A02A0, 0x00010000,    /* 01E1  call base=L10 argc=2 nres=1 */
-    0x000F0A42,                /* 01E3  gget L10 <- g15   (std::io::close) */
-    0x000B0841,                /* 01E4  move L11 <- L8 */
-    0x000A01A0, 0x00010000,    /* 01E5  call base=L10 argc=1 nres=1 */
-    0x00100A42,                /* 01E7  gget L10 <- g16   (println) */
-    0x00250B46,                /* 01E8  lconst L11 <- static#37   ("OK ") */
-    0x000C0085, 0x000B0000,    /* 01E9  add L12 <- L11 + L0 */
-    0x000B0C41,                /* 01EB  move L11 <- L12 */
-    0x000A01A0, 0x00010000,    /* 01EC  call base=L10 argc=1 nres=1 */
-    0x000A0104,                /* 01EE  lbool L10 <- 1 */
-    0x000A0102,                /* 01EF  return L10 count=1 */
-    0x00008141,                /* 01F0  move L0 <- P1 */
-    0x00010040,                /* 01F1  i8 L1 <- 0 */
-    0x00020040,                /* 01F2  i8 L2 <- 0 */
-    0x000B0542,                /* 01F3  gget L5 <- g11   (len) */
-    0x00068241,                /* 01F4  move L6 <- P2 */
-    0x000501A0, 0x00010000,    /* 01F5  call base=L5 argc=1 nres=1 */
-    0x00030541,                /* 01F7  move L3 <- L5 */
-    0x00050091, 0x00020003,    /* 01F8  lt L5 <- L2 < L3 */
-    0x001A054B,                /* 01FA  jf L5, +26 */
-    0x00050098, 0x80020002,    /* 01FB  getidx L5 <- P2[L2] */
-    0x00062F40,                /* 01FD  i8 L6 <- 47 */
-    0x0007008F, 0x00050006,    /* 01FE  eq L7 <- L5 == L6 */
-    0x0010074B,                /* 0200  jf L7, +16 */
-    0x000C0542,                /* 0201  gget L5 <- g12   (substr) */
-    0x00068241,                /* 0202  move L6 <- P2 */
-    0x00070141,                /* 0203  move L7 <- L1 */
-    0x00080086, 0x00020001,    /* 0204  sub L8 <- L2 - L1 */
-    0x000503A0, 0x00010000,    /* 0206  call base=L5 argc=3 nres=1 */
-    0x00040541,                /* 0208  move L4 <- L5 */
-    0x00220546,                /* 0209  lconst L5 <- static#34   ("/") */
-    0x00060085, 0x00000005,    /* 020A  add L6 <- L0 + L5 */
-    0x00000085, 0x00060004,    /* 020C  add L0 <- L6 + L4 */
-    0x00050140,                /* 020E  i8 L5 <- 1 */
-    0x00010085, 0x00020005,    /* 020F  add L1 <- L2 + L5 */
-    0x00050140,                /* 0211  i8 L5 <- 1 */
-    0x00020085, 0x00020005,    /* 0212  add L2 <- L2 + L5 */
-    0xFFE3004F,                /* 0214  jmp -29 */
-    0x00050542,                /* 0215  gget L5 <- g5   (compile_one) */
-    0x00060041,                /* 0216  move L6 <- L0 */
-    0x00220746,                /* 0217  lconst L7 <- static#34   ("/") */
-    0x00080085, 0x80000007,    /* 0218  add L8 <- P0 + L7 */
-    0x00090085, 0x00088002,    /* 021A  add L9 <- L8 + P2 */
-    0x00070941,                /* 021C  move L7 <- L9 */
-    0x000502A0, 0x00010000,    /* 021D  call base=L5 argc=2 nres=1 */
-    0x00050102,                /* 021F  return L5 count=1 */
+    0x00140A46,                /* 0107  lconst L10 <- static#20   ("error") */
+    0x000B0097, 0x0001000A,    /* 0108  is L11 <- L1 is L10 */
+    0x000C0B4B,                /* 010A  jf L11, +12 */
+    0x000E0A42,                /* 010B  gget L10 <- g14   (println) */
+    0x00150B46,                /* 010C  lconst L11 <- static#21   ("REFUSED ") */
+    0x000C0085, 0x000B0000,    /* 010D  add L12 <- L11 + L0 */
+    0x00160D46,                /* 010F  lconst L13 <- static#22   (" (unreadable)") */
+    0x000E0085, 0x000C000D,    /* 0110  add L14 <- L12 + L13 */
+    0x000B0E41,                /* 0112  move L11 <- L14 */
+    0x000A01A0, 0x00010000,    /* 0113  call base=L10 argc=1 nres=1 */
+    0x000A0004,                /* 0115  lbool L10 <- 0 */
+    0x000A0102,                /* 0116  return L10 count=1 */
+    0x000A0141,                /* 0117  move L10 <- L1 */
+    0x000A00A2, 0x00000001,    /* 0118  msg base=L10 argc=0 msg#0 nres=1   (readall) */
+    0x00020A41,                /* 011A  move L2 <- L10 */
+    0x000A0141,                /* 011B  move L10 <- L1 */
+    0x000A00A2, 0x00010001,    /* 011C  msg base=L10 argc=0 msg#1 nres=1   (close) */
+    0x00140A46,                /* 011E  lconst L10 <- static#20   ("error") */
+    0x000B0097, 0x0002000A,    /* 011F  is L11 <- L2 is L10 */
+    0x000C0B4B,                /* 0121  jf L11, +12 */
+    0x000E0A42,                /* 0122  gget L10 <- g14   (println) */
+    0x00150B46,                /* 0123  lconst L11 <- static#21   ("REFUSED ") */
+    0x000C0085, 0x000B0000,    /* 0124  add L12 <- L11 + L0 */
+    0x00160D46,                /* 0126  lconst L13 <- static#22   (" (unreadable)") */
+    0x000E0085, 0x000C000D,    /* 0127  add L14 <- L12 + L13 */
+    0x000B0E41,                /* 0129  move L11 <- L14 */
+    0x000A01A0, 0x00010000,    /* 012A  call base=L10 argc=1 nres=1 */
+    0x000A0004,                /* 012C  lbool L10 <- 0 */
+    0x000A0102,                /* 012D  return L10 count=1 */
+    0x000F0B42,                /* 012E  gget L11 <- g15   (Parser) */
+    0x000C0241,                /* 012F  move L12 <- L2 */
+    0x000B01A0, 0x00010000,    /* 0130  call base=L11 argc=1 nres=1 */
+    0x000A0B41,                /* 0132  move L10 <- L11 */
+    0x000A00A2, 0x00020001,    /* 0133  msg base=L10 argc=0 msg#2 nres=1   (program) */
+    0x00030A41,                /* 0135  move L3 <- L10 */
+    0x00140A46,                /* 0136  lconst L10 <- static#20   ("error") */
+    0x000B0097, 0x0003000A,    /* 0137  is L11 <- L3 is L10 */
+    0x000C0B4B,                /* 0139  jf L11, +12 */
+    0x000E0A42,                /* 013A  gget L10 <- g14   (println) */
+    0x00150B46,                /* 013B  lconst L11 <- static#21   ("REFUSED ") */
+    0x000C0085, 0x000B0000,    /* 013C  add L12 <- L11 + L0 */
+    0x00170D46,                /* 013E  lconst L13 <- static#23   (" (parse)") */
+    0x000E0085, 0x000C000D,    /* 013F  add L14 <- L12 + L13 */
+    0x000B0E41,                /* 0141  move L11 <- L14 */
+    0x000A01A0, 0x00010000,    /* 0142  call base=L10 argc=1 nres=1 */
+    0x000A0004,                /* 0144  lbool L10 <- 0 */
+    0x000A0102,                /* 0145  return L10 count=1 */
+    0x00100A42,                /* 0146  gget L10 <- g16   (compile_module) */
+    0x000B0341,                /* 0147  move L11 <- L3 */
+    0x000C0041,                /* 0148  move L12 <- L0 */
+    0x000D8141,                /* 0149  move L13 <- P1 */
+    0x000E0104,                /* 014A  lbool L14 <- 1 */
+    0x000F0004,                /* 014B  lbool L15 <- 0 */
+    0x00100004,                /* 014C  lbool L16 <- 0 */
+    0x00110004,                /* 014D  lbool L17 <- 0 */
+    0x00111242,                /* 014E  gget L18 <- g17   (expand_decorators) */
+    0x000A08A0, 0x00010000,    /* 014F  call base=L10 argc=8 nres=1 */
+    0x00040A41,                /* 0151  move L4 <- L10 */
+    0x00140A46,                /* 0152  lconst L10 <- static#20   ("error") */
+    0x000B0097, 0x0004000A,    /* 0153  is L11 <- L4 is L10 */
+    0x00180B4B,                /* 0155  jf L11, +24 */
+    0x000E0A42,                /* 0156  gget L10 <- g14   (println) */
+    0x00150B46,                /* 0157  lconst L11 <- static#21   ("REFUSED ") */
+    0x000C0085, 0x000B0000,    /* 0158  add L12 <- L11 + L0 */
+    0x00180D46,                /* 015A  lconst L13 <- static#24   (" (compile: ") */
+    0x000E0085, 0x000C000D,    /* 015B  add L14 <- L12 + L13 */
+    0x00120F42,                /* 015D  gget L15 <- g18   (str) */
+    0x00131042,                /* 015E  gget L16 <- g19   (error_message) */
+    0x00110441,                /* 015F  move L17 <- L4 */
+    0x001001A0, 0x00010000,    /* 0160  call base=L16 argc=1 nres=1 */
+    0x000F01A0, 0x00010000,    /* 0162  call base=L15 argc=1 nres=1 */
+    0x00100085, 0x000E000F,    /* 0164  add L16 <- L14 + L15 */
+    0x00191146,                /* 0166  lconst L17 <- static#25   (")") */
+    0x00120085, 0x00100011,    /* 0167  add L18 <- L16 + L17 */
+    0x000B1241,                /* 0169  move L11 <- L18 */
+    0x000A01A0, 0x00010000,    /* 016A  call base=L10 argc=1 nres=1 */
+    0x000A0004,                /* 016C  lbool L10 <- 0 */
+    0x000A0102,                /* 016D  return L10 count=1 */
+    0x001A0A46,                /* 016E  lconst L10 <- static#26   ("unlowered") */
+    0x00050098, 0x0004000A,    /* 016F  getidx L5 <- L4[L10] */
+    0x0001054E,                /* 0171  jnerr L5, +1 */
+    0x00050003,                /* 0172  lnil L5 */
+    0x001B0A46,                /* 0173  lconst L10 <- static#27   ("nil") */
+    0x000B0097, 0x0005000A,    /* 0174  is L11 <- L5 is L10 */
+    0x00020B4B,                /* 0176  jf L11, +2 */
+    0x00050082, 0x000A0000,    /* 0177  list L5 <- L10, 0 items */
+    0x000A00AE, 0x00050000,    /* 0179  iter L10 <- L5 */
+    0x000900AF, 0x000A004A,    /* 017B  itnext L9 <- L10, done +74 */
+    0x000B0240,                /* 017D  i8 L11 <- 2 */
+    0x000C0098, 0x0009000B,    /* 017E  getidx L12 <- L9[L11] */
+    0x00230C4B,                /* 0180  jf L12, +35 */
+    0x000E0B42,                /* 0181  gget L11 <- g14   (println) */
+    0x001C0C46,                /* 0182  lconst L12 <- static#28   ("TSTUB ") */
+    0x000D0085, 0x000C0000,    /* 0183  add L13 <- L12 + L0 */
+    0x001D0E46,                /* 0185  lconst L14 <- static#29   ("::") */
+    0x000F0085, 0x000D000E,    /* 0186  add L15 <- L13 + L14 */
+    0x00121042,                /* 0188  gget L16 <- g18   (str) */
+    0x00110040,                /* 0189  i8 L17 <- 0 */
+    0x00120098, 0x00090011,    /* 018A  getidx L18 <- L9[L17] */
+    0x00111241,                /* 018C  move L17 <- L18 */
+    0x001001A0, 0x00010000,    /* 018D  call base=L16 argc=1 nres=1 */
+    0x00110085, 0x000F0010,    /* 018F  add L17 <- L15 + L16 */
+    0x001E1246,                /* 0191  lconst L18 <- static#30   (" (template: ") */
+    0x00130085, 0x00110012,    /* 0192  add L19 <- L17 + L18 */
+    0x00121442,                /* 0194  gget L20 <- g18   (str) */
+    0x00150140,                /* 0195  i8 L21 <- 1 */
+    0x00160098, 0x00090015,    /* 0196  getidx L22 <- L9[L21] */
+    0x00151641,                /* 0198  move L21 <- L22 */
+    0x001401A0, 0x00010000,    /* 0199  call base=L20 argc=1 nres=1 */
+    0x00150085, 0x00130014,    /* 019B  add L21 <- L19 + L20 */
+    0x00191646,                /* 019D  lconst L22 <- static#25   (")") */
+    0x00170085, 0x00150016,    /* 019E  add L23 <- L21 + L22 */
+    0x000C1741,                /* 01A0  move L12 <- L23 */
+    0x000B01A0, 0x00010000,    /* 01A1  call base=L11 argc=1 nres=1 */
+    0x0022004F,                /* 01A3  jmp +34 */
+    0x000E0B42,                /* 01A4  gget L11 <- g14   (println) */
+    0x001F0C46,                /* 01A5  lconst L12 <- static#31   ("STUB ") */
+    0x000D0085, 0x000C0000,    /* 01A6  add L13 <- L12 + L0 */
+    0x001D0E46,                /* 01A8  lconst L14 <- static#29   ("::") */
+    0x000F0085, 0x000D000E,    /* 01A9  add L15 <- L13 + L14 */
+    0x00121042,                /* 01AB  gget L16 <- g18   (str) */
+    0x00110040,                /* 01AC  i8 L17 <- 0 */
+    0x00120098, 0x00090011,    /* 01AD  getidx L18 <- L9[L17] */
+    0x00111241,                /* 01AF  move L17 <- L18 */
+    0x001001A0, 0x00010000,    /* 01B0  call base=L16 argc=1 nres=1 */
+    0x00110085, 0x000F0010,    /* 01B2  add L17 <- L15 + L16 */
+    0x00201246,                /* 01B4  lconst L18 <- static#32   (" (") */
+    0x00130085, 0x00110012,    /* 01B5  add L19 <- L17 + L18 */
+    0x00121442,                /* 01B7  gget L20 <- g18   (str) */
+    0x00150140,                /* 01B8  i8 L21 <- 1 */
+    0x00160098, 0x00090015,    /* 01B9  getidx L22 <- L9[L21] */
+    0x00151641,                /* 01BB  move L21 <- L22 */
+    0x001401A0, 0x00010000,    /* 01BC  call base=L20 argc=1 nres=1 */
+    0x00150085, 0x00130014,    /* 01BE  add L21 <- L19 + L20 */
+    0x00191646,                /* 01C0  lconst L22 <- static#25   (")") */
+    0x00170085, 0x00150016,    /* 01C1  add L23 <- L21 + L22 */
+    0x000C1741,                /* 01C3  move L12 <- L23 */
+    0x000B01A0, 0x00010000,    /* 01C4  call base=L11 argc=1 nres=1 */
+    0xFFB4004F,                /* 01C6  jmp -76 */
+    0x00140A42,                /* 01C7  gget L10 <- g20   (to_wyc) */
+    0x000B0441,                /* 01C8  move L11 <- L4 */
+    0x000A01A0, 0x00010000,    /* 01C9  call base=L10 argc=1 nres=1 */
+    0x00060A41,                /* 01CB  move L6 <- L10 */
+    0x00140A46,                /* 01CC  lconst L10 <- static#20   ("error") */
+    0x000B0097, 0x0006000A,    /* 01CD  is L11 <- L6 is L10 */
+    0x000C0B4B,                /* 01CF  jf L11, +12 */
+    0x000E0A42,                /* 01D0  gget L10 <- g14   (println) */
+    0x00150B46,                /* 01D1  lconst L11 <- static#21   ("REFUSED ") */
+    0x000C0085, 0x000B0000,    /* 01D2  add L12 <- L11 + L0 */
+    0x00210D46,                /* 01D4  lconst L13 <- static#33   (" (serialize)") */
+    0x000E0085, 0x000C000D,    /* 01D5  add L14 <- L12 + L13 */
+    0x000B0E41,                /* 01D7  move L11 <- L14 */
+    0x000A01A0, 0x00010000,    /* 01D8  call base=L10 argc=1 nres=1 */
+    0x000A0004,                /* 01DA  lbool L10 <- 0 */
+    0x000A0102,                /* 01DB  return L10 count=1 */
+    0x00220A46,                /* 01DC  lconst L10 <- static#34   ("/") */
+    0x000B0085, 0x8000000A,    /* 01DD  add L11 <- P0 + L10 */
+    0x000C0085, 0x000B0000,    /* 01DF  add L12 <- L11 + L0 */
+    0x00230D46,                /* 01E1  lconst L13 <- static#35   (".wyd") */
+    0x00070085, 0x000C000D,    /* 01E2  add L7 <- L12 + L13 */
+    0x000D0A42,                /* 01E4  gget L10 <- g13   (std::io::open) */
+    0x000B0741,                /* 01E5  move L11 <- L7 */
+    0x00240C46,                /* 01E6  lconst L12 <- static#36   ("wb") */
+    0x000A02A0, 0x00010000,    /* 01E7  call base=L10 argc=2 nres=1 */
+    0x00080A41,                /* 01E9  move L8 <- L10 */
+    0x00140A46,                /* 01EA  lconst L10 <- static#20   ("error") */
+    0x000B0097, 0x0008000A,    /* 01EB  is L11 <- L8 is L10 */
+    0x000C0B4B,                /* 01ED  jf L11, +12 */
+    0x000E0A42,                /* 01EE  gget L10 <- g14   (println) */
+    0x00150B46,                /* 01EF  lconst L11 <- static#21   ("REFUSED ") */
+    0x000C0085, 0x000B0000,    /* 01F0  add L12 <- L11 + L0 */
+    0x00250D46,                /* 01F2  lconst L13 <- static#37   (" (cannot write)") */
+    0x000E0085, 0x000C000D,    /* 01F3  add L14 <- L12 + L13 */
+    0x000B0E41,                /* 01F5  move L11 <- L14 */
+    0x000A01A0, 0x00010000,    /* 01F6  call base=L10 argc=1 nres=1 */
+    0x000A0004,                /* 01F8  lbool L10 <- 0 */
+    0x000A0102,                /* 01F9  return L10 count=1 */
+    0x000A0841,                /* 01FA  move L10 <- L8 */
+    0x000B0641,                /* 01FB  move L11 <- L6 */
+    0x000A01A2, 0x00030001,    /* 01FC  msg base=L10 argc=1 msg#3 nres=1   (write) */
+    0x000A0841,                /* 01FE  move L10 <- L8 */
+    0x000A00A2, 0x00010001,    /* 01FF  msg base=L10 argc=0 msg#1 nres=1   (close) */
+    0x000E0A42,                /* 0201  gget L10 <- g14   (println) */
+    0x00260B46,                /* 0202  lconst L11 <- static#38   ("OK ") */
+    0x000C0085, 0x000B0000,    /* 0203  add L12 <- L11 + L0 */
+    0x000B0C41,                /* 0205  move L11 <- L12 */
+    0x000A01A0, 0x00010000,    /* 0206  call base=L10 argc=1 nres=1 */
+    0x000A0104,                /* 0208  lbool L10 <- 1 */
+    0x000A0102,                /* 0209  return L10 count=1 */
+    0x00008141,                /* 020A  move L0 <- P1 */
+    0x00010040,                /* 020B  i8 L1 <- 0 */
+    0x00020040,                /* 020C  i8 L2 <- 0 */
+    0x000B0542,                /* 020D  gget L5 <- g11   (len) */
+    0x00068241,                /* 020E  move L6 <- P2 */
+    0x000501A0, 0x00010000,    /* 020F  call base=L5 argc=1 nres=1 */
+    0x00030541,                /* 0211  move L3 <- L5 */
+    0x00050091, 0x00020003,    /* 0212  lt L5 <- L2 < L3 */
+    0x001A054B,                /* 0214  jf L5, +26 */
+    0x00050098, 0x80020002,    /* 0215  getidx L5 <- P2[L2] */
+    0x00062F40,                /* 0217  i8 L6 <- 47 */
+    0x0007008F, 0x00050006,    /* 0218  eq L7 <- L5 == L6 */
+    0x0010074B,                /* 021A  jf L7, +16 */
+    0x000C0542,                /* 021B  gget L5 <- g12   (substr) */
+    0x00068241,                /* 021C  move L6 <- P2 */
+    0x00070141,                /* 021D  move L7 <- L1 */
+    0x00080086, 0x00020001,    /* 021E  sub L8 <- L2 - L1 */
+    0x000503A0, 0x00010000,    /* 0220  call base=L5 argc=3 nres=1 */
+    0x00040541,                /* 0222  move L4 <- L5 */
+    0x00220546,                /* 0223  lconst L5 <- static#34   ("/") */
+    0x00060085, 0x00000005,    /* 0224  add L6 <- L0 + L5 */
+    0x00000085, 0x00060004,    /* 0226  add L0 <- L6 + L4 */
+    0x00050140,                /* 0228  i8 L5 <- 1 */
+    0x00010085, 0x00020005,    /* 0229  add L1 <- L2 + L5 */
+    0x00050140,                /* 022B  i8 L5 <- 1 */
+    0x00020085, 0x00020005,    /* 022C  add L2 <- L2 + L5 */
+    0xFFE3004F,                /* 022E  jmp -29 */
+    0x00050542,                /* 022F  gget L5 <- g5   (compile_one) */
+    0x00060041,                /* 0230  move L6 <- L0 */
+    0x00220746,                /* 0231  lconst L7 <- static#34   ("/") */
+    0x00080085, 0x80000007,    /* 0232  add L8 <- P0 + L7 */
+    0x00090085, 0x00088002,    /* 0234  add L9 <- L8 + P2 */
+    0x00070941,                /* 0236  move L7 <- L9 */
+    0x000502A0, 0x00010000,    /* 0237  call base=L5 argc=2 nres=1 */
+    0x00050102,                /* 0239  return L5 count=1 */
 };
 
 const wy_module_image compiler_main_image = {
