@@ -124,8 +124,8 @@ reader can predict `bytes(3)!pack_u32(0, 258)`'s resulting bytes from the text a
 ### M2 - pypoc: `bytes` builtin type and methods
 
 **Scope:** Add `BYTES = PrimitiveType("bytes", _to_bytes)` next to `STR`/`INT`/...,
-backed by `bytearray`. `_to_bytes` casts int to n zero bytes, str to UTF-8 encode,
-bytes/bytearray to a copy. Register native methods `append`, `resize`, `slice`, `to_str`,
+backed by `bytearray`. `_to_bytes` stercasts int to n zero bytes, str to UTF-8 encode,
+bytes/bytearray to a copy. Regi native methods `append`, `resize`, `slice`, `to_str`,
 `pack_u8/i32/u32/f32/f64`, `unpack_u8/i32/u32/f32/f64`, `copy` via
 `register_native_method`, following the existing `resize`/`append` pattern for `list`.
 Wire `b[i]` get/set through the existing indexing dispatch. Add `"bytes"` to

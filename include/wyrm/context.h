@@ -21,6 +21,10 @@ WY_BEGIN_DECLS
 /** Default gc_pressure threshold (bytes) before a safepoint triggers a collection */
 #define WY_CONTEXT_GC_THRESHOLD_DEFAULT (1u << 16)
 
+/** Default coroutine fiber sizing (design_c_vm.md §3). */
+#define WY_CONTEXT_CO_STACK_LEN_DEFAULT 512
+#define WY_CONTEXT_CO_FRAME_COUNT_DEFAULT 32
+
 /**
  * Output sink for builtins like `print`/`println` (design_c_vm.md §5).
  * `write` may be WY_NULL, in which case output is silently dropped; the
@@ -33,6 +37,12 @@ typedef struct wy_context_io
     void* ud;
 } wy_context_io;
 
+/** The hook returns an image allocated through wy_context_gc_alloc. On
+ * success ownership transfers to the loader (also on malformed-image failure).
+ * On failure the hook retains responsibility for any allocation. */
+typedef wy_error (*wy_import_hook)(wy_context*, const char* path, wy_uword len,
+    wy_u8** out_bytes, wy_uword* out_len, void* ud);
+
 struct wy_context
 {
     wy_machine* parent;
@@ -40,10 +50,20 @@ struct wy_context
     wy_module* root_module;
     wy_module* builtins;       /**< the builtins module; NULL until epic 2/M5 installs it */
     wy_class* error_class;     /**< the base `error` class; NULL until wy_builtins_new installs it */
+    wy_class* stop_iteration_class;  /**< the `StopIteration` class; NULL until wy_builtins_new installs it */
+    wy_class* os_error_class;  /**< the `OSError` class; NULL until wy_builtins_new installs it */
+    wy_fiber* fiber_list;      /**< intrusive list of root/independent fibers (design_c_vm.md §3's
+                                 * "context's fiber list"); a coroutine's own private fiber is never
+                                 * linked here, only reachable via its owning wy_coroutine - see
+                                 * wy_context_gc_full_run and wy_context_attach_fiber */
+    wy_uword co_stack_len;     /**< default value-stack length for a coroutine's own fiber */
+    wy_uword co_frame_count;   /**< default frame count for a coroutine's own fiber */
     wy_main_loop* main_loop;
     wy_primitive wakeable_source;
     wy_gc_arena arena;
     wy_context_io io;
+    wy_import_hook import_hook;
+    void* import_ud;
 
     wy_mem_info module_memory;
     wy_uword module_count;

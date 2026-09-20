@@ -21,6 +21,7 @@ extern const wy_object_type wy_error_obj_type;
 struct wy_error_obj
 {
     wy_object object;
+    wy_error code;             /**< optional VM fault code; NONE for user errors */
     wy_class* cls;
     wy_string* what;
     wy_value payload;

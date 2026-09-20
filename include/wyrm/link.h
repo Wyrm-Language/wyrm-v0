@@ -1,27 +1,32 @@
 #ifndef WYRM_LINK_H_
 #define WYRM_LINK_H_
 
-#include <wyrm/fwd.h>
-#include <wyrm/sys/errors.h>
+#include <wyrm/module.h>
 
 WY_BEGIN_DECLS
 
-/**
- * Layer 3 fill (wyc-format.md §7.2, design_c_vm.md §5): fill every free-name
- * slot of `module` that is still unfilled (`fill_layer[slot] == 0`) from
- * `builtins`'s exports, by bare-name match.
- *
- * A free name with no matching builtins export is left Unset - not an error
- * at fill time, only at `gget` read time (already handled by the dispatch
- * loop). Full layer 1 (imports) and layer 2 (`import *`) fill are epic 2/M6;
- * not implemented here.
- *
- * A no-op if `module->free_names` is empty, or if `builtins` is WY_NULL.
- *
- * @return WY_ERR_NONE, or WY_ERR_INVAL for a null context/module argument
- */
+/** Low bits are the winning layer; the high bit marks a deferred ambiguity
+ * fault stored in globals[slot]. An ordinary error value has no marker. */
+enum { WY_LINK_AMBIGUOUS = 128, WY_LINK_LAYER_MASK = 127 };
+
+/** Stronger (lower numbered) layer wins. Same-source/identical-value fills
+ * are no-ops, including after ambiguity. Allocation errors return immediately;
+ * ambiguity itself is deferred until the global is read. */
+wy_error wy_link_fill(wy_context* context, wy_module* module, wy_uword slot,
+    wy_value value, wy_u8 layer, wy_symbol source);
 wy_error wy_link_fill_from_builtins(wy_context* context, wy_module* module, wy_module* builtins);
+wy_error wy_link_fill_from_import(wy_context* context, wy_module* module, wy_symbol path, wy_module* dep);
+wy_error wy_link_fill_from_wildcard(wy_context* context, wy_module* module, const wy_wildcard* wildcard);
+wy_error wy_link_register_wildcard(wy_context* context, wy_module* module,
+    wy_module* dep, const wy_value* excepts, wy_uword count, wy_uword* index);
+
+/** A binding in the scope namespace: module exports, class statics, or
+ * function-owner exports. Never instance attributes. */
+wy_error wy_link_scope_member(wy_value owner, wy_symbol name, wy_value** out);
+
+/** Find or load and publish a dependency, without executing it. The caller
+ * must initialise a LOADED result inline on its current fiber. */
+wy_error wy_link_import(wy_context* context, wy_string* path, wy_module** out);
 
 WY_END_DECLS
-
 #endif

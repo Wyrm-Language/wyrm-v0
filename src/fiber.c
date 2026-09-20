@@ -53,6 +53,12 @@ wy_fiber* wy_fiber_create(wy_context* context, wy_uword stack_len, wy_uword fram
     fiber->pending = wy_exec_fn_create_empty();
     fiber->fault = wy_value_unset();
 
+    fiber->next_fiber = WY_NULL;
+    fiber->coroutine = WY_NULL;
+    fiber->pending_native_dst = WY_NULL;
+    fiber->pending_native_base_count = 0;
+    fiber->pending_native_nres = 0;
+
     fiber->current_frame = WY_MEM_INFO_BEGIN_PTR(wy_frame, &fiber->frame_memory);
     wy_memset(fiber->current_frame, 0, sizeof(wy_frame));
     fiber->current_frame->kind = WY_FRAME_NATIVE;
@@ -156,13 +162,21 @@ static wy_error start_children_iter(wy_context* context, wy_object* object, wy_w
     wa->data[0].word = 0;   /* value stack index */
     wa->data[1].word = 0;   /* frame index */
     wa->data[2].word = 0;   /* fault visited */
+    wa->data[3].word = 0;   /* sub-step within frame data[1]: defers/module/dispatch_body/aux */
     return WY_ERR_NONE;
 }
 
+/** Sub-steps `next_children_iter` visits for each live frame, in order. */
+enum { WY_FIBER_FRAME_STEP_DEFERS = 0, WY_FIBER_FRAME_STEP_MODULE, WY_FIBER_FRAME_STEP_DISPATCH_BODY,
+    WY_FIBER_FRAME_STEP_AUX, WY_FIBER_FRAME_STEP_DONE };
+
 /**
- * Children: the live value stack, each live frame's armed defer chain (a
- * frame draining defers keeps the rest of its chain only here), then the
- * fault - which must survive the defers that run while a frame unwinds.
+ * Children: the live value stack, then each live frame's armed defer chain
+ * (a frame draining defers keeps the rest of its chain only here), module,
+ * dispatch_body and aux (design_c_vm.md §3 - a coroutine body frame's `aux`
+ * is the only reference keeping its own `wy_coroutine` alive while it runs),
+ * then the fault - which must survive the defers that run while a frame
+ * unwinds.
  */
 static wy_error next_children_iter(wy_context* context, wy_object* object, wy_work_area* wa, const wy_object** child)
 {
@@ -184,16 +198,46 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
     if (self->current_frame != WY_NULL) {
         wy_frame* frames = WY_MEM_INFO_BEGIN_PTR(wy_frame, &self->frame_memory);
         wy_word fidx = wa->data[1].word;
+        wy_word step = wa->data[3].word;
         while (frames + fidx <= self->current_frame) {
             wy_frame* fr = frames + fidx;
-            fidx++;
-            if (fr->defers != WY_NULL) {
-                *child = (wy_object*) fr->defers;
-                wa->data[1].word = fidx;
-                return WY_ERR_NONE;
+            if (step == WY_FIBER_FRAME_STEP_DEFERS) {
+                step = WY_FIBER_FRAME_STEP_MODULE;
+                if (fr->defers != WY_NULL) {
+                    *child = (wy_object*) fr->defers;
+                    wa->data[1].word = fidx; wa->data[3].word = step;
+                    return WY_ERR_NONE;
+                }
             }
+            if (step == WY_FIBER_FRAME_STEP_MODULE) {
+                step = WY_FIBER_FRAME_STEP_DISPATCH_BODY;
+                if (fr->kind == WY_FRAME_BYTECODE && fr->module != WY_NULL) {
+                    *child = (wy_object*) fr->module;
+                    wa->data[1].word = fidx; wa->data[3].word = step;
+                    return WY_ERR_NONE;
+                }
+            }
+            if (step == WY_FIBER_FRAME_STEP_DISPATCH_BODY) {
+                step = WY_FIBER_FRAME_STEP_AUX;
+                if (wy_value_is_gc_ref_f(fr->dispatch_body)) {
+                    *child = fr->dispatch_body.data.gc_object;
+                    wa->data[1].word = fidx; wa->data[3].word = step;
+                    return WY_ERR_NONE;
+                }
+            }
+            if (step == WY_FIBER_FRAME_STEP_AUX) {
+                step = WY_FIBER_FRAME_STEP_DONE;
+                if (wy_value_is_gc_ref_f(fr->aux)) {
+                    *child = fr->aux.data.gc_object;
+                    wa->data[1].word = fidx; wa->data[3].word = step;
+                    return WY_ERR_NONE;
+                }
+            }
+            fidx++;
+            step = WY_FIBER_FRAME_STEP_DEFERS;
         }
         wa->data[1].word = fidx;
+        wa->data[3].word = step;
     }
 
     if (wa->data[2].word == 0) {

@@ -6,11 +6,13 @@
 #include <wyrm.h>
 #include <wyrm/error.h>
 #include <wyrm/bound_msg.h>
+#include <wyrm/coroutine.h>
 #include <wyrm/dict.h>
 #include <wyrm/function.h>
 #include <wyrm/instance.h>
 #include <wyrm/iter.h>
 #include <wyrm/list.h>
+#include <wyrm/link.h>
 #include <wyrm/native.h>
 #include <wyrm/pair.h>
 #include <wyrm/string.h>
@@ -512,6 +514,95 @@ static bool defer_pop_runnable_f(wy_frame* fr, bool failing, wy_value result0, w
     return false;
 }
 
+/**
+ * `StopIteration` as an error *value* (design_c_vm.md §3), delivered to
+ * `next`/`send` on a coroutine that's already DONE and to a coroutine's own
+ * resumer when its body returns without delegation. `ctx->stop_iteration_class`
+ * is only NULL in tests that never install the builtins module; the value is
+ * still a real error tag either way (`wy_value_is_error` doesn't need the
+ * class), just without a class chain to check `is StopIteration` against.
+ */
+static wy_value stop_iteration_value_f(wy_context* ctx)
+{
+    wy_string* what = WY_NULL;
+    (void) wy_string_strdup(ctx, "StopIteration", &what);
+    wy_error_obj* obj = WY_NULL;
+    if (wy_error_obj_new(ctx, ctx->stop_iteration_class, what, wy_value_nil(), &obj) != WY_ERR_NONE) {
+        return wy_value_word(-1);
+    }
+    return wy_value_object(WY_TYPE_TAG_ERROR, (wy_object*) obj);
+}
+
+/**
+ * `call` on a coroutine-flagged FUNCTION (design_c_vm.md §3): a fresh fiber,
+ * a wy_coroutine wrapping it, and the body frame pushed on that fiber -
+ * built exactly like an ordinary call (push_bytecode_call_bind_f), just
+ * targeting the new fiber instead of the current one. Nothing executes;
+ * `*out_value` is the COROUTINE value to write at the call site.
+ */
+static wy_error construct_coroutine_f(wy_context* ctx, wy_function* fn, const wy_value* args, wy_uword argc,
+    wy_dict* kwargs, wy_value* out_value, char* fault_msg, wy_uword fault_msg_size)
+{
+    wy_fiber* co_fiber = wy_fiber_create(ctx, ctx->co_stack_len, ctx->co_frame_count);
+    if (co_fiber == WY_NULL) { return WY_ERR_NOMEM; }
+
+    wy_coroutine* co = WY_NULL;
+    wy_error err = wy_coroutine_new_f(ctx, co_fiber, &co);
+    if (err != WY_ERR_NONE) { return err; }
+    co_fiber->coroutine = co;
+
+    wy_fiber* caller_fiber = ctx->current_fiber;
+    ctx->current_fiber = co_fiber;
+    err = push_bytecode_call_bind_f(ctx, fn, 0, WY_NULL, args, argc, kwargs, WY_NULL, 0, WY_RET_COROUTINE,
+        fault_msg, fault_msg_size);
+    if (err == WY_ERR_NONE) {
+        co_fiber->current_frame->aux = wy_value_object(WY_TYPE_TAG_COROUTINE, (wy_object*) co);
+    }
+    ctx->current_fiber = caller_fiber;
+    if (err != WY_ERR_NONE) { return err; }
+
+    co_fiber->pending = wy_exec_fn_create(wy_vm_run, wy_primitive_null());
+    *out_value = wy_value_object(WY_TYPE_TAG_COROUTINE, (wy_object*) co);
+    return WY_ERR_NONE;
+}
+
+/**
+ * The continuation `wy_vm_call_exec_push_f` runs once an exec native called
+ * from bytecode (design_c_vm.md §1.3/§3 - currently only `next`/`send`)
+ * completes, however long that takes: immediately (no coroutine switch), or
+ * after arbitrarily much coroutine execution on other fibers in between.
+ * Either way, by the time this runs `ctx->current_fiber` is back to the
+ * caller and its NATIVE bridge frame is already popped (fb->current_frame
+ * is the bytecode frame that made the call again) - copy the result into
+ * that call's destination window and resume the dispatch loop.
+ *
+ * This is the one place M3 re-enters wy_vm_run as a nested C call rather
+ * than looping. It stays O(1): every wy_vm_run invocation this bridges
+ * between already fully returned (via WY_EXEC_CONTINUE/WY_EXEC_SWITCH
+ * unwinding through wy_fiber_exec_f's pending loop and wy_context_exec's
+ * iterative fiber-switch loop) before this continuation runs, regardless of
+ * how many coroutines were involved - so this does not grow with wyrm-level
+ * call/coroutine nesting the way AGENTS.md's no-C-recursion rule guards
+ * against, only with the fixed bridge depth of one exec-native call.
+ */
+static wy_exec_state exec_native_call_resume_f(wy_context* ctx, wy_primitive c_data)
+{
+    WY_UNUSED(c_data);
+    wy_fiber* fb = ctx->current_fiber;
+    wy_value* dst = fb->pending_native_dst;
+    wy_uword nres = fb->pending_native_nres;
+    wy_uword base_count = fb->pending_native_base_count;
+    fb->pending_native_dst = WY_NULL;
+    fb->pending_native_nres = 0;
+
+    wy_error err = wy_vm_native_await_complete_f(ctx, base_count, dst, nres);
+    if (err != WY_ERR_NONE) {
+        fb->fault = fault_value_f(ctx, "native call bridge failed");
+        return WY_EXEC_FAULT;
+    }
+    return wy_vm_run(ctx, wy_primitive_null());
+}
+
 wy_exec_state wy_vm_run(wy_context* ctx, wy_primitive unused)
 {
     WY_UNUSED(unused);
@@ -607,6 +698,11 @@ reload:;
         case WY_OP_GGET: case WY_OP_GGET_WIDE: {
             wy_uword dst = (op == WY_OP_GGET) ? f : a1;
             wy_value g = G[a0];
+            if (mod->fill_layer != WY_NULL && (mod->fill_layer[a0] & WY_LINK_AMBIGUOUS)) {
+                fr->ip = next_ip;
+                fault_v = g;
+                goto do_fault;
+            }
             if (wy_value_is_unset(g)) {
                 /* Only a free slot nothing filled is unbound (interp.py
                  * OP_GGET, wyc-format.md §7.3); a module's own global that
@@ -627,6 +723,90 @@ reload:;
         case WY_OP_GSET: case WY_OP_GSET_WIDE: {
             wy_uword src = (op == WY_OP_GSET) ? f : a1;
             G[a0] = *wy_vm_reg8_f(fr, (wy_u8) src);
+            if (mod->fill_layer != WY_NULL) { mod->fill_layer[a0] &= WY_LINK_LAYER_MASK; }
+            ip = next_ip;
+            break;
+        }
+
+        case WY_OP_IMPORT: case WY_OP_IMPORT_WIDE: case WY_OP_IMPORT_STAR: {
+            fr->ip = next_ip;
+            if (a0 >= mod->static_count || mod->statics[a0].type != WY_TYPE_TAG_STR) {
+                fault_v = fault_value_f(ctx, "import: path must be a static string");
+                goto do_fault;
+            }
+            wy_string* path = mod->statics[a0].data.str;
+            wy_module* dep = WY_NULL;
+            wy_error err = wy_link_import(ctx, path, &dep);
+            if (err != WY_ERR_NONE) {
+                char msg[WY_VM_CALL_FAULT_MSG];
+                snprintf(msg, sizeof(msg), "import %s: '%s' -> '%.*s' (error %d)",
+                    err == WY_ERR_CYCLE ? "cycle" : "failed", mod->name ? mod->name : "<module>",
+                    (int) path->len, path->str, (int) err);
+                fault_v = fault_value_f(ctx, msg);
+                if (fault_v.type == WY_TYPE_TAG_ERROR) { ((wy_error_obj*) fault_v.data.gc_object)->code = err; }
+                goto do_fault;
+            }
+            wy_uword wildcard_index = 0;
+            bool star = op == WY_OP_IMPORT_STAR;
+            wy_value* dst = star ? WY_NULL : (op == WY_OP_IMPORT ? wy_vm_reg8_f(fr, f) : wy_vm_reg_f(fr, a1));
+            if (star) {
+                wy_uword base = a1 & 0x7fffu;
+                wy_uword capacity = (a1 & WYRM_REG_P_BIT) ? fr->p_count : fr->proto->nlocals;
+                if (base > capacity || f > capacity - base) {
+                    fault_v = fault_value_f(ctx, "import_star: invalid except window");
+                    goto do_fault;
+                }
+                err = wy_link_register_wildcard(ctx, mod, dep, wy_vm_reg_f(fr, a1), f, &wildcard_index);
+                if (err != WY_ERR_NONE) {
+                    fault_v = fault_value_f(ctx, "import_star: invalid except symbols or out of memory");
+                    goto do_fault;
+                }
+            }
+            if (dep->state == WY_MODULE_READY || dep->state == WY_MODULE_BUILTIN) {
+                if (star) { err = wy_link_fill_from_wildcard(ctx, mod, &mod->wildcards[wildcard_index]); }
+                else {
+                    wy_symbol spelling;
+                    err = wy_context_intern(ctx, path->str, path->len, &spelling);
+                    if (err == WY_ERR_NONE) { err = wy_link_fill_from_import(ctx, mod, spelling, dep); }
+                }
+                if (err != WY_ERR_NONE) { fault_v = fault_value_f(ctx, "import: fill failed"); goto do_fault; }
+                if (!star) { *dst = wy_value_object(WY_TYPE_TAG_MODULE, (wy_object*) dep); }
+                ip = next_ip;
+                break;
+            }
+            dep->init_proto.nlocals = dep->init_nlocals;
+            /* Only push_bytecode_call_bind_f reads this temporary callable.
+             * The persistent prototype and module are owned by the frame. */
+            wy_function init_fn = {0};
+            init_fn.module = dep;
+            init_fn.proto = &dep->init_proto;
+            char fault_msg[WY_VM_CALL_FAULT_MSG];
+            err = push_bytecode_call_bind_f(ctx, &init_fn, 0, WY_NULL, WY_NULL, 0,
+                WY_NULL, dst, star ? 0 : 1, star ? WY_RET_IMPORT_STAR : WY_RET_IMPORT,
+                fault_msg, sizeof(fault_msg));
+            if (err != WY_ERR_NONE) {
+                dep->state = WY_MODULE_FAILED;
+                fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
+                goto do_fault;
+            }
+            dep->state = WY_MODULE_INITIALISING;
+            fb->current_frame->aux = star ? wy_value_uword(wildcard_index) : mod->statics[a0];
+            goto reload;
+        }
+
+        case WY_OP_GETSCOPE: case WY_OP_SETSCOPE: {
+            bool get = op == WY_OP_GETSCOPE;
+            wy_uword symbol = get ? a2 : a1;
+            wy_value* binding = WY_NULL;
+            wy_error err = symbol >= mod->symbol_count ? WY_ERR_RANGE :
+                wy_link_scope_member(*wy_vm_reg_f(fr, get ? a1 : a0), mod->symbols[symbol], &binding);
+            if (err != WY_ERR_NONE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "scope: namespace has no such member");
+                goto do_fault;
+            }
+            if (get) { *wy_vm_reg_f(fr, a0) = *binding; }
+            else { *binding = *wy_vm_reg_f(fr, a2); }
             ip = next_ip;
             break;
         }
@@ -1213,9 +1393,25 @@ reload:;
             }
 
             if (callee.type == WY_TYPE_TAG_FUNCTION) {
+                wy_function* fn = (wy_function*) callee.data.gc_object;
+                if (fn->proto->flags & WY_FN_COROUTINE) {
+                    fr->ip = next_ip;
+                    wy_value co_v;
+                    char fault_msg[WY_VM_CALL_FAULT_MSG];
+                    wy_error err = construct_coroutine_f(ctx, fn, &L[base + 1], argc, WY_NULL, &co_v,
+                        fault_msg, sizeof(fault_msg));
+                    if (err != WY_ERR_NONE) {
+                        fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
+                        goto do_fault;
+                    }
+                    *wy_vm_reg_f(fr, base) = co_v;
+                    for (wy_uword i = 1; i < nres; i++) { *wy_vm_reg_f(fr, base + i) = wy_value_nil(); }
+                    ip = next_ip;
+                    break;
+                }
                 fr->ip = next_ip;
                 char fault_msg[WY_VM_CALL_FAULT_MSG];
-                wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) callee.data.gc_object,
+                wy_error err = push_bytecode_call_bind_f(ctx, fn,
                     0, WY_NULL, &L[base + 1], argc, WY_NULL, &L[base], nres, WY_RET_WINDOW,
                     fault_msg, sizeof(fault_msg));
                 if (err != WY_ERR_NONE) {
@@ -1228,11 +1424,28 @@ reload:;
 
             if (callee.type == WY_TYPE_TAG_NATIVE) {
                 wy_native* native = (wy_native*) callee.data.gc_object;
-                if (native->kind != WY_NATIVE_LEAF) {
+                if (native->kind == WY_NATIVE_EXEC) {
+                    /* Bridge to the reservation trampoline (design_c_vm.md
+                     * §1.3/§3): `next`/`send` are the only exec natives this
+                     * milestone registers, and may switch fibers to run a
+                     * coroutine before eventually resuming here. */
+                    if (argc < native->min_argc || argc > native->max_argc) {
+                        fr->ip = next_ip;
+                        fault_v = fault_value_f(ctx, "wrong argument count");
+                        goto do_fault;
+                    }
                     fr->ip = next_ip;
-                    fault_v = fault_value_f(ctx,
-                        "exec natives called from bytecode are not supported until epic 3+");
-                    goto do_fault;
+                    fb->pending_native_dst = &L[base];
+                    fb->pending_native_nres = (wy_u16) nres;
+                    fb->pending_native_base_count = wy_fiber_value_count_f(fb);
+                    wy_error err = wy_vm_call_exec_push_f(ctx,
+                        wy_exec_fn_create(exec_native_call_resume_f, wy_primitive_null()),
+                        native, &L[base + 1], argc, nres);
+                    if (err != WY_ERR_NONE) {
+                        fault_v = fault_value_f(ctx, "native call failed");
+                        goto do_fault;
+                    }
+                    return WY_EXEC_CONTINUE;
                 }
                 wy_error err = wy_vm_call_leaf_f(ctx, native, &L[base + 1], argc, &L[base], nres);
                 if (err != WY_ERR_NONE) {
@@ -1641,6 +1854,75 @@ reload:;
             break;
         }
 
+        case WY_OP_YIELD: {
+            /* a0 = base, f = count (wyc-format.md §6). Suspend this
+             * coroutine, handing count values from L[base..) to whoever is
+             * waiting - always co->resumer directly, even mid-delegation
+             * (design_c_vm.md §3: yield_from repoints a delegate's own
+             * `resumer` at the top-level caller so this needs no chain
+             * walk). On resume, next/send writes the sent value into
+             * L[base] itself before switching back here. */
+            wy_coroutine* co = fb->coroutine;
+            if (co == WY_NULL) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "yield: not running inside a coroutine");
+                goto do_fault;
+            }
+            wy_uword base = a0, count = f;
+            wy_value v;
+            if (count == 0) {
+                v = wy_value_nil();
+            } else if (count == 1) {
+                v = *wy_vm_reg_f(fr, base);
+            } else {
+                wy_tuple* tup = WY_NULL;
+                wy_error err = wy_tuple_new(ctx, &L[base], count, &tup);
+                if (err != WY_ERR_NONE) {
+                    fr->ip = next_ip;
+                    fault_v = fault_value_f(ctx, "yield: tuple construction failed");
+                    goto do_fault;
+                }
+                v = wy_value_object(WY_TYPE_TAG_TUPLE, (wy_object*) tup);
+            }
+            fr->ip = next_ip;
+            co->yield_base = (wy_u16) base;
+            co->state = WY_CO_SUSPENDED;
+            wy_fiber_set_result_f(co->resumer, 0, v);
+            ctx->current_fiber = co->resumer;
+            return WY_EXEC_SWITCH;
+        }
+
+        case WY_OP_YIELD_FROM: {
+            /* a0 = dst, a1 = sub coroutine register (wyc-format.md §6). */
+            wy_coroutine* co = fb->coroutine;
+            if (co == WY_NULL) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "yield_from: not running inside a coroutine");
+                goto do_fault;
+            }
+            wy_value subv = *wy_vm_reg_f(fr, a1);
+            if (subv.type != WY_TYPE_TAG_COROUTINE) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "yield_from: not a coroutine");
+                goto do_fault;
+            }
+            wy_coroutine* sub = (wy_coroutine*) subv.data.gc_object;
+            if (sub->state == WY_CO_DONE || sub->state == WY_CO_RUNNING) {
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, "yield_from: sub-coroutine is not resumable");
+                goto do_fault;
+            }
+            fr->ip = next_ip;
+            sub->outer = co;
+            sub->delegate_dst = wy_vm_reg_f(fr, a0);
+            sub->resumer = co->resumer;
+            co->delegate = sub;
+            sub->state = WY_CO_RUNNING;
+            sub->fiber->pending = wy_exec_fn_create(wy_vm_run, wy_primitive_null());
+            ctx->current_fiber = sub->fiber;
+            return WY_EXEC_SWITCH;
+        }
+
         default:
             fr->ip = next_ip;
             fault_v = fault_value_f(ctx, "unknown or unimplemented opcode");
@@ -1678,6 +1960,21 @@ do_return: {
         break;
     case WY_RET_DISCARD:
         break;
+    case WY_RET_IMPORT: case WY_RET_IMPORT_STAR: {
+        wy_module* importer = (fr - 1)->module;
+        wy_error err;
+        if (fr->ret_kind == WY_RET_IMPORT_STAR) {
+            err = wy_link_fill_from_wildcard(ctx, importer, &importer->wildcards[fr->aux.data.uword]);
+        } else {
+            wy_symbol path;
+            err = wy_context_intern(ctx, fr->aux.data.str->str, fr->aux.data.str->len, &path);
+            if (err == WY_ERR_NONE) { err = wy_link_fill_from_import(ctx, importer, path, mod); }
+        }
+        if (err != WY_ERR_NONE) { fault_v = fault_value_f(ctx, "import: fill failed"); goto do_fault; }
+        mod->state = WY_MODULE_READY;
+        if (fr->ret_kind == WY_RET_IMPORT) { *fr->ret_dst = wy_value_object(WY_TYPE_TAG_MODULE, (wy_object*) mod); }
+        break;
+    }
     case WY_RET_CONSTRUCT: {
         /* design_c_vm.md §7: an error result[0] replaces the instance,
          * anything else (including no results at all) keeps it. */
@@ -1685,9 +1982,34 @@ do_return: {
         wy_vm_backfill_f(fr->ret_dst, fr->ret_nres, &out, 1);
         break;
     }
+    case WY_RET_COROUTINE: {
+        /* design_c_vm.md §3: the coroutine's body finished on its own
+         * (not via a fault - do_unwind handles that path). Delegation
+         * hands the value to the outer coroutine's yield_from and resumes
+         * it directly; otherwise the resumer gets StopIteration, matching
+         * "raise StopIteration" ending an exhausted generator. Either way
+         * this coroutine's own fiber has nothing left to run, so control
+         * always leaves via a switch, never a plain reload. */
+        wy_coroutine* co = (wy_coroutine*) fr->aux.data.gc_object;
+        co->result = result0;
+        co->state = WY_CO_DONE;
+        fb->value_stack.top = fr->p;
+        fb->current_frame = fr - 1;
+        if (co->outer != WY_NULL) {
+            wy_coroutine* outer = co->outer;
+            *outer->delegate_dst = result0;
+            outer->delegate = WY_NULL;
+            co->outer = WY_NULL;
+            ctx->current_fiber = outer->fiber;
+            return WY_EXEC_SWITCH;
+        }
+        wy_value stop_it = stop_iteration_value_f(ctx);
+        wy_fiber_set_result_f(co->resumer, 0, stop_it);
+        ctx->current_fiber = co->resumer;
+        return WY_EXEC_SWITCH;
+    }
     default:
-        /* RESERVED/IMPORT/COROUTINE are not produced by a BYTECODE frame
-         * push yet (epic 4+). */
+        /* RESERVED is bridged through vm_call.c, not produced here. */
         break;
     }
     fb->value_stack.top = fr->p;
@@ -1722,6 +2044,9 @@ do_unwind: {
         /* No room (the fault may itself be a stack overflow): this defer
          * is lost, the original fault stands, and outer frames - which
          * have room again once this one pops - still drain theirs. */
+    }
+    if (fr->ret_kind == WY_RET_IMPORT || fr->ret_kind == WY_RET_IMPORT_STAR) {
+        mod->state = WY_MODULE_FAILED;
     }
     fb->value_stack.top = fr->p;
     fb->current_frame = fr - 1;
@@ -1758,11 +2083,15 @@ wy_error wy_vm_call_sync(wy_context* ctx, wy_value callee, const wy_value* args,
     if (state == WY_EXEC_DONE) { return WY_ERR_NONE; }
     if (state == WY_EXEC_FAULT) { return WY_ERR_FAULT; }
 
-    /* A native call is pending (WY_EXEC_CONTINUE): drive it to completion
-     * through the ordinary fiber trampoline, which will re-enter wy_vm_run
-     * as the continuation once it resolves (epic 3+ machinery; unreached
-     * by this milestone's own callers). */
-    return wy_fiber_exec_f(ctx->current_fiber, ctx);
+    /* A native call is pending (WY_EXEC_CONTINUE): drive it to completion.
+     * Epic 5/M3 is the first milestone where this can be more than one
+     * fiber-turn - `next`/`send` may switch to a coroutine's own fiber and
+     * back (possibly repeatedly, through further next/send calls the
+     * resumed bytecode makes) before the original call actually finishes -
+     * so this needs wy_context_exec's "keep following current_fiber" loop,
+     * not a single wy_fiber_exec_f turn on whichever fiber happens to be
+     * current right now. */
+    return wy_context_exec(ctx);
 }
 
 wy_error wy_vm_call_continue(wy_context* ctx, wy_exec_fn continuation, wy_value callee,

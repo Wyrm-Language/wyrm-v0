@@ -1,3 +1,4 @@
+#include <wyrm/link.h>
 #include <wyrm/module.h>
 
 #include <wyrm/allocator.h>
@@ -840,6 +841,8 @@ wy_error wy_module_load_image(wy_context* context, const wy_module_image* image,
     last_error = module_load_name_slot_dict_(context, module, image->sections[WY_SEC_FREE], &module->free_names);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
+    last_error = wy_link_fill_from_builtins(context, module, context->builtins);
+    if (last_error != WY_ERR_NONE) { return last_error; }
     module->state = WY_MODULE_LOADED;
     *out = module;
     return WY_ERR_NONE;
@@ -866,15 +869,25 @@ wy_error wy_module_run_init(wy_context* context, wy_module* module)
 {
     if (context == WY_NULL || module == WY_NULL) { return WY_ERR_INVAL; }
 
-    wy_function_proto init_proto = {0};
-    init_proto.code_offset = 0;
-    init_proto.nparams = 0;
-    init_proto.nlocals = module->init_nlocals;
-    init_proto.ncaptures = 0;
-
-    wy_function* init_fn = WY_NULL;
-    wy_error last_error = wy_function_new(context, module, &init_proto, WY_NULL, 0, &init_fn);
+    if (module->state == WY_MODULE_READY || module->state == WY_MODULE_BUILTIN) { return WY_ERR_NONE; }
+    if (module->state == WY_MODULE_INITIALISING) { return WY_ERR_CYCLE; }
+    if (module->state == WY_MODULE_FAILED) { return WY_ERR_LINK; }
+    bool registered = false;
+    for (wy_uword i = 0; i < context->module_count; i++) {
+        if (wy_context_get_module(context, i) == module) { registered = true; break; }
+    }
+    wy_error last_error = WY_ERR_NONE;
+    if (!registered) {
+        last_error = wy_context_module_register(context, module, WY_NULL);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+    }
+    last_error = wy_link_fill_from_builtins(context, module, context->builtins);
     if (last_error != WY_ERR_NONE) { return last_error; }
+    module->init_proto.nlocals = module->init_nlocals;
+    wy_function* init_fn = WY_NULL;
+    last_error = wy_function_new(context, module, &module->init_proto, WY_NULL, 0, &init_fn);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    module->state = WY_MODULE_INITIALISING;
 
     wy_value callee = wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) init_fn);
     last_error = wy_vm_call_sync(context, callee, WY_NULL, 0, WY_NULL, 0);
@@ -911,6 +924,9 @@ static void finalize(wy_context* context, wy_object* self_s)
     wy_context_gc_free(context, self->fill_source);
     wy_context_gc_free(context, self->statics);
     wy_context_gc_free(context, self->symbols);
+    for (wy_uword i = 0; i < self->wildcard_count; i++) {
+        wy_context_gc_free(context, self->wildcards[i].excepts);
+    }
     wy_context_gc_free(context, self->wildcards);
 
     wy_slot_finalize_f(&self->exports, allocator);
@@ -997,6 +1013,23 @@ static wy_error children_iter_next(wy_context* context, wy_object* object, wy_wo
             continue;
         }
 
+        if (phase == 4) {
+            wa->data[0].uword = 5;
+            wa->data[1].uword = 0;
+            if (self->import_path != WY_NULL) {
+                *child = (wy_object*) self->import_path;
+                return WY_ERR_NONE;
+            }
+            continue;
+        }
+        if (phase == 5) {
+            wy_uword idx = wa->data[1].uword;
+            if (idx < self->wildcard_count) {
+                wa->data[1].uword = idx + 1;
+                *child = (wy_object*) self->wildcards[idx].target;
+                return WY_ERR_NONE;
+            }
+        }
         return WY_ERR_STOP_ITERATION;
     }
 }

@@ -35,6 +35,18 @@ struct wy_fiber
 
     wy_mem_info frame_memory;       //!< Reserved memory for frame storage
     wy_frame* current_frame;        //!< Innermost active frame
+
+    wy_fiber* next_fiber;    //!< Intrusive link for context->fiber_list (root/independent fibers only)
+    wy_coroutine* coroutine; //!< Owning coroutine, or WY_NULL for a root/independent fiber
+
+    /** Scratch for the bytecode-to-exec-native call bridge (design_c_vm.md
+     * §1.3/§3): where WY_OP_CALL's destination window is, so the
+     * continuation that runs once the native completes (possibly after a
+     * coroutine fiber switch) can copy its result there and resume
+     * wy_vm_run. Valid only between that CALL and its continuation. */
+    wy_value* pending_native_dst;
+    wy_uword pending_native_base_count;
+    wy_u16 pending_native_nres;
 };
 
 

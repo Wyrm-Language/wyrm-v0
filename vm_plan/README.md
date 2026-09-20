@@ -15,6 +15,9 @@ for a fresh agent session; `design_c_vm.md` is the shared architecture for epics
 3. **Phase C (epics 8–11):** clean up the wyrm-in-wyrm AST, port the bytecode compiler to
    wyrm (`wy/wyrm/`), including a minimal bjson writer, until `.wy` files compile to
    bytecode on the C VM without Python, and the compiler compiles itself.
+4. **Epic 12 (post-Phase-C):** the message-dispatch inline cache and per-class slot dict
+   originally scoped into epic 6, deliberately deferred until the dispatch/class code
+   finishes moving through the compiler port.
 
 ## Decisions fixed at plan time
 
@@ -41,15 +44,18 @@ for a fresh agent session; `design_c_vm.md` is the shared architecture for epics
 | 3 | Data, closures, errors, defers | closures, collections, errors + 8 samples | 2 |
 | 4 | Classes, instances, messages | classes, messages, eval_messages | 3 |
 | 5 | Modules, imports, coroutines, CLI | two_module, wildcard, coroutines, decorators; full sweep | 4 |
-| 6 | Host API, hardening, performance | corelib tokenizer runs on C VM; benchmarks | 5 |
+| 6 | Host API, hardening, baseline benchmarks | corelib tokenizer runs on C VM; benchmarks | 5 |
 | 7 | `bytes` type (spec, pypoc, C) | wyrm can write binary files | 6 (C side), 3 (minimum) |
 | 8 | Front-end cleanup and verification | parser goldens pass on both engines | 6 |
 | 9 | bjson + image writer in wyrm | `hello.wyc` written from wyrm, byte-identical | 7, 8 |
 | 10 | Compiler port | corpus compiled by wyrm; self-compile fixed point | 9 |
 | 11 | Bootstrap integration | `wyrm script.wy` with no Python | 10 |
+| 12 | Dispatch performance: inline cache, slot dict | measured method-call speedup over epic 6's baseline | 11 |
 
 Epic 7 can start any time after epic 3 on the C side and after epic 1 on the pypoc side;
-it is placed after 6 so Phase A stays focused. Epic 8 can run in parallel with 6.
+it is placed after 6 so Phase A stays focused. Epic 8 can run in parallel with 6. Epic 12
+runs last, after epic 11, once the dispatch/class code it optimises has stopped moving
+(it was originally scoped into epic 6 as M3; see epic_6.md's opening note and epic_12.md).
 
 ## Epic protocol
 
@@ -74,7 +80,7 @@ Every epic runs as: **scan → execute → report**.
 | Work | Model | Why |
 |---|---|---|
 | Scan, milestone re-cutting, report | Opus | judgement across many files; delegates reading to Explore subagents |
-| Design-heavy milestones: E2 frame model + loop, E4 dispatch and `super`, E5 coroutines + linking, E6 caches + API, E10 compiler architecture | Opus | first-of-kind decisions with no reference implementation |
+| Design-heavy milestones: E2 frame model + loop, E4 dispatch and `super`, E5 coroutines + linking, E10 compiler architecture, E12 inline cache | Opus | first-of-kind decisions with no reference implementation |
 | Spec-driven work: loader sections, BSON strictness, opcode handlers once the loop exists, builtins, corpus script, doctests, `bytes` methods, bjson port, docs, parser fixes | Sonnet | the contract is written down; correctness is checked by running the corpus |
 | Fan-out inside a milestone: opcode groups, builtin families, one fixture per agent, one sample per agent | Sonnet subagents, 2–3 at once, disjoint files, each with its own acceptance command | independent and testable in isolation |
 

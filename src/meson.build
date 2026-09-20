@@ -17,6 +17,7 @@ cwyrm_sources = files(
     'bound_msg.c',
     'bytes.c',
     'context.c',
+    'coroutine.c',
     'dispatch.c',
     'error.c',
     'fiber.c',

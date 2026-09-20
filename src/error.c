@@ -13,6 +13,7 @@ wy_error wy_error_obj_new(wy_context* context, wy_class* cls, wy_string* what, w
     wy_error_obj* self = wy_context_gc_alloc(context, sizeof(wy_error_obj));
     if (self == WY_NULL) { return WY_ERR_NOMEM; }
 
+    self->code = WY_ERR_NONE;
     self->cls = cls;
     self->what = what;
     self->payload = payload;

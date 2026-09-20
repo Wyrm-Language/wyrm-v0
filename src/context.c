@@ -40,8 +40,14 @@ void wy_context_init_s(wy_context* self)
 {
     self->parent = WY_NULL;
     self->root_module = WY_NULL;
+    self->import_hook = WY_NULL;
+    self->import_ud = WY_NULL;
     self->builtins = WY_NULL;
     self->error_class = WY_NULL;
+    self->stop_iteration_class = WY_NULL;
+    self->fiber_list = WY_NULL;
+    self->co_stack_len = WY_CONTEXT_CO_STACK_LEN_DEFAULT;
+    self->co_frame_count = WY_CONTEXT_CO_FRAME_COUNT_DEFAULT;
     self->current_fiber = WY_NULL;
     self->main_loop = WY_NULL;
     self->wakeable_source = wy_primitive_null();
@@ -185,12 +191,22 @@ wy_error wy_context_exec(wy_context* self)
 }
 
 
+/**
+ * Attach a root/independent fiber (the host's main fiber, or a golden-test
+ * fixture's) and link it onto context->fiber_list - the permanent GC root
+ * set design_c_vm.md §3 calls "the context's fiber list". A coroutine's own
+ * private fiber (src/vm.c's WY_OP_CALL coroutine-construction branch) is
+ * never attached this way: it stays reachable only through its owning
+ * wy_coroutine, so an abandoned suspended coroutine can be collected.
+ */
 wy_error wy_context_attach_fiber(wy_context* self, wy_fiber* fiber)
 {
     if (self == WY_NULL || fiber == WY_NULL) { return WY_ERR_INVAL; }
     if (fiber->parent != WY_NULL) { return WY_ERR_BUSY; }
     self->current_fiber = fiber;
     fiber->parent = self;
+    fiber->next_fiber = self->fiber_list;
+    self->fiber_list = fiber;
     return WY_ERR_NONE;
 }
 
@@ -275,6 +291,16 @@ void wy_context_gc_full_run(wy_context* context)
     context->gc_abandoned = false;
     wy_gc_collect_start_f(context, &context->arena);
 
+    /* Root/independent fibers (design_c_vm.md §3) are always reachable;
+     * the currently-running fiber is visited too even when it's a
+     * coroutine's own private fiber not on that list, so a GC safepoint hit
+     * mid-coroutine-body doesn't collect the fiber it's executing on. A
+     * *suspended* coroutine fiber is neither current nor on fiber_list, so
+     * it survives only via its owning wy_coroutine - the abandoned-coroutine
+     * collection the epic's GC-stress test exercises. */
+    for (wy_fiber* f = context->fiber_list; f != WY_NULL; f = f->next_fiber) {
+        wy_gc_object_visit(context, (wy_object*) f);
+    }
     if (context->current_fiber != WY_NULL) {
         wy_gc_object_visit(context, (wy_object*) context->current_fiber);
     }

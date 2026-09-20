@@ -11,9 +11,8 @@ WY_BEGIN_DECLS
 /**
  * A module's lifecycle state (wyc-format.md §7.1).
  *
- * Epic 1 only ever produces WY_MODULE_LOADED (steps 1-5; nothing executes).
- * INITIALISING/READY/FAILED belong to step 6 (epic 2); BUILTIN marks the
- * synthetic builtins module (epic 2).
+ * Loading produces LOADED; published init frames transition through
+ * INITIALISING to READY or FAILED. BUILTIN needs no init.
  */
 typedef enum wy_module_state
 {
@@ -112,8 +111,8 @@ typedef struct wy_message_ref
 } wy_message_ref;
 
 /**
- * A layer-2 `import mod::*` fill source (wyc-format.md §7.2). Always empty
- * before epic 2, which is the first thing that runs an `import_star`.
+ * A layer-2 `import mod::*` fill source (wyc-format.md §7.2).
+ * The module owns the copied except-symbol array.
  */
 typedef struct wy_wildcard
 {
@@ -128,14 +127,16 @@ extern const wy_object_type wy_module_type;
  * A loaded `.wyc` module (design_c_vm.md §5).
  *
  * Populated by wy_module_load_image/wy_module_load_bytes through load steps
- * 1-5 of wyc-format.md §7.1: header, slot_defaults, symbols, tables. Step 6
- * (publish + run init) and the three-layer fill (§7.2) are epic 2.
+ * 1-5 of wyc-format.md §7.1: header, slot_defaults, symbols, tables and
+ * builtin fill. Step 6 publishes the module before running its init.
  */
 struct wy_module
 {
     wy_object head;
     wy_symbol name;
     wy_module_state state;
+    wy_string* import_path;    /**< full cache key, without symbol truncation */
+    wy_function_proto init_proto; /**< stable prototype for inline init frames */
 
     const wy_u8* image;    /**< the whole file this module was loaded from */
     wy_uword image_len;
@@ -147,8 +148,8 @@ struct wy_module
 
     wy_value* globals;      /**< global_count entries, all Unset until slot_defaults/init */
     wy_uword global_count;
-    wy_u8* fill_layer;       /**< global_count entries: which §7.2 layer filled each slot, 0 = unfilled */
-    wy_symbol* fill_source;  /**< global_count entries: the layer-2 source spelling, for ambiguity faults */
+    wy_u8* fill_layer;       /**< global_count entries: winning §7.2 layer; 0 = unfilled, high bit = ambiguity */
+    wy_symbol* fill_source;  /**< global_count entries: winning source spelling, for ambiguity faults */
 
     wy_value* statics;
     wy_uword static_count;
@@ -170,7 +171,7 @@ struct wy_module
     wy_slot_dict free_names;   /**< name -> global slot, every name this module reads but doesn't define */
     wy_dict* message_table;    /**< NULL until epic 4 */
 
-    wy_wildcard* wildcards;    /**< always empty before epic 2 */
+    wy_wildcard* wildcards;    /**< registered wildcard namespaces */
     wy_uword wildcard_count;
 };
 
@@ -185,9 +186,8 @@ wy_module* wy_module_new_f(wy_context* context);
 /**
  * Load steps 1-5 of wyc-format.md §7.1 from an already-parsed container.
  *
- * Executes nothing (init does not run; that is step 6, epic 2) and does not
- * fill free slots from builtins (also epic 2). Every table index is
- * bounds-checked against the table it indexes.
+ * Executes nothing; fills free slots from context->builtins when installed.
+ * Every table index is bounds-checked against the table it indexes.
  *
  * `image` must outlive the returned module: every pointer the module holds
  * into section payloads (code, string data before it is copied, etc.)
@@ -208,7 +208,9 @@ wy_error wy_module_load_bytes(wy_context* context, const wy_u8* data, wy_uword l
 /**
  * Load step 6 (wyc-format.md §7.1): run the module's top-level init code -
  * word offset 0 of `code`, a zero-argument, zero-capture call with
- * `nlocals = init_nlocals` - synchronously via wy_vm_call_sync.
+ * `nlocals = init_nlocals` - synchronously via wy_vm_call_sync. Host entry
+ * only: VM imports push init frames inline. READY/BUILTIN is a no-op;
+ * INITIALISING returns CYCLE and FAILED returns LINK.
  *
  * On success sets `module->state = WY_MODULE_READY`; on a fault sets it to
  * WY_MODULE_FAILED (the fault value is left on `context->current_fiber->fault`

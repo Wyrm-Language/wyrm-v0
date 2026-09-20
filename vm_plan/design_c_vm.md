@@ -390,7 +390,8 @@ src/test/fixtures/packed_ops.h
 | M5 | Classes + messages | class rework, instances, slots/attrs, virtual slots, construct-on-call, identities, msg/msg_va/getmsg/reg_msg/super, dunder hooks | goldens; ranking + 3-deep super unit tests | classes, messages |
 | M6 | Modules + linking | import/import_star inline init frames, hook + `-I`, three-layer fill, cycle detection, getscope/setscope | two_module (with `-I`), wildcard; a↔b cycle → `WY_ERR_CYCLE` | two_module, wildcard |
 | M7 | Coroutines | coroutine object, per-coroutine fiber, switch loop, yield/yield_from, next/send, StopIteration, GC | golden coroutines; abandon suspended coroutine → no leak | coroutines |
-| M8 | Host API + hardening | `wy_vm_call_continue`, bridge tests, packed entry helper, GC-stress CI, gcc/clang/tcc, docs | full `meson test` green on 3 compilers | all |
+| M8 | Host API + hardening | `wy_vm_call_continue`, bridge tests, packed entry helper, GC-stress CI, gcc/clang, docs | full `meson test` green on 2 compilers | all |
+| M9 | Dispatch performance (epic 12, post-Phase-C) | per-site message inline cache, per-class slot dict | measured method-call speedup over M8-era baseline, no corpus regression | all |
 
 ## 11 File list
 
