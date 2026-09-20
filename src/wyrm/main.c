@@ -1,5 +1,6 @@
 #include <wyrm.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -19,7 +20,7 @@
 #include <wyrm/platform/hosted/import_fs.h>
 #include <wyrm/platform/hosted/expand_native.h>
 #include "../embed/std/io_native.h"
-#include "repl.h"
+#include <wyrm/host.h>
 #include <wyrm/slot.h>
 #include <wyrm/string.h>
 #include <wyrm/vm.h>
@@ -147,174 +148,6 @@ static bool ends_with_(const char* text, const char* suffix)
     size_t text_len = strlen(text);
     size_t suffix_len = strlen(suffix);
     return text_len >= suffix_len && memcmp(text + text_len - suffix_len, suffix, suffix_len) == 0;
-}
-
-/**
- * Epic 11 M2/M3: run the embedded compiler's `compile_source` on
- * `compile_ctx` - the builtin table's wyrm::tools::compile_source, never a
- * filesystem lookup (that path would need the compiler to compile itself) -
- * and answer the fresh container bytes, allocated on `compile_ctx`. On
- * failure `*msg` names it for the CLI's error line (it points into the
- * context, so print before destroying anything).
- */
-static wy_error compile_source_bytes_(wy_context* compile_ctx,
-    const char* path, const wy_u8* source, wy_uword source_len,
-    wy_u8** out_bytes, wy_uword* out_len, const char** msg)
-{
-    static const char host_name[] = "wyrm::tools::compile_source";
-    wy_error err = WY_ERR_NONE;
-
-    wy_string* host_path = WY_NULL;
-    err = wy_string_new(compile_ctx, host_name, sizeof(host_name) - 1, &host_path);
-    if (err != WY_ERR_NONE) { return err; }
-    wy_module* host = WY_NULL;
-    err = wy_link_import(compile_ctx, host_path, &host);
-    if (err != WY_ERR_NONE) { *msg = "cannot load the embedded compiler"; return err; }
-    if (host->state == WY_MODULE_LOADED) {
-        err = wy_module_run_init(compile_ctx, host);
-        if (err != WY_ERR_NONE) {
-            wy_value fault = compile_ctx->current_fiber->fault;
-            *msg = (wy_value_is_error(fault) && fault.data.gc_object != WY_NULL &&
-                    ((wy_error_obj*) fault.data.gc_object)->what != WY_NULL)
-                ? ((wy_error_obj*) fault.data.gc_object)->what->str
-                : "the embedded compiler failed to initialise";
-            return err;
-        }
-    }
-
-    wy_symbol fn_sym = WY_NULL;
-    err = wy_context_intern(compile_ctx, "compile_source", sizeof("compile_source") - 1, &fn_sym);
-    if (err != WY_ERR_NONE) { return err; }
-    wy_value* fn_slot = WY_NULL;
-    err = wy_link_scope_member(wy_value_object(WY_TYPE_TAG_MODULE, (wy_object*) host), fn_sym, &fn_slot);
-    if (err != WY_ERR_NONE || fn_slot == WY_NULL) { *msg = "the embedded compiler has no compile_source"; return WY_ERR_UNBOUND; }
-
-    /* The module name is the entry's basename without .wy (compiler_main's
-     * naming); the module still runs as __main__. */
-    const char* base = strrchr(path, '/');
-    base = (base != WY_NULL) ? base + 1 : path;
-    size_t base_len = strlen(base);
-    if (base_len > 3 && memcmp(base + base_len - 3, ".wy", 3) == 0) { base_len -= 3; }
-
-    wy_string* src_str = WY_NULL;
-    wy_string* name_str = WY_NULL;
-    wy_string* path_str = WY_NULL;
-    err = wy_string_new(compile_ctx, (const char*) source, source_len, &src_str);
-    if (err == WY_ERR_NONE) { err = wy_string_new(compile_ctx, base, base_len, &name_str); }
-    if (err == WY_ERR_NONE) { err = wy_string_new(compile_ctx, path, strlen(path), &path_str); }
-    if (err != WY_ERR_NONE) { return err; }
-
-    wy_value args[3] = {
-        wy_value_object(WY_TYPE_TAG_STR, (wy_object*) src_str),
-        wy_value_object(WY_TYPE_TAG_STR, (wy_object*) name_str),
-        wy_value_object(WY_TYPE_TAG_STR, (wy_object*) path_str),
-    };
-    wy_value result = wy_value_nil();
-    if (wy_context_root_push_f(compile_ctx, &result) != WY_ERR_NONE) { return WY_ERR_NOMEM; }
-
-    err = wy_vm_call_sync(compile_ctx, *fn_slot, args, 3, &result, 1);
-    if (err != WY_ERR_NONE) {
-        wy_value fault = compile_ctx->current_fiber->fault;
-        *msg = (wy_value_is_error(fault) && fault.data.gc_object != WY_NULL &&
-                ((wy_error_obj*) fault.data.gc_object)->what != WY_NULL)
-            ? ((wy_error_obj*) fault.data.gc_object)->what->str : "compile fault";
-        wy_context_root_pop_f(compile_ctx);
-        return err;
-    }
-    if (wy_value_is_error(result)) {
-        wy_error_obj* failure = (wy_error_obj*) result.data.gc_object;
-        *msg = (failure != WY_NULL && failure->what != WY_NULL) ? failure->what->str : "compile failed";
-        wy_context_root_pop_f(compile_ctx);
-        return WY_ERR_FAULT;
-    }
-    if (result.type != WY_TYPE_TAG_BYTES) {
-        *msg = "the embedded compiler returned no image";
-        wy_context_root_pop_f(compile_ctx);
-        return WY_ERR_IMAGE;
-    }
-
-    /* Copy the container out of the wy_bytes value (which stops being
-     * rooted below). */
-    wy_bytes* blob = (wy_bytes*) result.data.gc_object;
-    *out_bytes = (wy_u8*) wy_context_gc_alloc(compile_ctx, blob->len);
-    if (*out_bytes == WY_NULL) { wy_context_root_pop_f(compile_ctx); return WY_ERR_NOMEM; }
-    wy_memcpy(*out_bytes, blob->data, blob->len);
-    *out_len = blob->len;
-    wy_context_root_pop_f(compile_ctx);
-    return WY_ERR_NONE;
-}
-
-static wy_import_fs_search_path* compile_shim_search_ = WY_NULL;
-static wy_uword compile_scratch_depth_ = 0;
-
-/**
- * The import hook's compile fn (epic 11 M3): the requesting VM is
- * suspended mid-import, so the compiler runs on an independent scratch
- * machine - the no-recursion rule forbids calling back into the
- * requester's execution (the same shape as std::expand's throwaway VM).
- * The scratch context shares the search path (builtin table, roots,
- * cache config), so its own imports resolve exactly like the CLI's.
- * The depth guard bounds .wy import cycles at compile time (a imports b
- * imports a would otherwise nest machines forever); each level's VM loop
- * nests on the C stack, so the cap is also a stack guard.
- */
-#define WY_MAIN_MAX_COMPILE_DEPTH 8
-
-static wy_error compile_on_scratch_(void* ud, wy_context* requester, const char* source_path,
-    const wy_u8* source, wy_uword source_len, wy_u8** out_bytes, wy_uword* out_len, const char** msg)
-{
-    WY_UNUSED(ud);
-    if (compile_scratch_depth_ >= WY_MAIN_MAX_COMPILE_DEPTH) {
-        *msg = "import cycle while compiling .wy sources";
-        return WY_ERR_CYCLE;
-    }
-    compile_scratch_depth_ += 1;
-    wy_machine* machine = wy_cmachine_new();
-    if (machine == WY_NULL) { *msg = "out of memory creating the compile machine"; return WY_ERR_NOMEM; }
-    wy_error err = WY_ERR_NONE;
-    wy_context* ctx = WY_NULL;
-    wy_u8* blob = WY_NULL;
-    wy_uword blob_len = 0;
-
-    ctx = wy_cmachine_context_new(machine);
-    if (ctx == WY_NULL) { *msg = "out of memory creating the compile context"; err = WY_ERR_NOMEM; goto done; }
-    wy_fiber* fiber = wy_fiber_create(ctx, WY_MAIN_STACK_LEN, WY_MAIN_FRAME_COUNT);
-    if (fiber == WY_NULL || wy_context_attach_fiber(ctx, fiber) != WY_ERR_NONE) {
-        *msg = "out of memory creating the compile fiber"; err = WY_ERR_NOMEM; goto done;
-    }
-    ctx->import_hook = wy_import_fs_hook;
-    ctx->import_ud = compile_shim_search_;
-
-    wy_module* builtins = WY_NULL;
-    err = wy_builtins_new(ctx, &builtins);
-    if (err == WY_ERR_NONE) {
-        ctx->builtins = builtins;
-        /* std package + std::expand: compile_source imports the decorator
-         * expander (wyrm::compiler::expansion), whose imports need both.
-         * The std::io natives too: build_bc writes its artifacts through the
-         * embedded std::io, which is written over them. This is
-         * the compile worker, not the security boundary - an expansion
-         * child spawned for decorators installs its own minimal module
-         * set and stays io-free (D10). */
-        err = wy_io_natives_install(ctx);
-        if (err == WY_ERR_NONE) { err = wy_expand_module_install(ctx); }
-    }
-    if (err != WY_ERR_NONE) { *msg = "cannot initialise the compile machine"; goto done; }
-
-    err = compile_source_bytes_(ctx, source_path, source, source_len, &blob, &blob_len, msg);
-    if (err != WY_ERR_NONE) { goto done; }
-
-    /* Copy out of the scratch heap (destroyed below) into the requester. */
-    *out_bytes = (wy_u8*) wy_context_gc_alloc(requester, blob_len);
-    if (*out_bytes == WY_NULL) { *msg = "out of memory"; err = WY_ERR_NOMEM; goto done; }
-    wy_memcpy(*out_bytes, blob, blob_len);
-    *out_len = blob_len;
-
-done:
-    compile_scratch_depth_ -= 1;
-    if (ctx != WY_NULL) { wy_cmachine_context_destroy(ctx); }
-    if (machine != WY_NULL) { (void) wy_cmachine_destroy_residual(machine); }
-    return err;
 }
 
 /** The entry's basename without .wy - the compiler's module name. */
@@ -560,6 +393,32 @@ int main(int argc, char** argv)
         return 2;
     }
 
+    if (want_repl) {
+        /* `-i`: the whole interactive loop is libwyrmhost's (wy_host_repl). */
+        wy_host_config host_config;
+        wy_host_config_default(&host_config);
+        host_config.include_paths = include_paths;
+        host_config.include_count = include_count;
+        host_config.cache_dir = cache_dir_arg;
+        host_config.verbose = want_verbose;
+        /* WYRM_SESSION_CODE_WORDS overrides the session's code reservation
+         * (32-bit words; default 4 Mi = 16 MiB), mostly for tests. */
+        const char* words_text = getenv("WYRM_SESSION_CODE_WORDS");
+        if (words_text != WY_NULL) {
+            char* end = WY_NULL;
+            unsigned long words = strtoul(words_text, &end, 10);
+            if (end != words_text && *end == '\0' && words > 0) { host_config.code_words = (wy_uword) words; }
+        }
+        wy_host* host = WY_NULL;
+        if (wy_host_new(&host_config, &host) != WY_ERR_NONE) {
+            fprintf(stderr, "wyrm: failed to create the interpreter\n");
+            return 1;
+        }
+        int status = wy_host_repl(host, stdin, isatty(STDIN_FILENO) != 0);
+        wy_host_free(host);
+        return status;
+    }
+
     wy_machine* machine = wy_cmachine_new();
     if (machine == WY_NULL) {
         fprintf(stderr, "wyrm: failed to create machine\n");
@@ -622,8 +481,8 @@ int main(int argc, char** argv)
             return 1;
         }
     }
-    compile_shim_search_ = &search_path;
-    search_path.compile = compile_on_scratch_;
+    search_path.compile = wy_host_compile_on_scratch_;
+    search_path.compile_ud = &search_path;
     context->import_hook = wy_import_fs_hook;
     context->import_ud = &search_path;
 
@@ -657,8 +516,6 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (want_repl) { return wyrm_repl(context, isatty(STDIN_FILENO) != 0); }
-
     wy_module* module = WY_NULL;
     wy_error last_error = WY_ERR_NONE;
 
@@ -691,7 +548,7 @@ int main(int argc, char** argv)
             const char* compile_msg = WY_NULL;
             wy_u8* blob = WY_NULL;
             wy_uword blob_len = 0;
-            last_error = compile_source_bytes_(context, file_path, file_content, file_size, &blob, &blob_len, &compile_msg);
+            last_error = wy_host_compile_source_bytes_(context, file_path, file_content, file_size, &blob, &blob_len, &compile_msg);
             if (last_error == WY_ERR_NONE) {
                 last_error = wy_module_load_bytes(context, blob, blob_len, true, &module);
                 if (last_error != WY_ERR_NONE) { compile_msg = WY_NULL; }
@@ -782,7 +639,7 @@ int main(int argc, char** argv)
                 const char* compile_msg = WY_NULL;
                 wy_u8* blob = WY_NULL;
                 wy_uword blob_len = 0;
-                last_error = compile_source_bytes_(context, file_path, file_content, file_size, &blob, &blob_len, &compile_msg);
+                last_error = wy_host_compile_source_bytes_(context, file_path, file_content, file_size, &blob, &blob_len, &compile_msg);
                 if (last_error != WY_ERR_NONE) {
                     if (compile_msg != WY_NULL) {
                         fprintf(stderr, "wyrm: %s: %s\n", file_path, compile_msg);

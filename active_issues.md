@@ -131,3 +131,21 @@ regen.
   Blocked on the parser reporting a position (the existing parse-failure item above).
 - **`definitions` (`foo::$ast`) keeps the first definition** of a name across inputs; a redefined
   function's `$ast` is stale.
+
+## Embedding API (libwyrmhost) gaps
+
+`doc/embedding.md` covers eval, scripts, variables and the REPL. Not there yet:
+
+- **Registering C functions** callable from wyrm code (the natives machinery exists in the core
+  API, but there is no `wy_host_register(name, fn)` convenience).
+- **Calling a wyrm function with C arguments** directly; today you evaluate a call expression
+  (`wy_host_eval(host, "scale(14)", &v)`), which needs the arguments spelled as source or set as
+  variables first.
+- **Typed access to lists, dictionaries and objects** (`wy_host_get` gives the raw `wy_value`).
+- **Static linking:** only the shared `libwyrmhost` is exercised; a static build has not been
+  tried (the `$ORIGIN` install rpath is shared-library specific).
+- **Thread safety:** a host is single-threaded, and the scratch compile hook keeps a
+  process-global nesting counter (bounds `.wy` import cycles), so concurrent hosts on different
+  threads are not supported.
+- A script loaded with `wy_host_load_file` shares the session's namespace; there is no isolated
+  "run this file as its own program" call (`wyrm script.wy` still is that).

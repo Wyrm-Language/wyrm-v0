@@ -15,6 +15,7 @@ test_cwyrm_sources = files(
     'test_link.cpp',
     'test_machine.cpp',
     'test_module.cpp',
+    'test_host.cpp',
     'test_session.cpp',
     'test_session_compile.cpp',
     'test_slot.cpp',
@@ -62,12 +63,12 @@ hello_1_c = custom_target('hello_1_c',
               '--emit', 'c', '@INPUT@'],
 )
 
-test_cwyrm_embedded_sources = [hello_1_c] + embed_sources
+test_cwyrm_embedded_sources = [hello_1_c]
 
 test_cwyrm_exe = executable('test_cwyrm',
     test_cwyrm_sources + extra_test_sources + test_cwyrm_embedded_sources,
     include_directories: [cwyrm_lib_inc, embed_inc] + extra_test_inc,
-    dependencies: [doctest_dep, wyrmxx_lib_dep] + extra_test_deps,
+    dependencies: [doctest_dep, wyrmxx_lib_dep, wyrm_host_dep] + extra_test_deps,
     link_with: [cwyrm_lib, wyrmxx_lib],
     cpp_args: [
         '-DWY_TEST_DEST_INCLUDE_DIR="' + project_root / 'include' / 'wyrm' + '"',

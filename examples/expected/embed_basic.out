@@ -1,0 +1,6 @@
+area = 1000
+describe() = 1000 square cm
+area is now 250
+compile error: syntax error: the input could not be parsed
+run-time fault: unbound global 'no_such_function'
+still works: 250 square cm

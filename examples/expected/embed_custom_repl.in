@@ -1,0 +1,11 @@
+turn
+turn + 10
+fn add(a, b):
+    return a + b
+
+add(turn, 100)
+zero := 0
+1 +* 2
+undefined_thing()
+"text"
+exit

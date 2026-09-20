@@ -1,12 +1,9 @@
-# Epic 11 M1: the builtin module table (embedded compiler + library images)
-# is tool payload, not libcwyrm payload: the generated sources are checked in
-# under ../embed/ (each `<module>.c` beside its `<module>.wy`; see
-# ../embed/meson.build for the source list, which also carries the natives
-# like std/io_native.c) and compiled into the wyrm executable (and into
-# test_cwyrm) only.
+# The executable is a thin front end: the embedded compiler and library images
+# (../embed), the std::io natives, the scratch compile hook and the REPL all live
+# in libwyrmhost (../host), which every embedder links too.
 wyrm_exe = executable('wyrm',
-    files('main.c', 'repl.c'), embed_sources,
-    dependencies: [cwyrm_lib_dep],
+    files('main.c'),
+    dependencies: [wyrm_host_dep],
     install: true,
 )
 

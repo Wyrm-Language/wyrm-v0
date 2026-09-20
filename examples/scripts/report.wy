@@ -1,0 +1,11 @@
+# A script an application might ship: it reads variables the host set before loading
+# (`limit`, `factor`), computes, and leaves results and functions for the host.
+
+import stats
+
+data := [3, 8, 5, 12, 7]
+above := stats::count_above(data, limit)
+summary := "limit " + str(limit) + ": " + str(above) + " of " + str(len(data)) + " above"
+
+fn scale(n):
+    return n * factor

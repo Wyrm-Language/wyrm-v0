@@ -1,0 +1,9 @@
+# A small module a script can import: examples/scripts is an import root because
+# wy_host_load_file adds the loaded script's directory.
+
+fn count_above(items, limit):
+    n := 0
+    for item in items:
+        if item > limit:
+            n = n + 1
+    return n

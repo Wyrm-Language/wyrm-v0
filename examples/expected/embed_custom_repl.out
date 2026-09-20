@@ -1,0 +1,8 @@
+wy> => 1
+wy> => 12
+wy>   ..   .. wy> => 104
+wy> wy> error: syntax error: the input could not be parsed
+wy> fault: unbound global 'undefined_thing'
+wy> => text
+wy> 
+bye after 8 inputs

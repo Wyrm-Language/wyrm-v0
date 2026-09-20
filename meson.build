@@ -10,6 +10,10 @@ project('wyrm', 'c', 'cpp',
 
 subdir('src')
 
+if get_option('hosted') and not get_option('wyrm').disabled()
+    subdir('examples')
+endif
+
 # Epic 8 M5: run every test/wy/*.wy under an external wyrm ($WYRM/$WYRM_FLAGS,
 # else pypoc's venv wyrm, else `wyrm` on PATH; see scripts/wytest_env.py) -
 # the self-hosted front-end tests (parser/tokenizer/DSL macro suite written in

@@ -78,6 +78,9 @@ Tests check behavior, plus our own compiler's self-consistency:
   stage0 with `python3 scripts/regen_builtins.py` and commit.
 - `wy-tests`, `scripts/check_parser_truth.py`: run under the external wyrm.
 
+- `examples` (`scripts/check_examples.sh`): the embedding examples in `examples/` run and
+  compared with `examples/expected/`; the library they use is `libwyrmhost` (`include/wyrm/host.h`,
+  guide in `doc/embedding.md`), covered by the `host` suite in `test_cwyrm`.
 - `wy-repl` (`scripts/check_wy_repl.sh`; user guide in `doc/repl.md`): the interactive loop, `wyrm -i`, driven by piped
   transcripts in `test/corpus/repl` (local only; not cross-checked against any other wyrm). The
   session-compile suites in `test_cwyrm` cover the compiler side (see `doc/repl-plan.md`); the

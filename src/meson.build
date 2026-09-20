@@ -145,6 +145,10 @@ pkgconfig.generate(cwyrm_lib,
 
 subdir('embed')
 
+if get_option('hosted')
+    subdir('host')
+endif
+
 if not wy_opt.disabled()
     subdir('wyrm')
 endif

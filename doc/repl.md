@@ -89,6 +89,12 @@ syntax errors with a location, and decorators defined in the same session (decor
 come from `-I` roots or the embedded library, because expansion runs in an isolated VM).
 See `active_issues.md`.
 
+## As a library
+
+Everything here is available to your own programs: `wy_host_repl` is this loop over any
+`FILE*`, and `wy_host_eval` / `wy_host_needs_more` are its pieces. See
+[embedding.md](embedding.md) and `examples/embed_repl.c`.
+
 ## How it works
 
 See `doc/repl-plan.md` for the design and `doc/vm_impl.md` ("Session modules") for the
