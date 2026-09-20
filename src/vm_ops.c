@@ -75,6 +75,21 @@ static wy_error compare_f(wy_context* ctx, wy_value lhs, wy_value rhs, int* out_
         *out_cmp = (int) lhs.data.flag - (int) rhs.data.flag;
         return WY_ERR_NONE;
     }
+    if (lhs.type == WY_TYPE_TAG_NIL && rhs.type == WY_TYPE_TAG_NIL) {
+        /* nil is a singleton; two nils are always equal. Previously missing
+         * here entirely, so `nil == nil` fell through to the "not
+         * comparable" default and WY_OP_EQ's own not-comparable fallback
+         * (always false) - `nil is nil` worked (a separate code path,
+         * wy_vm_is_f) which is why this went unnoticed until epic 9 hit it. */
+        *out_cmp = 0;
+        return WY_ERR_NONE;
+    }
+    if (lhs.type == WY_TYPE_TAG_SYMBOL && rhs.type == WY_TYPE_TAG_SYMBOL) {
+        /* Interned, so pointer identity is content equality. Same missing-
+         * case bug as nil above - 'foo == 'foo was also always false. */
+        *out_cmp = (lhs.data.symtab_entry == rhs.data.symtab_entry) ? 0 : 1;
+        return WY_ERR_NONE;
+    }
     if (lhs.type == WY_TYPE_TAG_BYTES && rhs.type == WY_TYPE_TAG_BYTES) {
         /* doc/stdlib.md: `==` is byte-for-byte. Ordering (<, cmp3, ...) is
          * not spec'd for bytes; a lexicographic compare (shared prefix,
@@ -210,6 +225,12 @@ wy_error wy_vm_is_f(wy_context* ctx, wy_value value, wy_value type_operand, wy_v
             match = value.type == WY_TYPE_TAG_TABLE;
         } else if (wy_strncmp_f(name->str, "pair", name->len) == 0 && name->len == 4) {
             match = value.type == WY_TYPE_TAG_PAIR;
+        } else if (wy_strncmp_f(name->str, "bytes", name->len) == 0 && name->len == 5) {
+            /* epic 7 added the bytes primitive type and epic 9's M1 found
+             * this was missing here: `x is bytes` compiled fine (pypoc's
+             * own primitive-type table already lists "bytes") but faulted
+             * "unknown primitive type name" at runtime on the C VM. */
+            match = value.type == WY_TYPE_TAG_BYTES;
         } else {
             return make_error_value_f(ctx, "unknown primitive type name", out);
         }

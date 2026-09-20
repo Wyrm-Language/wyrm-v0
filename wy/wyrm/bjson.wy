@@ -1,0 +1,386 @@
+# bjson.wy - epic 9 M1
+#
+# Wyrm port of pypoc/wypoc/compiler_bc/bsonlite.py: the pinned 8-tag BSON
+# subset (doc/wyc-format.md section 4) used by the structured module
+# sections. Operates on the `bytes` type (epic 7) instead of Python
+# bytes/bytearray. This file is compiled by pypoc's compiler_bc and run on
+# this repo's C VM (`wyrm`), not on pypoc's tree-walking interpreter - see
+# vm_plan/epic_9.md for why that distinction matters.
+#
+# Value <-> tag mapping (mirrors bsonlite.py exactly):
+#   nil -> null | bool -> bool | int -> int32 | float -> double
+#   str -> string | dict -> document | list -> array | bytes -> binary
+#
+# A BSON *document* is represented in wyrm as a `dict` (insertion-ordered on
+# this repo's C VM - verified empirically: iterating a dict yields keys in
+# the order they were first inserted, backed by an append-only dense array
+# plus a sparse hash index, src/wdict.c/src/iter.c). A BSON *array* is a
+# plain `list`. This choice mirrors bsonlite.py's own dict->document,
+# list->array mapping and lets `_value`'s dispatch use ordinary `is dict` /
+# `is list` checks, exactly like Python's `isinstance(value, dict)` /
+# `isinstance(value, (list, tuple))`.
+#
+# --- Working around gaps found in this repo's compile-to-bytecode-then-
+#     C-VM path while writing this file (none of these are bytes-specific,
+#     so none were "fixed as a first sub-task of M1" per the epic 9 risk
+#     mitigation - that clause is about missing *bytes* methods; these are
+#     general VM/builtin gaps, out of scope here, and are called out in the
+#     M1 report for whoever picks them up):
+#
+#   1. `len(x)` (doc/stdlib.md's "Builtin Functions") is not registered as
+#      a callable global on this repo's C VM - `src/builtin/builtins.c`'s
+#      `leaf_builtins_` table (the exhaustive list of bare-global builtins)
+#      has no "len" entry, confirmed by running a compiled script that
+#      calls it: `wyrm: fault: unbound global 'len'`. Worked around here
+#      with `_bytes_len`, a linear length probe using `catch` (see #3).
+#
+#   2. `x is bytes` is accepted by the compiler (bsonlite's own primitive
+#      type-name table in pypoc includes "bytes") but rejected at runtime
+#      on the C VM: `src/vm_ops.c`'s `wy_vm_is_f` has no "bytes" branch in
+#      its primitive-type-name dispatch, so it hits the `else` case and
+#      returns an "unknown primitive type name" error. Confirmed by running
+#      `println(bytes(3) is bytes)` -> prints `error`. Worked around in
+#      `_value` by elimination-order dispatch: nil, bool, int, float, str,
+#      dict, list are all checked with a working `is`; anything left over
+#      is assumed to be `bytes` (the only remaining representable type),
+#      so `_value` never actually calls `is bytes`. A value that is none of
+#      the above (not even bytes) will hit bytes-only methods in that last
+#      branch and fault instead of producing a clean `error(...)` - a real
+#      but narrow gap versus bsonlite.py's precise error message for that
+#      case. M3 (image.wy) should either keep using this same elimination
+#      order, or get `is bytes` fixed on the C VM first.
+#
+#   3. Out-of-range indexing (`b[i]`) is a *catchable* error (`catch`
+#      intercepts it fine), not an uncatchable fault, despite doc/stdlib.md
+#      calling pack_*/unpack_* range violations "faults" - verified with
+#      `bytes(3)[100] catch -1` -> `-1`. This is what makes the `_bytes_len`
+#      linear-probe workaround for gap #1 possible at all.
+#
+#   4. `nil == nil` (and `!= `) is FALSE on this repo's C VM:
+#      `src/vm_ops.c`'s `compare_f` has no TAG_NIL branch, so nil hits the
+#      "not comparable" path, and `WY_OP_EQ` on non-comparable operands is
+#      hard-coded to `false`. Verified: `println(nil == nil)` -> `false`.
+#      This file never compares anything to `nil` with `==`/`!=`; it always
+#      uses `is nil` (which *is* implemented correctly and was verified
+#      separately) or explicit `if/else` branching instead. Any future wy
+#      code operating on `nil` needs the same discipline until this is
+#      fixed at the VM level.
+#
+# Public API (matches bsonlite.py's names/shapes exactly, except where
+# noted): encode_document(pairs: dict), encode_array(items: list),
+# encode(value), decode_document(data: bytes), decode_array(data: bytes),
+# decode(data: bytes). The internal `_read_*` helpers gain an extra
+# `data_len` parameter versus bsonlite.py, threading the whole buffer's
+# length down from a single `_bytes_len` probe at the top-level decode
+# entry points (gap #1) rather than the my having each recursive call
+# re-derive it.
+
+TAG_DOUBLE := 0x01
+TAG_STRING := 0x02
+TAG_DOCUMENT := 0x03
+TAG_ARRAY := 0x04
+TAG_BINARY := 0x05
+TAG_BOOL := 0x08
+TAG_NULL := 0x0A
+TAG_INT32 := 0x10
+
+PERMITTED_TAGS := [TAG_DOUBLE, TAG_STRING, TAG_DOCUMENT, TAG_ARRAY, TAG_BINARY,
+                   TAG_BOOL, TAG_NULL, TAG_INT32]
+
+INT32_MIN := -(2 ** 31)
+INT32_MAX := (2 ** 31) - 1
+
+
+# --------------------------------------------------------------------------
+# small helper: bytes length probe (gap #1 above)
+
+
+fn _bytes_len(b) -> int:
+    n := 0
+    while true:
+        v := b[n] catch nil
+        if v is nil:
+            break
+        n = n + 1
+    return n
+
+
+# --------------------------------------------------------------------------
+# encoding
+
+
+fn encode_document(pairs: dict) -> bytes | error:
+    elements := []
+    for key in pairs:
+        el := _element(str(key), pairs[key])
+        if el is error:
+            return el
+        elements!append(el)
+    return _frame(elements)
+
+
+fn encode_array(items: list) -> bytes | error:
+    elements := []
+    i := 0
+    for item in items:
+        el := _element(str(i), item)
+        if el is error:
+            return el
+        elements!append(el)
+        i = i + 1
+    return _frame(elements)
+
+
+fn encode(value) -> bytes | error:
+    if value is dict:
+        return encode_document(value)
+    if value is list:
+        return encode_array(value)
+    return error("bsonlite: a section payload must be a document or an array")
+
+
+fn _frame(elements: list) -> bytes:
+    body := bytes(0)
+    for el in elements:
+        body!append(el)
+    total := _bytes_len(body) + 5
+    result := bytes(4)
+    result!pack_i32(0, total)
+    result!append(body)
+    result!append(0)
+    return result
+
+
+fn _element(key: str, value) -> bytes | error:
+    tagged := _value(value)
+    if tagged is error:
+        return tagged
+    tag := tagged[0]
+    payload := tagged[1]
+    cs := _cstring(key)
+    if cs is error:
+        return cs
+    result := bytes(0)
+    result!append(tag)
+    result!append(cs)
+    result!append(payload)
+    return result
+
+
+fn _value(value) -> tuple | error:
+    # nil before bool before int before float before str before dict/list,
+    # matching bsonlite.py's order (its "bool before int" comment doesn't
+    # apply here - wyrm's `bool` and `int` are already distinct types, `is`
+    # can't conflate them, verified: `true is int` -> false). Anything left
+    # after dict/list is assumed to be `bytes` - see gap #2 above.
+    if value is nil:
+        result := (TAG_NULL, bytes(0))
+        return result
+    if value is bool:
+        b := bytes(1)
+        if value:
+            b!pack_u8(0, 1)
+        else:
+            b!pack_u8(0, 0)
+        result := (TAG_BOOL, b)
+        return result
+    if value is int:
+        if value < INT32_MIN or value > INT32_MAX:
+            return error("bsonlite: integer " + str(value) + " does not fit in an int32 element")
+        payload := bytes(4)
+        payload!pack_i32(0, value)
+        result := (TAG_INT32, payload)
+        return result
+    if value is float:
+        payload := bytes(8)
+        payload!pack_f64(0, value)
+        result := (TAG_DOUBLE, payload)
+        return result
+    if value is str:
+        encoded := bytes(value)
+        encoded!append(0)
+        n := _bytes_len(encoded)
+        payload := bytes(4)
+        payload!pack_i32(0, n)
+        payload!append(encoded)
+        result := (TAG_STRING, payload)
+        return result
+    if value is dict:
+        doc := encode_document(value)
+        if doc is error:
+            return doc
+        result := (TAG_DOCUMENT, doc)
+        return result
+    if value is list:
+        arr := encode_array(value)
+        if arr is error:
+            return arr
+        result := (TAG_ARRAY, arr)
+        return result
+    # Last resort: treat as a `bytes` binary payload (gap #2: `is bytes`
+    # itself is not usable here).
+    n := _bytes_len(value)
+    payload := bytes(4)
+    payload!pack_i32(0, n)
+    payload!append(0)
+    payload!append(value)
+    result := (TAG_BINARY, payload)
+    return result
+
+
+fn _cstring(text: str) -> bytes | error:
+    for ch in text:
+        if ch[0] == 0:
+            return error("bsonlite: a key may not contain a NUL byte")
+    encoded := bytes(text)
+    encoded!append(0)
+    return encoded
+
+
+# --------------------------------------------------------------------------
+# decoding
+
+
+fn decode_document(data: bytes) -> dict | error:
+    data_len := _bytes_len(data)
+    r := _read_document(data, 0, data_len)
+    if r is error:
+        return r
+    value := r[0]
+    end := r[1]
+    if end != data_len:
+        return error("bsonlite: " + str(data_len - end) + " trailing byte(s) after the document")
+    return value
+
+
+fn decode_array(data: bytes) -> list | error:
+    document := decode_document(data)
+    if document is error:
+        return document
+    result := []
+    position := 0
+    for key in document:
+        expected := str(position)
+        if key != expected:
+            return error("bsonlite: array element " + str(position) + " has key " + key + ", expected " + expected)
+        result!append(document[key])
+        position = position + 1
+    return result
+
+
+fn decode(data: bytes) -> dict | list | error:
+    document := decode_document(data)
+    if document is error:
+        return document
+    is_array := true
+    position := 0
+    for key in document:
+        if key != str(position):
+            is_array = false
+        position = position + 1
+    if is_array:
+        result := []
+        for key in document:
+            result!append(document[key])
+        return result
+    return document
+
+
+fn _read_document(data: bytes, offset: int, data_len: int) -> tuple | error:
+    if offset + 4 > data_len:
+        return error("bsonlite: truncated document length")
+    total := data!unpack_i32(offset)
+    end := offset + total
+    if total < 5 or end > data_len:
+        return error("bsonlite: bad document length " + str(total))
+    if data[end - 1] != 0:
+        return error("bsonlite: document is not NUL-terminated")
+    result := {}
+    cursor := offset + 4
+    while cursor < end - 1:
+        tag := data[cursor]
+        cursor = cursor + 1
+        r1 := _read_cstring(data, cursor, data_len)
+        if r1 is error:
+            return r1
+        key := r1[0]
+        cursor = r1[1]
+        r2 := _read_value(data, cursor, tag, data_len)
+        if r2 is error:
+            return r2
+        value := r2[0]
+        cursor = r2[1]
+        result[key] = value
+    if cursor != end - 1:
+        return error("bsonlite: element list overruns the document")
+    pair := (result, end)
+    return pair
+
+
+fn _read_value(data: bytes, offset: int, tag: int, data_len: int) -> tuple | error:
+    if not (tag in PERMITTED_TAGS):
+        return error("bsonlite: element type is outside the subset")
+    if tag == TAG_NULL:
+        pair := (nil, offset)
+        return pair
+    if tag == TAG_BOOL:
+        byte := data[offset]
+        if byte != 0 and byte != 1:
+            return error("bsonlite: bool byte is neither 0 nor 1")
+        pair := (byte == 1, offset + 1)
+        return pair
+    if tag == TAG_INT32:
+        value := data!unpack_i32(offset)
+        pair := (value, offset + 4)
+        return pair
+    if tag == TAG_DOUBLE:
+        value := data!unpack_f64(offset)
+        pair := (value, offset + 8)
+        return pair
+    if tag == TAG_STRING:
+        length := data!unpack_i32(offset)
+        body_offset := offset + 4
+        if length < 1 or body_offset + length > data_len:
+            return error("bsonlite: bad string length " + str(length))
+        if data[body_offset + length - 1] != 0:
+            return error("bsonlite: string is not NUL-terminated")
+        chunk := data!slice(body_offset, length - 1)
+        pair := (chunk!to_str(), body_offset + length)
+        return pair
+    if tag == TAG_BINARY:
+        length := data!unpack_i32(offset)
+        subtype := data[offset + 4]
+        if subtype != 0:
+            return error("bsonlite: binary subtype is not 0")
+        start := offset + 5
+        if length < 0 or start + length > data_len:
+            return error("bsonlite: bad binary length " + str(length))
+        chunk := data!slice(start, length)
+        pair := (chunk, start + length)
+        return pair
+    # document / array: both decode as documents; an array is recognized by
+    # its keys, exactly as decode() does at the top level.
+    r := _read_document(data, offset, data_len)
+    if r is error:
+        return r
+    doc := r[0]
+    end := r[1]
+    if tag == TAG_ARRAY:
+        arr := []
+        for key in doc:
+            arr!append(doc[key])
+        pair := (arr, end)
+        return pair
+    pair := (doc, end)
+    return pair
+
+
+fn _read_cstring(data: bytes, offset: int, data_len: int) -> tuple | error:
+    i := offset
+    while i < data_len and data[i] != 0:
+        i = i + 1
+    if i >= data_len:
+        return error("bsonlite: unterminated key")
+    chunk := data!slice(offset, i - offset)
+    pair := (chunk!to_str(), i + 1)
+    return pair

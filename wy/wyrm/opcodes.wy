@@ -1,0 +1,239 @@
+# wyrm bytecode opcodes - GENERATED from wypoc/compiler_bc/opcodes.py.
+#
+# Do not hand-edit: run pypoc/tools/generate_opcode_wy.py after changing
+# the opcode table. doc/llm-bytecode.md section 3 is the prose alongside
+# it.
+#
+# Instruction encoding (section 2), little-endian:
+#
+#   word 0:  [ a0 : u16 ][ f : u8 ][ op : u8 ]
+#   word 1:  [ a1 : u16 ][ a2 : u16 ]
+#
+# Bit 7 of the opcode is the length: op < 0x80 is one word, op >= 0x80
+# is two words.
+#
+# This module carries only what epic 9 needs to *encode* instructions -
+# the data table, lookup, register-reference helpers, and pack() - not a
+# disassembler (deferred; see vm_plan/epic_9.md M2 scope) and not
+# pack_pairable's automatic compact/wide fallback (hand-assembly already
+# knows which form each instruction uses).
+
+LONG_START := 0x80
+P_BIT := 0x8000
+
+CORE := "core"
+PAIRABLE := "pairable"
+LONG := "long"
+
+# Every row carries name/value/form; pairable rows additionally carry
+# shape/wide_name/wide_value (the wide twin's mnemonic and value, or
+# ""/0 on a row that has none).
+OPS := [
+    {"name": "noop", "value": 0x00, "form": "core", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "trap", "value": 0x01, "form": "core", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "return", "value": 0x02, "form": "core", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "lnil", "value": 0x03, "form": "core", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "lbool", "value": 0x04, "form": "core", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "lunset", "value": 0x05, "form": "core", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "i8", "value": 0x40, "form": "pairable", "shape": "imm", "wide_name": "i32", "wide_value": 0xC0},
+    {"name": "move", "value": 0x41, "form": "pairable", "shape": "reg", "wide_name": "move", "wide_value": 0xC1},
+    {"name": "gget", "value": 0x42, "form": "pairable", "shape": "inv", "wide_name": "gget", "wide_value": 0xC2},
+    {"name": "gset", "value": 0x43, "form": "pairable", "shape": "inv", "wide_name": "gset", "wide_value": 0xC3},
+    {"name": "lsym", "value": 0x45, "form": "pairable", "shape": "inv", "wide_name": "lsym", "wide_value": 0xC5},
+    {"name": "lconst", "value": 0x46, "form": "pairable", "shape": "inv", "wide_name": "lconst", "wide_value": 0xC6},
+    {"name": "import", "value": 0x47, "form": "pairable", "shape": "inv", "wide_name": "import", "wide_value": 0xC7},
+    {"name": "neg", "value": 0x48, "form": "pairable", "shape": "reg", "wide_name": "neg", "wide_value": 0xC8},
+    {"name": "inv", "value": 0x49, "form": "pairable", "shape": "reg", "wide_name": "inv", "wide_value": 0xC9},
+    {"name": "not", "value": 0x4A, "form": "pairable", "shape": "reg", "wide_name": "not", "wide_value": 0xCA},
+    {"name": "jf", "value": 0x4B, "form": "pairable", "shape": "jcond", "wide_name": "jf", "wide_value": 0xCB},
+    {"name": "jt", "value": 0x4C, "form": "pairable", "shape": "jcond", "wide_name": "jt", "wide_value": 0xCC},
+    {"name": "jerr", "value": 0x4D, "form": "pairable", "shape": "jcond", "wide_name": "jerr", "wide_value": 0xCD},
+    {"name": "jnerr", "value": 0x4E, "form": "pairable", "shape": "jcond", "wide_name": "jnerr", "wide_value": 0xCE},
+    {"name": "jmp", "value": 0x4F, "form": "pairable", "shape": "jmp", "wide_name": "jmp", "wide_value": 0xCF},
+    {"name": "f32", "value": 0x80, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "tuple", "value": 0x81, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "list", "value": 0x82, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "dict", "value": 0x83, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "plist", "value": 0x84, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "add", "value": 0x85, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "sub", "value": 0x86, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "mul", "value": 0x87, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "div", "value": 0x88, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "mod", "value": 0x89, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "pow", "value": 0x8A, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "band", "value": 0x8B, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "bor", "value": 0x8C, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "shl", "value": 0x8D, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "shr", "value": 0x8E, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "eq", "value": 0x8F, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "ne", "value": 0x90, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "lt", "value": 0x91, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "le", "value": 0x92, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "gt", "value": 0x93, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "ge", "value": 0x94, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "bxor", "value": 0x95, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "in", "value": 0x96, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "is", "value": 0x97, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "getidx", "value": 0x98, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "setidx", "value": 0x99, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "getattr", "value": 0x9A, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "setattr", "value": 0x9B, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "getslot", "value": 0x9C, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "setslot", "value": 0x9D, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "call", "value": 0xA0, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "call_va", "value": 0xA1, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "msg", "value": 0xA2, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "msg_va", "value": 0xA3, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "getmsg", "value": 0xA4, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "super", "value": 0xA5, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "return_cps", "value": 0xA6, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "yield", "value": 0xA7, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "closure", "value": 0xA8, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "class", "value": 0xA9, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "new_instance", "value": 0xAA, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "new_primitive", "value": 0xAB, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "reg_msg", "value": 0xAC, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "defer_reg", "value": 0xAD, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "iter", "value": 0xAE, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "itnext", "value": 0xAF, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "yield_from", "value": 0xB0, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "unpack", "value": 0xB1, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "cmp3", "value": 0xB2, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "getscope", "value": 0xB3, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "setscope", "value": 0xB4, "form": "long", "shape": "", "wide_name": "", "wide_value": 0},
+    {"name": "import_star", "value": 0xB5, "form": "long", "shape": "", "wide_name": "", "wide_value": 0}
+]
+
+# BY_NAME/BY_VALUE index OPS by mnemonic (str) and by opcode value
+# (int), the wide twin of a pairable op included in both, exactly
+# like opcodes.py's BY_NAME/BY_VALUE.
+fn _build_index():
+    by_name := {}
+    by_value := {}
+    for op in OPS:
+        by_name[op["name"]] = op
+        by_value[op["value"]] = op
+        if op["form"] == PAIRABLE:
+            by_value[op["wide_value"]] = op
+            if op["wide_name"] != op["name"]:
+                by_name[op["wide_name"]] = op
+    return by_name, by_value
+
+BY_NAME, BY_VALUE := _build_index()
+
+# `op` is a mnemonic (sym) or an opcode value (int); resolve it to its
+# table entry (a dict, see OPS above).
+fn lookup(op: sym | int) -> dict:
+    var entry: dict | nil
+    if op is sym:
+        entry = BY_NAME[str(op)] catch nil
+    else:
+        entry = BY_VALUE[op] catch nil
+    if entry is nil:
+        return error("unknown opcode " + str(op))
+    return entry
+
+# --------------------------------------------------------------------
+# register references (spec 2.1)
+
+# A u16 register reference naming L`n` (a local or temp). ('slot' is a
+# reserved word in wyrm's own grammar, so the parameter is named `n`.)
+fn L(n: int) -> int:
+    if n < 0 or n > 0x7FFF:
+        return error("L" + str(n) + " is outside the 32767-local frame limit")
+    return n
+
+# A u16 register reference naming P`n` (a this value, param or capture).
+fn P(n: int) -> int:
+    if n < 0 or n > 0x7FFF:
+        return error("P" + str(n) + " is outside the 32767-slot P frame limit")
+    return P_BIT | n
+
+fn is_p(reg: int) -> bool:
+    return (reg & P_BIT) != 0
+
+fn reg_index(reg: int) -> int:
+    return reg & 0x7FFF
+
+fn reg_name(reg: int) -> str:
+    if is_p(reg):
+        return "P" + str(reg_index(reg))
+    return "L" + str(reg_index(reg))
+
+# The 8-bit form of a register reference, or nil when it does not fit.
+#
+# A reg8 addresses L0-L127 (bit 7 clear) or P0-P127 (bit 7 set);
+# anything above that forces the wide form of the instruction.
+fn to_reg8(reg: int) -> int | nil:
+    index := reg_index(reg)
+    if index > 127:
+        return nil
+    if is_p(reg):
+        return 0x80 | index
+    return index
+
+fn from_reg8(byte: int) -> int:
+    if (byte & 0x80) != 0:
+        return P(byte & 0x7F)
+    return L(byte)
+
+fn fits_i8(value: int) -> bool:
+    return value >= -128 and value <= 127
+
+fn fits_i16(value: int) -> bool:
+    return value >= -32768 and value <= 32767
+
+# --------------------------------------------------------------------
+# encoding
+
+fn _check_field(name: str, value: int, low: int, high: int) -> nil:
+    if value < low or value > high:
+        return error(
+            "instruction field " + name + "=" + str(value) + " is outside " + str(low) + ".." + str(high)
+        )
+    return nil
+
+fn _value_for_name(entry: dict, name) -> int:
+    name_str := str(name)
+    if entry["form"] == PAIRABLE and name_str == entry["wide_name"] and entry["wide_name"] != entry["name"]:
+        return entry["wide_value"]
+    return entry["value"]
+
+# Encode one instruction into a list of 1 or 2 u32 words.
+#
+# `op` is a mnemonic or an opcode value; for a pairable op the mnemonic
+# selects the compact form, so callers that want the wide form pass its
+# value (compact | 0x80) or - for i8/i32 - the wide mnemonic. `w1` sets
+# the whole second word (a 32-bit payload) and is mutually exclusive
+# with a1/a2. Unlike opcodes.py's pack(), the words below are not
+# masked with 0xFFFFFFFF: that literal does not fit wyrm's 32-bit
+# `int`, and it is unnecessary - shifting/OR-ing already-range-checked
+# fields, or passing w1 straight through, produces the same 32-bit bit
+# pattern either way; only the printed sign differs, which the VM does
+# not care about.
+fn pack(op, f: int = 0, a0: int = 0, a1: int = 0, a2: int = 0, w1: int | nil = nil) -> list:
+    entry := lookup(op)
+    var value: int
+    if op is int:
+        value = op
+    else:
+        value = _value_for_name(entry, op)
+    _check_field("op", value, 0, 0xFF)
+    _check_field("f", f, 0, 0xFF)
+    _check_field("a0", a0, 0, 0xFFFF)
+    word0 := ((a0 & 0xFFFF) << 16) | ((f & 0xFF) << 8) | value
+    if value < LONG_START:
+        if a1 != 0 or a2 != 0 or w1 is not nil:
+            return error(entry["name"] + ": one-word form has no second word")
+        return [word0]
+    var word1: int
+    if w1 is not nil:
+        if a1 != 0 or a2 != 0:
+            return error(entry["name"] + ": w1 and a1/a2 are alternatives")
+        word1 = w1
+    else:
+        _check_field("a1", a1, 0, 0xFFFF)
+        _check_field("a2", a2, 0, 0xFFFF)
+        word1 = ((a1 & 0xFFFF) << 16) | (a2 & 0xFFFF)
+    return [word0, word1]
+

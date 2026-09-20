@@ -1,0 +1,98 @@
+# wy/wyrm/tools/test_image_driver.wy - epic 9 M3 milestone-verification
+# driver for wy/wyrm/image.wy.
+#
+# NOT wired into any test harness (see wy/wyrm/tools/test_bjson_driver.wy's
+# header comment for why: this compiles under pypoc's compiler_bc and runs
+# on this repo's C VM `wyrm` binary, a different pipeline from the
+# tree-walker `test/wy/*` suite). Hand-builds the `hello` module image from
+# doc/wyc-format.md Appendix A (statics, one function `greet`, the 15 code
+# words, exports, free - all given verbatim in vm_plan/epic_9.md's M3
+# section) via image.wy's constructors and opcodes.wy's `pack()`, then
+# writes `to_wyc()`'s bytes to a file with the C VM's raw `std::io`
+# natives (open/write/close on an int handle - see the import comment
+# below for why, not wy/std/io.wy's `File` class).
+#
+# Run it by hand:
+#
+#   work=$(mktemp -d)
+#   cp wy/wyrm/bjson.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
+#      wy/wyrm/tools/test_image_driver.wy "$work/"
+#   for f in bjson opcodes image test_image_driver; do
+#     pypoc/.venv/bin/wyrm -Iwy -Iwy/wyrm --build-bc "$work/$f.wy"
+#   done
+#   ./buildDir/src/wyrm/wyrm -I"$work" "$work/test_image_driver.wyc"
+#
+#   mkdir -p /tmp/e9_hello_ref
+#   pypoc/.venv/bin/wyrm --build-bc --strip --emit wyc -o /tmp/e9_hello_ref \
+#     pypoc/test/bytecode/hello.wy
+#   cmp /tmp/hello_built.wyc /tmp/e9_hello_ref/hello.wyc
+#
+# `cmp` reporting no difference is this milestone's real acceptance gate.
+#
+# The output path is hardcoded below (OUT_PATH) rather than taken from a
+# CLI argument: this repo's wy scripts have no exposed `argv`-equivalent
+# builtin to read the extra `wyrm file.wyc [args...]` CLI arguments from
+# wy source (checked: no such builtin in doc/stdlib.md, and nothing in
+# src/*.c wires CLI argv into a wy-visible global/builtin).
+
+import bjson::*
+import opcodes::*
+import image::*
+import std::io
+
+# The C VM has no compiled `.wy` corelib (no compiler exists in this repo
+# until epics 9-11 - see test/bytecode/bytes_header/cvm_header.wy's header
+# comment for the precedent), so `std::io` here is raw POSIX natives
+# (open/write/close on an int handle), not wy/std/io.wy's `File` class /
+# `write_bytes_file` helper (those only exist on pypoc's tree-walker).
+
+OUT_PATH := "/tmp/hello_built.wyc"
+
+fn build_hello_image() -> dict:
+    img := make_image("hello", 1, 2, 3)
+    img["statics"] = ["Hello ", "World"]
+    img["functions"] = [make_function("greet", [make_param("name")], 2, 11, 0)]
+    img["exports"] = {"greet": 0}
+    img["free"] = {"println": 1}
+
+    words := []
+    # -- module init (offset 0) --
+    for w in pack("closure"):                                  # A8 00 00 00 00 00 00 00
+        words!append(w)
+    for w in pack("gset", f=0, a0=0):                           # 43 00 00 00      gset g0 <- L0
+        words!append(w)
+    for w in pack("gget", f=0, a0=1):                           # 42 00 01 00      gget L0 <- g1
+        words!append(w)
+    for w in pack("gget", f=1, a0=0):                           # 42 01 00 00      gget L1 <- g0
+        words!append(w)
+    for w in pack("lconst", f=2, a0=1):                         # 46 02 01 00      lconst L2 <- static#1
+        words!append(w)
+    for w in pack("call", f=1, a0=L(1), a1=1):                  # call base=L1 argc=1 nres=1
+        words!append(w)
+    for w in pack("call", f=1, a0=L(0), a1=1):                  # call base=L0 argc=1 nres=1
+        words!append(w)
+    for w in pack("return", f=0, a0=0):                         # 02 00 00 00      return count=0
+        words!append(w)
+    # -- greet (offset 11) --
+    for w in pack("lconst", f=0, a0=0):                         # 46 00 00 00      lconst L0 <- static#0
+        words!append(w)
+    for w in pack("add", f=0, a0=L(1), a1=L(0), a2=P(0)):       # add L1 <- L0 + P0
+        words!append(w)
+    for w in pack("return", f=1, a0=1):                         # 02 01 01 00      return L1 count=1
+        words!append(w)
+
+    img["code"] = words
+    return img
+
+fn main():
+    img := build_hello_image()
+    encoded := to_wyc(img)
+    if encoded is error:
+        println("FAIL: to_wyc errored: " + str(encoded))
+        return
+    handle := std::io::open(OUT_PATH, "wb")
+    std::io::write(handle, encoded)
+    std::io::close(handle)
+    println("wrote hello image to " + OUT_PATH)
+
+main()

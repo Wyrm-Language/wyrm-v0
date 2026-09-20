@@ -753,15 +753,19 @@ TEST_SUITE("vm dispatch loop") {
         const wy_u32 callee_code[] = { enc1(WY_OP_RETURN, 3, 0x8000) };
 
         // caller: closure L0 <- fn#1, 0 caps; L3 <- 1; L1 <- tuple(L3);
-        //   kw = {b: 2, x: 3} as interleaved pairs L4..L7; L2 <- dict(L4);
-        //   call_va base=L0 nres=3; return L0, 3
+        //   kw = {b: 2, x: 3} as interleaved pairs L4..L7 (keys are STR
+        //   statics, matching the real compiler's call_va encoding - a
+        //   keyword dict's keys are plain strings, not interned symbols,
+        //   confirmed against pypoc/wypoc/compiler_bc's actual output
+        //   during epic 9); L2 <- dict(L4); call_va base=L0 nres=3;
+        //   return L0, 3
         const wy_u32 caller_code[] = {
             enc2a(WY_OP_CLOSURE, 0, 0), enc2b(1, 0),
             enc1(WY_OP_I8, 1, 3),
             enc2a(WY_OP_TUPLE, 1, 1), enc2b(3, 0),
-            enc1(WY_OP_LSYM, 4, 0),
+            enc1(WY_OP_LCONST, 4, 0),
             enc1(WY_OP_I8, 2, 5),
-            enc1(WY_OP_LSYM, 6, 1),
+            enc1(WY_OP_LCONST, 6, 1),
             enc1(WY_OP_I8, 3, 7),
             enc2a(WY_OP_DICT, 2, 2), enc2b(4, 0),
             enc2a(WY_OP_CALL_VA, 0, 0), enc2b(3, 0),
@@ -772,12 +776,18 @@ TEST_SUITE("vm dispatch loop") {
         std::copy(std::begin(caller_code), std::end(caller_code), combined);
         std::copy(std::begin(callee_code), std::end(callee_code), combined + std::size(caller_code));
 
-        wy_symbol sym_a = WY_NULL, sym_b = WY_NULL, sym_x = WY_NULL, sym_kw = WY_NULL;
+        wy_symbol sym_a = WY_NULL, sym_b = WY_NULL, sym_kw = WY_NULL;
         REQUIRE_EQ(wy_context_intern(context, "a", 1, &sym_a), WY_ERR_NONE);
         REQUIRE_EQ(wy_context_intern(context, "b", 1, &sym_b), WY_ERR_NONE);
-        REQUIRE_EQ(wy_context_intern(context, "x", 1, &sym_x), WY_ERR_NONE);
         REQUIRE_EQ(wy_context_intern(context, "kw", 2, &sym_kw), WY_ERR_NONE);
-        const wy_symbol symbols[] = { sym_b, sym_x };
+
+        wy_string *str_b = WY_NULL, *str_x = WY_NULL;
+        REQUIRE_EQ(wy_string_new(context, "b", 1, &str_b), WY_ERR_NONE);
+        REQUIRE_EQ(wy_string_new(context, "x", 1, &str_x), WY_ERR_NONE);
+        const wy_value statics[] = {
+            wy_value_object(WY_TYPE_TAG_STR, (wy_object*) str_b),
+            wy_value_object(WY_TYPE_TAG_STR, (wy_object*) str_x),
+        };
 
         // Param names are the interned symbols: keyword lookup matches by
         // symtab pointer, exactly as a loaded module's params always are.
@@ -801,7 +811,7 @@ TEST_SUITE("vm dispatch loop") {
         caller_proto.nlocals = 8;
 
         wy_module* module = make_code_module(context, combined, std::size(combined),
-            { caller_proto, callee_proto }, nullptr, 0, symbols, std::size(symbols));
+            { caller_proto, callee_proto }, statics, std::size(statics));
 
         wy_function* fn = WY_NULL;
         REQUIRE_EQ(wy_function_new(context, module, &module->functions[0], WY_NULL, 0, &fn), WY_ERR_NONE);
@@ -813,7 +823,7 @@ TEST_SUITE("vm dispatch loop") {
         CHECK_EQ(out[1].data.word, 2);
         REQUIRE_EQ(out[2].type, WY_TYPE_TAG_TABLE);
         wy_dict* kw = (wy_dict*) out[2].data.gc_object;
-        wy_value* x = wy_dict_get(context, kw, WY_TYPE_TAG_SYMBOL, wy_value_symbol(sym_x).data);
+        wy_value* x = wy_dict_get(context, kw, WY_TYPE_TAG_STR, wy_value_object(WY_TYPE_TAG_STR, (wy_object*) str_x).data);
         REQUIRE_NE(x, WY_NULL);
         CHECK_EQ(x->data.word, 3);
     }
@@ -895,16 +905,17 @@ TEST_SUITE("vm dispatch loop") {
         const wy_u32 callee_code[] = { enc1(WY_OP_RETURN, 0, 0) };
 
         // caller: closure L0 <- fn#1, 0 caps; L1 <- () (empty tuple);
-        //   kw = {c: 1, a: 9, b: 2} as interleaved pairs L4..L9;
-        //   L2 <- dict(L4); call_va base=L0 nres=1
+        //   kw = {c: 1, a: 9, b: 2} as interleaved pairs L4..L9 (STR keys,
+        //   matching the real compiler's call_va encoding - see the
+        //   sibling kwargs test above); L2 <- dict(L4); call_va base=L0 nres=1
         const wy_u32 caller_code[] = {
             enc2a(WY_OP_CLOSURE, 0, 0), enc2b(1, 0),
             enc2a(WY_OP_TUPLE, 0, 1), enc2b(3, 0),
-            enc1(WY_OP_LSYM, 4, 0),
+            enc1(WY_OP_LCONST, 4, 0),
             enc1(WY_OP_I8, 1, 5),
-            enc1(WY_OP_LSYM, 6, 1),
+            enc1(WY_OP_LCONST, 6, 1),
             enc1(WY_OP_I8, 9, 7),
-            enc1(WY_OP_LSYM, 8, 2),
+            enc1(WY_OP_LCONST, 8, 2),
             enc1(WY_OP_I8, 2, 9),
             enc2a(WY_OP_DICT, 3, 2), enc2b(4, 0),
             enc2a(WY_OP_CALL_VA, 0, 0), enc2b(1, 0),
@@ -915,11 +926,18 @@ TEST_SUITE("vm dispatch loop") {
         std::copy(std::begin(caller_code), std::end(caller_code), combined);
         std::copy(std::begin(callee_code), std::end(callee_code), combined + std::size(caller_code));
 
-        wy_symbol sym_c = WY_NULL, sym_a = WY_NULL, sym_b = WY_NULL;
-        REQUIRE_EQ(wy_context_intern(context, "c", 1, &sym_c), WY_ERR_NONE);
+        wy_symbol sym_a = WY_NULL;
         REQUIRE_EQ(wy_context_intern(context, "a", 1, &sym_a), WY_ERR_NONE);
-        REQUIRE_EQ(wy_context_intern(context, "b", 1, &sym_b), WY_ERR_NONE);
-        const wy_symbol symbols[] = { sym_c, sym_a, sym_b };
+
+        wy_string *str_c = WY_NULL, *str_a = WY_NULL, *str_b = WY_NULL;
+        REQUIRE_EQ(wy_string_new(context, "c", 1, &str_c), WY_ERR_NONE);
+        REQUIRE_EQ(wy_string_new(context, "a", 1, &str_a), WY_ERR_NONE);
+        REQUIRE_EQ(wy_string_new(context, "b", 1, &str_b), WY_ERR_NONE);
+        const wy_value statics[] = {
+            wy_value_object(WY_TYPE_TAG_STR, (wy_object*) str_c),
+            wy_value_object(WY_TYPE_TAG_STR, (wy_object*) str_a),
+            wy_value_object(WY_TYPE_TAG_STR, (wy_object*) str_b),
+        };
 
         wy_function_proto callee_proto = {};
         callee_proto.name = "f";
@@ -934,7 +952,7 @@ TEST_SUITE("vm dispatch loop") {
         caller_proto.nlocals = 10;
 
         wy_module* module = make_code_module(context, combined, std::size(combined),
-            { caller_proto, callee_proto }, nullptr, 0, symbols, std::size(symbols));
+            { caller_proto, callee_proto }, statics, std::size(statics));
 
         wy_function* fn = WY_NULL;
         REQUIRE_EQ(wy_function_new(context, module, &module->functions[0], WY_NULL, 0, &fn), WY_ERR_NONE);

@@ -1,0 +1,295 @@
+# image.wy - epic 9 M3
+#
+# Wyrm port of pypoc/wypoc/compiler_bc/image.py's section-building and
+# `.wyc` serialization (ModuleImage.sections()/code_bytes()/to_wyc()). Like
+# wy/wyrm/bjson.wy (M1) and wy/wyrm/opcodes.wy (M2), this file is compiled
+# by pypoc's compiler_bc and run on this repo's C VM (`wyrm`), never on
+# pypoc's tree-walking interpreter - see vm_plan/epic_9.md.
+#
+# Only section builders and the binary container are in scope here (per
+# epic 9 M3). `to_wya()`/`to_c()`/`assemble_wya()` are M4's job, on the same
+# file - this module leaves room for that by not claiming anything M4 would
+# need to touch.
+#
+# --------------------------------------------------------------------------
+# Data shape: a "module image" is a plain `dict` (no wyrm dataclasses exist
+# to reach for), with these keys:
+#
+#   "name"    : str            module name, "::"-separated       (header n)
+#   "version" : int            format version, always 1           (header v)
+#   "globals" : int            module global slot count            (header g)
+#   "init_l"  : int            init routine's L-frame size          (header l)
+#   "statics"       : list | nil   BSON array elements, or nil if none
+#   "slot_defaults" : dict | nil   {"<index str>": value}, or nil
+#   "symbols"       : list | nil   list of str, or nil
+#   "functions"     : list | nil   list of function dicts (see below), or nil
+#   "classes"       : list | nil   list of ready-to-encode BSON dicts, or nil
+#   "messages"      : list | nil   list of ready-to-encode BSON dicts, or nil
+#   "exports"       : dict | nil   {name: global slot index}, or nil
+#   "free"          : dict | nil   {name: global slot index}, or nil
+#   "code"          : list         u32 words, ALWAYS present (never nil;
+#                                  an empty list is legal and still emits a
+#                                  present, zero-length code section, exactly
+#                                  like image.py's unconditional
+#                                  `out[SECTION_IDS["code"]] = self.code_bytes()`)
+#
+# Convention (this is the "general enough for later sections" contract the
+# milestone asked for): every *optional* section field is either `nil`
+# (section entirely absent) or a real, non-empty list/dict (section present).
+# A caller must never store an empty-but-present list/dict in one of these
+# fields - if there is nothing to put there, leave it `nil`. This sidesteps
+# needing a generic "is this collection empty" probe, which would otherwise
+# hit the same missing-`len()`-builtin gap bjson.wy's header comment
+# documents (gap #1) with the added wrinkle that a list may legitimately
+# contain `nil` elements, making the `catch`-based length-probe trick
+# ambiguous for arbitrary payloads (it is only safe for `bytes`, whose
+# elements are always 0-255, never nil - see `_bytes_len` below, which is
+# used ONLY on `bytes` values for exactly that reason).
+#
+# `classes`/`messages` are intentionally left as "already-shaped BSON
+# dicts/lists" rather than given full builder helpers - hello has neither,
+# and doc/wyc-format.md sections 8.6/8.7 fully specify their shape for
+# whoever (epic 10) needs to build real ones; over-investing here beyond
+# "sections() can encode one" is out of this milestone's scope.
+#
+# A function dict (an element of "functions"):
+#   { "n": str, "p": list of param dicts, "l": int, "c": int, "f": int,
+#     "t": list | nil, "k": int | nil, "r": int | nil }
+# A param dict: { "n": str, "d": int | nil }
+# (`t`/`k`/`r`/`d` nil means "omit this key", matching wyc-format.md 8.5's
+# optional fields exactly.)
+
+import bjson::*
+
+SEC_HEADER := 1
+SEC_STATICS := 2
+SEC_SLOT_DEFAULTS := 3
+SEC_SYMBOLS := 4
+SEC_FUNCTIONS := 5
+SEC_CLASSES := 6
+SEC_MESSAGES := 7
+SEC_CODE := 8
+# SEC_DEBUG = 9 - deliberately never emitted this epic (see file header).
+SEC_EXPORTS := 10
+SEC_FREE := 11
+
+WYC_MAGIC_W := 87  # 'W'
+WYC_MAGIC_Y := 89  # 'Y'
+WYC_MAGIC_C := 67  # 'C'
+CONTAINER_VERSION := 1
+
+# All section ids this milestone's writer knows how to emit, in ascending
+# order. Building sections in this exact order also means the `sections()`
+# dict comes out already directory-sorted (bjson.wy's header comment notes
+# this repo's dict preserves insertion order), which `to_wyc()` relies on
+# instead of re-deriving a sort.
+ALL_SECTION_IDS := [SEC_HEADER, SEC_STATICS, SEC_SLOT_DEFAULTS, SEC_SYMBOLS,
+                     SEC_FUNCTIONS, SEC_CLASSES, SEC_MESSAGES, SEC_CODE,
+                     SEC_EXPORTS, SEC_FREE]
+
+# --------------------------------------------------------------------------
+# constructors
+
+fn make_image(name: str, version: int, globals_count: int, init_l: int) -> dict:
+    return {"name": name, "version": version, "globals": globals_count, "init_l": init_l, "statics": nil, "slot_defaults": nil, "symbols": nil, "functions": nil, "classes": nil, "messages": nil, "exports": nil, "free": nil, "code": []}
+
+fn make_param(name: str, default: int | nil = nil) -> dict:
+    return {"n": name, "d": default}
+
+fn make_function(name: str, params: list | nil = nil, nlocals: int = 0,
+                  code_offset: int = 0, flags: int = 0,
+                  dispatch: list | nil = nil, ncaptures: int | nil = nil,
+                  nresults: int | nil = nil) -> dict:
+    var p: list
+    if params is nil:
+        p = []
+    else:
+        p = params
+    return {"n": name, "p": p, "l": nlocals, "c": code_offset, "f": flags, "t": dispatch, "k": ncaptures, "r": nresults}
+
+# --------------------------------------------------------------------------
+# small helper: bytes length probe (same trick as bjson.wy's `_bytes_len`,
+# duplicated here rather than exported/imported since it is a tiny,
+# file-local piece of plumbing around the same missing-`len()` VM gap -
+# bjson.wy's own header comment documents the gap once; this is just
+# another site that needs the same workaround). Safe ONLY on `bytes`
+# values (elements are always 0-255, never nil) - see the module header
+# comment on why this trick is not generalized to lists/dicts.
+
+fn _bytes_len(b: bytes) -> int:
+    n := 0
+    while true:
+        v := b[n] catch nil
+        if v is nil:
+            break
+        n = n + 1
+    return n
+
+# --------------------------------------------------------------------------
+# section document builders
+
+fn _header_doc(image: dict) -> dict:
+    return {"n": image["name"], "v": image["version"], "g": image["globals"], "l": image["init_l"]}
+
+fn _function_doc(func: dict) -> dict:
+    doc := {}
+    doc["n"] = func["n"]
+    params := []
+    for p in func["p"]:
+        entry := {}
+        entry["n"] = p["n"]
+        if p["d"] is not nil:
+            entry["d"] = p["d"]
+        params!append(entry)
+    doc["p"] = params
+    doc["l"] = func["l"]
+    doc["c"] = func["c"]
+    doc["f"] = func["f"]
+    if func["t"] is not nil:
+        doc["t"] = func["t"]
+    if func["k"] is not nil:
+        doc["k"] = func["k"]
+    if func["r"] is not nil:
+        doc["r"] = func["r"]
+    return doc
+
+fn _function_docs(image: dict) -> list:
+    docs := []
+    for func in image["functions"]:
+        docs!append(_function_doc(func))
+    return docs
+
+# --------------------------------------------------------------------------
+# sections() / code_bytes() / to_wyc()
+
+fn code_bytes(image: dict) -> bytes:
+    out := bytes(0)
+    for w in image["code"]:
+        word := bytes(4)
+        word!pack_u32(0, w)
+        out!append(word)
+    return out
+
+fn sections(image: dict) -> dict | error:
+    out := {}
+
+    header_bytes := encode_document(_header_doc(image))
+    if header_bytes is error:
+        return header_bytes
+    out[SEC_HEADER] = header_bytes
+
+    if image["statics"] is not nil:
+        r := encode_array(image["statics"])
+        if r is error:
+            return r
+        out[SEC_STATICS] = r
+
+    if image["slot_defaults"] is not nil:
+        r := encode_document(image["slot_defaults"])
+        if r is error:
+            return r
+        out[SEC_SLOT_DEFAULTS] = r
+
+    if image["symbols"] is not nil:
+        r := encode_array(image["symbols"])
+        if r is error:
+            return r
+        out[SEC_SYMBOLS] = r
+
+    if image["functions"] is not nil:
+        r := encode_array(_function_docs(image))
+        if r is error:
+            return r
+        out[SEC_FUNCTIONS] = r
+
+    if image["classes"] is not nil:
+        r := encode_array(image["classes"])
+        if r is error:
+            return r
+        out[SEC_CLASSES] = r
+
+    if image["messages"] is not nil:
+        r := encode_array(image["messages"])
+        if r is error:
+            return r
+        out[SEC_MESSAGES] = r
+
+    # Always present, even when empty (0 code words -> a present, 0-length
+    # section) - matches image.py's unconditional assignment.
+    out[SEC_CODE] = code_bytes(image)
+
+    if image["exports"] is not nil:
+        r := encode_document(image["exports"])
+        if r is error:
+            return r
+        out[SEC_EXPORTS] = r
+
+    if image["free"] is not nil:
+        r := encode_document(image["free"])
+        if r is error:
+            return r
+        out[SEC_FREE] = r
+
+    return out
+
+fn to_wyc(image: dict) -> bytes | error:
+    secs := sections(image)
+    if secs is error:
+        return secs
+
+    # Directory order: ascending section id. `secs` was already built in
+    # ascending order (see ALL_SECTION_IDS above), but walk the canonical id
+    # list explicitly rather than trusting dict-iteration order to stay
+    # sorted, so this keeps working even if a future edit adds a section out
+    # of numeric order by mistake.
+    ids := []
+    for id in ALL_SECTION_IDS:
+        present := secs[id] catch nil
+        if present is not nil:
+            ids!append(id)
+
+    count := 0
+    for id in ids:
+        count = count + 1
+
+    header := bytes(8)
+    header!pack_u8(0, WYC_MAGIC_W)
+    header!pack_u8(1, WYC_MAGIC_Y)
+    header!pack_u8(2, WYC_MAGIC_C)
+    header!pack_u8(3, 0)
+    header!pack_u8(4, CONTAINER_VERSION)
+    header!pack_u8(5, count)
+    header!pack_u8(6, 0)
+    header!pack_u8(7, 0)
+
+    directory_end := 8 + 12 * count
+    payloads := bytes(0)
+    directory := bytes(0)
+    for id in ids:
+        payload := secs[id]
+        plen := _bytes_len(payload)
+        running := _bytes_len(payloads)
+        offset := directory_end + running
+
+        entry := bytes(12)
+        entry!pack_u8(0, id)
+        entry!pack_u8(1, 0)
+        entry!pack_u8(2, 0)
+        entry!pack_u8(3, 0)
+        entry!pack_u32(4, offset)
+        entry!pack_u32(8, plen)
+        directory!append(entry)
+
+        payloads!append(payload)
+        total := _bytes_len(payloads)
+        pad := (4 - (total % 4)) % 4
+        i := 0
+        while i < pad:
+            payloads!append(0)
+            i = i + 1
+
+    result := bytes(0)
+    result!append(header)
+    result!append(directory)
+    result!append(payloads)
+    return result

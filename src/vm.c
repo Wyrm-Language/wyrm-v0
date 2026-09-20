@@ -86,6 +86,43 @@ static bool binding_kwarg_consumed_f(const wy_symbol* consumed, wy_uword n, wy_s
 }
 
 /**
+ * A `call_va`/`msg_va` keyword dict has plain STR keys (the compiler builds
+ * it from ordinary string statics, matching the reference interpreter's
+ * `kwargs[a.name] = ...` - `**kwargs` is an ordinary str-keyed dict once it
+ * reaches wyrm code, per wyc-format.md §8.5). `pm->name` is an interned
+ * `wy_symbol`, not a `wy_string*`, so it can't be looked up via
+ * `wy_dict_get`'s STR case without first boxing it - a linear content
+ * comparison avoids that allocation on every parameter of every call that
+ * uses keyword arguments.
+ */
+static wy_value* dict_get_by_symbol_as_str_f(wy_dict* kwargs, wy_symbol name)
+{
+    wy_uword name_len = wy_strlen_f(name);
+    for (wy_uword i = 0; i < kwargs->count; i++) {
+        const wy_key_hash_value* kv = &kwargs->dense[i];
+        if (kv->key.type == WY_TYPE_TAG_STR) {
+            wy_string* s = kv->key.data.str;
+            if (s->len == name_len && wy_strncmp_f(s->str, name, name_len) == 0) {
+                return (wy_value*) &kv->value;
+            }
+        }
+    }
+    return WY_NULL;
+}
+
+/** Same STR-vs-interned-symbol content comparison as above, for checking
+ * whether a leftover kwargs entry (STR key) was already consumed by a
+ * plain parameter (tracked as a `wy_symbol` in `consumed[]`). */
+static bool binding_kwarg_str_consumed_f(const wy_symbol* consumed, wy_uword n, wy_string* key)
+{
+    for (wy_uword i = 0; i < n; i++) {
+        wy_uword clen = wy_strlen_f(consumed[i]);
+        if (clen == key->len && wy_strncmp_f(consumed[i], key->str, clen) == 0) { return true; }
+    }
+    return false;
+}
+
+/**
  * Push a bytecode call frame for `fn` (design_c_vm.md §1.1.2), binding the
  * parameters the language specifies (frame.py:build_pframe, wyc-format.md
  * §8.5): positionally in order, then by keyword from `kwargs` (never mutated
@@ -180,7 +217,7 @@ static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn,
         if (taken < argc) {
             bound = args[taken++];
         } else if (kwargs != WY_NULL) {
-            wy_value* hit = wy_dict_get(ctx, kwargs, WY_TYPE_TAG_SYMBOL, wy_value_symbol(pm->name).data);
+            wy_value* hit = dict_get_by_symbol_as_str_f(kwargs, pm->name);
             if (hit != WY_NULL) {
                 bound = *hit;
                 if (nconsumed < WY_VM_CALL_MAX_KWARGS) { consumed[nconsumed++] = pm->name; }
@@ -229,8 +266,8 @@ static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn,
         if (err == WY_ERR_NONE && kwargs != WY_NULL) {
             for (wy_uword i = 0; i < kwargs->count && err == WY_ERR_NONE; i++) {
                 const wy_key_hash_value* kv = &kwargs->dense[i];
-                if (kv->key.type == WY_TYPE_TAG_SYMBOL
-                    && binding_kwarg_consumed_f(consumed, nconsumed, kv->key.data.symtab_entry)) {
+                if (kv->key.type == WY_TYPE_TAG_STR
+                    && binding_kwarg_str_consumed_f(consumed, nconsumed, kv->key.data.str)) {
                     continue;
                 }
                 err = wy_dict_set(ctx, kd, kv->key.type, kv->key.data, kv->value.type, kv->value.data);
@@ -246,10 +283,10 @@ static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn,
         wy_uword n_unexpected = 0;
         for (wy_uword i = 0; i < kwargs->count; i++) {
             const wy_key_hash_value* kv = &kwargs->dense[i];
-            if (kv->key.type == WY_TYPE_TAG_SYMBOL && kv->key.data.symtab_entry != WY_NULL
-                && !binding_kwarg_consumed_f(consumed, nconsumed, kv->key.data.symtab_entry)
+            if (kv->key.type == WY_TYPE_TAG_STR
+                && !binding_kwarg_str_consumed_f(consumed, nconsumed, kv->key.data.str)
                 && n_unexpected < WY_VM_CALL_MAX_KWARGS) {
-                unexpected[n_unexpected++] = kv->key.data.symtab_entry;
+                unexpected[n_unexpected++] = kv->key.data.str->str;
             }
         }
         if (n_unexpected > 0) {

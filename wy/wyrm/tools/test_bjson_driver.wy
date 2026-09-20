@@ -1,0 +1,176 @@
+# wy/wyrm/tools/test_bjson_driver.wy - epic 9 M1 regression driver for
+# wy/wyrm/bjson.wy.
+#
+# This is NOT wired into any test harness (meson's wy-tests runs test/wy/*
+# under pypoc's tree-walking interpreter; this file must instead be
+# compiled by pypoc's compiler_bc and run on this repo's C VM `wyrm`
+# binary, a different pipeline entirely - see wy/wyrm/bjson.wy's header
+# comment and vm_plan/epic_9.md). Run it by hand:
+#
+#   work=$(mktemp -d)
+#   cp wy/wyrm/bjson.wy wy/wyrm/tools/test_bjson_driver.wy "$work/"
+#   pypoc/.venv/bin/wyrm -Iwy -Iwy/wyrm --build-bc "$work/bjson.wy"
+#   pypoc/.venv/bin/wyrm -Iwy -Iwy/wyrm --build-bc "$work/test_bjson_driver.wy"
+#   ./buildDir/src/wyrm/wyrm -I"$work" "$work/test_bjson_driver.wyc"
+#
+# (--build-bc always writes its .wyc next to the *input* file, ignoring
+# -o's directory component, hence copying sources into a scratch dir
+# first rather than compiling the checked-in copies in place.)
+#
+# Every check below prints "PASS: <name>" or "FAIL: <name> ...". A human
+# (or a future harness) greps the output for "FAIL" to find problems.
+
+import bjson::*
+
+# --------------------------------------------------------------------------
+# a small hex dumper for diagnostics (bytes has no generic length query we
+# can rely on here - see bjson.wy's header comment on the missing `len()`
+# builtin - but we always know the length of what *we* just built, so a
+# plain loop with a passed-in count is enough)
+
+fn _div16(v: int) -> int:
+    # `/` is always true division (float, per doc/stdlib.md) and there is
+    # no int() cast / floor-division operator to get back to an int index,
+    # so integer division by 16 (v is always 0-255 here) is done by
+    # repeated subtraction instead.
+    q := 0
+    r := v
+    while r >= 16:
+        r = r - 16
+        q = q + 1
+    return q
+
+fn _hex_dump(b, count: int) -> str:
+    digits := "0123456789abcdef"
+    out := ""
+    i := 0
+    while i < count:
+        v := b[i]
+        hi_index := _div16(v)
+        lo_index := v % 16
+        out = out + digits[hi_index] + digits[lo_index]
+        i = i + 1
+    return out
+
+# --------------------------------------------------------------------------
+# check 1: the 39-byte hello-header fixture, byte for byte
+
+fn build_expected_hello() -> bytes:
+    vals := [39, 0, 0, 0, 2, 110, 0, 6, 0, 0, 0, 104, 101, 108, 108, 111, 0,
+              16, 118, 0, 1, 0, 0, 0, 16, 103, 0, 2, 0, 0, 0, 16, 108, 0, 3,
+              0, 0, 0, 0]
+    result := bytes(0)
+    for v in vals:
+        result!append(v)
+    return result
+
+fn check_hello_fixture():
+    doc := {"n": "hello", "v": 1, "g": 2, "l": 3}
+    encoded := encode_document(doc)
+    if encoded is error:
+        println("FAIL: hello fixture: encode_document errored")
+        return
+    expected := build_expected_hello()
+    if encoded == expected:
+        println("PASS: hello fixture matches the 39-byte reference")
+    else:
+        println("FAIL: hello fixture mismatch")
+        println("  got:      " + _hex_dump(encoded, 39))
+        println("  expected: " + _hex_dump(expected, 39))
+
+    decoded := decode_document(encoded)
+    if decoded is error:
+        println("FAIL: hello fixture: decode_document errored")
+        return
+    ok := true
+    if decoded["n"] != "hello":
+        ok = false
+    if decoded["v"] != 1:
+        ok = false
+    if decoded["g"] != 2:
+        ok = false
+    if decoded["l"] != 3:
+        ok = false
+    if ok:
+        println("PASS: hello fixture round-trips through decode_document")
+    else:
+        println("FAIL: hello fixture round trip produced wrong values")
+
+# --------------------------------------------------------------------------
+# check 2: encode_array / decode_array round trip
+
+fn check_array_roundtrip():
+    items := [10, 20, 30]
+    encoded := encode_array(items)
+    if encoded is error:
+        println("FAIL: array round trip: encode_array errored")
+        return
+    decoded := decode_array(encoded)
+    if decoded is error:
+        println("FAIL: array round trip: decode_array errored")
+        return
+    if decoded[0] == 10 and decoded[1] == 20 and decoded[2] == 30:
+        println("PASS: encode_array/decode_array round trip")
+    else:
+        println("FAIL: array round trip produced wrong values")
+
+    # decode() should also recognize this as an array (dense "0","1","2" keys)
+    generic := decode(encoded)
+    if generic is error:
+        println("FAIL: decode() on an array-shaped document errored")
+    elif generic is list:
+        println("PASS: decode() recognizes a dense-key document as an array")
+    else:
+        println("FAIL: decode() did not recognize array shape")
+
+# --------------------------------------------------------------------------
+# check 3: decode_array rejects non-dense keys
+
+fn check_array_rejection():
+    bad := {"0": 1, "2": 2}
+    encoded := encode_document(bad)
+    if encoded is error:
+        println("FAIL: rejection case: encode_document errored")
+        return
+    decoded := decode_array(encoded)
+    if decoded is error:
+        println("PASS: decode_array rejects non-dense keys")
+    else:
+        println("FAIL: decode_array accepted non-dense keys")
+
+# --------------------------------------------------------------------------
+# check 4: malformed input - bad tag byte must error, not crash
+
+fn check_bad_tag():
+    doc := {"n": "hello", "v": 1, "g": 2, "l": 3}
+    encoded := encode_document(doc)
+    if encoded is error:
+        println("FAIL: bad tag case: setup encode_document errored")
+        return
+    corrupted := encoded!copy()
+    corrupted!pack_u8(4, 0xFF)  # offset 4 is the "n" element's tag byte
+    decoded := decode_document(corrupted)
+    if decoded is error:
+        println("PASS: decode_document rejects a bad tag byte")
+    else:
+        println("FAIL: decode_document accepted a bad tag byte")
+
+# --------------------------------------------------------------------------
+# check 5: malformed input - truncated length prefix must error
+
+fn check_truncated():
+    tiny := bytes(2)
+    decoded := decode_document(tiny)
+    if decoded is error:
+        println("PASS: decode_document rejects a truncated length prefix")
+    else:
+        println("FAIL: decode_document accepted a truncated buffer")
+
+# --------------------------------------------------------------------------
+
+check_hello_fixture()
+check_array_roundtrip()
+check_array_rejection()
+check_bad_tag()
+check_truncated()
+println("done")
