@@ -201,7 +201,7 @@ TEST_SUITE("link") {
     TEST_CASE("two_module synthetic import runs dependency inline once and fills qualified names") {
         test_fiber_fixture fix;
         auto* ctx = fix.get_context_ptr();
-        ctx->gc_threshold = 0;
+        ctx->gc_threshold = 0; ctx->gc_growth_factor = 0;
         const wy_u32 dep_code[] = {enc1(WY_OP_I8, 42, 0), enc1(WY_OP_GSET, 0, 0), enc1(WY_OP_RETURN, 0, 0)};
         const wy_u32 code[] = {enc1(WY_OP_IMPORT, 0, 0), enc1(WY_OP_IMPORT_WIDE, 0, 0), 1u << 16,
             enc1(WY_OP_GGET, 2, 0), enc1(WY_OP_GSET, 2, 1), enc1(WY_OP_RETURN, 0, 0)};
@@ -244,7 +244,7 @@ TEST_SUITE("link") {
     TEST_CASE("wildcard inline init copies excepts and exports only") {
         test_fiber_fixture fix;
         auto* ctx = fix.get_context_ptr();
-        ctx->gc_threshold = 0;
+        ctx->gc_threshold = 0; ctx->gc_growth_factor = 0;
         const wy_u32 dep_code[] = {enc1(WY_OP_I8, 42, 0), enc1(WY_OP_GSET, 0, 0), enc1(WY_OP_RETURN, 0, 0)};
         const wy_u32 code[] = {enc1(WY_OP_LSYM, 0, 0), enc1(WY_OP_IMPORT_STAR, 1, 0), 0,
             enc1(WY_OP_LNIL, 0, 0), enc1(WY_OP_GGET, 1, 0), enc1(WY_OP_RETURN, 0, 0)};

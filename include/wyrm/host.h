@@ -18,8 +18,8 @@
  *     wy_host_free(host);
  *
  * Everything evaluated in one host shares one namespace (the session; see
- * doc/repl.md for its scoping rules), so a variable set from C is visible to
- * scripts and the other way round. See doc/embedding.md and examples/.
+ * doc-llm/repl.md for its scoping rules), so a variable set from C is visible to
+ * scripts and the other way round. See doc-llm/embedding.md and examples/.
  *
  * Not thread safe: use one host from one thread at a time.
  */
@@ -113,7 +113,7 @@ bool wy_host_needs_more(wy_host* host, const char* source);
 /**
  * The interactive loop of `wyrm -i`, reading lines from `in` until end of
  * input or `:quit`: read, evaluate, print non-nil results, report errors, keep
- * going (commands `:quit :reset :help`; see doc/repl.md). Prompts are printed
+ * going (commands `:quit :reset :help`; see doc-llm/repl.md). Prompts are printed
  * only when `interactive`. Returns 0 on a normal exit.
  */
 int wy_host_repl(wy_host* host, FILE* in, bool interactive);

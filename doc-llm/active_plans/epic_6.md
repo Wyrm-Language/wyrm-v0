@@ -29,7 +29,7 @@ than reviving this note's original three-compiler scope wholesale, since AGENTS.
 
 ## Inputs
 
-- `vm_plan/epic_5_report.md` — read first, especially the final corpus counts and the
+- `doc-llm/history/wypoc-vm-port/epic_5_report.md` — read first, especially the final corpus counts and the
   import-hook signature it records (this epic's embedding API wraps that hook).
 - State-scan checklist:
   1. Confirm `meson test -C buildDir` passes on the default compiler and record the count.
@@ -45,14 +45,14 @@ than reviving this note's original three-compiler scope wholesale, since AGENTS.
   6. Confirm `pypoc/.venv` exists (epic 1's toolchain setup) and `--build-bc` works today
      against `tokenizer.wy` without error under pypoc alone (sanity check before blaming
      the C VM for any divergence).
-  7. Confirm whether `doc/embedding.md` or `include/wyrmxx/` already exist in any form.
+  7. Confirm whether `doc-llm/embedding.md` or `include/wyrmxx/` already exist in any form.
   8. Confirm the corpus manifest from epic 5 is unchanged (no drift) before starting —
      `test/bytecode/manifest.txt` diff against epic 5's recorded counts.
 
 ## Context to load
 
-1. `vm_plan/design_c_vm.md` §1.4 (C → bytecode), §8 (GC) — read in full, ~2k tokens.
-2. `vm_plan/epic_5_report.md` — read, ~1-2k tokens.
+1. `doc-llm/history/wypoc-vm-port/design_c_vm.md` §1.4 (C → bytecode), §8 (GC) — read in full, ~2k tokens.
+2. `doc-llm/history/wypoc-vm-port/epic_5_report.md` — read, ~1-2k tokens.
 3. Current C: `include/wyrm/vm.h`, `src/vm_call.c` (or wherever epic 3's call-binding
    milestone put it), `src/gc.c`, `include/wyrm/context.h` — read only what each
    milestone's scope touches, budget ~3k tokens total, spread across milestones rather than
@@ -142,7 +142,7 @@ would cost more in coordination than it saves.
 ### M3 — Public embedding API and C++ wrappers
 
 **Scope**
-- `doc/embedding.md`: the public surface a host embeds against — `wy_context_init_s`,
+- `doc-llm/embedding.md`: the public surface a host embeds against — `wy_context_init_s`,
   module loading (`wy_module_load_bytes`), `wy_vm_call_sync`, the import hook typedef, the
   output hook (`ctx->io.write`), GC root push/pop for host-held values across allocations,
   error handling (`wy_error`, `fiber->fault`). Written for a host developer who has not
@@ -151,7 +151,7 @@ would cost more in coordination than it saves.
   handles, a `std::expected`-shaped (or equivalent) call result, MISRA C++ 2023 compliant.
 
 **Files**
-- New: `doc/embedding.md`, `include/wyrmxx/context.hpp`, `include/wyrmxx/value.hpp` (or
+- New: `doc-llm/embedding.md`, `include/wyrmxx/context.hpp`, `include/wyrmxx/value.hpp` (or
   whatever split the executor's scan finds natural given the C API's actual final shape).
 
 **Acceptance**
@@ -162,7 +162,7 @@ a context via the wrapper, load `hello.wyc`, run it, read the captured output, m
 **Model:** Sonnet (the C API surface is fixed by the time this milestone starts; this is
 documentation and a wrapper layer over an already-decided contract).
 
-**Fan-out:** 2 Sonnet subagents — (a) `doc/embedding.md`, (b) `include/wyrmxx/*` + its
+**Fan-out:** 2 Sonnet subagents — (a) `doc-llm/embedding.md`, (b) `include/wyrmxx/*` + its
 test — independent once the C API is frozen (confirm M1-M2 are done first, or at minimum
 that their public signatures won't change further).
 

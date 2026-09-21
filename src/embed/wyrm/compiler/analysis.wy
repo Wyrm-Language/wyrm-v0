@@ -64,7 +64,7 @@ import std::pairs::*
 # `std::pairs`' `list_tail`/`field` are NOT used here: `list_tail` walks with
 # `for i in range(0, n)`, and a `for` over a `range(...)` iterates zero times
 # on this repo's C VM (range is a coroutine there and `wy_iterator_next` has
-# no coroutine case - epic 6's deferred gap, see vm_plan/epic_10_prereport.md).
+# no coroutine case - epic 6's deferred gap, see doc-llm/history/wypoc-vm-port/epic_10_prereport.md).
 # So `field(node, n)` silently answers `car(node)` whatever `n` is, on the C
 # VM only. These two walk with a `while` instead and behave the same on both
 # engines.

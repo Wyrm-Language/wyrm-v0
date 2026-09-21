@@ -210,7 +210,7 @@ write ones that do; `test/bytecode/expand/wydeclib.wy` is one).
   `AMALGAM_FILES` (before module.wy) and `SELF_SOURCES` — 21 → 22 self-sources. Its
   helpers use `_pd_`-prefixed names for the amalgam's flat namespace.
 - **D1/D8/D9/D10 revised mid-session** (epic file + new
-  `doc/addendum-decorator-expansion.md`: D1 final = imports-only; D8 = isolated
+  `doc-llm/addendum-decorator-expansion.md`: D1 final = imports-only; D8 = isolated
   single-level expansion VM; D9 = arguments are forms; D6 retired). M0 predates
   expansion and is unaffected: the pre-pass here is exactly what M3's "scope first,
   predefined `template` as fallback" lookup replaces. None of the M0 code assumes
@@ -282,5 +282,5 @@ write ones that do; `test/bytecode/expand/wydeclib.wy` is one).
   Deviations).
 - The mid-session plan revision (D1 final imports-only, D8 isolated child VM, D9
   form-arguments, D6 retired) is already in `epic_10a.md` +
-  `doc/addendum-decorator-expansion.md`; read those before M1, they supersede the
+  `doc-llm/addendum-decorator-expansion.md`; read those before M1, they supersede the
   original Goal/D1 text in earlier reports' quotes.

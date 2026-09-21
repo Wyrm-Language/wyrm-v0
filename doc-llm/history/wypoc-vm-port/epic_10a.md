@@ -17,7 +17,7 @@ expanded tree is copied back into the parent and the child is destroyed. Only th
 lowering run. The mechanism is a small **`expand` primitive in the C API, exposed to wyrm**;
 the compiler and the expander stay in wyrm.
 
-Language-level wording for all of this is in `doc/addendum-decorator-expansion.md`
+Language-level wording for all of this is in `doc-llm/addendum-decorator-expansion.md`
 (proposed spec text; fold into `doc/language-spec.md` when M3 lands).
 
 **The module being compiled is not part of the execution path.** It is still a tree. Only
@@ -308,7 +308,7 @@ name in the child's scope (predefined `template` as fallback, so shadowing works
 M0's pre-pass), argument delivery per D9 (literal fold, else tree box), `send`, decode the
 answer, repeat until no `'decorated` remains, nested and expression-position decorators,
 `macroexpand`. It imports nothing but pure support modules. Also: parent-side wiring that
-collects the import closure's images for `expand`; fold `doc/addendum-decorator-expansion.md`
+collects the import closure's images for `expand`; fold `doc-llm/addendum-decorator-expansion.md`
 into `doc/language-spec.md`; unstub `compiler_main.wy`'s reporting (scan item 1).
 
 Acceptance: `decorators/decorated` compiles through the port and matches its `.out`; a test
@@ -361,7 +361,7 @@ compile-time marker; resource limits on the expansion VM.
 
 ## Report
 
-`vm_plan/epic_10a_report.md` per README template. Record: D1's final wording as implemented,
+`doc-llm/history/wypoc-vm-port/epic_10a_report.md` per README template. Record: D1's final wording as implemented,
 whether byte-identity vs pypoc's `parser.wyc` (`--strip`) held or which sections differ and
 why, the size of the `expand` and `send` changes, and how D9's parameter-annotation check was
 resolved.

@@ -5,7 +5,7 @@
 # sections. Operates on the `bytes` type (epic 7) instead of Python
 # bytes/bytearray. This file is compiled by pypoc's compiler_bc and run on
 # this repo's C VM (`wyrm`), not on pypoc's tree-walking interpreter - see
-# vm_plan/epic_9.md for why that distinction matters.
+# doc-llm/history/wypoc-vm-port/epic_9.md for why that distinction matters.
 #
 # Value <-> tag mapping (mirrors bsonlite.py exactly):
 #   nil -> null | bool -> bool | int -> int32 | float -> double

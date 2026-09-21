@@ -1,7 +1,7 @@
 # Examples: embedding wyrm
 
 Each is a small C program using `<wyrm/host.h>` (libwyrmhost); see
-[doc/embedding.md](../doc/embedding.md) for the full guide. They are built with the
+[doc-llm/embedding.md](../doc-llm/embedding.md) for the full guide. They are built with the
 project and checked by the `examples` meson test.
 
 | File | Shows |

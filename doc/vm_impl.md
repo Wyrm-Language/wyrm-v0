@@ -9,8 +9,8 @@ Basic Stuff:
 
 ## Agent map (epic 2: foundations and core interpreter)
 
-Read this before touching the interpreter. `vm_plan/README.md` and the
-current `vm_plan/epic_N.md` are the plan; this table is where each piece
+Read this before touching the interpreter. `doc-llm/history/wypoc-vm-port/README.md` and the
+current `doc-llm/history/wypoc-vm-port/epic_N.md` are the plan; this table is where each piece
 of it actually lives. Epic 1's own map (loader-only) follows below it.
 
 | File | Responsibility |
@@ -20,7 +20,7 @@ of it actually lives. Epic 1's own map (loader-only) follows below it.
 | `include/wyrm/symtab.h`, `src/symtab.c` | Real interning hash keyed on the wyc-format.md §8.4 31-codepoint significant prefix, FNV-1a, open addressing. Replaces the old 8KB scaffold in `src/machine.c`; `wy_context_intern` (`src/context.c`) is still the one entry point. |
 | `include/wyrm/{tuple,list,bytes,error,function,native}.h` + matching `.c` | The six new GC-tracked heap object kinds (design_c_vm.md §4). `wy_bytes` is a placeholder for epic 7's `bytes` type - no language surface yet. |
 | `include/wyrm/gc.h`, `src/gc.c` | Iterative mark (gray worklist, not recursive); abandons the sweep (not just the visit) if the worklist can't grow, so a partial mark never frees a live object. |
-| `include/wyrm/context.h`, `src/context.c` | `gc_pressure`/`gc_threshold` + `wy_context_gc_safepoint` (checked once per dispatch-loop instruction); `roots[64]` + `wy_context_root_push_f`/`pop_f` for C code holding a fresh value across allocations; `io.write`/`io.ud` output hook; `builtins` field (a GC root). |
+| `include/wyrm/context.h`, `src/context.c` | `gc_pressure`/`gc_threshold` + `wy_context_gc_safepoint` (polled by `wy_vm_run` at frame entry and on backward jumps only, `WY_VM_SAFEPOINT`); after each collection `gc_threshold` is reset to `max(64 KB, estimated live bytes * gc_growth_factor)` so collection work scales with allocation (`gc_growth_factor = 0` pins the threshold; GC-stress code that sets `gc_threshold` to 0 or `-1` must also zero it); `roots[64]` + `wy_context_root_push_f`/`pop_f` for C code holding a fresh value across allocations; `io.write`/`io.ud` output hook; `builtins` field (a GC root). |
 | `include/wyrm/frame.h` | `wy_frame`: tagged native/bytecode call frame, replacing the old `wy_fiber_frame`. `wy_fiber_push_frame_f`/`pop_continuation_f`/`tail_call_f` (`src/fiber.c`) use only its native-frame fields (`native`, `ret_nres`, `restore_base`) with no behavioral change from before this type existed. |
 | `include/wyrm/exec_fn.h` | `wy_exec_state` gained `WY_EXEC_SWITCH`/`WY_EXEC_FAULT`; `wy_fiber_exec_f` (`src/fiber.c`) surfaces a fault as `WY_ERR_FAULT` (`fiber->fault` readable) and stops driving a fiber that switched away; `wy_context_exec` (`src/context.c`) loops across switches. |
 | `src/vm.c` | `wy_vm_run`: the dispatch loop (design_c_vm.md §2) - a `reload:`-labeled loop over `wy_frame`s, no C recursion. `wy_vm_call_sync` (host/loader entry point) lives here too, moved up from its planned epic-2/M5 slot because M4's own tests need it. |
@@ -185,7 +185,7 @@ A delta image is an ordinary container whose header carries `d: 1`, the module's
 the delta (`bc bf bs by bk bm bg`), the total globals after (`g`) and the input's function index
 (`i`); sections hold only new items and every reference is absolute. The compiler side
 (`SessionContext`, `compile_snippet`) and the driver (`src/wyrm/repl.c`) are described in
-`doc/repl-plan.md`. If the loader refuses a delta the compiler already counted, call
+`doc-llm/history/repl/repl-plan.md`. If the loader refuses a delta the compiler already counted, call
 `session_undo` (compile_source.wy) so the two sides stay in step; `repl.c` does.
 
 Embedding: the session compiles in the same context that hosts it. Keep the compiler's session

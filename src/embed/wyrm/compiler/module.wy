@@ -693,7 +693,7 @@ fn compile_module(program_node, module_name: str, source_file = nil, check: bool
     return img
 
 # ---------------------------------------------------------------------------
-# REPL session (doc/repl-plan.md, M2)
+# REPL session (doc-llm/history/repl/repl-plan.md, M2)
 #
 # One ModuleContext (and its ModuleImage) lives for the whole session, so
 # global slots, statics, symbols, functions, classes and - crucially - message

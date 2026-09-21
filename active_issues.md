@@ -112,13 +112,13 @@ but the compiler accepts same-scope redeclaration: `x := 1` then `x := 2`, `fn a
 enforced. Expect fallout: sweep `test/corpus`, `test/wy`, `src/embed` and `wy/` for sources
 that relied on it (the behavior corpus and `selfcompile` will find them), and confirm which
 declaration forms the rule covers (`:=`, `var`, `fn`, `class`, `import`, slots). Do it with
-the per-scope `declared_here` mechanism described in `doc/repl-plan.md` (the REPL treats each
+the per-scope `declared_here` mechanism described in `doc-llm/history/repl/repl-plan.md` (the REPL treats each
 input as a scope and needs the same machinery). A change under `src/embed/` needs a stage0
 regen.
 
 ## REPL follow-ups
 
-`wyrm -i` works (`doc/repl-plan.md`), with these known gaps:
+`wyrm -i` works (`doc-llm/history/repl/repl-plan.md`), with these known gaps:
 
 - **Blank line ends an input,** so a class or function body cannot contain a blank line. Same
   rule as Python's REPL, but hostile when pasting a script. Done when the driver can tell a
@@ -134,7 +134,7 @@ regen.
 
 ## Embedding API (libwyrmhost) gaps
 
-`doc/embedding.md` covers eval, scripts, variables and the REPL. Not there yet:
+`doc-llm/embedding.md` covers eval, scripts, variables and the REPL. Not there yet:
 
 - **Registering C functions** callable from wyrm code (the natives machinery exists in the core
   API, but there is no `wy_host_register(name, fn)` convenience).

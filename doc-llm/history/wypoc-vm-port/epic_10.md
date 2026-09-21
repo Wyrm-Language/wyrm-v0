@@ -54,11 +54,11 @@ conformance harness), and `diff -r` on the two generations is empty (the fixed p
 
 ## Inputs
 
-- `vm_plan/epic_9_report.md`: confirms `bjson.wy`/`image.wy`/`opcodes.wy` exist, their
+- `doc-llm/history/wypoc-vm-port/epic_9_report.md`: confirms `bjson.wy`/`image.wy`/`opcodes.wy` exist, their
   exact API (function names and argument order for section builders, `pack`, `to_wyc`),
   the section-id enum actually shipped, and whether `assemble_wya()` landed (needed here
   if the milestone policy's "fall back to a `.wy_a` semantic diff" is exercised).
-- `vm_plan/epic_8_report.md` if it exists: the state of `wy/wyrm/ast.wy` (node kind table
+- `doc-llm/history/wypoc-vm-port/epic_8_report.md` if it exists: the state of `wy/wyrm/ast.wy` (node kind table
   aligned with `sexpr.py`'s `ROWS`), `decode.wy` escape fixes, parser parity status. If
   epic 8 has not run, treat the front end as the state described in the plan's Epic 8
   section and re-derive the node-kind table straight from `sexpr.py` instead.
@@ -361,7 +361,7 @@ agents never touch the same file at once.
 
 ## Report
 
-Write `vm_plan/epic_10_report.md` per `vm_plan/README.md`'s template. Beyond the standard
+Write `doc-llm/history/wypoc-vm-port/epic_10_report.md` per `doc-llm/history/wypoc-vm-port/README.md`'s template. Beyond the standard
 sections, record explicitly:
 - Per fixture: byte-identical, or `.wy_a`-semantic-diff-with-reason, or REFUSED/DIVERGES
   (reuse the pypoc conformance vocabulary from `test_vm_samples.py`).

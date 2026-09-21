@@ -18,7 +18,7 @@
 #include <test_common/test_context_fixture.h>
 #include <test_common/test_fiber_fixture.h>
 
-// REPL session module, milestone M0 (doc/repl-plan.md): the reservation
+// REPL session module, milestone M0 (doc-llm/history/repl/repl-plan.md): the reservation
 // mechanics. Appending real deltas is M1; here the tables are written by hand
 // to prove that the reserved arrays do not move and that overruns are reported
 // before anything changes.

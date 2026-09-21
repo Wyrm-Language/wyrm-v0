@@ -1301,7 +1301,7 @@ TEST_SUITE("vm defers and fault unwinding") {
         for (wy_uword threshold : { (wy_uword) -1, (wy_uword) 0 }) {
             test_fiber_fixture ctx;
             wy_context* context = ctx.get_context_ptr();
-            if (threshold == 0) { context->gc_threshold = 0; }
+            if (threshold == 0) { context->gc_threshold = 0; context->gc_growth_factor = 0; }
             wy_module* module = make_code_module(context, code, std::size(code), {
                 proto_at(context, "outer", 0, 2), proto_at(context, "inner", 9, 1),
                 proto_at(context, "d_inner", 14, 1), proto_at(context, "d_outer", 17, 2) });
@@ -1348,7 +1348,7 @@ TEST_SUITE("vm defers and fault unwinding") {
         for (wy_uword threshold : { (wy_uword) -1, (wy_uword) 0 }) {
             test_fiber_fixture ctx;
             wy_context* context = ctx.get_context_ptr();
-            if (threshold == 0) { context->gc_threshold = 0; }
+            if (threshold == 0) { context->gc_threshold = 0; context->gc_growth_factor = 0; }
             wy_module* module = make_code_module(context, code, std::size(code), {
                 proto_at(context, "main", 0, 3), proto_at(context, "rec", 9, 3, 1), proto_at(context, "count", 22, 2) });
             give_globals(context, module, 2);

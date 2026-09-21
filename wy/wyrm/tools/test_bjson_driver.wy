@@ -5,7 +5,7 @@
 # under pypoc's tree-walking interpreter; this file must instead be
 # compiled by pypoc's compiler_bc and run on this repo's C VM `wyrm`
 # binary, a different pipeline entirely - see wy/wyrm/bjson.wy's header
-# comment and vm_plan/epic_9.md). Run it by hand:
+# comment and doc-llm/history/wypoc-vm-port/epic_9.md). Run it by hand:
 #
 #   work=$(mktemp -d)
 #   cp wy/wyrm/bjson.wy wy/wyrm/tools/test_bjson_driver.wy "$work/"

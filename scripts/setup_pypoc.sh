@@ -2,7 +2,7 @@
 # Sets up the nested pypoc/ checkout's Python toolchain: venv, dev deps, and
 # a sanity run of pypoc's own test suite. Idempotent - safe to re-run.
 #
-# vm_plan/README.md: "pypoc/ is a nested git checkout, gitignored. Tooling
+# doc-llm/history/wypoc-vm-port/README.md: "pypoc/ is a nested git checkout, gitignored. Tooling
 # uses pypoc/.venv/bin/wyrm."
 set -euo pipefail
 

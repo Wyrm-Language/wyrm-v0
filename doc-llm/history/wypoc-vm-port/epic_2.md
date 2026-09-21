@@ -21,7 +21,7 @@ meson test -C buildDir --suite golden                      # hello, hello_1/2/3,
 
 ## Inputs
 
-`vm_plan/epic_1_report.md`. State-scan checklist:
+`doc-llm/history/wypoc-vm-port/epic_1_report.md`. State-scan checklist:
 
 1. Read the report's "Proposed edits to epic_2.md" and apply them to this file first.
 2. `meson test` green; record the count. `meson test --suite loader` green.
@@ -48,8 +48,8 @@ meson test -C buildDir --suite golden                      # hello, hello_1/2/3,
 ## Context to load
 
 Read (≈35k tokens):
-- `vm_plan/README.md`; `vm_plan/design_c_vm.md` §0–§2, §4, §6, §8, §9, §10 rows M0/M2.
-- `AGENTS.md`, `doc/EXPLAINER.md`, `doc/vm_impl.md` (epic-1 version).
+- `doc-llm/history/wypoc-vm-port/README.md`; `doc-llm/history/wypoc-vm-port/design_c_vm.md` §0–§2, §4, §6, §8, §9, §10 rows M0/M2.
+- `AGENTS.md`, `doc-llm/EXPLAINER.md`, `doc/vm_impl.md` (epic-1 version).
 - `pypoc/doc/wyc-format.md` §1 machine model, §5 encoding, §6.1–6.2 and the call/return/
   closure rows of §6.3, §7.1 step 4 (builtins fill) and §7.2.
 - `include/wyrm/{fiber.h,stack.h,exec_fn.h,context.h,value.h,primitive.h,string.h,

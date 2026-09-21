@@ -4,8 +4,8 @@
 # (src/platform/hosted/expand_native.c) creates a throwaway machine, loads a
 # "scope" module (only the compiling module's imports), loads this module and
 # calls `expand_tree(tree, scope)` there. Only tree-shaped data crosses in and
-# out. See doc/addendum-decorator-expansion.md for the language rules and
-# vm_plan/epic_10a.md (D1-D10) for the design.
+# out. See doc-llm/addendum-decorator-expansion.md for the language rules and
+# doc-llm/history/wypoc-vm-port/epic_10a.md (D1-D10) for the design.
 #
 # What it does: walk the module tree outside-in, in source order. A
 # `$['decorated, decorators, stmt]` node applies its OUTERMOST decorator to the
@@ -16,7 +16,7 @@
 # decorator is still a `'decorated` node inside it, and `sexpr(this)` does not
 # expand it (unlike pypoc's, which expands on the way to encoding). A
 # decorator that must see the expanded inner tree has no `macroexpand` yet -
-# a known gap recorded in vm_plan/epic_10a_report.md; none of this repo's
+# a known gap recorded in doc-llm/history/wypoc-vm-port/epic_10a_report.md; none of this repo's
 # decorators (`@accept`, `@template`) nests.
 #
 # Arguments are FORMS, not values (D9): a pure literal argument arrives as its

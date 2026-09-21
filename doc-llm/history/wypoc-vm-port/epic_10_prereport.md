@@ -1,6 +1,6 @@
 # Epic 10 pre-report — state-scan checklist verification
 
-Verified 2026-09-18 against `vm_plan/epic_10.md`'s "State-scan checklist" (items 1-8)
+Verified 2026-09-18 against `doc-llm/history/wypoc-vm-port/epic_10.md`'s "State-scan checklist" (items 1-8)
 and its *(verify in scan)* Assumptions, before any milestone work starts.
 
 ## Checklist results

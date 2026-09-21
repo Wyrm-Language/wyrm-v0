@@ -6,7 +6,7 @@
 # on this repo's C VM `wyrm` binary, a different pipeline from the
 # tree-walker `test/wy/*` suite). Hand-builds the `hello` module image from
 # doc/wyc-format.md Appendix A (statics, one function `greet`, the 15 code
-# words, exports, free - all given verbatim in vm_plan/epic_9.md's M3
+# words, exports, free - all given verbatim in doc-llm/history/wypoc-vm-port/epic_9.md's M3
 # section) via image.wy's constructors and opcodes.wy's `pack()`, then
 # writes `to_wyc()`'s bytes to a file with the C VM's raw `std::io`
 # natives (open/write/close on an int handle - see the import comment

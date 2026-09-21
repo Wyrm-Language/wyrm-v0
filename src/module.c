@@ -1073,7 +1073,7 @@ const wy_object_type wy_module_type = {
 };
 
 /* -------------------------------------------------------------------------
- * Session extension (doc/repl-plan.md, M1)
+ * Session extension (doc-llm/history/repl/repl-plan.md, M1)
  *
  * A delta image is an ordinary container whose header carries `d: 1` and the
  * module's counts *before* the delta:

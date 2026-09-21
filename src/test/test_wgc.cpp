@@ -132,7 +132,7 @@ TEST_SUITE("wgc") {
         wy_context* context = fix.get_context_ptr();
         wy_gc_arena* arena = arena_of(fix);
 
-        context->gc_threshold = 0;
+        context->gc_threshold = 0; context->gc_growth_factor = 0;
 
         wy_pair* rooted = wy_pair_new_f(context);
         REQUIRE_NE(rooted, WY_NULL);

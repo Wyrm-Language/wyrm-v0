@@ -11,6 +11,9 @@ typedef struct wy_gc_arena
     wy_allocator* allocator;
     wy_object* first;
     wy_object* last;
+    /** Set by wy_gc_collect_finish_f: objects the sweep examined, and how many of them survived */
+    wy_uword last_examined;
+    wy_uword last_survivors;
 } wy_gc_arena;
 
 void wy_gc_init_f(wy_gc_arena* self, wy_allocator* allocator);

@@ -12,8 +12,8 @@
 #include <string.h>
 
 /*
- * The interactive loop (`wyrm -i`, wy_host_repl). See doc/repl.md for what the
- * user sees; doc/repl-plan.md for the design.
+ * The interactive loop (`wyrm -i`, wy_host_repl). See doc-llm/repl.md for what the
+ * user sees; doc-llm/history/repl/repl-plan.md for the design.
  */
 
 static void emit_(wy_host* host, const char* text, size_t len)

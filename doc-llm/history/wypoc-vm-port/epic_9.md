@@ -28,11 +28,11 @@ which changes this to a `--strip`-produced reference rather than the checked-in 
 
 ## Inputs
 
-- `vm_plan/epic_8_report.md` if epic 8 has run (front-end cleanup: `ast.wy`, `decode.wy`
+- `doc-llm/history/wypoc-vm-port/epic_8_report.md` if epic 8 has run (front-end cleanup: `ast.wy`, `decode.wy`
   fixes, parser parity). If absent, read the plan's Epic 8 section instead and treat its
   deliverables as unverified; note any that epic 9 actually needs (bug-free `\x`/`\u`
   decoding in `decode.wy` is used nowhere in this epic, so its absence is not blocking).
-- `vm_plan/epic_7_report.md` if it exists (the `bytes` type landing pypoc + C); otherwise
+- `doc-llm/history/wypoc-vm-port/epic_7_report.md` if it exists (the `bytes` type landing pypoc + C); otherwise
   the plan's Epic 7 section (`bytes(n)`, `append`, `resize`, `slice`, `to_str`,
   `pack_u8/i32/u32/f32/f64`, `unpack_*`, `copy`, `==`).
 
@@ -281,7 +281,7 @@ existing corpus-runner) that runs the exit-criterion pipeline and `cmp`s the res
 
 ## Report
 
-Write `vm_plan/epic_9_report.md` using the template in `vm_plan/README.md`. Beyond the
+Write `doc-llm/history/wypoc-vm-port/epic_9_report.md` using the template in `doc-llm/history/wypoc-vm-port/README.md`. Beyond the
 template's standard sections, record explicitly:
 - The final debug-section decision actually implemented (strip-and-compare, as assumed
   above, or something else the executor chose instead, and why).

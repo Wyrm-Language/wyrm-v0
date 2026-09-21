@@ -22,7 +22,7 @@ Both runs write a file byte-identical to
 ## Inputs
 
 - Previous report: none yet. Epic 7 can start after epic 3 (C-side `wy_bytes` object
-  minimum) and epic 1 (pypoc side). If `vm_plan/epic_6_report.md` or a later report
+  minimum) and epic 1 (pypoc side). If `doc-llm/history/wypoc-vm-port/epic_6_report.md` or a later report
   exists, read its "Orientation for the next session" for anything amending
   `design_c_vm.md` §4/§5. If no reports exist yet, proceed from `design_c_vm.md` as
   written and note in this epic's report that it ran ahead of the C-side epics.
@@ -49,8 +49,8 @@ Both runs write a file byte-identical to
 ## Context to load
 
 Read in full:
-- `vm_plan/design_c_vm.md` §4 (`wy_bytes` struct, value tags), ~1k tokens.
-- `vm_plan/design_c_vm.md` §5, the "Builtins are a module" paragraph, ~300 tokens.
+- `doc-llm/history/wypoc-vm-port/design_c_vm.md` §4 (`wy_bytes` struct, value tags), ~1k tokens.
+- `doc-llm/history/wypoc-vm-port/design_c_vm.md` §5, the "Builtins are a module" paragraph, ~300 tokens.
 - `pypoc/doc/wyc-format.md` §4 "The BSON subset" and §8 "Section schemas" (`statics`),
   ~1.5k tokens.
 - `pypoc/wypoc/compiler_bc/bsonlite.py` in full (223 lines): `_element`, `_value`'s
@@ -285,7 +285,7 @@ reports no differences among the outputs actually runnable.
 
 ## Report
 
-`vm_plan/epic_7_report.md` follows the README template, plus:
+`doc-llm/history/wypoc-vm-port/epic_7_report.md` follows the README template, plus:
 
 - The exact message set landed for `bytes` in both engines, with deviations from M1.
 - Whether M4 (C-side `std::io` binary mode) landed or was descoped, and which later epic

@@ -2,7 +2,7 @@
 
 > **SUPERSEDED (same day):** M4, M5, and M6 landed after this handoff was
 > written — `d603500` (M4), `d7d6d2f` (M5+M6). The epic is complete; see
-> `vm_plan/epic_11_report.md`. The "Remaining milestones" section below is
+> `doc-llm/history/wypoc-vm-port/epic_11_report.md`. The "Remaining milestones" section below is
 > historical; the traps and regen notes still hold.
 
 Session date: 2026-09-19 · Written per the user's pause-after-a-couple-of-
@@ -16,7 +16,7 @@ Session date: 2026-09-19 · Written per the user's pause-after-a-couple-of-
   (unchanged from 10a's final state). Selfcompile: gen1 == gen2
   byte-for-byte **plus** the new embedded-images staleness check ("embedded
   images: N files up to date with wy/").
-- The M1 re-cut lives in `vm_plan/epic_11.md` (scan outcomes that supersede
+- The M1 re-cut lives in `doc-llm/history/wypoc-vm-port/epic_11.md` (scan outcomes that supersede
   the original M1 text). Read it before anything else.
 
 ## What landed, compressed
@@ -91,7 +91,7 @@ opportunity:** the binary can now compile .wy itself, so regen could drive
 the built `wyrm` with a tiny driver script instead of the pypoc/gen0 seed —
 not done, would be a clean M4/M5 follow-up.
 
-## Remaining milestones (per vm_plan/epic_11.md, unchanged in scope)
+## Remaining milestones (per doc-llm/history/wypoc-vm-port/epic_11.md, unchanged in scope)
 
 - **M4 — CLI parity** (pypoc/wypoc/cli.py is the reference; scan confirmed
   exit codes **0 success / 1 runtime+compile failure / 2 usage errors**):
@@ -117,12 +117,12 @@ not done, would be a clean M4/M5 follow-up.
   pypoc when present — that is accepted (second independent implementation)
   but must be documented.
 - **M6 — EXPLAINER.md + the stripped-PATH end-to-end test.** Update
-  doc/EXPLAINER.md:189-191 (".wy still needs pypoc" — now false) and the
-  engines table in doc/agent-notes.md (already partially updated). Final
+  doc-llm/EXPLAINER.md:189-191 (".wy still needs pypoc" — now false) and the
+  engines table in doc-llm/agent-notes.md (already partially updated). Final
   meson test: `env -i PATH=/usr/bin:/bin ./buildDir/src/wyrm/wyrm -Iwy
   test/bytecode/hello.wy` → `Hello World`; assert the test's PATH provably
   lacks python (`command -v python3` must fail) before asserting the run.
-  Then write `vm_plan/epic_11_report.md` per the README template (it must
+  Then write `doc-llm/history/wypoc-vm-port/epic_11_report.md` per the README template (it must
   record: table format + provenance, tier split, exit-code table,
   --check recursion decision, stripped-PATH command output, and any
   remaining pypoc assumptions — the sweep tests + build_amalgam are the

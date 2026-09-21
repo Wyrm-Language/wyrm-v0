@@ -21,6 +21,15 @@ WY_BEGIN_DECLS
 /** Default gc_pressure threshold (bytes) before a safepoint triggers a collection */
 #define WY_CONTEXT_GC_THRESHOLD_DEFAULT (1u << 16)
 
+/**
+ * Default gc_growth_factor: after each collection the next threshold becomes
+ * `live_bytes * factor` (never below WY_CONTEXT_GC_THRESHOLD_DEFAULT), so the
+ * heap may grow to (1 + factor) times its live size between collections and
+ * total collection work stays proportional to allocation, not to heap size
+ * times allocation.
+ */
+#define WY_CONTEXT_GC_GROWTH_FACTOR_DEFAULT 2u
+
 /** Default coroutine fiber sizing (design_c_vm.md §3). */
 #define WY_CONTEXT_CO_STACK_LEN_DEFAULT 512
 #define WY_CONTEXT_CO_FRAME_COUNT_DEFAULT 32
@@ -79,6 +88,14 @@ struct wy_context
     /** Bytes allocated since the last collection; compared against gc_threshold at safepoints */
     wy_uword gc_pressure;
     wy_uword gc_threshold;
+    /**
+     * Adaptive threshold multiplier (see WY_CONTEXT_GC_GROWTH_FACTOR_DEFAULT). 0 pins gc_threshold
+     * at whatever it is set to: GC-stress code that sets it to 0 (collect at every safepoint) or
+     * to `(wy_uword) -1` (never) must also set this to 0, or the next collection overwrites it.
+     */
+    wy_uword gc_growth_factor;
+    /** Estimated bytes surviving the last collection (see wy_context_gc_full_run) */
+    wy_uword gc_live_bytes;
     /** Set mid-collection when the mark worklist could not grow; the sweep for that cycle is skipped */
     bool gc_abandoned;
 

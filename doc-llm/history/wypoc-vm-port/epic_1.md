@@ -25,7 +25,7 @@ the top of `epic_1_report.md`):
 1. `meson setup buildDir && meson compile -C buildDir && meson test -C buildDir` is green
    and record the case count (was 75 cases / 453 assertions on 2026-09-15).
 2. `git status` is clean apart from `pypoc/` being ignored; the uncommitted
-   `include/wyrm/context.h` change (`WY_CONTEXT_MODULE_INITIAL`) and `doc/EXPLAINER.md`
+   `include/wyrm/context.h` change (`WY_CONTEXT_MODULE_INITIAL`) and `doc-llm/EXPLAINER.md`
    have been committed or are committed as this epic's first commit.
 3. `pypoc/.venv` exists, or create it: `cd pypoc && python -m venv .venv && .venv/bin/pip
    install -e ".[dev]"`; then `.venv/bin/pytest -q` is green (record count).
@@ -47,8 +47,8 @@ the top of `epic_1_report.md`):
 ## Context to load
 
 Read (≈25k tokens total):
-- `vm_plan/README.md`, `vm_plan/design_c_vm.md` §0, §5, §9 (loader, module struct, testing).
-- `AGENTS.md` (all), `doc/EXPLAINER.md` (all).
+- `doc-llm/history/wypoc-vm-port/README.md`, `doc-llm/history/wypoc-vm-port/design_c_vm.md` §0, §5, §9 (loader, module struct, testing).
+- `AGENTS.md` (all), `doc-llm/EXPLAINER.md` (all).
 - `pypoc/doc/wyc-format.md` §2 container, §3 sections, §4 BSON subset, §7 load sequence,
   §8 section schemas, Appendix A and B. Skip §5–§6 (instruction set) for this epic.
 - `pypoc/wypoc/compiler_bc/include/wyrm/image.h` (37 lines), `opcode.h` (130 lines).
@@ -251,9 +251,9 @@ manifest-driven suite. Disjoint functions in `src/module.c`, coordinate via one 
   agrees with the compiler. Run it once; add as a meson test if it is stable.
 - `doc/vm_impl.md` rewritten as the agent map: file → responsibility table, the
   `wy_module` table layout, how to regenerate the corpus, how to run one fixture.
-  `doc/EXPLAINER.md` "Bytecode / VM state" section updated to reflect the loader.
+  `doc-llm/EXPLAINER.md` "Bytecode / VM state" section updated to reflect the loader.
 
-**Files** changed: `src/wyrm/main.c`, `doc/vm_impl.md`, `doc/EXPLAINER.md`; new:
+**Files** changed: `src/wyrm/main.c`, `doc/vm_impl.md`, `doc-llm/EXPLAINER.md`; new:
 `scripts/check_disasm.sh`.
 
 **Acceptance** the exit-criterion commands; `scripts/check_disasm.sh` reports 0

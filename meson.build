@@ -5,6 +5,7 @@ project('wyrm', 'c', 'cpp',
         'cpp_std=c++23',
         'c_std=c11',
         'warning_level=3',
+        'b_ndebug=if-release',
     ],
 )
 

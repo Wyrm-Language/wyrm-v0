@@ -194,7 +194,7 @@ Harness:
 
 ## Orientation for the next session (epic 10a)
 
-- Read `vm_plan/epic_10a.md` and the "M7 final status" section above.
+- Read `doc-llm/history/wypoc-vm-port/epic_10a.md` and the "M7 final status" section above.
 - Baseline to protect: `meson test` 8/8, corpus sweep 19/20, self-compile gen1 == gen2.
   `SELFCOMPILE_KEEP=/tmp/x python3 scripts/run_selfcompile.py` keeps the trees.
 - Debugging recipe that worked: swap gen0/pypoc-built `.wyc` modules into a copy of the

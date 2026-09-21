@@ -19,10 +19,10 @@ cannot serve a stale overload after `reg_msg` adds a more specific one at runtim
 
 ## Inputs
 
-- `vm_plan/epic_11_report.md` — read first: confirm the self-hosted compiler's own dispatch
+- `doc-llm/history/wypoc-vm-port/epic_11_report.md` — read first: confirm the self-hosted compiler's own dispatch
   and class code (if any changed shape from the C VM's during the port) hasn't moved
   `src/dispatch.c`/`include/wyrm/class.h` in a way that invalidates this file's plan.
-- `vm_plan/epic_6_report.md` — read for the baseline benchmark table (method-call-loop
+- `doc-llm/history/wypoc-vm-port/epic_6_report.md` — read for the baseline benchmark table (method-call-loop
   number this epic must beat) and any "Proposed edits to epic_12.md" it recorded.
 - State-scan checklist:
   1. Confirm `src/dispatch.c` and `include/wyrm/class.h` still exist at the paths epic 4/6
@@ -43,9 +43,9 @@ cannot serve a stale overload after `reg_msg` adds a more specific one at runtim
 
 ## Context to load
 
-1. `vm_plan/design_c_vm.md` §7 (classes), §10 (message dispatch caching, one paragraph) —
+1. `doc-llm/history/wypoc-vm-port/design_c_vm.md` §7 (classes), §10 (message dispatch caching, one paragraph) —
    read in full, ~1.5k tokens.
-2. `vm_plan/epic_6_report.md`, `vm_plan/epic_11_report.md` — read, ~2-3k tokens combined.
+2. `doc-llm/history/wypoc-vm-port/epic_6_report.md`, `doc-llm/history/wypoc-vm-port/epic_11_report.md` — read, ~2-3k tokens combined.
 3. `pypoc/doc/wyc-format.md` §10 — read, ~0.3k tokens.
 4. Current C: `src/dispatch.c`, `include/wyrm/class.h`, the `msg`/`msg_va` cases in
    `src/vm.c` — read in full, ~3k tokens.

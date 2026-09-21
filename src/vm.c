@@ -740,6 +740,20 @@ static wy_exec_state exec_native_call_resume_f(wy_context* ctx, wy_primitive c_d
     return wy_vm_run(ctx, wy_primitive_null());
 }
 
+/*
+ * GC safepoint. Polled only where an unbounded amount of allocation can
+ * accumulate: frame entry/re-entry (`reload`, which covers calls and
+ * recursion) and backward jumps (loops). Straight-line code between polls
+ * allocates a bounded amount. `fr->ip` must name the resume point.
+ */
+#define WY_VM_SAFEPOINT() \
+    do { \
+        if (ctx->gc_pressure > ctx->gc_threshold) { \
+            fr->ip = ip; \
+            wy_context_gc_safepoint(ctx); \
+        } \
+    } while (0)
+
 wy_exec_state wy_vm_run(wy_context* ctx, wy_primitive unused)
 {
     WY_UNUSED(unused);
@@ -758,12 +772,10 @@ reload:;
     if (fr->phase == WY_PHASE_RETURNING) { goto do_return; }
     if (fr->phase == WY_PHASE_FAILING) { goto do_unwind; }
 
-    for (;;) {
-        if (ctx->gc_pressure > ctx->gc_threshold) {
-            fr->ip = ip;
-            wy_context_gc_safepoint(ctx);
-        }
+    /* Frame entry/re-entry (every call, return, resume lands at `reload`). */
+    WY_VM_SAFEPOINT();
 
+    for (;;) {
         wy_u32 w0 = *ip;
         wy_u8 op = (wy_u8) (w0 & 0xffu);
         wy_u8 f = (wy_u8) ((w0 >> 8) & 0xffu);
@@ -997,16 +1009,19 @@ reload:;
             default:          take = false; break;
             }
             ip = take ? (next_ip + rel) : next_ip;
+            if (take && rel < 0) { WY_VM_SAFEPOINT(); }
             break;
         }
         case WY_OP_JMP: {
             wy_i32 rel = (int16_t) a0;
             ip = next_ip + rel;
+            if (rel < 0) { WY_VM_SAFEPOINT(); }
             break;
         }
         case WY_OP_JMP_WIDE: {
             wy_i32 rel = (wy_i32) w1;
             ip = next_ip + rel;
+            if (rel < 0) { WY_VM_SAFEPOINT(); }
             break;
         }
 

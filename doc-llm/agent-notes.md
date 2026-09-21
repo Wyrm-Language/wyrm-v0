@@ -1,6 +1,6 @@
 # Notes for automated agents: traps, method, and past regressions
 
-Distilled from epics 7-10 (see `vm_plan/epic_N_report.md` for full detail). Read this before
+Distilled from epics 7-10 (see `doc-llm/history/wypoc-vm-port/epic_N_report.md` for full detail). Read this before
 touching `src/vm*.c`, `src/embed/wyrm/*.wy`, or the self-hosted compiler.
 
 ## Engines and which one is the reference
@@ -190,3 +190,48 @@ Symptom -> usual cause seen so far:
   is unbound, look there first.
 - The REPL compiles inside the collected VM, so GC-stress runs of the differential are slow; keep
   those to a small subset.
+
+## Performance experiments that were tried and not kept
+
+Record of optimizations that were implemented, measured and reverted, so they are not redone.
+Numbers are wall-clock seconds from release builds (`-Dbuildtype=release -Db_ndebug=true`), 3 runs
+each, benchmarks from `Programming-Language-Benchmarks/bench/algorithm/*/1.wy`.
+
+### Computed-goto (threaded) dispatch in `wy_vm_run` - no gain, reverted
+
+**What was tried.** GNU labels-as-values dispatch: `WY_JUMP_TABLE_*` / `WY_DISPATCH_*` macros in
+`include/wyrm/sys/toolchain.h` (a 256-entry `static const void* const` table, one label per `case`,
+`goto *table[op]` at the end of each handler) with a fallback to the plain `switch` when
+the extension was unavailable or `WY_DISABLE_COMPUTED_GOTO` was defined. The decode block at the top of
+the loop became a macro so each handler could re-run it and jump directly to the next handler. All 14
+meson suites passed in both modes; the change was semantically sound.
+
+**Why it was dropped.** No measurable speedup, and it is non-standard C (`-Wpedantic` needs pragmas, the
+`[0 ... 255]` range designator and `goto *` are GNU extensions), which is not worth carrying for nothing.
+
+| benchmark | plain `switch` | computed goto (default flags) |
+|---|---|---|
+| fannkuch-redux 10 | 8.0 - 8.2 | 8.2 - 8.4 |
+| lru 100 500000 | 2.5 | 2.6 |
+| nsieve 9 | 2.5 | 2.5 |
+| binarytrees 14 | 1.9 | 1.9 |
+
+Two tuned variants were also measured (`--param=max-goto-duplication-insns=1000`, alone and with
+`-fno-crossjumping`) and were also within noise (about 1-3%) of the plain switch.
+
+**Things learned that still apply:**
+
+- With default GCC flags the compiler undoes the technique: it factors every `goto *` back into one
+  shared indirect jump (objdump of `vm.c.o`: 4 indirect jumps versus 2 for the switch). The number of
+  jumps only reaches roughly one per handler (105) with `max-goto-duplication-insns` raised and
+  `-fno-crossjumping`. When counting, match `jmp +\*`, not `jmp .*\*%r`: indexed indirect jumps print
+  as `jmp *(%rax,%rdx,8)`.
+- Even with per-handler jumps there was no gain, so dispatch branch prediction is not the bottleneck on
+  the current CPUs. Time is in handler bodies (callgrind: `wy_vm_run` 37-56%, `wy_vm_binop_f` 12-17%,
+  `push_bytecode_call_bind_f` 15% on binarytrees, dict `find_sparse_slot` 12% on fannkuch).
+- Better targets, in the order they were measured: the fixed 64 KB GC threshold
+  (`WY_CONTEXT_GC_THRESHOLD_DEFAULT`, which made binarytrees 15 go from 6.5 s to 1.0 s at 64 MB), an inline
+  word/word fast path for `ADD`/`SUB`/compare/bit ops in the loop instead of calling `wy_vm_binop_f`, and
+  the call path (`push_bytecode_call_bind_f`).
+- Retry only if handler bodies get much cheaper first (dispatch overhead is then a larger share), and
+  re-measure with per-handler jumps confirmed in the object code.

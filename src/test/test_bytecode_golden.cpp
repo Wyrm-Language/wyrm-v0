@@ -123,6 +123,7 @@ std::string run_fixture(const std::string& name, wy_uword gc_threshold)
     context->io.write = capture_write_;
     context->io.ud = &captured;
     context->gc_threshold = gc_threshold;
+    if (gc_threshold != WY_CONTEXT_GC_THRESHOLD_DEFAULT) { context->gc_growth_factor = 0; }
     std::string import_root = std::string(WY_TEST_FIXTURE_DIR) + "/" + name.substr(0, name.find_last_of('/'));
     context->import_hook = fixture_import;
     context->import_ud = &import_root;

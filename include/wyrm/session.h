@@ -2,7 +2,7 @@
 #define WYRM_SESSION_H_
 
 /*
- * REPL session module (doc/repl-plan.md).
+ * REPL session module (doc-llm/history/repl/repl-plan.md).
  *
  * A session is one wy_module that is extended by each input instead of being
  * loaded once. A running VM holds raw pointers into a module's arrays (a

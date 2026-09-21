@@ -20,7 +20,7 @@ parser output matches pypoc's for the same source.
 
 ## Inputs
 
-- Previous report: `vm_plan/epic_6_report.md` (or latest available) for where the C VM's
+- Previous report: `doc-llm/history/wypoc-vm-port/epic_6_report.md` (or latest available) for where the C VM's
   hosted import path and CLI live, since M6 needs to run compiled front-end code on the C
   VM. Epic 8 can run in parallel with epic 6 per the README's phase map; if epic 6 isn't
   finished, M6 is descoped and the report says so.
@@ -123,7 +123,7 @@ documented table: for every node kind the parser actually emits (cross-reference
 covers what's produced, not just what pypoc's decoder expects), one line of
 `kind -> (field, field, ...)`, with an inline `DIVERGES(reason)` note wherever wyrm's
 parser and pypoc's `sexpr.py` differ, matching the corpus convention from
-`vm_plan/README.md` rather than silently picking a side. Keep the live helper functions;
+`doc-llm/history/wypoc-vm-port/README.md` rather than silently picking a side. Keep the live helper functions;
 update any that reference a deleted class.
 
 **Files:** `wy/wyrm/ast.wy`.
@@ -252,7 +252,7 @@ milestone starts, compile the front end with pypoc's `--build-bc`, run it on the
 against the M3 corpus, and extend `check_parser_truth.py` (or add a sibling) to diff both
 engines' outputs against each other as well as the committed truth. Any difference
 becomes a fix (only if genuinely in scope, epic 8 does not touch C code per the plan) or
-a named `DIVERGES(reason)` entry, per `vm_plan/README.md`'s conformance discipline. If
+a named `DIVERGES(reason)` entry, per `doc-llm/history/wypoc-vm-port/README.md`'s conformance discipline. If
 epic 6 hasn't landed, mark this milestone blocked in the report with what's needed to
 unblock it.
 
@@ -302,7 +302,7 @@ mechanical harness-running part.
 
 ## Report
 
-`vm_plan/epic_8_report.md` follows the README template, plus:
+`doc-llm/history/wypoc-vm-port/epic_8_report.md` follows the README template, plus:
 
 - The node-kind table landed in `ast.wy` (pointer to it, not a duplicate), with any
   `DIVERGES` entries against `sexpr.py`'s `ROWS`.

@@ -58,14 +58,14 @@ for a fresh agent session; `design_c_vm.md` is the shared architecture for epics
 Epic 7 can start any time after epic 3 on the C side and after epic 1 on the pypoc side;
 it is placed after 6 so Phase A stays focused. Epic 8 can run in parallel with 6. Epic 12
 runs last, after epic 11, once the dispatch/class code it optimises has stopped moving
-(it was originally scoped into epic 6 as M3; see epic_6.md's opening note and epic_12.md).
+(it was originally scoped into epic 6 as M3; see doc-llm/active_plans/epic_6.md's opening note and doc-llm/active_plans/epic_12.md).
 
 ## Epic protocol
 
 Every epic runs as: **scan → execute → report**.
 
 1. **Scan** (start of session, Opus). Read this README, the epic file, the previous
-   `epic_(N-1)_report.md`, and `doc/EXPLAINER.md`. Run the epic's *state-scan checklist*
+   `epic_(N-1)_report.md`, and `doc-llm/EXPLAINER.md`. Run the epic's *state-scan checklist*
    using Explore subagents, not by reading whole files. Confirm or refute each item in the
    epic's *Assumptions* list. If a milestone is invalidated, re-cut it in the epic file
    *before* starting and note the change in the report. Run the existing test suite and
@@ -73,8 +73,8 @@ Every epic runs as: **scan → execute → report**.
 2. **Execute** (Opus or Sonnet per milestone; see staging). Milestones in order unless the
    epic marks them independent. Commit per milestone with a message that names the epic
    and milestone (`E2/M2: core loop runs hello.wyc`). `meson test` green at every commit.
-   Update `doc/EXPLAINER.md` and `doc/vm_impl.md` when a structural fact changes.
-3. **Report** (end of session, Opus). Write `vm_plan/epic_N_report.md` using the template
+   Update `doc-llm/EXPLAINER.md` and `doc/vm_impl.md` when a structural fact changes.
+3. **Report** (end of session, Opus). Write `doc-llm/history/wypoc-vm-port/epic_N_report.md` using the template
    below. The report is the only hand-off to the next epic; the next session will not see
    this session's chat.
 
@@ -100,7 +100,7 @@ Each epic file marks every milestone with a suggested model and whether it may f
   run the full suite only before a commit.
 - Prefer `pypoc/.venv/bin/wyrm --build-bc --emit wya file.wy` and reading the specific
   instruction lines you need over re-deriving lowering from the compiler source.
-- Keep `doc/EXPLAINER.md` accurate; it is what makes the next session's scan cheap.
+- Keep `doc-llm/EXPLAINER.md` accurate; it is what makes the next session's scan cheap.
 - When a subagent is spawned, give it: the acceptance command, the files it owns, the
   files it must not touch, and the section of `design_c_vm.md` it implements.
 
@@ -135,5 +135,5 @@ Session dates: … · Models used: … · Commits: <first>..<last>
 - `README.md` — this file.
 - `design_c_vm.md` — C VM architecture (frames, loop, coroutines, values, linking,
   symbols, classes, GC, testing, milestone table M0–M8). Epics 2–6 cite its sections.
-- `epic_1.md` … `epic_11.md`, `epic_10a.md`, `epic_12.md` — one brief per epic, same seven sections each.
+- `epic_1.md` … `epic_11.md`, `epic_10a.md`; `doc-llm/active_plans/epic_12.md` — one brief per epic, same seven sections each.
 - `epic_N_report.md` — written by the executing session at the end of epic N.

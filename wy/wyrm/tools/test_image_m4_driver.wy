@@ -22,7 +22,7 @@
 #
 # The real M4 acceptance gate is comparing to_wya()'s per-section hex bodies
 # against a `--strip` pypoc listing (comments ignored), and compiling the
-# to_c() output with gcc; see vm_plan/epic_9.md's M4 section.
+# to_c() output with gcc; see doc-llm/history/wypoc-vm-port/epic_9.md's M4 section.
 #
 # Output paths are hardcoded: no wy-visible argv builtin exists (see the M3
 # driver's header comment).

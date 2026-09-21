@@ -1,9 +1,9 @@
 # REPL plan: an append-only session module
 
 Status: implemented (M-1 through M4); this document is now the design record. User-facing
-documentation is `doc/repl.md`. Audience: whoever changes it next. Read AGENTS.md
-(build, tests, coding standards) and `doc/agent-notes.md` first; the "Bootstrap trap"
-in `doc/agent-notes.md` and the memory note apply to any compiler change here.
+documentation is `doc-llm/repl.md`. Audience: whoever changes it next. Read AGENTS.md
+(build, tests, coding standards) and `doc-llm/agent-notes.md` first; the "Bootstrap trap"
+in `doc-llm/agent-notes.md` and the memory note apply to any compiler change here.
 
 ## Goal
 
@@ -458,7 +458,7 @@ it (test: "a refused extend ... is undone on the compile side", which fails with
 becomes NULL and the registry loops skip it) so the next collection frees its reservation (test:
 "unregistering a session lets the next collection free it"). `WYRM_SESSION_CODE_WORDS` overrides the
 code reservation; `scripts/check_wy_repl.sh` uses it to check the limit path end to end. Docs:
-`doc/repl.md` (user guide), `doc/vm_impl.md` ("Session modules"), AGENTS.md, this plan.
+`doc-llm/repl.md` (user guide), `doc/vm_impl.md` ("Session modules"), AGENTS.md, this plan.
 
 ## Risks and traps
 

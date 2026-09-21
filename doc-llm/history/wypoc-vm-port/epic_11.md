@@ -92,16 +92,16 @@ layer so the same lines cover the entry script and every transitive import.
 
 ## Inputs
 
-- `vm_plan/epic_10a_report.md`: how decorator expansion landed (`std::eval`, `expand.wy`).
+- `doc-llm/history/wypoc-vm-port/epic_10a_report.md`: how decorator expansion landed (`std::eval`, `expand.wy`).
   **Epic 11 depends on 10a, not only 10:** M2's in-process compile of a user `.wy` must run
   decorator expansion, so the embedded image set must include `std::eval`'s natives and the
   expansion pass, and the embedded `parser` is the one 10a M5 compiled (true self-hosted).
-- `vm_plan/epic_10_report.md`: which fixtures are byte-identical vs. semantic-diff, the
+- `doc-llm/history/wypoc-vm-port/epic_10_report.md`: which fixtures are byte-identical vs. semantic-diff, the
   self-compile fixed point's actual convergence status, the final shape/entry point of
   `wy/wyrm/compiler/module.wy` (or wherever `compiler.wy`'s replacement landed), and any
   `_dsl.wy` decorator gaps noted there that might affect compiling `wy/std` or `wy/wyrm`
   itself at embed time.
-- `vm_plan/epic_9_report.md`: the section-id enum and `wy_module_image` struct shape
+- `doc-llm/history/wypoc-vm-port/epic_9_report.md`: the section-id enum and `wy_module_image` struct shape
   actually shipped, since M1 here embeds images built that way.
 
 State-scan checklist:
@@ -127,7 +127,7 @@ State-scan checklist:
 6. Check `AGENTS.md`'s current wording around "Prefer the default 'wyrm' in user $PATH"
    (~39-41), this is the exact sentence epic 11 must invert once the in-repo binary is
    self-sufficient.
-7. Check `doc/EXPLAINER.md`'s "Bytecode / VM state" section for whatever it currently says
+7. Check `doc-llm/EXPLAINER.md`'s "Bytecode / VM state" section for whatever it currently says
    about the `.wy` sources under `wy/` "not yet wired to the C loader", that sentence
    becomes false at the end of this epic and must be updated.
 8. Confirm meson's test infrastructure (`src/test/meson.build`, `test/samples/`,
@@ -151,7 +151,7 @@ Read:
    embedding source of truth per state-scan item 3). ~1.5k tokens.
 5. `AGENTS.md` in full (currently ~100-150 lines), this is one of the two files M6
    updates, so read it completely rather than by grep.
-6. `doc/EXPLAINER.md` in full (222 lines at plan time), the other file M6 updates.
+6. `doc-llm/EXPLAINER.md` in full (222 lines at plan time), the other file M6 updates.
 7. Skim `src/meson.build` and `src/wyrm/meson.build` for how the `wyrm` executable target
    is currently defined, since M1's embedding step adds a build-time dependency (compile
    the images, then compile them into the binary) that has to fit meson's dependency
@@ -373,16 +373,16 @@ directly) as well as in the normal environment.
 
 **Fan-out.** None.
 
-### M6 — `doc/EXPLAINER.md` update and the final end-to-end meson test
+### M6 — `doc-llm/EXPLAINER.md` update and the final end-to-end meson test
 
-**Scope.** Update `doc/EXPLAINER.md`'s "Bytecode / VM state" section (the sentence about
+**Scope.** Update `doc-llm/EXPLAINER.md`'s "Bytecode / VM state" section (the sentence about
 `.wy` sources "not yet wired to the C loader" is now false) and any other section whose
 facts this epic changed (the `wyrm` binary is now the preferred interpreter, not a
 loader-only tool). Add the final meson test: compile and run a `.wy` sample from source
 with `PATH` stripped of Python (`env -i PATH=/usr/bin:/bin` or equivalent), asserting
 correct output, as the exit criterion above specifies.
 
-**Files.** Edit: `doc/EXPLAINER.md`. New: a meson test target (likely under
+**Files.** Edit: `doc-llm/EXPLAINER.md`. New: a meson test target (likely under
 `src/test/meson.build` or `test/`) implementing the stripped-`PATH` run.
 
 **Acceptance.** The exit criterion command block, run exactly as written, succeeds in CI
@@ -443,7 +443,7 @@ whoever last touched M1-M5 with full context of what actually landed, not delega
 
 ## Report
 
-Write `vm_plan/epic_11_report.md` per `vm_plan/README.md`'s template. Beyond the standard
+Write `doc-llm/history/wypoc-vm-port/epic_11_report.md` per `doc-llm/history/wypoc-vm-port/README.md`'s template. Beyond the standard
 sections, record explicitly:
 - The builtin table's format, and how bootstrap provenance (`.wyc` seed vs `.wyd`) was resolved.
 - Confirmation the table is checked-in `wy_c` `.c`, the regen/staleness procedure, and which

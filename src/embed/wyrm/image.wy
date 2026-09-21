@@ -6,7 +6,7 @@
 # container, spec 5.2). Like wy/wyrm/bjson.wy (M1) and wy/wyrm/opcodes.wy
 # (M2), this file is compiled by pypoc's compiler_bc and run on this repo's
 # C VM (`wyrm`), never on pypoc's tree-walking interpreter - see
-# vm_plan/epic_9.md.
+# doc-llm/history/wypoc-vm-port/epic_9.md.
 #
 # `assemble_wya()` is deliberately not ported here: epic 10 compares listings
 # against this output but never reassembles one, and nothing else consumes a
@@ -138,7 +138,7 @@ fn make_function(name: str, params: list | nil = nil, nlocals: int = 0,
 
 fn _header_doc(image: dict) -> dict:
     doc := {"n": image["name"], "v": image["version"], "g": image["globals"], "l": image["init_l"]}
-    # A REPL session delta (doc/repl-plan.md): `d` marks it, `bc`..`bg` are the
+    # A REPL session delta (doc-llm/history/repl/repl-plan.md): `d` marks it, `bc`..`bg` are the
     # module's counts before the delta (the loader refuses a mismatch), `i` is
     # the absolute index of the function that runs this input.
     delta := (image["delta"] catch nil)

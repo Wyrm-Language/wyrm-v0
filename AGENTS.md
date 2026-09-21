@@ -80,10 +80,10 @@ Tests check behavior, plus our own compiler's self-consistency:
 
 - `examples` (`scripts/check_examples.sh`): the embedding examples in `examples/` run and
   compared with `examples/expected/`; the library they use is `libwyrmhost` (`include/wyrm/host.h`,
-  guide in `doc/embedding.md`), covered by the `host` suite in `test_cwyrm`.
-- `wy-repl` (`scripts/check_wy_repl.sh`; user guide in `doc/repl.md`): the interactive loop, `wyrm -i`, driven by piped
+  guide in `doc-llm/embedding.md`), covered by the `host` suite in `test_cwyrm`.
+- `wy-repl` (`scripts/check_wy_repl.sh`; user guide in `doc-llm/repl.md`): the interactive loop, `wyrm -i`, driven by piped
   transcripts in `test/corpus/repl` (local only; not cross-checked against any other wyrm). The
-  session-compile suites in `test_cwyrm` cover the compiler side (see `doc/repl-plan.md`); the
+  session-compile suites in `test_cwyrm` cover the compiler side (see `doc-llm/history/repl/repl-plan.md`); the
   slow whole-corpus differential is its own test, `cwyrm-session-differential`.
 
 External wyrm selection (`scripts/wytest_env.py`): exported `$WYRM`, else
@@ -114,9 +114,9 @@ To test a script for syntax:
 ## Debugging and Known Traps
 
 Before changing the VM, the parser, or the self-hosted compiler, read
-[doc/agent-notes.md](doc/agent-notes.md): engine roles, the gen0/gen1/gen2 compiler
+[doc-llm/agent-notes.md](doc-llm/agent-notes.md): engine roles, the gen0/gen1/gen2 compiler
 generations and why the amalgam hides bugs, bisect/disasm-diff recipes, and the parser, VM
-and codegen pitfalls behind past regressions. Epic history lives in `vm_plan/`.
+and codegen pitfalls behind past regressions. Epic history lives in `doc-llm/history/wypoc-vm-port/`.
 
 ## C/C++ Coding Standards
 

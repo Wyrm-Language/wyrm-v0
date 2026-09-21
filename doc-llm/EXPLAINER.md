@@ -126,7 +126,7 @@ src/platform/*                "hosted" = standard C11 malloc/free); platform/*
 
 ### Bytecode / VM state — **the most important thing to know before touching this**
 
-As of epic 2 (`vm_plan/epic_2.md`), `wyrm file.wyc` actually runs: the
+As of epic 2 (`doc-llm/history/wypoc-vm-port/epic_2.md`), `wyrm file.wyc` actually runs: the
 dispatch loop executes real `.wyc` module images compiled by `pypoc/`
 (`pypoc/.venv/bin/wyrm --build-bc`), linked against a builtins module for
 `println`/`print`. See `doc/vm_impl.md` for the file-by-file map, the

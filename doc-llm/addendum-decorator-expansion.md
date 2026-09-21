@@ -3,7 +3,7 @@
 Proposed additions to `doc/language-spec.md`, *Semantics > Decorators*, for merging into the
 canonical wyrm spec. They define what the spec currently leaves open: which code a decorator
 may run, what it receives, and what the expansion environment may touch. They are the design
-of `vm_plan/epic_10a.md`. Each section says what is defined and why.
+of `doc-llm/history/wypoc-vm-port/epic_10a.md`. Each section says what is defined and why.
 
 ## The module being compiled does not execute
 

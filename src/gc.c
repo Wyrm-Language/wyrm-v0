@@ -8,6 +8,8 @@ void wy_gc_init_f(wy_gc_arena* self, wy_allocator* allocator)
     self->first = WY_NULL;
     self->last = WY_NULL;
     self->allocator = allocator;
+    self->last_examined = 0;
+    self->last_survivors = 0;
 }
 
 
@@ -138,10 +140,13 @@ void wy_gc_collect_finish_f(wy_context* parent, wy_gc_arena* self)
     wy_object* first = WY_NULL;
     wy_object* last = WY_NULL;
     wy_object* gc_cur = self->first;
+    wy_uword examined = 0, survivors = 0;
 
     while (gc_cur) {
         wy_object* next_gc = gc_cur->next;
+        examined++;
         if ((gc_cur->flags & (WY_GC_FLAG_MARKED | WY_GC_STATIC)) != 0) {
+            survivors++;
             /* survivor: relink onto the new list */
             if (first == WY_NULL) { first = gc_cur; }
             else { last->next = gc_cur; }
@@ -156,4 +161,6 @@ void wy_gc_collect_finish_f(wy_context* parent, wy_gc_arena* self)
 
     self->first = first;
     self->last = last;
+    self->last_examined = examined;
+    self->last_survivors = survivors;
 }

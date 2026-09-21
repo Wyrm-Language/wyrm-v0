@@ -19,7 +19,7 @@ zero unexplained category changes.
 
 ## Inputs
 
-- `vm_plan/epic_4_report.md` — read first, especially its notes on the qualified-name
+- `doc-llm/history/wypoc-vm-port/epic_4_report.md` — read first, especially its notes on the qualified-name
   first-component resolver built for message paths (this epic's `getscope` and `import`
   both reuse or parallel it) and the dispatch-cache-table deferral.
 - State-scan checklist:
@@ -47,9 +47,9 @@ zero unexplained category changes.
 
 ## Context to load
 
-1. `vm_plan/design_c_vm.md` §3 (coroutines), §5 (module and linking) — read in full, ~4k
+1. `doc-llm/history/wypoc-vm-port/design_c_vm.md` §3 (coroutines), §5 (module and linking) — read in full, ~4k
    tokens; this epic's primary spec.
-2. `vm_plan/epic_4_report.md` — read, ~1-2k tokens.
+2. `doc-llm/history/wypoc-vm-port/epic_4_report.md` — read, ~1-2k tokens.
 3. `pypoc/doc/wyc-format.md` §7.1-§7.3 (load sequence, three-layer fill, resolving one
    entry) — read in full, ~2.5k tokens.
 4. `pypoc/wypoc/vm/module.py:196-263` (`fill`, `global_fault`, `bound`) and

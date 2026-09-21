@@ -12,7 +12,7 @@
 #
 # This driver has NO `import` line on purpose: it is concatenated with its
 # dependencies into one module. Two engine bugs make that the only way to
-# exercise context.wy today (both recorded in vm_plan/epic_10_report.md):
+# exercise context.wy today (both recorded in doc-llm/history/wypoc-vm-port/epic_10_report.md):
 #
 #   * on the C VM, ANY message call on a class instance whose class comes
 #     from another module fails with "no overload of '<name>' matches 1

@@ -19,7 +19,7 @@ green for `closures.wyc` and `collections.wyc`.
 
 ## Inputs
 
-- `vm_plan/epic_2_report.md` — read first; it says where the loop, `wy_vm_call_sync`, and
+- `doc-llm/history/wypoc-vm-port/epic_2_report.md` — read first; it says where the loop, `wy_vm_call_sync`, and
   the golden harness actually live after epic 2's own scan corrections.
 - State-scan checklist (confirm each before cutting milestones; update this file if any is
   false):
@@ -47,9 +47,9 @@ green for `closures.wyc` and `collections.wyc`.
 
 Budget assumes a fresh Opus scan session; each executor milestone loads only its own rows.
 
-1. `vm_plan/design_c_vm.md` §1 (frame model), §4 (values), §6 (symbols/strings) — read,
+1. `doc-llm/history/wypoc-vm-port/design_c_vm.md` §1 (frame model), §4 (values), §6 (symbols/strings) — read,
    ~3k tokens.
-2. `vm_plan/epic_2_report.md` — read in full, ~1–2k tokens.
+2. `doc-llm/history/wypoc-vm-port/epic_2_report.md` — read in full, ~1–2k tokens.
 3. `pypoc/doc/wyc-format.md` §6.1–§6.3 (opcode tables, already excerpted below) — read
    once, ~2k tokens; do not re-fetch per milestone.
 4. `pypoc/wypoc/vm/interp.py:283-660` (`execute`, the whole dispatch body) — read once for

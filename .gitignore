@@ -33,3 +33,7 @@ gen
 
 # nested checkout of the Python proof-of-concept (own git history)
 pypoc/
+
+# Stray outputs from running scripts in the repo root
+io_file.tmp
+stderr.log

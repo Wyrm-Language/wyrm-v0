@@ -59,6 +59,8 @@ void wy_context_init_s(wy_context* self)
 
     self->gc_pressure = 0;
     self->gc_threshold = WY_CONTEXT_GC_THRESHOLD_DEFAULT;
+    self->gc_growth_factor = WY_CONTEXT_GC_GROWTH_FACTOR_DEFAULT;
+    self->gc_live_bytes = 0;
     self->gc_abandoned = false;
     self->root_count = 0;
 
@@ -349,6 +351,22 @@ void wy_context_gc_full_run(wy_context* context)
     }
 
     wy_gc_collect_finish_f(context, &context->arena);
+
+    /* Object sizes are not tracked per object, so the surviving bytes are estimated: everything
+     * allocated so far (previous survivors plus new allocation) scaled by the fraction of objects
+     * that survived. Good enough to pace the next collection. */
+    if (context->gc_growth_factor != 0) {
+        wy_uword total_bytes = context->gc_live_bytes + context->gc_pressure;
+        wy_uword examined = context->arena.last_examined;
+        wy_uword survived = context->arena.last_survivors;
+        context->gc_live_bytes = examined != 0 ? (wy_uword) ((double) total_bytes * (double) survived / (double) examined) : 0;
+
+        wy_uword next = context->gc_live_bytes * context->gc_growth_factor;
+        if (next < WY_CONTEXT_GC_THRESHOLD_DEFAULT || next / context->gc_growth_factor != context->gc_live_bytes) {
+            next = next < WY_CONTEXT_GC_THRESHOLD_DEFAULT ? WY_CONTEXT_GC_THRESHOLD_DEFAULT : WY_UWORD_MAX;
+        }
+        context->gc_threshold = next;
+    }
     context->gc_pressure = 0;
 }
 

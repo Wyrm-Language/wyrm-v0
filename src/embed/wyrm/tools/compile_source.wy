@@ -78,7 +78,7 @@ fn _write_out(path: str, data):
     return nil
 
 # ---------------------------------------------------------------------------
-# REPL session entry points (doc/repl-plan.md). The session object lives in the
+# REPL session entry points (doc-llm/history/repl/repl-plan.md). The session object lives in the
 # host's context between calls; each input compiles to a delta container the
 # host feeds to wy_module_extend.
 

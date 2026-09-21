@@ -1,5 +1,5 @@
 #!/bin/sh
-# The REPL (`wyrm -i`, doc/repl-plan.md): each test/corpus/repl/NAME.in is piped
+# The REPL (`wyrm -i`, doc-llm/history/repl/repl-plan.md): each test/corpus/repl/NAME.in is piped
 # to the interpreter and its combined stdout+stderr must equal NAME.out.
 # Local to this repository - the REPL is a development tool and is not
 # cross-checked against any other interpreter. Prompts are only printed on a

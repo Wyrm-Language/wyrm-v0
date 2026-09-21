@@ -165,7 +165,7 @@ fn test_parse(s: str) -> pair:
 #
 # `DIVERGES(reason)` marks a kind where wyrm's parser output differs from
 # pypoc's canonical sexpr table (`pypoc/wypoc/sexpr.py`'s `ROWS` plus its
-# `_ENCODERS`/`_DECODERS`), per vm_plan/README.md's corpus convention - this
+# `_ENCODERS`/`_DECODERS`), per doc-llm/history/wypoc-vm-port/README.md's corpus convention - this
 # is documentation of the current mismatch, not a fix (that's epic 8 M2+).
 #
 # A bare `sym` (no `$['kind, ...]` wrapper) is itself a valid node: every

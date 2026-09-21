@@ -9,7 +9,7 @@
 # compiled into a "scope" module; `std::expand::expand` (a throwaway VM, see
 # src/platform/hosted/expand_native.c) loads that scope, runs
 # wyrm::compiler::expand there on the tree and answers the fully expanded
-# tree. See doc/addendum-decorator-expansion.md and vm_plan/epic_10a.md.
+# tree. See doc-llm/addendum-decorator-expansion.md and doc-llm/history/wypoc-vm-port/epic_10a.md.
 #
 # Requirements on the caller's include path: the `.wyc` images of
 # wyrm::compiler::expand and of every module the compiled module imports (the

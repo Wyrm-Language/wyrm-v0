@@ -20,7 +20,7 @@ a corpus rebuild (`scripts/build_corpus.py` re-run against a patched pypoc) show
 
 ## Inputs
 
-- `vm_plan/epic_3_report.md` — read first. In particular its notes on the minimal
+- `doc-llm/history/wypoc-vm-port/epic_3_report.md` — read first. In particular its notes on the minimal
   `wy_class` stub shape and the ancestor-distance helper it built for `is`.
 - State-scan checklist:
   1. Read epic 3's `wy_class` stub (`include/wyrm/class.h`) — confirm fields
@@ -48,9 +48,9 @@ a corpus rebuild (`scripts/build_corpus.py` re-run against a patched pypoc) show
 
 ## Context to load
 
-1. `vm_plan/design_c_vm.md` §7 (classes, instances, messages) — read in full, ~2.5k
+1. `doc-llm/history/wypoc-vm-port/design_c_vm.md` §7 (classes, instances, messages) — read in full, ~2.5k
    tokens; this is the epic's primary spec.
-2. `vm_plan/epic_3_report.md` — read, ~1-2k tokens.
+2. `doc-llm/history/wypoc-vm-port/epic_3_report.md` — read, ~1-2k tokens.
 3. `pypoc/doc/wyc-format.md` §8.6 (`classes` section schema), §6.3 object-access and
    calls/dispatch tables (`getattr/setattr/getslot/setslot`, `msg/msg_va/getmsg/super/
    reg_msg`) — read, ~2k tokens (already excerpted in this repo's scan notes; re-read only

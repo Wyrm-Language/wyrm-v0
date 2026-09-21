@@ -66,7 +66,7 @@ is in the working tree, not yet committed.
 - **M5 not landed as a separate script + meson wrapper.** The exit criterion's
   `cmp` is demonstrated by `test_image_driver.wy`/`test_image_m4_driver.wy`
   against the stripped reference, run by hand as documented in their headers.
-  Meson wiring was not added: `vm_plan/README.md` requires `meson test` to never
+  Meson wiring was not added: `doc-llm/history/wypoc-vm-port/README.md` requires `meson test` to never
   need Python, and the C VM exposes no `argv` builtin, so a meson-run driver
   could not take its output path from the CLI. Treat the M3/M4 drivers as the
   epic's acceptance artifact.

@@ -97,7 +97,7 @@ Everything here is available to your own programs: `wy_host_repl` is this loop o
 
 ## How it works
 
-See `doc/repl-plan.md` for the design and `doc/vm_impl.md` ("Session modules") for the
+See `doc-llm/history/repl/repl-plan.md` for the design and `doc/vm_impl.md` ("Session modules") for the
 embedding API. In short: the session is one module whose arrays are reserved at full
 size and only appended to, so running frames never see a pointer move; each input compiles
 to a delta image against a persistent compiler-side session and is loaded with

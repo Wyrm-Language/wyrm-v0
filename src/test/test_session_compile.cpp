@@ -26,7 +26,7 @@
 
 #include <test_common/test_context_fixture.h>
 
-// REPL session, milestone M2 (doc/repl-plan.md): the compiler side. The same
+// REPL session, milestone M2 (doc-llm/history/repl/repl-plan.md): the compiler side. The same
 // context that hosts the session also runs the embedded compiler (as the real
 // driver will), so a session's compile-time state and its loaded module share
 // one process. Every input goes compile -> delta container -> wy_module_extend
@@ -86,6 +86,7 @@ struct harness
     {
         ctx = fix.get_context_ptr();
         ctx->gc_threshold = gc_threshold;
+        if (gc_threshold != WY_CONTEXT_GC_THRESHOLD_DEFAULT) { ctx->gc_growth_factor = 0; }
         wy_fiber* fiber = wy_fiber_create(ctx, 65536, 4096);
         REQUIRE_NE(fiber, WY_NULL);
         REQUIRE_EQ(wy_context_attach_fiber(ctx, fiber), WY_ERR_NONE);
