@@ -400,7 +400,7 @@ fn _scan_xid(buffer: str, cur_pos: int) -> int | nil:
 # Operator spellings valid after a symbol literal's quote - longest first, so
 # "**" isn't cut short as "*" and "<=>" isn't cut short as "<=".
 _OPERATOR_SYMBOLS := [
-    "...", "<=>", "**", "<<", ">>", "==", "!=", "<=", ">=",
+    "...", "<=>", "**", "<<", ">>", "==", "!=", "<=", ">=", "::",
     "+", "-", "*", "/", "%", "&", "|", "^", "~", "<", ">"
 ]
 
@@ -759,6 +759,7 @@ class TokenStream:
         while len(car(this.indents)) > len(this.line_ws):
             this.indents = cdr(this.indents)
             this ! _emit('TOK_DEDENT, pos)
+            this ! _emit('TOK_STMT_END, pos)
 
         # The line must land exactly on an enclosing level
         if car(this.indents) != this.line_ws:

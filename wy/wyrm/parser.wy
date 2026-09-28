@@ -96,7 +96,7 @@ fn [Parser] xid() -> sym:
 fn _mk_qualified_name(segs):
     if cdr(segs) == nil:
         return sym(car(segs))
-    return cons('qualified_name, segs)
+    return cons('::, segs)
 
 # Qualified name; used for an expression of a fully qualified name
 fn [Parser] qualified_name():
@@ -170,9 +170,12 @@ fn [Parser] top_level_stmt():
 fn [Parser] block():
     @accept $[
         $[~'TOK_COLON, ~'TOK_NEWLINE, ~'TOK_INDENT, stmt_list, ~'TOK_DEDENT]
-      | $[~'TOK_COLON, stmt_line, ~opt(stmt_sep)]
+      | $[~'TOK_COLON, apply_if(_one_block, stmt_line), ~opt(stmt_sep)]
       | $[~'TOK_LBRACE, stmt_list, ~'TOK_RBRACE]
      ]
+
+fn _one_block(expr):
+    return $[expr]
 
 #>  ### Statements
 #>
@@ -196,10 +199,10 @@ fn [Parser] block():
 #>  ```
 
 fn [Parser] stmt_list():
-    @accept $[ stmt_line, many($[opt(stmt_sep), stmt_line]), opt(stmt_sep) ]
+    @accept $[cons(stmt_line, many($[~stmt_sep, stmt_line])), ~stmt_sep]
 
 fn [Parser] stmt_sep():
-    @accept $['TOK_NEWLINE | 'TOK_SEMICOLON | 'TOK_END]
+    @accept $['TOK_NEWLINE | 'TOK_SEMICOLON | 'TOK_STMT_END | 'TOK_END]
 
 fn [Parser] expect_stmt_sep() -> bool:
     @accept $[expect("statement end", stmt_sep)]
@@ -309,7 +312,7 @@ fn [Parser] if_stmt():
         opt($[~'TOK_KW_ELSE, block]))
 
 fn $_mk_while(expr):
-    return $['while, car(expr), cadr(expr)]
+    return cons('while, cons(car(expr), cadr(expr)))
 
 #>  ```ebnf
 #>    while_stmt      ::= "while" , expression , block ;
@@ -490,6 +493,8 @@ fn [Parser] assignment_stmt():
 
 # Split a pair list into (all-but-last, last)
 fn _split_last(lst):
+    if lst is not pair:
+        return error("bad construction")
     if cdr(lst) == nil:
         return $[nil, car(lst)]
     rest := _split_last(cdr(lst))
@@ -1067,13 +1072,13 @@ fn $_mk_postfix(expr):
         op := car(remaining)
         op_kind := car(op)
         if op_kind == 'call_op:
-            current = $['call, current, cdr(op)]
+            current = cons('apply, cons(current, cdr(op)))
         elif op_kind == 'index_op:
             current = $['index, current, cdr(op)]
         elif op_kind == 'attr_op:
-            current = $['attr, current, cdr(op)]
-        elif op_kind == 'message_op:
-            current = $['message, current, cadr(op), cddr(op)]
+            current = $['attr, current, cadr(op)]
+        elif op_kind == 'bind_msg_op:
+            current = $['bind_msg, current, cadr(op)]
         else:
             # Unknown postfix op, return original
             return expr
@@ -1090,14 +1095,14 @@ fn $_mk_postfix(expr):
 #>    call_op         ::= "(" , [ arg_list ] , ")" ;
 #>    index_op        ::= "[" , expression , "]" ;
 #>    attr_op         ::= "." , identifier ;
-#>    message_op      ::= "!" , identifier , [ "(" , [ arg_list ] , ")" ] ;
+#>    bind_msg        ::= "!" , identifier ;
 #>  ```
 
 fn [Parser] postfix_expr():
     @accept apply_if($_mk_postfix, cons(primary, many(postfix_op)))
 
 fn [Parser] postfix_op():
-    @accept $[call_op | index_op | attr_op | message_op]
+    @accept $[call_op | index_op | attr_op | bind_msg_op]
 
 fn [Parser] call_op():
     @accept  $[~'TOK_LPAREN, cons(push('call_op), opt(arg_list)), ~'TOK_RPAREN]
@@ -1108,8 +1113,8 @@ fn [Parser] index_op():
 fn [Parser] attr_op():
     @accept $[~'TOK_DOT, push('attr_op), xid]
 
-fn [Parser] message_op():
-    @accept $[~'TOK_BANG, cons(push('message_op), cons(xid, opt($[~'TOK_LPAREN, opt(arg_list), ~'TOK_RPAREN])))]
+fn [Parser] bind_msg_op():
+    @accept $[~'TOK_BANG, push('bind_msg_op), xid]
 
 #>  ```ebnf
 #>    arg_list        ::= argument , { "," , argument } ;
@@ -1265,7 +1270,7 @@ fn $_mk_lambda(expr):
     return $['lambda, params, ret_type, body]
 
 #>  #### Anonymous Closures and Types
-#>  
+#>
 #>  These provide a way to create an anonymous class or function. Note that
 #>  anonymous classes *must* provide their messages internally as message
 #>  definitions require the lexical class name.
@@ -1331,7 +1336,7 @@ fn [Parser] anonymous_class():
 #>  ```
 #>
 fn [Parser] do_expr():
-    @accept $[value('do, 'TOK_KW_DO), block]
+    @accept cons(value('do, 'TOK_KW_DO), block)
 
 
 # (* ---------------------------------------------------------------------
