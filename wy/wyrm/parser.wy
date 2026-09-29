@@ -72,6 +72,8 @@ class Parser:
         this.cache_hits = {}
         this.cache_misses = []
 
+fn _as_list(expr):
+    return $[expr]
 
 #>  ```ebnf
 #>    bool_literal    ::= "true" | "false" ;
@@ -80,10 +82,10 @@ class Parser:
 #>  _Example_: `true`, `false`
 #>
 fn [Parser] bool_literal():
-    @accept $[value('true, 'TOK_KW_TRUE) | value('false, 'TOK_KW_FALSE)]
+    @accept apply_if(_as_list, $[value('true, 'TOK_KW_TRUE) | value('false, 'TOK_KW_FALSE)])
 
 fn [Parser] nil_literal():
-    @accept value('nil, 'TOK_KW_NIL)
+    @accept apply_if(_as_list, value('nil, 'TOK_KW_NIL))
 
 
 fn [Parser] xid() -> sym:
@@ -141,8 +143,7 @@ fn [Parser] char_literal():
 # -----------------------------------------------------------------------------
 #>
 #>  ```ebnf
-#>  program ::= { [stmt_sep] , top_level_stmt } ;
-#>  top_level_stmt ::= import_stmt | stmt_line ;
+#>  program ::= { stmt_sep } , [ stmt_list ], { stmt_sep }, tok_end ;
 #>  ```
 #>
 
@@ -150,11 +151,8 @@ fn _mk_module(expr):
     cons('module, expr)
 
 fn [Parser] program():
-    @accept apply_if(_mk_module, many($[~opt(stmt_sep), top_level_stmt]))
+    @accept apply_if(_mk_module, ~many(stmt_sep), opt(stmt_list), ~expect("statement end", 'TOK_END))
 
-
-fn [Parser] top_level_stmt():
-    @accept $[import_stmt | stmt_line]
 
 
 # -----------------------------------------------------------------------------
@@ -167,15 +165,21 @@ fn [Parser] top_level_stmt():
 #>                     | "{" , stmt_list , "}" ;
 #>  ```
 
-fn [Parser] block():
+fn [Parser] raw_block():
     @accept $[
         $[~'TOK_COLON, ~'TOK_NEWLINE, ~'TOK_INDENT, stmt_list, ~'TOK_DEDENT]
-      | $[~'TOK_COLON, apply_if(_one_block, stmt_line), ~opt(stmt_sep)]
+      | $[~'TOK_COLON, apply_if(_as_list, stmt_line), ~opt(stmt_sep)]
       | $[~'TOK_LBRACE, stmt_list, ~'TOK_RBRACE]
      ]
 
-fn _one_block(expr):
-    return $[expr]
+fn _multi_block(expr):
+    if len(expr) < 2:
+        car(expr)
+    else:
+        cons('do, expr)
+
+fn [Parser] block():
+    @accept apply_if(_multi_block, raw_block)
 
 #>  ### Statements
 #>
@@ -199,10 +203,10 @@ fn _one_block(expr):
 #>  ```
 
 fn [Parser] stmt_list():
-    @accept $[cons(stmt_line, many($[~stmt_sep, stmt_line])), ~stmt_sep]
+    @accept $[cons(stmt_line, many($[~stmt_sep, stmt_line])), ~many(stmt_sep)]
 
 fn [Parser] stmt_sep():
-    @accept $['TOK_NEWLINE | 'TOK_SEMICOLON | 'TOK_STMT_END | 'TOK_END]
+    @accept $['TOK_NEWLINE | 'TOK_SEMICOLON | 'TOK_STMT_END]
 
 fn [Parser] expect_stmt_sep() -> bool:
     @accept $[expect("statement end", stmt_sep)]
@@ -312,7 +316,7 @@ fn [Parser] if_stmt():
         opt($[~'TOK_KW_ELSE, block]))
 
 fn $_mk_while(expr):
-    return cons('while, cons(car(expr), cadr(expr)))
+    return $['while, car(expr), cadr(expr)]
 
 #>  ```ebnf
 #>    while_stmt      ::= "while" , expression , block ;
@@ -386,19 +390,19 @@ fn [Parser] yield_stmt():
 #>    break_stmt      ::= "break" ;
 #>  ```
 fn [Parser] break_stmt():
-    @accept value('break, 'TOK_KW_BREAK)
+    @accept apply_if(_as_list, value('break, 'TOK_KW_BREAK))
 
 #>  ```ebnf
 #>    continue_stmt   ::= "continue" ;
 #>  ```
 fn [Parser] continue_stmt():
-    @accept value('continue, 'TOK_KW_CONTINUE)
+    @accept apply_if(_as_list, value('continue, 'TOK_KW_CONTINUE))
 
 #>  ```ebnf
 #>    pass_stmt       ::= "pass" ;
 #>  ```
 fn [Parser] pass_stmt():
-    @accept value('pass, 'TOK_KW_PASS)
+    @accept apply_if(_as_list, value('pass, 'TOK_KW_PASS))
 
 
 #>  ```ebnf
@@ -594,9 +598,9 @@ fn _mk_import(expr):
     is_static := car(expr)
     body := cdr(expr)
     if is_static:
-        $['import_static, body]
+        cons('import_static, body)
     else:
-        $['import, body]
+        cons('import, body)
 
 #>  ```ebnf
 #>      import_stmt     ::= "import" , [ "static" ] , import_body ;
@@ -613,7 +617,7 @@ fn _mk_import(expr):
 #>  ```
 #>
 fn [Parser] import_stmt():
-    @accept apply_if(_mk_import, $[~'TOK_KW_IMPORT, bool('TOK_KW_STATIC), import_body, ~expect("statement end", stmt_sep)])
+    @accept apply_if(_mk_import, $[~'TOK_KW_IMPORT, bool('TOK_KW_STATIC), import_body])
 
 
 fn $_mk_import_all_except(expr):
@@ -1336,7 +1340,7 @@ fn [Parser] anonymous_class():
 #>  ```
 #>
 fn [Parser] do_expr():
-    @accept cons(value('do, 'TOK_KW_DO), block)
+    @accept cons(value('do, 'TOK_KW_DO), raw_block)
 
 
 # (* ---------------------------------------------------------------------
