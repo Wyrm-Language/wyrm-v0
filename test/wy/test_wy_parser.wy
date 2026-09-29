@@ -19,13 +19,16 @@ check("xid excludes keyword", Parser("fn")!xid(), 'NO_MATCH)
 
 basic_import := Parser("import std::io")!import_stmt()
 check("basic import parse", cmd_type(basic_import), 'import)
-check("basic import target", cmd_type(car(cadr(basic_import))), 'qualified_name)
+# The path is a qualified name: (:: std io)
+check("basic import target", cmd_type(cadr(basic_import)), sym("::"))
 
+# import_stmt stops at the path; the trailing tokens are an error at the
+# statement level, where no separator follows
 p_import_2 := Parser("import std::io 12345")
-r_import_2 := p_import_2!import_stmt()
+r_import_2 := p_import_2!program()
 check("import with garbage", r_import_2 is error, true)
 
-check("nil parse", Parser("nil")!nil_literal(), 'nil)
+check("nil parse", Parser("nil")!nil_literal(), $[ 'nil ])
 
 p_qual_id_1 := Parser("foo::bar::baz::bleet")
 r_qual_id_1 := p_qual_id_1!qualified_name()
@@ -35,8 +38,8 @@ p_qual_id_2 := Parser("**")
 r_qual_id_2 := p_qual_id_2!qualified_name()
 check("qual_id parsed into 'NO_MATCH", r_qual_id_2, 'NO_MATCH)
 
-check("bool true parse", Parser("true")!literal(), 'true)
-check("bool false parse", Parser("false")!bool_literal(), 'false)
+check("bool true parse", Parser("true")!literal(), $[ 'true ])
+check("bool false parse", Parser("false")!bool_literal(), $[ 'false ])
 check("bool non-parse", Parser("!")!bool_literal(), 'NO_MATCH)
 # #check("bool in paren (primary recurse)", Parser("(true)")!expression(), $['true])
 
@@ -78,46 +81,49 @@ r_do := Parser("do: 5")!expression()
 check("do expr kind", car(r_do), 'do)
 check("do expr body", is_num_lit(cadr(r_do)), true)
 
-check("return bare", Parser("return")!expression(), $[ 'return, nil ])
+check("return bare", Parser("return")!expression(), $[ 'return ])
 check("return val", Parser("return a")!expression(), $[ 'return, 'a ])
-check("yield bare", Parser("yield")!expression(), $[ 'yield, nil ])
+check("yield bare", Parser("yield")!expression(), $[ 'yield ])
 check("yield val", Parser("yield a")!expression(), $[ 'yield, 'a ])
 check("yield from", Parser("yield from a")!expression(), $[ 'yield_from, 'a ])
-check("break", Parser("break")!expression(), 'break)
-check("continue", Parser("continue")!expression(), 'continue)
-check("pass", Parser("pass")!expression(), 'pass)
-check("if", Parser("if a: b")!expression(), $[ 'if, 'a, 'b, nil, nil ])
-check("if else", Parser("if a: b else: c")!expression(), $[ 'if, 'a, 'b, nil, 'c ])
+check("break", Parser("break")!expression(), $[ 'break ])
+check("continue", Parser("continue")!expression(), $[ 'continue ])
+check("pass", Parser("pass")!expression(), $[ 'pass ])
+check("if", Parser("if a: b")!expression(), $[ 'cond, $[ 'a, 'b ] ])
+check("if else", Parser("if a: b; else: c")!expression(), $[ 'cond, $[ 'a, 'b ], $[ 'else, 'c ] ])
+check("if else braces", Parser("if a { b } else { c }")!expression(), $[ 'cond, $[ 'a, 'b ], $[ 'else, 'c ] ])
+# A one-line block must end its statement before the else
+check("if else no separator", Parser("if a: b else: c")!program() is error, true)
 check("while", Parser("while a: b")!expression(), $[ 'while, 'a, 'b ])
-check("for", Parser("for x in a: b")!expression(), $[ 'for, 'x, 'a, 'b, nil ])
+check("for", Parser("for x in a: b")!expression(), $[ 'for, 'x, 'a, nil, 'b ])
 
 # var statement tests
 #
 # A single target lowers to n_define ($['define, name, type, init]); more
 # than one lowers to n_set_values' $['define_values, targets, init] with
 # one $[name, type] per target. An omitted type is the auto type node.
-check("var simple", Parser("var x")!stmt_line(), $[ 'define, 'x, $[ 'type, 'auto ], nil ])
-check("var with type", Parser("var x: int")!stmt_line(), $[ 'define, 'x, $[ 'type, 'int ], nil ])
+check("var simple", Parser("var x")!stmt(), $[ 'define, 'x, $[ 'type, 'auto ], nil ])
+check("var with type", Parser("var x: int")!stmt(), $[ 'define, 'x, $[ 'type, 'int ], nil ])
 
-r_var_init := Parser("var x = 5")!stmt_line()
+r_var_init := Parser("var x = 5")!stmt()
 check("var with init target", $[ car(r_var_init), cadr(r_var_init), caddr(r_var_init) ],
     $[ 'define, 'x, $[ 'type, 'auto ] ])
 check("var with init value", is_num_lit(car(cdddr(r_var_init))), true)
 
-r_var_type_init := Parser("var x: int = 5")!stmt_line()
+r_var_type_init := Parser("var x: int = 5")!stmt()
 check("var with type and init target", $[ car(r_var_type_init), cadr(r_var_type_init), caddr(r_var_type_init) ],
     $[ 'define, 'x, $[ 'type, 'int ] ])
 check("var with type and init value", is_num_lit(car(cdddr(r_var_type_init))), true)
 
-check("var multiple", Parser("var x, y")!stmt_line(),
+check("var multiple", Parser("var x, y")!stmt(),
     $[ 'define_values, $[ $[ 'x, $[ 'type, 'auto ] ], $[ 'y, $[ 'type, 'auto ] ] ], nil ])
 
-r_var_multi_init := Parser("var x, y = 5")!stmt_line()
+r_var_multi_init := Parser("var x, y = 5")!stmt()
 check("var multiple with init target", $[ car(r_var_multi_init), cadr(r_var_multi_init) ],
     $[ 'define_values, $[ $[ 'x, $[ 'type, 'auto ] ], $[ 'y, $[ 'type, 'auto ] ] ] ])
 check("var multiple with init value", is_num_lit(caddr(r_var_multi_init)), true)
 
-r_var_mixed := Parser("var x: int, y, z: str = 10")!stmt_line()
+r_var_mixed := Parser("var x: int, y, z: str = 10")!stmt()
 check("var multiple mixed target", $[ car(r_var_mixed), cadr(r_var_mixed) ],
     $[ 'define_values, $[ $[ 'x, $[ 'type, 'int ] ], $[ 'y, $[ 'type, 'auto ] ], $[ 'z, $[ 'type, 'str ] ] ] ])
 check("var multiple mixed value", is_num_lit(caddr(r_var_mixed)), true)

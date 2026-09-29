@@ -10,6 +10,7 @@ of primitives with basic execution should be considered stable.
 ## Basics
 
 Wyrm files shall be encoded in UTF-8.
+
 ### Keywords
 
 Keywords are considered own tokens:
@@ -57,6 +58,7 @@ NEWLINE         ::= (* virtual statement-separator token, emitted by lexer *) ;
 INDENT          ::= (* virtual token: rise in layout column *) ;
 DEDENT          ::= (* virtual token: fall in layout column *) ;
 ```
+
 ### Numbers
 
 _Example_:
@@ -143,23 +145,53 @@ _Example_: `\a`, `\newline`
 ## Program Structure
 
 ```ebnf
-program ::= { [stmt_sep] , top_level_stmt } ;
-top_level_stmt ::= import_stmt | stmt_line ;
+program ::= { stmt_sep } , [ stmt_list ], { stmt_sep }, tok_end ;
 ```
 
+_S-Expression_
+
+`cons('module, stmt_list)` - given a stmt_list present
+`(module)` - given stmt_list not present
+
 # Blocks and statements
+
+Blocks and Clause Bodies provide means for statements to have their own
+sublist of statements. `stmt_sep` provides the various means of terminating
+a statement. Statement grammars do not accept the terminator - that is
+handled at this level.
+
+
 ```ebnf
-block           ::= ":" , NEWLINE , INDENT , stmt_list , DEDENT
-                   | ":" , stmt_line, [stmt_sep]
-                   | "{" , stmt_list , "}" ;
+stmt_list ::= stmt , { stmt_sep , { stmt_sep } , stmt } , { stmt_sep } ;
+stmt_sep ::= NEWLINE | ";" | STMT_END ;
+
+block           ::= indent_block | line_block | brace_block ;
+indent_block    ::= ":" , NEWLINE , INDENT , stmt_list , DEDENT ;
+line_block      ::= ":" , stmt ;
+brace_block     ::= "{" , stmt_list , "}" ;
+clause_body     ::= line_block , ( ";" , [ NEWLINE ] | NEWLINE )
+                   | ( indent_block | brace_block ) , [ NEWLINE | STMT_END ] ;
 ```
+
+`clause_body` is the block before an `elif` or `else` clause, which
+extends an otherwise complete statement. It takes the separator between
+the block and the clause.
+
+_S-Expression_
+
+```scheme
+stmt          ; a block of one statement is that statement
+(cons 'do stmt_list) ; stmt_list is placed in 'do form
+```
+
+`stmt_list` is a list of statements as collected in order
 ### Statements
 
 Statements include all expressions with the addition of statements that
 introduce name definitions or scope operations.
 
 ```ebnf
-  stmt_line       ::= { decorator } ,
+  stmt            ::= { decorator } ,
                        ( var_stmt
                        | assignment_stmt
                        | expression
@@ -170,9 +202,12 @@ introduce name definitions or scope operations.
                        | co_def
                        | class_def
                        | slot_def ) ;
-  stmt_list ::= stmt_line , { [stmt_sep] , stmt_line } , [stmt_sep] ;
-  stmt_sep ::= NEWLINE | ";" | EOF ;
 ```
+
+_S-Expression_
+
+`stmt` expansion is specified by each stmt type.
+
 #### Decorators
 
 Decorators provide macros to a statement line. Example:
@@ -200,9 +235,9 @@ defer on error:        # runs only if the calling block force-returned an error
 ```
 
 ```ebnf
-  if_stmt         ::= "if" , expression , block ,
-                       { "elif" , expression , block } ,
-                       [ "else" , block ] ;
+  if_stmt         ::= "if" , expression ,
+                       { clause_body , "elif" , expression } ,
+                       [ clause_body , "else" ] , block ;
 ```
 
 _Example_:
@@ -214,6 +249,14 @@ elif condition_2:
     statements
 else:
     statements
+```
+
+_S-Expression_
+
+```scheme
+(cond (condition block) (condition_2 block) ... (else block)) ; a clause per if/elif
+(cond (a x))                                                  ; if a: x
+(cond (a x) (else y))                                         ; if a: x; else: y
 ```
 
 ```ebnf
@@ -229,9 +272,15 @@ while condition:
         break
 ```
 
+_S-Expression_
+
+```scheme
+(while condition block)
+```
+
 ```ebnf
-  for_stmt        ::= "for" , identifier , "in" , expression , block ,
-                       [ "else" , block ] ;
+  for_stmt        ::= "for" , identifier , "in" , expression ,
+                       [ clause_body , "else" ] , block ;
 ```
 
 _Example_:
@@ -245,6 +294,12 @@ else:
     statement_if_no_break
 ```
 
+_S-Expression_
+
+```scheme
+(for name iterable else_block block) ; else_block is () without an else
+```
+
 ```ebnf
   return_stmt     ::= "return" , [ expression ] ;
 ```
@@ -253,7 +308,7 @@ else:
                      | "yield" , [ expression ] ;
 ```
 ```ebnf
-  break_stmt      ::= "break" ;
+  break_stmt      ::= "break" , [ expression ] ;
 ```
 ```ebnf
   continue_stmt   ::= "continue" ;
@@ -337,6 +392,21 @@ import std::io::* except (File, StreamReader)
 import static std::io
 ```
 
+_S-Expression_
+
+```scheme
+(import path spec)        ; spec is optional: at most one of the forms below
+(import_static path spec) ; the same, for `import static`
+
+(import (:: mod baz bar))                       ; import mod::baz::bar
+(import (:: mod baz) (as bt))                   ; import mod::baz as bt
+(import (:: std io) (items (item File ()) ...)) ; import std::io::(File, ...)
+(import (:: std io) (all))                      ; import std::io::*
+(import (:: std io) (all File StreamReader))    ; ... except (File, StreamReader)
+(import std)                                    ; import std - no :: form required with single element
+(import_static (:: std io))                     ; import static std::io
+```
+
 ```ebnf
     import_body     ::= qualified_name , "::" , "*" , "except" , except_names
                      | qualified_name , "::" , "*"
@@ -345,6 +415,13 @@ import static std::io
 ```
 ```ebnf
   import_item     ::= identifier , [ "as" , identifier ] ;
+```
+
+_S-Expression_
+
+```scheme
+(item name alias) ; alias is () without `as`
+
 ```
 ```ebnf
   except_names    ::= identifier
@@ -479,10 +556,10 @@ _Example_: `file := open('badfile.txt') catch open('goodfile.txt')`
   call_op         ::= "(" , [ arg_list ] , ")" ;
   index_op        ::= "[" , expression , "]" ;
   attr_op         ::= "." , identifier ;
-  message_op      ::= "!" , identifier , [ "(" , [ arg_list ] , ")" ] ;
+  bind_msg        ::= "!" , identifier ;
 ```
 ```ebnf
-  arg_list        ::= argument , { "," , argument } ;
+  arg_list        ::= argument , { "," , argument } , [ "," ] ;
   argument        ::= expression
                      | identifier , "=" , expression          (* keyword argument *)
                      | "*" , expression                       (* spread positional *)
@@ -490,6 +567,7 @@ _Example_: `file := open('badfile.txt') catch open('goodfile.txt')`
 ```
 ```ebnf
   primary         ::= literal
+                     | decorated_expr
                      | qualified_name
                      | "(" , tuple_expression , ")"
                      | "(" , ")"                              (* empty tuple *)
@@ -509,8 +587,7 @@ _Example_: `file := open('badfile.txt') catch open('goodfile.txt')`
                      | co_lambda_expr
                      | anonymous_class
                      | do_expr ;
-```
-```ebnf
+
   decorated_expr  ::= decorator , { decorator } , expression ;
 ```
 

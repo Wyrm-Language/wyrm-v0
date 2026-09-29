@@ -98,7 +98,7 @@ fn [Parser] xid() -> sym:
 fn _mk_qualified_name(segs):
     if cdr(segs) == nil:
         return sym(car(segs))
-    return cons('::, segs)
+    return cons(sym("::"), segs)
 
 # Qualified name; used for an expression of a fully qualified name
 fn [Parser] qualified_name():
@@ -146,6 +146,11 @@ fn [Parser] char_literal():
 #>  program ::= { stmt_sep } , [ stmt_list ], { stmt_sep }, tok_end ;
 #>  ```
 #>
+#>  _S-Expression_
+#>
+#> `cons('module, stmt_list)` - given a stmt_list present
+#> `(module)` - given stmt_list not present
+#>
 
 fn _mk_module(expr):
     cons('module, expr)
@@ -158,19 +163,55 @@ fn [Parser] program():
 # -----------------------------------------------------------------------------
 #>  # Blocks and statements
 # -----------------------------------------------------------------------------
-
+#>
+#> Blocks and Clause Bodies provide means for statements to have their own
+#> sublist of statements. `stmt_sep` provides the various means of terminating
+#> a statement. Statement grammars do not accept the terminator - that is
+#> handled at this level.
+#>
+#>
 #>  ```ebnf
-#>  block           ::= ":" , NEWLINE , INDENT , stmt_list , DEDENT
-#>                     | ":" , stmt_line, [stmt_sep]
-#>                     | "{" , stmt_list , "}" ;
+#>  stmt_list ::= stmt , { stmt_sep , { stmt_sep } , stmt } , { stmt_sep } ;
+#>  stmt_sep ::= NEWLINE | ";" | STMT_END ;
+#>
+#>  block           ::= indent_block | line_block | brace_block ;
+#>  indent_block    ::= ":" , NEWLINE , INDENT , stmt_list , DEDENT ;
+#>  line_block      ::= ":" , stmt ;
+#>  brace_block     ::= "{" , stmt_list , "}" ;
+#>  clause_body     ::= line_block , ( ";" , [ NEWLINE ] | NEWLINE )
+#>                     | ( indent_block | brace_block ) , [ NEWLINE | STMT_END ] ;
 #>  ```
+#>
+#> `clause_body` is the block before an `elif` or `else` clause, which
+#> extends an otherwise complete statement. It takes the separator between
+#> the block and the clause.
+#>
+#>  _S-Expression_
+#>
+#>  ```scheme
+#>  stmt          ; a block of one statement is that statement
+#>  (cons 'do stmt_list) ; stmt_list is placed in 'do form
+#>  ```
+#>
+#> `stmt_list` is a list of statements as collected in order
+
+fn [Parser] stmt_list():
+    @accept $[cons(stmt, many($[~stmt_sep, ~many(stmt_sep), stmt])), ~many(stmt_sep)]
+
+fn [Parser] stmt_sep():
+    @accept $['TOK_NEWLINE | 'TOK_SEMICOLON | 'TOK_STMT_END]
+
+fn [Parser] indent_block():
+    @accept $[~'TOK_COLON, ~'TOK_NEWLINE, ~'TOK_INDENT, stmt_list, ~'TOK_DEDENT]
+
+fn [Parser] line_block():
+    @accept $[~'TOK_COLON, apply_if(_as_list, stmt)]
+
+fn [Parser] brace_block():
+    @accept $[~'TOK_LBRACE, stmt_list, ~'TOK_RBRACE]
 
 fn [Parser] raw_block():
-    @accept $[
-        $[~'TOK_COLON, ~'TOK_NEWLINE, ~'TOK_INDENT, stmt_list, ~'TOK_DEDENT]
-      | $[~'TOK_COLON, apply_if(_as_list, stmt_line), ~opt(stmt_sep)]
-      | $[~'TOK_LBRACE, stmt_list, ~'TOK_RBRACE]
-     ]
+    @accept $[indent_block | line_block | brace_block]
 
 fn _multi_block(expr):
     if len(expr) < 2:
@@ -181,13 +222,21 @@ fn _multi_block(expr):
 fn [Parser] block():
     @accept apply_if(_multi_block, raw_block)
 
+fn [Parser] clause_body():
+    @accept $[
+        $[apply_if(_multi_block, line_block),
+          ~$[$['TOK_SEMICOLON, opt('TOK_NEWLINE)] | 'TOK_NEWLINE]]
+        | $[apply_if(_multi_block, $[indent_block | brace_block]),
+            ~opt($['TOK_NEWLINE | 'TOK_STMT_END])]
+        ]
+
 #>  ### Statements
 #>
 #>  Statements include all expressions with the addition of statements that
 #>  introduce name definitions or scope operations.
 #>
 #>  ```ebnf
-#>    stmt_line       ::= { decorator } ,
+#>    stmt            ::= { decorator } ,
 #>                         ( var_stmt
 #>                         | assignment_stmt
 #>                         | expression
@@ -198,28 +247,26 @@ fn [Parser] block():
 #>                         | co_def
 #>                         | class_def
 #>                         | slot_def ) ;
-#>    stmt_list ::= stmt_line , { [stmt_sep] , stmt_line } , [stmt_sep] ;
-#>    stmt_sep ::= NEWLINE | ";" | EOF ;
 #>  ```
-
-fn [Parser] stmt_list():
-    @accept $[cons(stmt_line, many($[~stmt_sep, stmt_line])), ~many(stmt_sep)]
-
-fn [Parser] stmt_sep():
-    @accept $['TOK_NEWLINE | 'TOK_SEMICOLON | 'TOK_STMT_END]
+#>
+#>  _S-Expression_
+#>
+#> `stmt` expansion is specified by each stmt type.
+#>
 
 fn [Parser] expect_stmt_sep() -> bool:
     @accept $[expect("statement end", stmt_sep)]
 
-fn $_mk_stmt_line(expr):
+fn $_mk_stmt(expr):
     decs := car(expr)
     stmt := cadr(expr)
-    if decs == nil:
-        return stmt
-    return $['decorated, decs, stmt]
+    # The first decorator is the outermost: (decorate name target arg...)
+    for d in reverse(decs):
+        stmt = cons('decorate, cons(car(d), cons(stmt, cadr(d))))
+    return stmt
 
-fn [Parser] stmt_line():
-    r := @accept apply_if($_mk_stmt_line,
+fn [Parser] stmt():
+    r := @accept apply_if($_mk_stmt,
         many(decorator),
         $[ var_stmt
          | assignment_stmt
@@ -243,7 +290,7 @@ fn [Parser] stmt_line():
 fn $_mk_decorator(expr):
     name := car(expr)
     args := cadr(expr)
-    return $['decorator, name, args]
+    return $[name, args]
 
 #>  #### Decorators
 #>
@@ -262,9 +309,11 @@ fn [Parser] decorator():
         ~opt('TOK_NEWLINE))
 
 fn $_mk_defer(expr):
-    cond := car(expr)
+    on_type := car(expr)
     body := cadr(expr)
-    return $['defer, cond, body]
+    if on_type == nil:
+        return $['defer, body]
+    return $['defer_on, on_type, body]
 
 #>  ```ebnf
 #>    defer_stmt      ::= "defer" , [ "on" , type_constraint ] , block ;
@@ -285,17 +334,10 @@ fn $_mk_defer(expr):
 fn [Parser] defer_stmt():
     @accept apply_if($_mk_defer, ~'TOK_KW_DEFER, opt($[~"on", type_expression]), block)
 
-fn $_mk_if(expr):
-    cond := car(expr)
-    body := cadr(expr)
-    elifs := caddr(expr)
-    else_block := car(cdddr(expr))
-    return $['if, cond, body, elifs, else_block]
-
 #>  ```ebnf
-#>    if_stmt         ::= "if" , expression , block ,
-#>                         { "elif" , expression , block } ,
-#>                         [ "else" , block ] ;
+#>    if_stmt         ::= "if" , expression ,
+#>                         { clause_body , "elif" , expression } ,
+#>                         [ clause_body , "else" ] , block ;
 #>  ```
 #>
 #>  _Example_:
@@ -309,11 +351,36 @@ fn $_mk_if(expr):
 #>      statements
 #>  ```
 #>
+#>  _S-Expression_
+#>
+#>  ```scheme
+#>  (cond (condition block) (condition_2 block) ... (else block)) ; a clause per if/elif
+#>  (cond (a x))                                                  ; if a: x
+#>  (cond (a x) (else y))                                         ; if a: x; else: y
+#>  ```
+#>
+
 fn [Parser] if_stmt():
     @accept apply_if($_mk_if,
-        ~'TOK_KW_IF, expression, block,
-        many($[~'TOK_KW_ELIF, expression, block]),
-        opt($[~'TOK_KW_ELSE, block]))
+        ~'TOK_KW_IF, expression,
+        many($[clause_body, ~'TOK_KW_ELIF, expression]),
+        opt($[clause_body, ~'TOK_KW_ELSE]),
+        block)
+
+fn $_mk_if(expr):
+    test := car(expr)
+    clauses := nil
+    for elif_clause in cadr(expr):
+        clauses = cons($[test, car(elif_clause)], clauses)
+        test = cadr(elif_clause)
+    body := caddr(expr)
+    last_block := car(cdddr(expr))
+    if body == nil:
+        clauses = cons($[test, last_block], clauses)
+    else:
+        clauses = cons($[test, body], clauses)
+        clauses = cons($['else, last_block], clauses)
+    return cons('cond, reverse(clauses))
 
 fn $_mk_while(expr):
     return $['while, car(expr), cadr(expr)]
@@ -331,19 +398,28 @@ fn $_mk_while(expr):
 #>          break
 #>  ```
 #>
+#>  _S-Expression_
+#>
+#>  ```scheme
+#>  (while condition block)
+#>  ```
+#>
 fn [Parser] while_stmt():
     @accept apply_if($_mk_while, ~'TOK_KW_WHILE, expression, block)
 
+# expr is: name, iterable, body_before_else | nil, last_block
 fn $_mk_for(expr):
     varname := car(expr)
     iterable := cadr(expr)
     body := caddr(expr)
-    else_block := car(cdddr(expr))
-    return $['for, varname, iterable, body, else_block]
+    last_block := car(cdddr(expr))
+    if body == nil:
+        return $['for, varname, iterable, nil, last_block]
+    return $['for, varname, iterable, last_block, body]
 
 #>  ```ebnf
-#>    for_stmt        ::= "for" , identifier , "in" , expression , block ,
-#>                         [ "else" , block ] ;
+#>    for_stmt        ::= "for" , identifier , "in" , expression ,
+#>                         [ clause_body , "else" ] , block ;
 #>  ```
 #>
 #>  _Example_:
@@ -357,11 +433,21 @@ fn $_mk_for(expr):
 #>      statement_if_no_break
 #>  ```
 #>
+#>  _S-Expression_
+#>
+#>  ```scheme
+#>  (for name iterable else_block block) ; else_block is () without an else
+#>  ```
+#>
 fn [Parser] for_stmt():
     @accept apply_if($_mk_for,
-        ~'TOK_KW_FOR, xid, ~'TOK_KW_IN, expression, block, opt($[~'TOK_KW_ELSE, block]))
+        ~'TOK_KW_FOR, xid, ~'TOK_KW_IN, expression,
+        opt($[clause_body, ~'TOK_KW_ELSE]),
+        block)
 
 fn $_mk_return(expr):
+    if expr == nil:
+        return $['return]
     return $['return, expr]
 
 #>  ```ebnf
@@ -370,10 +456,17 @@ fn $_mk_return(expr):
 fn [Parser] return_stmt():
     @accept apply_if($_mk_return, ~'TOK_KW_RETURN, opt(expression))
 
+fn $_mk_break(expr):
+    if expr == nil:
+        return $['break]
+    return $['break, expr]
+
 fn $_mk_yield_from(expr):
     return $['yield_from, expr]
 
 fn $_mk_yield(expr):
+    if expr == nil:
+        return $['yield]
     return $['yield, expr]
 
 #>  ```ebnf
@@ -387,10 +480,10 @@ fn [Parser] yield_stmt():
     ]
 
 #>  ```ebnf
-#>    break_stmt      ::= "break" ;
+#>    break_stmt      ::= "break" , [ expression ] ;
 #>  ```
 fn [Parser] break_stmt():
-    @accept apply_if(_as_list, value('break, 'TOK_KW_BREAK))
+    @accept apply_if($_mk_break, ~'TOK_KW_BREAK, opt(expression))
 
 #>  ```ebnf
 #>    continue_stmt   ::= "continue" ;
@@ -543,7 +636,7 @@ fn $_mk_static(expr):
     name := car(expr)
     type_c := cadr(expr)
     init := caddr(expr)
-    return $['static, name, type_c, init]
+    return $['static, name, _mk_type_or_auto(type_c), init]
 
 #>  ```ebnf
 #>    static_stmt     ::= "static" , identifier , [ ":" , type_constraint ] , [ "=" , expression ] ;
@@ -585,10 +678,10 @@ fn [Parser] type_expression():
 fn _mk_type_expression(type_expr):
     if type_expr == nil:
         return $['type, 'auto]
-    if cdr(type_expr) == nil:
-        return car(type_expr)
-    # FIXME: should generated warning, algebraic types not supported
-    return $['type, 'auto]
+    members := nil
+    for atom in type_expr:
+        members = cons(cadr(atom), members)
+    return cons('type, reverse(members))
 
 #------------------------------------------------------------------------------
 #>  ## Modules and Imports
@@ -596,7 +689,7 @@ fn _mk_type_expression(type_expr):
 
 fn _mk_import(expr):
     is_static := car(expr)
-    body := cdr(expr)
+    body := cadr(expr)
     if is_static:
         cons('import_static, body)
     else:
@@ -616,6 +709,21 @@ fn _mk_import(expr):
 #>  import static std::io
 #>  ```
 #>
+#>  _S-Expression_
+#>
+#>  ```scheme
+#>  (import path spec)        ; spec is optional: at most one of the forms below
+#>  (import_static path spec) ; the same, for `import static`
+#>
+#>  (import (:: mod baz bar))                       ; import mod::baz::bar
+#>  (import (:: mod baz) (as bt))                   ; import mod::baz as bt
+#>  (import (:: std io) (items (item File ()) ...)) ; import std::io::(File, ...)
+#>  (import (:: std io) (all))                      ; import std::io::*
+#>  (import (:: std io) (all File StreamReader))    ; ... except (File, StreamReader)
+#>  (import std)                                    ; import std - no :: form required with single element
+#>  (import_static (:: std io))                     ; import static std::io
+#>  ```
+#>
 fn [Parser] import_stmt():
     @accept apply_if(_mk_import, $[~'TOK_KW_IMPORT, bool('TOK_KW_STATIC), import_body])
 
@@ -623,20 +731,20 @@ fn [Parser] import_stmt():
 fn $_mk_import_all_except(expr):
     path := car(expr)
     ex := cadr(expr)
-    return $['import_all, path, ex]
+    return $[path, cons('all, ex)]
 
 fn $_mk_import_all(path):
-    return $['import_all, path, nil]
+    return $[path, $['all]]
 
 fn $_mk_import_items(expr):
     path := car(expr)
     items := cadr(expr)
-    return $['import_items, path, items]
+    return $[path, cons('items, items)]
 
 fn $_mk_import_as(expr):
     path := car(expr)
     alias := cadr(expr)
-    return $['import_as, path, alias]
+    return $[path, $['as, alias]]
 
 #>  ```ebnf
 #>      import_body     ::= qualified_name , "::" , "*" , "except" , except_names
@@ -650,17 +758,25 @@ fn [Parser] import_body():
       | apply_if($_mk_import_all, qualified_name, ~'TOK_SCOPE, ~'TOK_MUL)
       | apply_if($_mk_import_items, qualified_name, ~'TOK_SCOPE, ~'TOK_LPAREN, import_item_list, ~'TOK_RPAREN)
       | apply_if($_mk_import_as, qualified_name, ~"as", xid)
-      | qualified_name
+      | apply_if(_as_list, qualified_name)
     ]
 
 
 fn $_mk_import_item(expr):
     name := car(expr)
     alias := cadr(expr)
-    return $['import_item, name, alias]
+    return $['item, name, alias]
 
 #>  ```ebnf
 #>    import_item     ::= identifier , [ "as" , identifier ] ;
+#>  ```
+#>
+#>  _S-Expression_
+#>
+#>  ```scheme
+#>  (item name alias) ; alias is () without `as`
+#>
+#   (item open o) ; open as o
 #>  ```
 fn [Parser] import_item():
     @accept apply_if($_mk_import_item, xid, opt($[~"as", xid]))
@@ -683,13 +799,22 @@ fn [Parser] except_names():
 #    4. Functions
 #    --------------------------------------------------------------------- *)
 
+# class_target's receiver names -> (dispatch (type A) ...), or nil without one
+fn _mk_dispatch(targets):
+    if targets == nil:
+        return nil
+    types := nil
+    for t in targets:
+        types = cons($['type, t], types)
+    return cons('dispatch, reverse(types))
+
 fn $_mk_fn_def(expr):
     dispatch := car(expr)
     name := cadr(expr)
     params := caddr(expr)
     ret_type := car(cdddr(expr))
     body := cadr(cdddr(expr))
-    return $['fn_def, name, dispatch, params, ret_type, body]
+    return $['fn_def, name, _mk_dispatch(dispatch), params, _mk_type_or_auto(ret_type), body]
 
 #>  ```ebnf
 #>    fn_def          ::= "fn" , [ class_target ] , identifier , "(" , [ param_list ] , ")" ,
@@ -734,7 +859,7 @@ fn $_mk_plain_param(expr):
     name := car(expr)
     type_c := cadr(expr)
     default := caddr(expr)
-    return $['param, name, type_c, default]
+    return $['param, name, _mk_type_or_auto(type_c), default]
 
 #>  ```ebnf
 #>    plain_param     ::= identifier , [ ":" , type_constraint ] , [ "=" , expression ] ;
@@ -744,7 +869,7 @@ fn [Parser] plain_param():
         xid, opt($[~'TOK_COLON, type_expression]), opt($[~'TOK_EQUAL, expression]))
 
 fn $_mk_var_positional(expr):
-    return $['var_positional, expr]
+    return $['spread_param, expr, $['type, 'auto]]
 
 #>  ```ebnf
 #>    var_positional  ::= "*" , identifier ;
@@ -753,7 +878,7 @@ fn [Parser] var_positional():
     @accept apply_if($_mk_var_positional, ~'TOK_MUL, xid)
 
 fn $_mk_var_keyword(expr):
-    return $['var_keyword, expr]
+    return $['spread_kw_param, expr, $['type, 'auto]]
 
 #>  ```ebnf
 #>    var_keyword     ::= "**" , identifier ;
@@ -765,13 +890,25 @@ fn [Parser] var_keyword():
 #    5. Coroutines
 #    --------------------------------------------------------------------- *)
 
+# co_param_list gives (co_params send params), or nil when empty
+fn _co_send(co_params):
+    if co_params == nil:
+        return nil
+    return cadr(co_params)
+
+fn _co_plist(co_params):
+    if co_params == nil:
+        return nil
+    return caddr(co_params)
+
 fn $_mk_co_def(expr):
     dispatch := car(expr)
     name := cadr(expr)
     params := caddr(expr)
     ret_type := car(cdddr(expr))
     body := cadr(cdddr(expr))
-    return $['co_def, name, dispatch, params, ret_type, body]
+    return $['co_def, name, _mk_dispatch(dispatch), _co_plist(params),
+             _mk_type_or_auto(_co_send(params)), _mk_type_or_auto(ret_type), body]
 
 #>  ```ebnf
 #>    co_def          ::= "co" , [ class_target ] , identifier , "(" , [ co_param_list ] , ")" ,
@@ -808,7 +945,10 @@ fn $_mk_class_def(expr):
     name := car(expr)
     bases := cadr(expr)
     body := caddr(expr)
-    return $['class_def, name, bases, body]
+    base := nil
+    if bases != nil:
+        base = car(bases)
+    return $['class_def, name, base, body]
 
 #>  ```ebnf
 #>    class_def       ::= "class" , identifier , [ "(" , [ arg_list ] , ")" ] , block ;
@@ -833,7 +973,7 @@ fn $_mk_slot_def(expr):
     type_c := cadr(expr)
     init := caddr(expr)
     options := car(cdddr(expr))
-    return $['slot_def, name, type_c, init, options]
+    return $['slot_def, name, _mk_type_or_auto(type_c), init, options]
 
 #>  ```ebnf
 #>    slot_def        ::= "slot" , identifier , [ ":" , type_constraint ] ,
@@ -891,6 +1031,9 @@ fn $_mk_values(expr):
 
 fn $_mk_tuple(expr):
     return cons('tuple, expr)
+
+fn _mk_tuple_one(expr):
+    return $['tuple, expr]
 
 #>  ```ebnf
 #>    tuple_expression ::= list_expression ;        (* comma = tuple *)
@@ -968,16 +1111,16 @@ fn [Parser] not_expr():
 
 fn $_mk_is(expr):
     if cadr(expr):
-        return ['not, ['is, car(expr), caddr(expr)]]
-    return ['is, car(expr), caddr(expr)]
+        return $['not, $['is, car(expr), caddr(expr)]]
+    return $['is, car(expr), caddr(expr)]
 
 fn $_mk_comparison(expr):
     $[cadr(expr), car(expr), caddr(expr)]
 
 fn $_mk_in(expr):
     if cadr(expr):
-        return ['not, ['in, car(expr), caddr(expr)]]
-    return ['in, car(expr), caddr(expr)]
+        return $['not, $['in, car(expr), caddr(expr)]]
+    return $['in, car(expr), caddr(expr)]
 
 #>  ```ebnf
 #>    comparison      ::= binary_expr , "is" , [ "not" ] , type_constraint
@@ -1003,10 +1146,44 @@ fn [Parser] comp_op():
                value('!=, 'TOK_NE) ]
 
 # Binary Op
+
+#: precedence for the operand, determines order of folding
+fn _binary_prec(op) -> int:
+    if op == '|:
+        return 1
+    if op == '^:
+        return 2
+    if op == '&:
+        return 3
+    if op == '<< or op == '>>:
+        return 4
+    if op == '+ or op == '-:
+        return 5
+    return 6
+
+#: apply head op to operands and return result
+fn _binary_reduce(ops, operands):
+    rhs := car(operands)
+    lhs := cadr(operands)
+    return cons($[car(ops), lhs, rhs], cdr(cdr(operands)))
+
+# expr is the flat list `operand op operand op operand ...`
 fn $_binary_expr(expr):
-    if cdr(expr) == nil:
-        return car(expr)
-    return expr
+    operands := $[car(expr)]
+    ops := nil
+    rest := cdr(expr)
+    while rest != nil:
+        op := car(rest)
+        while ops != nil and _binary_prec(car(ops)) >= _binary_prec(op):
+            operands = _binary_reduce(ops, operands)
+            ops = cdr(ops)
+        ops = cons(op, ops)
+        operands = cons(cadr(rest), operands)
+        rest = cdr(cdr(rest))
+    while ops != nil:
+        operands = _binary_reduce(ops, operands)
+        ops = cdr(ops)
+    return car(operands)
 
 #>  ```ebnf
 #>    binary_expr     ::= unary_expr , { binary_op , unary_expr } ;
@@ -1036,7 +1213,7 @@ fn $_mk_pos(expr):
     return $['pos, expr]
 
 fn $_mk_invert(expr):
-    return $['invert, expr]
+    return $['~, expr]
 
 #>  ```ebnf
 #>    unary_expr      ::=
@@ -1053,7 +1230,7 @@ fn [Parser] unary_expr():
     ]
 
 fn $_mk_exp(expr):
-    cons('exp, expr)
+    cons('**, expr)
 
 #>  ```ebnf
 #>    power_expr      ::= postfix_expr , [ "**" , unary_expr ] ;       (* right-assoc *)
@@ -1078,7 +1255,7 @@ fn $_mk_postfix(expr):
         if op_kind == 'call_op:
             current = cons('apply, cons(current, cdr(op)))
         elif op_kind == 'index_op:
-            current = $['index, current, cdr(op)]
+            current = $['index, current, cadr(op)]
         elif op_kind == 'attr_op:
             current = $['attr, current, cadr(op)]
         elif op_kind == 'bind_msg_op:
@@ -1121,21 +1298,36 @@ fn [Parser] bind_msg_op():
     @accept $[~'TOK_BANG, push('bind_msg_op), xid]
 
 #>  ```ebnf
-#>    arg_list        ::= argument , { "," , argument } ;
+#>    arg_list        ::= argument , { "," , argument } , [ "," ] ;
 #>    argument        ::= expression
 #>                       | identifier , "=" , expression          (* keyword argument *)
 #>                       | "*" , expression                       (* spread positional *)
 #>                       | "**" , expression ;                    (* spread keyword *)
 #>  ```
 fn [Parser] arg_list():
-    @accept cons(argument, many(~'TOK_COMMA, argument))
+    @accept $[cons(argument, many(~'TOK_COMMA, argument)), ~opt('TOK_COMMA)]
+
+fn $_mk_kwarg(expr):
+    return $['kwarg, car(expr), cadr(expr)]
+
+fn $_mk_spread(expr):
+    return $['spread, expr]
+
+fn $_mk_spread_kw(expr):
+    return $['spread_kw, expr]
 
 fn [Parser] argument():
-    @accept expression
+    @accept $[
+        apply_if($_mk_kwarg, xid, ~'TOK_EQUAL, expression)
+      | apply_if($_mk_spread_kw, ~'TOK_EXPONENT, expression)
+      | apply_if($_mk_spread, ~'TOK_MUL, expression)
+      | expression
+    ]
 
 
 #>  ```ebnf
 #>    primary         ::= literal
+#>                       | decorated_expr
 #>                       | qualified_name
 #>                       | "(" , tuple_expression , ")"
 #>                       | "(" , ")"                              (* empty tuple *)
@@ -1155,26 +1347,25 @@ fn [Parser] argument():
 #>                       | co_lambda_expr
 #>                       | anonymous_class
 #>                       | do_expr ;
-#>  ```
-#>  ```ebnf
+#>
 #>    decorated_expr  ::= decorator , { decorator } , expression ;
 #>  ```
 #>
 #>  _Example_: `v := @accept 'TOK_XID` (see decorator in parser.wy)
 #>
 fn [Parser] decorated_expr():
-    @accept apply_if($_mk_stmt_line, cons(decorator, many(decorator)), expression)
+    @accept apply_if($_mk_stmt, cons(decorator, many(decorator)), expression)
 
 fn [Parser] primary():
     @accept $[ literal
              | decorated_expr
              | qualified_name
+             | apply_if(_mk_tuple_one, $[~'TOK_LPAREN, expression, ~'TOK_COMMA, ~'TOK_RPAREN])
              | $[~'TOK_LPAREN, tuple_expression, ~'TOK_RPAREN]
              | array_literal
              | pair_literal
              | dict_literal
-             | $[~'TOK_LPAREN, ~'TOK_RPAREN, push('tuple)]
-
+             | apply_if(_as_list, value('tuple, $[~'TOK_LPAREN, ~'TOK_RPAREN]))
              | return_stmt
              | yield_stmt
              | break_stmt
@@ -1205,7 +1396,7 @@ fn [Parser] literal():
                | string_literal
                | symbol_literal
                | char_literal
-               | value('TOK_ELLIPSIS, 'TOK_ELLIPSIS)
+             | apply_if(_as_list, value('ellipsis, 'TOK_ELLIPSIS))
              ]
 
 fn $_mk_array(expr):
@@ -1219,7 +1410,7 @@ fn $_mk_array(expr):
 #>
 fn [Parser] array_literal():
     @accept $[
-        value('array, $[~'TOK_LBRACKET, ~'TOK_RBRACKET])
+        apply_if(_as_list, value('array, $[~'TOK_LBRACKET, ~'TOK_RBRACKET]))
         | apply_if($_mk_array, $[~'TOK_LBRACKET, list_expression, ~'TOK_RBRACKET])
     ]
 
@@ -1234,7 +1425,7 @@ fn $_mk_list(expr):
 #>
 fn [Parser] pair_literal():
     @accept $[
-        value('list, $[~'TOK_LBRACKET_S, ~'TOK_RBRACKET])
+        apply_if(_as_list, value('list, $[~'TOK_LBRACKET_S, ~'TOK_RBRACKET]))
         | apply_if($_mk_list, $[~'TOK_LBRACKET_S, list_expression, ~'TOK_RBRACKET])
     ]
 
@@ -1256,7 +1447,7 @@ fn $_mk_dict(expr):
 #>
 fn [Parser] dict_literal():
     @accept $[
-        value('dict, $[~'TOK_LBRACE, ~'TOK_RBRACE])
+        apply_if(_as_list, value('dict, $[~'TOK_LBRACE, ~'TOK_RBRACE]))
         | apply_if($_mk_dict,
             $[~'TOK_LBRACE, cons(dict_pair, many($[~'TOK_COMMA, dict_pair])), ~opt('TOK_COMMA), ~'TOK_RBRACE]
           )
@@ -1271,7 +1462,7 @@ fn $_mk_lambda(expr):
     params := car(expr)
     ret_type := cadr(expr)
     body := caddr(expr)
-    return $['lambda, params, ret_type, body]
+    return $['lambda, params, _mk_type_or_auto(ret_type), body]
 
 #>  #### Anonymous Closures and Types
 #>
@@ -1292,7 +1483,8 @@ fn $_mk_co_lambda(expr):
     params := car(expr)
     ret_type := cadr(expr)
     body := caddr(expr)
-    return $['co_lambda, params, ret_type, body]
+    return $['co_lambda, _co_plist(params), _mk_type_or_auto(_co_send(params)),
+             _mk_type_or_auto(ret_type), body]
 
 #>  ```ebnf
 #>    co_lambda_expr  ::= "co" , "(" , [ co_param_list ] , ")" , [ "->" , type_constraint ] , block ;

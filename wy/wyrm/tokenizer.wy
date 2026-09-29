@@ -7,6 +7,7 @@ import std::ctype::*
 #>  ## Basics
 #>
 #>  Wyrm files shall be encoded in UTF-8.
+#>
 
 # Scanned Token from the Scanner
 #
@@ -245,6 +246,7 @@ fn _scan_to_eol_raw(buffer: str, cur_pos: int) -> int:
 #>  INDENT          ::= (* virtual token: rise in layout column *) ;
 #>  DEDENT          ::= (* virtual token: fall in layout column *) ;
 #>  ```
+#>
 
 # Scan whitespace
 fn _find_end_whitespace(buffer: str, cur_pos: int) -> int:

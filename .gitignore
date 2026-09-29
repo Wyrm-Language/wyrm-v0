@@ -4,6 +4,8 @@
 .idea
 .cache
 .wyrm
+.gram
+.clangd
 
 # Caches
 *.wyc
@@ -16,6 +18,7 @@ py/
 *~
 *.swp
 *.bak
+*.orig
 CMakeSettings.json
 cmake-build-*
 buildDir

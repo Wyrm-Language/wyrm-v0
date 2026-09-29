@@ -1,8 +1,11 @@
 # Wyrm Standard Library
 
-## Builtin Functions
+## Builtin Functions and Messages
 
   - len(x): Return number of elements within a collection
+  - @template(): Mark class, function, or coroutine as created specifically for usage of
+    the syntax tree. An error is generated for failed compilation of annotated template
+    if any only if the primitive is used in it's compiled form.
 
 ## Builtin Primitives
 
