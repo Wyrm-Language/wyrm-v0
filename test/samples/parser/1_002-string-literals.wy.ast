@@ -1,1 +1,1 @@
-$['module, $['str, "plain string"], $['str, "line one\nline two\ttabbed"], $['str, "hex escape: A and B"], $['str, "unicode escape: é and ☃"]]
+(module (str "plain string") (str "line one\nline two\ttabbed") (str "hex escape: A and B") (str "unicode escape: é and ☃"))

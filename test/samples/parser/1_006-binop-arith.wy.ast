@@ -1,1 +1,1 @@
-$['module, $['binop, '+, $['binop, '+, $['int, 1], $['int, 2]], $['int, 3]], $['binop, '-, 'a, 'b], $['binop, '*, 'a, 'b], $['binop, '/, 'a, 'b], $['binop, '%, 'a, 'b]]
+(module (+ (+ (int 1) (int 2)) (int 3)) (- a b) (* a b) (/ a b) (% a b))

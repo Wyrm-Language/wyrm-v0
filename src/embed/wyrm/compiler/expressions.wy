@@ -70,7 +70,7 @@
 # 6. `super` and a qualified message name (`recv ! mod::name(...)`) are not
 #    reachable: wy/wyrm's grammar has no `super` construct at all (no
 #    `TOK_SUPER`, no rule), and `message_op`'s name is a single `xid`, never
-#    a `qualified_name` (parser.wy:1128). Neither `_super` nor a
+#    a `(:: ...)` path. Neither `_super` nor a
 #    module-qualified `message_index` is implemented; both are real parser
 #    gaps, not lowering gaps, and out of scope for expressions.wy.
 #
@@ -87,7 +87,7 @@
 #
 # 8. `foo::$ast` (`_ast_ref`) has no grammar of its own: `$` is a legal
 #    identifier character, so `foo::$ast` parses as an ordinary
-#    `'qualified_name` whose leaf segment spells `$ast`, and it is the
+#    `(:: foo $ast)` path whose leaf segment spells `$ast`, and it is the
 #    lowering (`_scope`) that decides - by that leaf spelling - that this
 #    names a definition's tree rather than a scope hop. The tree comes from
 #    `frame.module.definitions`, populated by module.wy's declare pass
@@ -96,7 +96,7 @@
 #    tree-constant path `$[...]` literals use.
 #
 # 9. `_scope`'s free-global/class-static shortcut is checked once, against
-#    the whole flattened `qualified_name` path, then folds the remaining
+#    the whole flattened `(:: ...)` path, then folds the remaining
 #    segments with `getscope`. pypoc's `_scope` re-derives this check at
 #    *each* nesting level (`ast.Scope` is binary and `compile_expr` recurses
 #    into `node.obj`), which only matters when an inner prefix of a 3+
@@ -349,46 +349,26 @@ fn resolve_name(name, frame: FnContext, dst):
         return free
     return _land_free(frame, dst, free)
 
+# `(nil)`, the literal nil (ast.md R3).
+fn _nil_lit(frame: FnContext, dst):
+    reg := _target(frame, dst)
+    if reg is error:
+        return reg
+    e := _emit_pack(frame, 'lnil, a0=reg)
+    if e is error:
+        return e
+    return reg
+
 fn _this(frame: FnContext, dst):
     if frame.this_reg is nil:
         return error("`this` is only meaningful inside a method")
     return _land(frame, dst, frame.this_reg)
 
-# `node` here is a bare symbol - either a name reference, or one of the
-# handful of keywords wy/wyrm's parser represents the same way (ast.wy's
-# "bare-symbol representation trap": nil/true/false/this all arrive
-# unwrapped). `array`/`tuple` arrive bare too - as the EMPTY literals
-# `[]`/`()` (parser.wy's `value('array, ...)` shortcuts), which is the one
-# place the shorthand collides with a name reference; the literal wins.
+# `node` here is a bare symbol, which is always a name (ast.md R3): `this`,
+# which the enclosing method binds (syntax.md G4), or a name to resolve.
 fn _bare_symbol(node, frame: FnContext, dst):
-    if node == 'nil:
-        if (frame ! lookup(node)) is nil:
-            reg := _target(frame, dst)
-            if reg is error:
-                return reg
-            e := _emit_pack(frame, 'lnil, a0=reg)
-            if e is error:
-                return e
-            return reg
-        return resolve_name(node, frame, dst)
-    if node == 'true:
-        return _bool_lit(true, frame, dst)
-    if node == 'false:
-        return _bool_lit(false, frame, dst)
     if node == 'this:
         return _this(frame, dst)
-    if node == 'array:
-        return _array(node, frame, dst)
-    if node == 'tuple:
-        return _tuple(node, frame, dst)
-    if node == 'list:
-        # `$[]` - the empty pair literal (parser.wy's value('list, ...)).
-        return _plist(node, frame, dst)
-    if node == 'dict:
-        # `{}` - the empty dict literal.
-        return _dict(node, frame, dst)
-    if (node == 'break) or (node == 'continue) or (node == 'pass):
-        return error(str(node) + " is not an expression")
     return resolve_name(node, frame, dst)
 
 # ---------------------------------------------------------------------------
@@ -415,10 +395,11 @@ fn _pos(node, frame: FnContext, dst):
         return src
     return _land(frame, dst, src)
 
+# `(op lhs rhs)` (ast.md R5).
 fn _binop(node, frame: FnContext, dst):
-    op_sym := (_field(node, 1) catch nil)
-    lhs_node := (_field(node, 2) catch nil)
-    rhs_node := (_field(node, 3) catch nil)
+    op_sym := car(node)
+    lhs_node := (_field(node, 1) catch nil)
+    rhs_node := (_field(node, 2) catch nil)
     op := (BINOPS[str(op_sym)] catch nil)
     if op is nil:
         return error("the bytecode compiler does not support the '" + str(op_sym) + "' operator yet")
@@ -511,19 +492,18 @@ fn _short_circuit(node, frame: FnContext, dst, is_and: bool):
 # ---------------------------------------------------------------------------
 # `is` (type checks, spec 7.1)
 
-# The atoms of a `$['type, ...]` node: itself for a plain type, or each
-# nested type node for a `$['type, 'union, type1, type2, ...]`.
+# The atoms of a type node: itself for a plain type `(type a)`, and for a
+# union `(type a b ...)` (ast.md) each member as its own `(type a)`.
 fn _type_atoms(type_node) -> list | error:
     if (not (type_node is pair)) or (car(type_node) != 'type):
         return error("not a type expression")
-    head := (_field(type_node, 1) catch nil)
-    if head == 'union:
-        out := []
-        rest := (_tail(type_node, 2) catch nil)
-        while rest is pair:
-            out ! append(car(rest))
-            rest = cdr(rest)
-        return out
+    atoms := (_tail(type_node, 1) catch nil)
+    if (atoms is pair) and (cdr(atoms) is pair):
+        out2 := []
+        while atoms is pair:
+            out2 ! append($['type, car(atoms)])
+            atoms = cdr(atoms)
+        return out2
     return [type_node]
 
 fn _type_parts(atom_node) -> list | error:
@@ -532,7 +512,7 @@ fn _type_parts(atom_node) -> list | error:
     x := (_field(atom_node, 1) catch nil)
     if x is sym:
         return [str(x)]
-    if node_kind(x) == 'qualified_name:
+    if is_path_node(x):
         out := []
         rest := (_tail(x, 1) catch nil)
         while rest is pair:
@@ -643,7 +623,7 @@ fn has_spread_or_keyword(args) -> bool:
 
 fn _compile_call(node, frame: FnContext, nres: int) -> int | error:
     func_node := (_field(node, 1) catch nil)
-    args := (_field(node, 2) catch nil)
+    args := (_tail(node, 2) catch nil)
     argc := len(args)
     if argc > 128:
         return error(str(argc) + " arguments, over the 128-parameter call limit")
@@ -688,7 +668,7 @@ fn _compile_call(node, frame: FnContext, nres: int) -> int | error:
 # not bound (a local, parameter, capture or module global named `trap`
 # shadows it), and never as a value.
 fn _compile_trap(node, frame: FnContext, nres: int) -> int | error:
-    args := (_field(node, 2) catch nil)
+    args := (_tail(node, 2) catch nil)
     code := 1
     if len(args) > 1:
         return error("trap takes at most one argument, an integer literal 0-255")
@@ -723,12 +703,15 @@ fn compile_call(node, frame: FnContext, nres: int) -> int | error:
     func_node := (_field(node, 1) catch nil)
     if (func_node is sym) and (func_node == 'trap) and ((frame ! storage(func_node)) is nil):
         return _compile_trap(node, frame, nres)
-    args := (_field(node, 2) catch nil)
+    args := (_tail(node, 2) catch nil)
     if has_spread_or_keyword(args):
         func_node := (_field(node, 1) catch nil)
         return compile_va(frame, nres, 'call_va, func_node, args, nil, nil)
     return _compile_call(node, frame, nres)
 
+# An application is `(apply callee arg...)` (ast.md R5): a direct send when
+# the callee is `(bind_msg recv sel)` (_message), otherwise a call. The
+# arguments are the apply's tail.
 fn _call(node, frame: FnContext, dst):
     r := compile_call(node, frame, 1)
     if r is error:
@@ -891,11 +874,12 @@ fn _lambda(node, frame: FnContext, dst):
 fn _do(node, frame: FnContext, dst):
     if _body_compiler is nil:
         return error("'do' block lowering needs statements.wy's compile_body; import wyrm::compiler::statements before compiling a module with 'do' blocks")
-    body := (_field(node, 1) catch nil)
+    # The `do` node is its own body and scope owner (analysis.wy's
+    # body_statements/block_bodies), in either shape.
     reg := _target(frame, dst)
     if reg is error:
         return reg
-    e := _body_compiler(body, frame, reg)
+    e := _body_compiler(node, frame, reg)
     if e is error:
         return e
     return reg
@@ -990,14 +974,21 @@ fn _catch(node, frame: FnContext, dst):
 # with no prior identity creates one. See deviation 6: a qualified message
 # name has no grammar support, so `path` is always the single name.
 fn message_index(node, frame: FnContext) -> int | error:
-    name := (_field(node, 2) catch nil)
+    name := (_field(_msg_binding(node), 2) catch nil)
     return frame ! reference([str(name)])
 
 # Lay out a message window and emit `msg`; returns the window base. The
 # receiver sits at the base and the arguments follow it, exactly as a
 # call's callee does.
+# The `(bind_msg recv sel)` of a send `(apply (bind_msg recv sel) arg...)`,
+# or the node itself when it is the bound message.
+fn _msg_binding(node):
+    if node_kind(node) == 'apply:
+        return (_field(node, 1) catch nil)
+    return node
+
 fn compile_message(node, frame: FnContext, nres: int, receivers: list | nil = nil) -> int | error:
-    args := (_field(node, 3) catch nil)
+    args := (_tail(node, 2) catch nil)
     if args is nil:
         # `recv ! name()` - a send whose argument list is empty.
         args = []
@@ -1005,7 +996,7 @@ fn compile_message(node, frame: FnContext, nres: int, receivers: list | nil = ni
         reloc := message_index(node, frame)
         if reloc is error:
             return reloc
-        target_node := (_field(node, 1) catch nil)
+        target_node := (_field(_msg_binding(node), 1) catch nil)
         return compile_va(frame, nres, 'msg_va, nil, args, reloc, target_node)
     argc := len(args)
     if argc > 128:
@@ -1018,7 +1009,7 @@ fn compile_message(node, frame: FnContext, nres: int, receivers: list | nil = ni
     if window is error:
         return window
     if receivers is nil:
-        target_node := (_field(node, 1) catch nil)
+        target_node := (_field(_msg_binding(node), 1) catch nil)
         r := compile_expr(target_node, frame, window)
         if r is error:
             return r
@@ -1065,9 +1056,8 @@ fn compile_message(node, frame: FnContext, nres: int, receivers: list | nil = ni
 # the bare `recv ! name` form - the bound closure, not a dispatch - and
 # 'send for a call, whose argument list may still be empty (`recv ! name()`).
 fn _message(node, frame: FnContext, dst):
-    args := (_field(node, 3) catch nil)
-    target_node := (_field(node, 1) catch nil)
-    if (_field(node, 4) catch nil) == 'bound:
+    target_node := (_field(_msg_binding(node), 1) catch nil)
+    if node_kind(node) == 'bind_msg:
         # `recv ! name` with no call: the bound closure, not a dispatch.
         recv := compile_expr(target_node, frame, nil)
         if recv is error:
@@ -1523,15 +1513,23 @@ fn compile_expr(node, frame: FnContext, dst = nil):
         return _char_lit(node, frame, dst)
     elif ks == "sym":
         return _symbol_lit(node, frame, dst)
+    elif ks == "nil":
+        return _nil_lit(frame, dst)
+    elif ks == "true":
+        return _bool_lit(true, frame, dst)
+    elif ks == "false":
+        return _bool_lit(false, frame, dst)
+    elif (ks == "break") or (ks == "continue") or (ks == "pass"):
+        return error(ks + " is not an expression")
     elif ks == "not":
         return _unary(node, frame, dst, 'not)
     elif ks == "neg":
         return _unary(node, frame, dst, 'neg)
-    elif ks == "invert":
+    elif ks == "~":
         return _unary(node, frame, dst, 'inv)
     elif ks == "pos":
         return _pos(node, frame, dst)
-    elif ks == "exp":
+    elif ks == "**":
         return _exp(node, frame, dst)
     elif ks == "and":
         return _short_circuit(node, frame, dst, true)
@@ -1541,10 +1539,14 @@ fn compile_expr(node, frame: FnContext, dst = nil):
         return _in_op(node, frame, dst)
     elif ks == "is":
         return _type_check(node, frame, dst)
-    elif ks == "binop":
+    elif ks in BINARY_OPERATORS:
         return _binop(node, frame, dst)
-    elif ks == "call":
+    elif ks == "apply":
+        if node_kind((_field(node, 1) catch nil)) == 'bind_msg:
+            return _message(node, frame, dst)
         return _call(node, frame, dst)
+    elif ks == "bind_msg":
+        return _message(node, frame, dst)
     elif ks == "array":
         return _array(node, frame, dst)
     elif ks == "tuple":
@@ -1565,11 +1567,9 @@ fn compile_expr(node, frame: FnContext, dst = nil):
         return _try(node, frame, dst)
     elif ks == "catch":
         return _catch(node, frame, dst)
-    elif ks == "message":
-        return _message(node, frame, dst)
     elif ks == "yield":
         return _yield(node, frame, dst)
-    elif ks == "if":
+    elif ks == "cond":
         # `if` is an expression as well as a statement (wyrm.gram's
         # if_expr): the same node either way, lowered by the registered
         # statement-shape handler (statements.wy's _if_expr, the same
@@ -1577,7 +1577,7 @@ fn compile_expr(node, frame: FnContext, dst = nil):
         return dispatch(EXPR_HANDLERS, node, frame, dst)
     elif ks == "yield_from":
         return _yield_from(node, frame, dst)
-    elif ks == "qualified_name":
+    elif ks == "::":
         return _scope(node, frame, dst)
     else:
         return error("the bytecode compiler does not support '" + ks + "' expressions yet")

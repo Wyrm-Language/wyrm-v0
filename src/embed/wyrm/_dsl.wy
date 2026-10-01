@@ -106,6 +106,7 @@
 # parsed.
 
 import wyrm::ast::*
+import wyrm::template::*
 import std::pairs::(replace, chain, cadr)
 
 # The sexpr for the `'NO_MATCH` symbol literal - the failure sentinel every
@@ -116,19 +117,15 @@ NO_MATCH_EXPR := $['sym, 'NO_MATCH]
 # --- decoding a term into an expression -------------------------------
 
 fn _decode_apply_if(first, rest) -> pair:
-    then_stmts := [mk_expr_stmt(mk_call_expr(first, [mk_name('_vt)]))]
+    then_stmts := $[mk_call_expr(first, $[mk_name('_vt)])]
     matched := mk_binop(mk_name('_vt), '!=, NO_MATCH_EXPR)
     is_err := mk_is_type(mk_name('_vt), 'error)
-    return mk_do([
+    return mk_do($[
         n_define('_vt, N_AUTO_TYPE, _build_sequence_expr(rest)),
-        mk_expr_stmt(mk_if(
-                is_err,
-                [mk_expr_stmt(mk_name('_vt))],
-                [mk_expr_stmt(mk_if(
-                        matched,
-                        then_stmts,
-                        [mk_expr_stmt(NO_MATCH_EXPR)
-                    ]))]))
+        mk_if(
+            is_err,
+            $[mk_name('_vt)],
+            $[mk_if(matched, then_stmts, $[NO_MATCH_EXPR])])
     ])
 
 # --- name - another rule reference
@@ -223,9 +220,19 @@ fn $_manyflat(match_expr):
             this ! reset(_mark)
             items = m
             break
-        if m is pair or m is list or m is nil:
-            for x in m:
-                items = cons(x, items)
+        # No `for` in a template: C5 reorders the for node's fields, and a
+        # template's ::$ast tree can reach a compiler of the other shape
+        # during a stage0 regen.
+        if m is pair or m is nil:
+            _mf_p := m
+            while _mf_p is pair:
+                items = cons(car(_mf_p), items)
+                _mf_p = cdr(_mf_p)
+        elif m is list:
+            _mf_i := 0
+            while _mf_i < len(m):
+                items = cons(m[_mf_i], items)
+                _mf_i = _mf_i + 1
         else:
             items = cons(m, items)
     reverse(items)
@@ -370,7 +377,7 @@ fn $_binop_or(first_expr, second_expr):
 
 # ENTRY: lhs OP rhs -- handle binary operands
 fn _decode_binop(node) -> pair:
-    op := s_op_name(node)
+    op := s_binop_op(node)
     if op == '|:
         return mk_expand_n($_binop_or::$ast,
                 pair('first_expr, _decode_term(s_binop_lhs(node))),
@@ -395,9 +402,9 @@ fn _decode_term(node) -> pair:
         return _decode_token_kind(cadr(node))
     if kind == 'str:
         return _decode_soft_keyword(cadr(node))
-    if kind == 'call:
+    if kind == 'apply:
         return _decode_call(node)
-    if kind == 'binop:
+    if kind == '|:
         return _decode_binop(node)
     if s_is_pairlist(node):
         return _build_sequence_expr(s_pairlist_items(node))
@@ -422,7 +429,7 @@ fn _build_sequence_steps(remaining, n_capture_count) -> pair:
         if n_capture_count == 1:
             return mk_index(mk_name('_acc), $['int, 0])
         else:
-            return mk_call('reverse, [mk_name('_acc)])
+            return mk_call('reverse, $[mk_name('_acc)])
 
     term := car(remaining)
     capture_inc := 1
@@ -432,10 +439,10 @@ fn _build_sequence_steps(remaining, n_capture_count) -> pair:
         term = s_unary_target(term)
         capture_inc = 0
     else:
-        then_stmts!append(n_set('_acc, mk_call('cons, [mk_name('_t), mk_name('_acc)])))
+        then_stmts!append(n_set('_acc, mk_call('cons, $[mk_name('_t), mk_name('_acc)])))
 
     rest := _build_sequence_steps(cdr(remaining), n_capture_count + capture_inc)
-    then_stmts!append(mk_expr_stmt(rest))
+    then_stmts!append(rest)
     matched := mk_binop(mk_name('_t), '!=, NO_MATCH_EXPR)
     is_err := mk_is_type(mk_name('_t), 'error)
 
@@ -447,25 +454,21 @@ fn _build_sequence_steps(remaining, n_capture_count) -> pair:
     #        _NO_MATCH
     #   else:
     #       _t
-    return mk_do([
+    return mk_do($[
         n_set('_t, _decode_term(term)),
-        mk_expr_stmt(mk_if(
-                is_err,
-                [mk_expr_stmt(mk_name('_t))],
-                [mk_expr_stmt(mk_if(
-                        matched,
-                        then_stmts,
-                        [mk_expr_stmt(NO_MATCH_EXPR)
-                    ]))]))
+        mk_if(
+            is_err,
+            $[mk_name('_t)],
+            $[mk_if(matched, chain(then_stmts), $[NO_MATCH_EXPR])])
     ])
 
 
 # Preamble: declare the target list once, then descend through the steps.
 fn _build_sequence_expr(elements) -> pair:
-    return mk_do([
+    return mk_do($[
         n_define('_acc, N_AUTO_TYPE, NIL_EXPR),
         n_define('_t, N_AUTO_TYPE, NIL_EXPR),
-        mk_expr_stmt(_build_sequence_steps(chain(elements), 0))
+        _build_sequence_steps(chain(elements), 0)
     ])
 
 # a bare term is a one-term sequence

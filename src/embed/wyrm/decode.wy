@@ -6,13 +6,52 @@ import std::ctype::*
 fn decode_sym(text: str) -> sym:
     return sym(text)
 
-# expect - our int(str) parses all valid tokens
+# An integer token's value: decimal, `0x` hex or `0b` binary, with `_`
+# separators (tokenizer.wy's integer literal). Parsed digit by digit: the
+# native int() is strtol-based, so it takes neither `0b` nor `_`, and it
+# reads a leading 0 as octal.
 fn decode_int(text: str) -> int:
-    return int(text)
+    n := len(text)
+    base := 10
+    i := 0
+    if (n > 2) and (text[0] == 48):
+        if (text[1] == \x) or (text[1] == \X):
+            base = 16
+            i = 2
+        elif (text[1] == \b) or (text[1] == \B):
+            base = 2
+            i = 2
+    value := 0
+    while i < n:
+        d := _digit_value(text[i])
+        if d >= 0:
+            value = value * base + d
+        i = i + 1
+    return value
 
-# expect - our float(str) parses all valid tokens
+# The value of the digit character `c` (0-9, a-f, A-F), or -1 (`_`).
+fn _digit_value(c: int) -> int:
+    if (c >= 48) and (c <= 57):
+        return c - 48
+    if (c >= 97) and (c <= 102):
+        return c - 87
+    if (c >= 65) and (c <= 70):
+        return c - 55
+    return -1
+
+# A float token's value. The grammar allows `_` separators in the digits
+# (tokenizer.wy's float_literal), which the native float() does not take.
 fn decode_float(text: str) -> float:
-    return float(text)
+    digits := ""
+    n := len(text)
+    run_start := 0
+    i := 0
+    while i < n:
+        if text[i] == 95:
+            digits = digits + (text ! substr(run_start, i - run_start))
+            run_start = i + 1
+        i = i + 1
+    return float(digits + (text ! substr(run_start, n - run_start)))
 
 fn _char_at(body: str, idx: int) -> int | sym:
     return body[idx] catch 'EOF

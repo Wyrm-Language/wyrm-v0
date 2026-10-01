@@ -8,5 +8,6 @@ target, run on every build) compiles every `.wy` here with the build tree's
 own compiler into `<builddir>/test_fixtures/expand/*.wyd`, and
 `test_bytecode_golden.cpp` runs them, seeding `__ARGS[0]` with that directory
 so `expandmain` can read its sibling images (`scope.wyd`, `scope_io.wyd`).
-`wydeclib.wy`/`wydecorated.wy` are also manifest rows, run end to end by
-`scripts/run_behavior.py`.
+The decorator library fixture that both engines run end to end is
+`decorators/declib.wy` with `decorators/decorated.wy` (plan C collapsed the
+port-shaped `wydeclib`/`wydecorated` twins into it).

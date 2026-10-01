@@ -26,17 +26,43 @@ fixing one forces the manifest update.
   identifier.
 - **`try` / `catch` expressions** (`samples/eval_error_handling.wy`): `try x`, `x catch y`,
   `catch return`. Compile fails; not diagnosed.
-- **`samples/decolib.wy`**: compile fails (decorator library using `-> TreeBase`,
-  `car`/`cdr` walks); not diagnosed.
+- **`...` has no lowering** (`samples/decolib.wy`): the tree is `(ellipsis)`, but the VM has
+  no value for it ("does not support 'ellipsis' expressions yet"). wypoc evaluates it to an
+  ELLIPSIS singleton.
 - **`samples/eval_messages.wy`**: compiles, then faults at run time with "no overload of
   'describe' matches 1 receiver(s)".
-- **`decorators/decorated.wy`**: pypoc's `declib` builds pypoc's 8-field `'fn` node; the
-  port's parser emits `'fn_def`. Needs a port-shaped twin (see `expand/wydecorated`) or
-  dropping.
 - **`samples/eval_coroutines.wy`**: `cofun.value` has no property-table entry for a
   coroutine's result (`getattr: unsupported receiver type`).
 - **`samples/eval_modules.wy`**: `import std::io::println as alias` needs the
   parent-then-member fallback in `wy_link_import`.
+
+## Slot subscopes: helper bindings are not lowered
+
+A virtual slot's block (project design `syntax.md` G3) may hold helper bindings next to
+`fn getter`/`fn setter` (`epoch := 1970`, `fn helper(): ...`), which the accessors capture.
+`compiler/classes.wy` `_subscope_accessors` refuses them ("helper bindings in a slot
+subscope are not supported yet"). Done when they lower as closure captures of the accessors.
+
+## Float literals lose precision
+
+A float literal in source comes out at single precision although `wy_float` is binary64:
+`x := 0.1` then `x == float("0.1")` is false, and `println(1e20)` prints
+`1.0000000200408773e+20`. A float made at run time (`float("0.1")`) is exact. The loss is
+by design, inherited from pypoc: a literal is loaded by the `f32` immediate opcode
+(`compiler/expressions.wy` `_f32_bits`). Found in plan C0 (project design
+`plans/C-wyrm-v0.md`).
+
+Done when: a float literal that isn't exact in binary32 goes through the constant pool
+(or an f64 load), and round-trips; add a `behavior` fixture.
+
+## `\"` and `\\` are not decoded in string literals
+
+`decode.wy`'s `decode_str` leaves an unknown escape as its backslash plus the character,
+and `\"`/`\\` are not in its list: `"a\"b"` is the 4 characters `a\"b`, and `len("\\")`
+is 2 (wypoc: `a"b`, 1). The escape set is decided in the project's `syntax.md` G8, which
+is outside plan C; `sexp_print.wy` avoids string escapes for this reason.
+
+Done when: `decode_str` follows G8.
 
 ## Parse failures surface as the wrong error
 
@@ -45,15 +71,6 @@ When the parser cannot parse a source it returns a non-module node, and the user
 raw-string gap above was found by bisecting because of this. Done when a parse failure
 reports the parse error (file, line, what was unexpected) through `--check`, `--build-bc`
 and a plain run.
-
-## `check_parser_truth.py` fails 46/46
-
-`scripts/check_parser_truth.py` diffs the external wyrm's `-m wyrm::parser` output against
-`test/samples/parser/*.wy.ast`. It already failed on every file before the test rework
-(the committed truth files lack what the current parser prints). It is not wired into
-meson, so nothing noticed. Done when the truth files are regenerated
-(`update_sample_parser_truth.py`) against a wyrm whose parser output is agreed to be
-correct, and the check is a meson test.
 
 ## `--build-bc` cannot write `.wy_a`
 

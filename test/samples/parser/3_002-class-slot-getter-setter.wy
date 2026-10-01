@@ -1,4 +1,5 @@
 class Account:
-    slot balance: int with:
-        getter = 0
-        setter = undefined
+    slot _balance: int = 0
+    slot balance: int:
+        fn getter(): this._balance
+        fn setter(v: int): this._balance = v

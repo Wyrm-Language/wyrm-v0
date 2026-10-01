@@ -1,1 +1,1 @@
-$['module, $['neg, 'x], $['pos, 'x], $['invert, 'x], $['not, 'x]]
+(module (neg x) (pos x) (~ x) (not x))

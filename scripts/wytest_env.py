@@ -68,6 +68,16 @@ def local_wyrm():
     return [LOCAL_WYRM]
 
 
+def parse_dump_argv(path):
+    """The argv that prints `path`'s tree in D2 Scheme form with the build
+    tree's own parser (the one the binary embeds), or None when not built.
+    The conformance corpus and test/samples/parser use this form."""
+    local = local_wyrm()
+    if local is None:
+        return None
+    return local + ["-I" + WY_ROOT, "-m", "wyrm::tools::parse_dump", "--scheme", path]
+
+
 def require_reference(tool):
     """reference_wyrm() or print a skip notice and return None."""
     ref = reference_wyrm()

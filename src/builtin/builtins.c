@@ -37,16 +37,14 @@ enum { WY_BUILTIN_FMT_BUF_SIZE = 64 };
 
 /**
  * Shortest decimal string that round-trips back to `value` through
- * `strtod` (matches Python's `repr(float)`, which is what the pypoc
- * reference's `_to_str` relies on via `str(float)`).
+ * `strtod`, laid out like Python's `repr(float)` (what the wypoc reference
+ * prints): positional for decimal exponents -4..15, otherwise scientific,
+ * and always with a '.' or an exponent so `1.0` never prints as the bare `1`.
  *
- * Tries increasing `%.*g` precision from 1 to 17 significant digits,
- * stopping at the first that reads back bit-identical. 17 significant
- * digits always round-trips an IEEE-754 binary64, so this always
- * terminates with a match. Ensures the result still "looks like" a float
- * (has a '.', 'e', or is inf/nan) so `1.0` never prints as the bare `1`.
+ * With `d2` set the exponent is spelled the D2 way (`1e20`, `1.5e-7`), without
+ * Python's sign and zero padding (`1e+20`, `1.5e-07`).
  */
-static wy_uword format_float_(double value, char* buf, wy_uword buf_size)
+static wy_uword format_float_(double value, bool d2, char* buf, wy_uword buf_size)
 {
     if (isnan(value)) {
         int n = snprintf(buf, buf_size, "nan");
@@ -57,136 +55,263 @@ static wy_uword format_float_(double value, char* buf, wy_uword buf_size)
         return (n > 0) ? (wy_uword) n : 0;
     }
 
-    int written = 0;
-    for (int precision = 1; precision <= 17; precision++) {
-        int n = snprintf(buf, buf_size, "%.*g", precision, value);
-        if (n <= 0 || (wy_uword) n >= buf_size) { continue; }
-        written = n;
-        if (strtod(buf, WY_NULL) == value) { break; }
+    /* Shortest significant digits: "%.*e" at increasing precision until the
+     * text reads back bit-identical (17 digits always do for binary64). */
+    char sci[32];
+    for (int precision = 0; precision <= 16; precision++) {
+        int n = snprintf(sci, sizeof(sci), "%.*e", precision, value);
+        if (n <= 0 || (wy_uword) n >= sizeof(sci)) { return 0; }
+        if (strtod(sci, WY_NULL) == value) { break; }
     }
-    if (written <= 0) { return 0; }
 
-    bool has_float_marker = false;
-    for (int i = 0; i < written; i++) {
-        char c = buf[i];
-        if (c == '.' || c == 'e' || c == 'E' || c == 'n' /* nan/inf, defensive */) {
-            has_float_marker = true;
-            break;
+    /* Split "-d.ddde+XX" into sign, digits and decimal exponent. */
+    const char* cursor = sci;
+    bool negative = false;
+    if (*cursor == '-') { negative = true; cursor++; }
+    char digits[20];
+    wy_uword ndigits = 0;
+    for (; *cursor != 'e' && *cursor != '\0'; cursor++) {
+        if (*cursor != '.' && ndigits < sizeof(digits)) { digits[ndigits++] = *cursor; }
+    }
+    long exponent = (*cursor == 'e') ? strtol(cursor + 1, WY_NULL, 10) : 0;
+    while (ndigits > 1 && digits[ndigits - 1] == '0') { ndigits--; }
+
+    char out[48];
+    wy_uword len = 0;
+    if (negative) { out[len++] = '-'; }
+    if (exponent >= -4 && exponent < 16) {
+        if (exponent < 0) {
+            out[len++] = '0';
+            out[len++] = '.';
+            for (long i = -1; i > exponent; i--) { out[len++] = '0'; }
+            for (wy_uword i = 0; i < ndigits; i++) { out[len++] = digits[i]; }
+        } else {
+            wy_uword int_digits = (wy_uword) exponent + 1;
+            for (wy_uword i = 0; i < int_digits; i++) { out[len++] = (i < ndigits) ? digits[i] : '0'; }
+            out[len++] = '.';
+            if (ndigits > int_digits) {
+                for (wy_uword i = int_digits; i < ndigits; i++) { out[len++] = digits[i]; }
+            } else {
+                out[len++] = '0';
+            }
         }
+        out[len] = '\0';
+    } else {
+        out[len++] = digits[0];
+        if (ndigits > 1) {
+            out[len++] = '.';
+            for (wy_uword i = 1; i < ndigits; i++) { out[len++] = digits[i]; }
+        }
+        int n = snprintf(out + len, sizeof(out) - len, d2 ? "e%ld" : "e%+03ld", exponent);
+        if (n <= 0) { return 0; }
+        len += (wy_uword) n;
     }
-    if (!has_float_marker && (wy_uword)(written + 2) < buf_size) {
-        buf[written] = '.';
-        buf[written + 1] = '0';
-        written += 2;
-        buf[written] = '\0';
-    }
-    return (wy_uword) written;
-}
-
-/** Write `len` bytes through the context's output hook, a no-op if unset. */
-static void io_write_(wy_context* context, const char* bytes, wy_uword len)
-{
-    if (context->io.write == WY_NULL || len == 0) { return; }
-    context->io.write(context, bytes, len, context->io.ud);
-}
-
-static void io_write_str_(wy_context* context, const char* cstr)
-{
-    if (cstr == WY_NULL) return;
-    io_write_(context, cstr, wy_strlen_f(cstr));
+    if (len >= buf_size) { return 0; }
+    wy_memcpy(buf, out, len + 1);
+    return len;
 }
 
 /**
- * Format one value and write it to context's IO.
+ * Where format_value_ sends its text: the context's IO hook (`to_io`), or a
+ * buffer. With `buf` NULL a buffer sink only counts, so `str()` can size the
+ * string in a first pass and fill it in a second.
  */
-static wy_error format_value_f(wy_context* context, wy_value value)
+typedef struct format_sink_
 {
+    wy_context* context;
+    bool to_io;
+    char* buf;
+    wy_uword len;
+} format_sink_;
+
+/** Write `len` bytes to the sink. The IO hook is a no-op if unset. */
+static void sink_write_(format_sink_* sink, const char* bytes, wy_uword len)
+{
+    if (len == 0) { return; }
+    if (sink->to_io) {
+        wy_context* context = sink->context;
+        if (context->io.write != WY_NULL) { context->io.write(context, bytes, len, context->io.ud); }
+        return;
+    }
+    if (sink->buf != WY_NULL) { wy_memcpy(sink->buf + sink->len, bytes, len); }
+    sink->len += len;
+}
+
+static void sink_write_str_(format_sink_* sink, const char* cstr)
+{
+    if (cstr == WY_NULL) return;
+    sink_write_(sink, cstr, wy_strlen_f(cstr));
+}
+
+/**
+ * A str in D2 form: double-quoted, with \\ \" \n \r \t escaped and any
+ * other control character or byte that isn't valid UTF-8 written as \xHH.
+ */
+static void write_quoted_(format_sink_* sink, const char* str, wy_uword len)
+{
+    sink_write_str_(sink, "\"");
+    wy_uword offset = 0;
+    while (offset < len) {
+        wy_u32 cp = 0;
+        wy_uword seq_len = wy_utf8_decode_f(str, len, offset, &cp);
+        wy_u8 byte = (wy_u8) str[offset];
+        const char* escape = WY_NULL;
+        switch (byte) {
+        case '\\': escape = "\\\\"; break;
+        case '"': escape = "\\\""; break;
+        case '\n': escape = "\\n"; break;
+        case '\r': escape = "\\r"; break;
+        case '\t': escape = "\\t"; break;
+        default: break;
+        }
+        if (escape != WY_NULL) {
+            sink_write_str_(sink, escape);
+        } else if (byte < 0x20 || byte == 0x7F || (seq_len == 1 && byte >= 0x80)) {
+            char hex[8];
+            int n = snprintf(hex, sizeof(hex), "\\x%02X", (unsigned) byte);
+            sink_write_(sink, hex, (n > 0) ? (wy_uword) n : 0);
+        } else {
+            sink_write_(sink, str + offset, seq_len);
+        }
+        offset += seq_len;
+    }
+    sink_write_str_(sink, "\"");
+}
+
+/**
+ * How format_value_ renders a value, by where it sits:
+ *
+ * - PLAIN: an argument of println/str, or inside a container that is one;
+ *   strings print raw.
+ * - D2: an element of a pair list. The pair list prints in the D2 Scheme
+ *   form shared with the tree dumps (wyrm::sexp_print, wypoc's
+ *   sexp_print.py): `(1 (2 3) a "s")`, `(1 . 2)`, nil as `()`, strings
+ *   quoted and escaped, a float's exponent as `1e20`.
+ * - REPR: inside a list, tuple or dict that is itself inside a pair list:
+ *   wypoc's repr form, strings quoted, symbols as `'sym`, nil as `nil`.
+ */
+typedef enum format_mode_ { FORMAT_PLAIN_, FORMAT_D2_, FORMAT_REPR_ } format_mode_;
+
+static wy_error format_value_f(format_sink_* sink, wy_value value, format_mode_ mode)
+{
+    /* Elements of a list, tuple or dict. */
+    format_mode_ inner = (mode == FORMAT_PLAIN_) ? FORMAT_PLAIN_ : FORMAT_REPR_;
     char buf[WY_BUILTIN_FMT_BUF_SIZE];
     wy_uword len = 0;
 
     switch (value.type) {
     case WY_TYPE_TAG_STR: {
         wy_string* str = value.data.str;
-        if (str != WY_NULL) io_write_(context, str->str, str->len);
+        if (str == WY_NULL) break;
+        if (mode != FORMAT_PLAIN_) write_quoted_(sink, str->str, str->len);
+        else sink_write_(sink, str->str, str->len);
         break;
     }
-    case WY_TYPE_TAG_NIL: io_write_str_(context, "nil"); break;
-    case WY_TYPE_TAG_BOOL: io_write_str_(context, value.data.flag ? "true" : "false"); break;
+    case WY_TYPE_TAG_NIL: sink_write_str_(sink, (mode == FORMAT_D2_) ? "()" : "nil"); break;
+    case WY_TYPE_TAG_BOOL: sink_write_str_(sink, value.data.flag ? "true" : "false"); break;
     case WY_TYPE_TAG_WORD:
         len = (wy_uword) snprintf(buf, sizeof(buf), "%lld", (long long) value.data.word);
-        io_write_(context, buf, len);
+        sink_write_(sink, buf, len);
         break;
     case WY_TYPE_TAG_UWORD:
         len = (wy_uword) snprintf(buf, sizeof(buf), "%llu", (unsigned long long) value.data.uword);
-        io_write_(context, buf, len);
+        sink_write_(sink, buf, len);
         break;
     case WY_TYPE_TAG_FLOAT:
-        len = format_float_((double) value.data.fp, buf, sizeof(buf));
-        io_write_(context, buf, len);
+        len = format_float_((double) value.data.fp, mode == FORMAT_D2_, buf, sizeof(buf));
+        sink_write_(sink, buf, len);
         break;
     case WY_TYPE_TAG_SYMBOL:
-        io_write_str_(context, value.data.symtab_entry);
+        if (mode == FORMAT_REPR_) sink_write_str_(sink, "'");
+        sink_write_str_(sink, value.data.symtab_entry);
         break;
     case WY_TYPE_TAG_ERROR:
-        if (value.data.gc_object == WY_NULL) io_write_str_(context, "Unset");
-        else io_write_str_(context, "error");
+        if (value.data.gc_object == WY_NULL) sink_write_str_(sink, "Unset");
+        else sink_write_str_(sink, "error");
         break;
     case WY_TYPE_TAG_LIST: {
         wy_list* list = (wy_list*) value.data.gc_object;
-        io_write_str_(context, "[");
+        sink_write_str_(sink, "[");
         for (wy_uword i = 0; i < list->count; i++) {
-            if (i > 0) io_write_str_(context, ", ");
-            format_value_f(context, list->items[i]);
+            if (i > 0) sink_write_str_(sink, ", ");
+            format_value_f(sink, list->items[i], inner);
         }
-        io_write_str_(context, "]");
+        sink_write_str_(sink, "]");
         break;
     }
     case WY_TYPE_TAG_TUPLE: {
         wy_tuple* tup = (wy_tuple*) value.data.gc_object;
-        io_write_str_(context, "(");
+        sink_write_str_(sink, "(");
         for (wy_uword i = 0; i < tup->count; i++) {
-            if (i > 0) io_write_str_(context, ", ");
-            format_value_f(context, tup->items[i]);
+            if (i > 0) sink_write_str_(sink, ", ");
+            format_value_f(sink, tup->items[i], inner);
         }
-        io_write_str_(context, ")");
+        sink_write_str_(sink, ")");
         break;
     }
     case WY_TYPE_TAG_TABLE: {
         wy_dict* dict = (wy_dict*) value.data.gc_object;
-        io_write_str_(context, "{");
+        sink_write_str_(sink, "{");
         for (wy_uword i = 0; i < dict->count; i++) {
-            if (i > 0) io_write_str_(context, ", ");
-            format_value_f(context, dict->dense[i].key);
-            io_write_str_(context, ": ");
-            format_value_f(context, dict->dense[i].value);
+            if (i > 0) sink_write_str_(sink, ", ");
+            format_value_f(sink, dict->dense[i].key, inner);
+            sink_write_str_(sink, ": ");
+            format_value_f(sink, dict->dense[i].value, inner);
         }
-        io_write_str_(context, "}");
+        sink_write_str_(sink, "}");
         break;
     }
     case WY_TYPE_TAG_PAIR: {
-        wy_pair* p = (wy_pair*) value.data.gc_object;
-        io_write_str_(context, "(");
-        format_value_f(context, p->car);
-        io_write_str_(context, " . ");
-        format_value_f(context, p->cdr);
-        io_write_str_(context, ")");
+        /* Walk the cdr chain iteratively; only nested elements recurse. */
+        wy_value cursor = value;
+        sink_write_str_(sink, "(");
+        bool first = true;
+        while (cursor.type == WY_TYPE_TAG_PAIR) {
+            wy_pair* p = (wy_pair*) cursor.data.gc_object;
+            if (!first) sink_write_str_(sink, " ");
+            format_value_f(sink, p->car, FORMAT_D2_);
+            first = false;
+            cursor = p->cdr;
+        }
+        if (cursor.type != WY_TYPE_TAG_NIL) {
+            sink_write_str_(sink, " . ");
+            format_value_f(sink, cursor, FORMAT_D2_);
+        }
+        sink_write_str_(sink, ")");
         break;
     }
     default:
-        io_write_str_(context, "<object>");
+        sink_write_str_(sink, "<object>");
         break;
     }
     return WY_ERR_NONE;
 }
 
+/** `value` rendered by format_value_ into a new string (two passes: size, then fill). */
+static wy_error format_to_string_(wy_context* context, wy_value value, wy_string** out_str)
+{
+    format_sink_ sink = { context, false, WY_NULL, 0 };
+    format_value_f(&sink, value, FORMAT_PLAIN_);
+    wy_uword total = sink.len;
+    char* text = wy_context_gc_alloc(context, total + 1);
+    if (text == WY_NULL) { return WY_ERR_NOMEM; }
+    sink.buf = text;
+    sink.len = 0;
+    format_value_f(&sink, value, FORMAT_PLAIN_);
+    wy_error err = wy_string_new(context, text, total, out_str);
+    wy_context_gc_free(context, text);
+    return err;
+}
+
 /** Shared body for `print`/`println`: space-join every arg's rendering. */
 static wy_error write_joined_(wy_context* context, wy_value* args, wy_uword argc, bool trailing_newline)
 {
+    format_sink_ sink = { context, true, WY_NULL, 0 };
     for (wy_uword i = 0; i < argc; i++) {
-        if (i > 0) { io_write_str_(context, " "); }
-        format_value_f(context, args[i]);
+        if (i > 0) { sink_write_str_(&sink, " "); }
+        format_value_f(&sink, args[i], FORMAT_PLAIN_);
     }
-    if (trailing_newline) { io_write_str_(context, "\n"); }
+    if (trailing_newline) { sink_write_str_(&sink, "\n"); }
     return WY_ERR_NONE;
 }
 
@@ -1154,7 +1279,7 @@ static wy_error builtin_str_(wy_context* context, wy_value* args, wy_uword argc,
     case WY_TYPE_TAG_BOOL: text = value.data.flag ? "true" : "false"; len = wy_strlen_f(text); break;
     case WY_TYPE_TAG_WORD: len = (wy_uword) snprintf(buffer, sizeof(buffer), "%lld", (long long) value.data.word); break;
     case WY_TYPE_TAG_UWORD: len = (wy_uword) snprintf(buffer, sizeof(buffer), "%llu", (unsigned long long) value.data.uword); break;
-    case WY_TYPE_TAG_FLOAT: len = format_float_((double) value.data.fp, buffer, sizeof(buffer)); break;
+    case WY_TYPE_TAG_FLOAT: len = format_float_((double) value.data.fp, false, buffer, sizeof(buffer)); break;
     case WY_TYPE_TAG_SYMBOL: text = value.data.symtab_entry; len = wy_strlen_f(text); break;
     case WY_TYPE_TAG_BYTES:
         /* doc/stdlib.md: "N bytes", matching image.py's _static_repr binary-
@@ -1169,6 +1294,13 @@ static wy_error builtin_str_(wy_context* context, wy_value* args, wy_uword argc,
         else if (eobj->what == WY_NULL) { text = "error"; len = 5; }
         else { text = eobj->what->str; len = eobj->what->len; }
         break;
+    }
+    case WY_TYPE_TAG_PAIR: case WY_TYPE_TAG_LIST: case WY_TYPE_TAG_TUPLE: case WY_TYPE_TAG_TABLE: {
+        /* Containers render as println does (a pair list in D2 form). */
+        wy_string* rendered = WY_NULL;
+        wy_error err = format_to_string_(context, value, &rendered);
+        if (err == WY_ERR_NONE) { out[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) rendered); }
+        return err;
     }
     default: return WY_ERR_BAD_TYPE;
     }

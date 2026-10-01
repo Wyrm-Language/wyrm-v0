@@ -1,1 +1,1 @@
-$['module, $['define, 'a, $['type, 'auto], nil], $['define, 'b, $['type, 'auto], nil], $['set, 'a, $['int, 1]], $['set, $['index, 'b, $['int, 0]], $['int, 2]], $['set_values, $['a, 'b], $['tuple, 'b, 'a]]]
+(module (define a (type auto) ()) (define b (type auto) ()) (set a (int 1)) (set (index b (int 0)) (int 2)) (set_values (a b) (tuple b a)))

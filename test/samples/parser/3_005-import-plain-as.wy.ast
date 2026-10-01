@@ -1,1 +1,1 @@
-$['module, $['import, $[$['qualified_name, 'std, 'io]]], $['import, $[$['import_as, $['qualified_name, 'std, 'io, 'pairs], 'p]]]]
+(module (import (:: std io)) (import (:: std io pairs) (as p)))

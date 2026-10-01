@@ -1,0 +1,45 @@
+# Plan C4/C5 (ast.md R2): a one-statement body is that statement, so a
+# function whose whole body is one loop, `if` or `do` hands the compiler a
+# body that is also a scope owner of its own.
+fn each(xs):
+    for x in xs:
+        println(x)
+
+fn count_down(n):
+    while n > 0:
+        n = n - 1
+
+fn sign(n):
+    if n < 0:
+        -1
+    elif n == 0:
+        0
+    else:
+        1
+
+fn twice(n):
+    do:
+        m := n * 2
+        m
+
+fn find(xs, t):
+    for x in xs:
+        if x == t:
+            return "found"
+    else:
+        return "missing"
+
+fn guarded():
+    defer:
+        println("deferred")
+    println("body")
+    static calls: int = 0
+    calls = calls + 1
+    calls
+
+each([1, 2])
+println(count_down(3))
+println(sign(-5), sign(0), sign(5))
+println(twice(21))
+println(find([1, 2], 2), find([1], 5))
+println(guarded(), guarded())

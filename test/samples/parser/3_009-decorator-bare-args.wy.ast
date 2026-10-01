@@ -1,1 +1,1 @@
-$['module, $['decorated, $[$['decorator, 'memoize, nil]], $['fn_def, 'square, nil, $[$['param, 'x, $['type, 'int], nil]], $['type, 'int], $[$['return, $['binop, '*, 'x, 'x]]]]], $['decorated, $[$['decorator, 'route, $[$['str, "/home"], $['str, "GET"]]]], $['fn_def, 'handler, nil, nil, nil, $[$['return, 'nil]]]]]
+(module (decorate memoize (fn_def square () ((x (type int) ())) (type int) (return (* x x)))) (decorate route (fn_def handler () () (type auto) (return (nil))) (str "/home") (str "GET")))

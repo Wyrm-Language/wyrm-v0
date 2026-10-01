@@ -1,1 +1,1 @@
-$['module, $['sym, 'sym], $['sym, '+], 'true, 'false, 'nil]
+(module (sym sym) (sym +) (true) (false) (nil))

@@ -1,0 +1,17 @@
+# Plan C9b (syntax.md G3): a virtual slot is a subscope defining fn getter
+# and/or fn setter; without a setter it is read-only. `with` is a name.
+class Person:
+    slot birth: int = 1990
+    slot age:
+        fn getter(): 2026 - this.birth
+        fn setter(years: int): this.birth = 2026 - years
+    slot _id: int = 7
+    slot id: int:
+        fn getter(): this._id
+
+with := "with is an ordinary name"
+p := Person()
+println(p.age, p.id)
+p.age = 30
+println(p.birth, p.age)
+println(with)

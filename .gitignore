@@ -9,6 +9,8 @@
 *.wyc
 *.wyd
 __wycache__
+__pycache__/
+*.pyc
 
 # Generate python
 py/

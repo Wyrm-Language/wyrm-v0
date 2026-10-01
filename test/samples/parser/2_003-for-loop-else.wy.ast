@@ -1,1 +1,1 @@
-$['module, $['for, 'item, 'items, $[$['call, 'process, $['item]]], $[$['call, 'log, $[$['str, "not found"]]]]]]
+(module (for item items (apply log (str "not found")) (apply process item)))

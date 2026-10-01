@@ -1,11 +1,25 @@
-# Parse the file named by the first argument with wy/wyrm's own parser and
-# print the resulting tree. (Formerly `__main` at the foot of parser.wy,
-# moved out in epic 10a: parser.wy must not import std::io, because its
-# decorators are expanded in an expansion VM that has no host modules.)
+# Parse a file with wy/wyrm's own parser and print the resulting tree.
+#
+#     parse_dump.wy [--scheme] FILE
+#
+# --scheme prints the tree in D2 Scheme form (wyrm::sexp_print), the form the
+# conformance corpus uses; without it the tree prints through println.
+# (Formerly `__main` at the foot of parser.wy, moved out in epic 10a:
+# parser.wy must not import std::io, because its decorators are expanded in
+# an expansion VM that has no host modules.)
 import std::io::*
 import wyrm::parser::*
+import wyrm::sexp_print::*
 
-f := open(car(__ARGS), "r")
+args := __ARGS
+scheme := false
+if car(args) == "--scheme":
+    scheme = true
+    args = cdr(args)
+f := open(car(args), "r")
 content := f!readall()
 program := Parser(content)!program()
-println(program)
+if scheme:
+    println(write(program))
+else:
+    println(program)

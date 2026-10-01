@@ -1,1 +1,1 @@
-$['module, $['import, $[$['import_all, $['qualified_name, 'std, 'io], nil]]], $['import, $[$['import_all, $['qualified_name, 'std, 'io], $['File, 'StreamReader]]]]]
+(module (import (:: std io) (all)) (import (:: std io) (all File StreamReader)))

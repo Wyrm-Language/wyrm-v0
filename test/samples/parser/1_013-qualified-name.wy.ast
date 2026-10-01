@@ -1,1 +1,1 @@
-$['module, $['qualified_name, 'a, 'b, 'c]]
+(module (:: a b c))

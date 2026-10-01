@@ -1,6 +1,6 @@
-((a . (b . nil)) . ((a . (b . nil)) . nil))
+((a b) (a b))
 5000 5000
-([1, s, sym, 2.5, true, (1, 2), nil] . ([1, s, sym, 2.5, true, (1, 2), nil] . nil))
+([1, "s", 'sym, 2.5, true, (1, 2), nil] [1, "s", 'sym, 2.5, true, (1, 2), nil])
 cannot cross the expansion boundary: function
 expansion is not re-entrant
 expander module 'expander_none' has no expand_tree

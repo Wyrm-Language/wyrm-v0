@@ -15,20 +15,13 @@
 # ---------------------------------------------------------------------------
 # Deviations from module.py, each forced by the port
 #
-# 1. No decorator expansion. module.py's `_expand_decorators` runs real
-#    wyrm code over the sexpr tree before lowering (see the prereport's
-#    item 6: not `_dsl.wy`'s machinery, a `wyrm_eval_parse_tree`-equivalent
-#    is new infrastructure). Epic 10a M0 added the slice of it that needs
-#    no evaluation at all: predefined.wy's pre-pass rewrites `@template X`
-#    to a `'template` wrapper before the walk, and the wrapper handlers
-#    here and in statements.wy hand the marking down to the definition's
-#    frame so `_compile_or_stub` can stub a body that will not lower. Any
-#    other `decorated` node reaching the top-level walk is still refused
-#    with `unsupported` - same as every other construct this port has no
-#    lowering for; `decorators.wy` is already REFUSED in
-#    test/bytecode/manifest.txt, so the deferral is precedented. M3
-#    replaces the pre-pass with a real lookup (scope first, the built-in
-#    as fallback) so shadowing works.
+# 1. Decorator expansion is the caller's. compile_module takes an `expander`
+#    (wyrm::compiler::expansion runs decorators in a throwaway VM, epic 10a
+#    M3); there are no predefined decorators. `@template` is wyrm::template's
+#    library decorator (syntax.md G7): it answers `(annotate template (true)
+#    X)`, which _lower_annotations turns into the `'template` wrapper the
+#    handlers here and in statements.wy hand down to the definition's frame,
+#    so `_compile_or_stub` can stub a body that will not lower.
 #
 # 2. No message promotion. module.py's `_collect_promotions`/`_emit_promotion`
 #    register a plain top-level `fn name` as the wildcard overload of a
@@ -45,10 +38,10 @@
 #    deviation 3). Compare with `--strip` semantically: the images here are
 #    the stripped shape already.
 #
-# 4. Import shapes are wyrm's, not pypoc's flat Import dataclass (ast.wy's
-#    module section): an `import`/`import_static` node holds one narrowing
-#    body - a bare qualified_name, `import_as`, `import_items`, or
-#    `import_all` (the wildcard). `import static` lowers exactly like
+# 4. Import shapes are wyrm's, not pypoc's flat Import dataclass: an
+#    `import`/`import_static` node is `(import path spec?)` (ast.md), spec
+#    `(as name)`, `(items ...)` or `(all except...)` (the wildcard).
+#    `import static` lowers exactly like
 #    `import`, as in pypoc: `static` restricts usage by prose convention
 #    this compiler does not enforce.
 #
@@ -71,7 +64,6 @@ import wyrm::compiler::statements::*
 import wyrm::compiler::functions::*
 import wyrm::compiler::classes::*
 import wyrm::compiler::handlers::*
-import wyrm::compiler::predefined::*
 import wyrm::compiler::verify::*
 
 # ---------------------------------------------------------------------------
@@ -130,15 +122,15 @@ fn _prefix(parts, n: int) -> list:
         i = i + 1
     return out
 
-# The name parts of an import path: a bare sym (`import_items`/`import_all`
-# keep single-component paths bare) or a `qualified_name` node (whose SPECS
-# entry lists no sub-nodes - the parts ride as plain fields).
+# The name parts of an import path: a bare sym (a single-component path) or
+# a `(:: a b ...)` node (whose SPECS entry lists no sub-nodes - the parts
+# ride as plain fields).
 fn _path_parts_of(path) -> list | error:
     parts := []
     if path is sym:
         parts ! append(str(path))
         return parts
-    if node_kind(path) == 'qualified_name:
+    if is_path_node(path):
         rest := _tail(path, 1)
         while rest is pair:
             parts ! append(str(car(rest)))
@@ -148,33 +140,28 @@ fn _path_parts_of(path) -> list | error:
 
 # One import statement's shape, normalized to what the hoist below emits:
 # [path_parts, alias_or_nil, items_or_nil, wildcard, excepts_or_nil].
-# `items` is a list of [name, binding] pairs. The narrowing body is one of
-# a bare sym (single-component paths: `import geometry`),
-# `qualified_name`, `import_as`, `import_items`, or `import_all`.
+# `items` is a list of [name, binding] pairs. The statement is
+# `(import path spec?)` (ast.md): path a name or a `(:: ...)` node, spec
+# `(as name)`, `(items (item name alias)...)` or `(all except...)`.
 fn _import_shape(node) -> list | error:
-    body := (_field(node, 1) catch nil)
-    if body is nil:
-        return error("an import needs a body")
-    narrowing := car(body)
-    if narrowing is sym:
-        return [[str(narrowing)], nil, nil, false, nil]
-    kind := node_kind(narrowing)
-    if kind == 'qualified_name:
-        parts := _path_parts_of(narrowing)
-        if parts is error:
-            return parts
+    path := (_field(node, 1) catch nil)
+    if path is nil:
+        return error("an import needs a path")
+    return _import_spec_shape(path, (_field(node, 2) catch nil))
+
+# `_import_shape` for a `path` and `spec`.
+fn _import_spec_shape(path, spec) -> list | error:
+    parts := _path_parts_of(path)
+    if parts is error:
+        return parts
+    kind := node_kind(spec)
+    if spec is nil:
         return [parts, nil, nil, false, nil]
-    if kind == 'import_as:
-        parts := _path_parts_of((_field(narrowing, 1) catch nil))
-        if parts is error:
-            return parts
-        return [parts, str((_field(narrowing, 2) catch nil)), nil, false, nil]
-    if kind == 'import_items:
-        parts := _path_parts_of((_field(narrowing, 1) catch nil))
-        if parts is error:
-            return parts
+    if kind == 'as:
+        return [parts, str((_field(spec, 1) catch nil)), nil, false, nil]
+    if kind == 'items:
         items := []
-        p := (_field(narrowing, 2) catch nil)
+        p := cdr(spec)
         while p is pair:
             item := car(p)
             name := (_field(item, 1) catch nil)
@@ -185,18 +172,57 @@ fn _import_shape(node) -> list | error:
                 items ! append([str(name), str(alias)])
             p = cdr(p)
         return [parts, nil, items, false, nil]
-    if kind == 'import_all:
-        parts := _path_parts_of((_field(narrowing, 1) catch nil))
-        if parts is error:
-            return parts
-        excepts := (_field(narrowing, 2) catch nil)
-        return [parts, nil, nil, true, excepts]
-    return error("an import body is a qualified name, import_as, import_items or import_all")
+    if kind == 'all:
+        return [parts, nil, nil, true, cdr(spec)]
+    return error("an import spec is (as name), (items ...) or (all ...)")
+
+# ---------------------------------------------------------------------------
+# annotations (ast.md "Annotations", syntax.md G7)
+
+# `node` (expanded) with every `(annotate key value target)` replaced: the
+# `template` key by the `template` wrapper the rest of the compiler lowers
+# (a definition whose lowering failure becomes a trap), any other key by
+# its bare target (unknown keys are ignored). A real annotate node has
+# exactly four elements, which a parameter or target named `annotate`
+# never does.
+fn _lower_annotations(node):
+    if not _has_annotation(node):
+        return node
+    return _lower_annotations_(node)
+
+fn _has_annotation(node) -> bool:
+    if node is pair:
+        if car(node) == 'annotate:
+            return true
+        return _has_annotation(car(node)) or _has_annotation(cdr(node))
+    if node is list:
+        for x in node:
+            if _has_annotation(x):
+                return true
+    return false
+
+fn _lower_annotations_(node):
+    if node is pair:
+        if (car(node) == 'annotate) and (pair_length(node) == 4) and ((_field(node, 1) catch nil) is sym):
+            target := _lower_annotations_((_field(node, 3) catch nil))
+            if (_field(node, 1) catch nil) == 'template:
+                return $['template, target]
+            return target
+        return cons(_lower_annotations_(car(node)), _lower_annotations_(cdr(node)))
+    if node is list:
+        out := []
+        for x in node:
+            out ! append(_lower_annotations_(x))
+        return out
+    return node
 
 # ---------------------------------------------------------------------------
 # the declare pass (module.py's _declare_module_names, over wyrm shapes)
 
 fn _declare_module_names(body, module: ModuleContext) -> nil | error:
+    implicit := check_implicit_names(body)
+    if implicit is error:
+        return implicit
     # fn/co names are declared up front too - the docstring intent of
     # module.py's _declare_module_names ("`fn` definitions included"),
     # which its own code does not actually do. Without this, a recursive
@@ -239,7 +265,7 @@ fn _declare_module_names(body, module: ModuleContext) -> nil | error:
                 if index6 is error:
                     return index6
         elif kind == 'template:
-            # predefined.wy's rewrite (epic 10a M0): a template-wrapped
+            # The template annotation (syntax.md G7): a template-wrapped
             # definition keeps the same binding it would have had bare -
             # a dispatched `fn [T]` binds no global, a plain
             # `fn`/`co` name does (recursion, forward references, value
@@ -264,7 +290,7 @@ fn _declare_module_names(body, module: ModuleContext) -> nil | error:
 # _collect_definitions, over wyrm shapes)
 
 # Index every fn, co and class this module defines, by name. Built from the
-# rewritten tree - after predefined.wy's pre-pass, so a `@template`
+# lowered tree - after _lower_annotations, so a `@template`
 # definition is indexed as what the marking wrapped, the tree its binding
 # would hold (10a M0's stand-in for module.py's "built from the expanded
 # tree"; M3 will index what real expansion left behind). Nested definitions
@@ -471,7 +497,7 @@ fn _import_toplevel(node, module: ModuleContext, extra) -> nil | error:
 fn _class_toplevel(node, module: ModuleContext, extra) -> nil | error:
     return compile_class_toplevel(node, module)
 
-# A `'template` wrapper (predefined.wy's rewrite of `@template X`, epic 10a
+# A `'template` wrapper (_lower_annotations' form of `(annotate template ...)`, epic 10a
 # M0). The marking is handed down to fn/co definitions so their frames
 # compile tolerantly - a body that will not lower stubs instead of failing
 # the module - and everything else compiles exactly as written: a class
@@ -578,27 +604,27 @@ fn _assemble(module: ModuleContext) -> dict | error:
 # decorator expansion hook (epic 10a M3/M4)
 #
 # The module being compiled never executes. When its tree still holds a
-# `'decorated` node after the predefined-decorator pre-pass, `compile_module`
+# `decorate` node, `compile_module`
 # hands the statements to the caller's `expander` (wyrm::compiler::expansion's
 # `expand_decorators` for the real thing: it compiles a scope module of the
 # module's imports and runs std::expand). The hook keeps this file free of
 # std::expand and wyrm::image, which pypoc's interpreter cannot import.
 
-# Does any `'decorated` node remain in `node`? Walks pair chains iteratively,
+# Does any `decorate` node remain in `node`? Walks pair chains iteratively,
 # recursing only into elements, so depth follows tree nesting, not list length.
-fn _has_decorated(node) -> bool:
+fn _has_decorate(node) -> bool:
     if node is pair:
-        if car(node) == 'decorated:
+        if car(node) == 'decorate:
             return true
         cur := node
         while cur is pair:
-            if _has_decorated(car(cur)):
+            if _has_decorate(car(cur)):
                 return true
             cur = cdr(cur)
         return false
     if (node is list) or (node is tuple):
         for x in node:
-            if _has_decorated(x):
+            if _has_decorate(x):
                 return true
     return false
 
@@ -606,7 +632,7 @@ fn _has_decorated(node) -> bool:
 # image.wy's `to_wyc` serializes), verifying it first unless `check` is
 # false. Lowering is strict since 10a M0: a function body that will not
 # lower fails the whole module, unless the definition is under a
-# `@template` marking (predefined.wy's rewrite) - then the body becomes a
+# `@template` marking (wyrm::template's annotation) - then the body becomes a
 # trapping stub with the reason recorded on the image. Anything outside a
 # function body is a refusal either way.
 fn compile_module(program_node, module_name: str, source_file = nil, check: bool = true,
@@ -619,24 +645,18 @@ fn compile_module(program_node, module_name: str, source_file = nil, check: bool
     if node_kind(program_node) != 'module:
         return error("compile_module needs a 'module node")
 
-    # Predefined decorators first (epic 10a M0): `@template X` becomes a
-    # `'template` wrapper before the declare pass or the walk reads the
-    # tree, so every later stage sees one shape.
-    rewritten := expand_predefined_decorators(body)
-    if rewritten is error:
-        return rewritten
-    body = rewritten
-
-    # Decorators that remain (anything but a lone `@template`, which the
-    # pre-pass consumed) expand before lowering, by the caller's expander.
-    # Modules without any pay nothing.
-    if _has_decorated(body):
+    # Decorators expand before lowering, by the caller's expander (there
+    # are no predefined ones: `@template` is wyrm::template's, syntax.md
+    # G7). Modules without any pay nothing. Annotations, which expansion
+    # or a hand-built tree leaves, are lowered after it.
+    if _has_decorate(body):
         if expander is nil:
             return error("'" + module_name + "' has decorators but no expander was supplied (see wyrm::compiler::expansion)")
         expanded := expander(body, module_name)
         if expanded is error:
             return expanded
         body = cdr(expanded)
+    body = _lower_annotations(body)
 
     d := _declare_module_names(body, module)
     if d is error:
@@ -719,6 +739,10 @@ class SessionContext:
     slot last_snap
     slot last_undo
     slot last_code_len
+    # Every import statement of the inputs so far: an input's decorators
+    # expand in the scope of these and its own, as they would in one module
+    # (`import wyrm::template::*`, then `@template fn ...` next input).
+    slot imports: list
 
     fn init():
         m := ModuleContext("__repl__", nil)
@@ -729,6 +753,7 @@ class SessionContext:
         this.last_snap = nil
         this.last_undo = []
         this.last_code_len = 0
+        this.imports = []
 
 fn new_session() -> SessionContext:
     return SessionContext()
@@ -758,6 +783,7 @@ fn _session_snapshot(session: SessionContext) -> dict:
     snap["image_dicts"] = [copy(image._static_index), copy(image._symbol_index), copy(image._message_index), copy(image._global_index), copy(image._free_index)]
     snap["module_dicts"] = [copy(m.globals), copy(m.classes), copy(m.class_statics), copy(m.slot_names), copy(m.superclasses), copy(m.definitions), copy(m.promoted_arities), copy(m.session_pending)]
     snap["wildcard"] = m.has_wildcard_import
+    snap["imports"] = len(session.imports)
     return snap
 
 fn _session_restore(session: SessionContext, snap: dict) -> nil:
@@ -779,6 +805,7 @@ fn _session_restore(session: SessionContext, snap: dict) -> nil:
     _truncate(image.functions, lens[4])
     _truncate(image.classes, lens[5])
     _truncate(m.static_imports, lens[6])
+    _truncate(session.imports, snap["imports"])
     d := snap["image_dicts"]
     image._static_index = d[0]
     image._symbol_index = d[1]
@@ -855,17 +882,31 @@ fn _compile_snippet_body(session: SessionContext, program_node, expander) -> dic
     wm_classes := len(image.classes)
 
     body := cdr(program_node)
-    rewritten := expand_predefined_decorators(body)
-    if rewritten is error:
-        return rewritten
-    body = rewritten
-    if _has_decorated(body):
+    if _has_decorate(body):
         if expander is nil:
             return error("this input has decorators but no expander was supplied (see wyrm::compiler::expansion)")
-        expanded := expander(body, name)
+        # Expanded behind the earlier inputs' imports, which are dropped
+        # from the answer again (expansion keeps the statement count).
+        prior := session.imports
+        scoped := body
+        i := len(prior) - 1
+        while i >= 0:
+            scoped = cons(prior[i], scoped)
+            i = i - 1
+        expanded := expander(scoped, name)
         if expanded is error:
             return expanded
         body = cdr(expanded)
+        k := 0
+        while k < len(prior):
+            body = cdr(body)
+            k = k + 1
+    body = _lower_annotations(body)
+    seen := body
+    while seen is pair:
+        if (node_kind(car(seen)) == 'import) or (node_kind(car(seen)) == 'import_static):
+            (session.imports) ! append(car(seen))
+        seen = cdr(seen)
 
     d := _declare_module_names(body, module)
     if d is error:
@@ -897,9 +938,9 @@ fn _compile_snippet_body(session: SessionContext, program_node, expander) -> dic
     for node in nodes:
         mark := init ! mark()
         var r: nil | error
-        if (idx == last) and (node_kind(node) == 'expr_stmt) and (not supported(TOPLEVEL_HANDLERS, node)):
+        if (idx == last) and is_expression_statement(node) and (not supported(TOPLEVEL_HANDLERS, node)):
             # A trailing bare expression is the input's value: return it.
-            value := (_field(node, 1) catch nil)
+            value := node
             reg := compile_expr(value, init, nil)
             if reg is error:
                 return reg

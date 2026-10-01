@@ -33,7 +33,7 @@
 # node kind, listing only the fields that are sub-nodes, with the role each
 # plays (a single node, a statement body, a pair list of nodes, ...).  Name
 # fields (`define`'s name, `for`'s loop variable, `attr`'s attribute,
-# `binop`'s operator, a `type` node's contents) are simply absent from the
+# an operator node's head, a `type` node's contents) are simply absent from the
 # row, which is what makes "every bare symbol the walk reaches is a name
 # reference" true - the same invariant `isinstance(node, ast.Name)` gives
 # analysis.py for free.  `RESERVED` then subtracts the bare symbols that are
@@ -91,20 +91,24 @@ fn _field(node, index: int):
 # `co_lambda` and `class_expr` are wyrm kinds with no pypoc counterpart
 # (ast.wy: pypoc's `_CANNOT_CROSS` list) and belong here for the same reason
 # their named forms do.
-BOUNDARIES := ['fn_def, 'co_def, 'lambda, 'co_lambda, 'class_def, 'class_expr, 'defer]
+BOUNDARIES := ['fn_def, 'co_def, 'lambda, 'co_lambda, 'class_def, 'class_expr, 'defer, 'defer_on]
 
 # The scope boundaries whose free names pass through to the enclosing frame
 # (analysis.py's `free_names`/`cell_names` recurse into FnDef/CoDef/Lambda
 # and Defer, and deliberately *not* into ClassDef).
 FN_LIKE := ['fn_def, 'co_def, 'lambda, 'co_lambda]
 
-# Bare symbols that are keywords, not name references - wy/wyrm/ast.wy's
-# "bare-symbol representation trap". `this` is here because pypoc spells it
-# `ThisRef`, a node of its own that `free_names` never notes.
-RESERVED := ['nil, 'true, 'false, 'break, 'continue, 'pass, 'this]
+# Bare symbols that are not name references to capture: `this`, which every
+# method binds implicitly (syntax.md G4). Literals and keyword statements
+# are headed nodes (ast.md R3), never bare symbols.
+RESERVED := ['this]
 
 # Kinds that own nested block scopes (analysis.py's `block_bodies`).
-BLOCK_OWNERS := ['if, 'while, 'do, 'for]
+BLOCK_OWNERS := ['if, 'cond, 'while, 'do, 'for]
+
+# The binary operators that head their own node, `(+ a b)` (ast.md R5).
+# `in` is a node of its own too, but is listed with its own SPECS row.
+BINARY_OPERATORS := ["+", "-", "*", "/", "%", "**", "&", "|", "^", "<<", ">>", "==", "!=", "<", "<=", ">", ">=", "<=>"]
 
 # Field roles used by SPECS (see the header comment):
 #
@@ -127,20 +131,13 @@ fn _build_specs() -> dict:
     s["nil"] = []
     s["true"] = []
     s["false"] = []
-    s["break"] = []
+    s["break"] = [[1, "node"]]
     s["continue"] = []
     s["pass"] = []
     s["type"] = []
-    s["qualified_name"] = []
-    s["var_positional"] = []
-    s["var_keyword"] = []
-    s["slot_option"] = []
+    s["::"] = []
     s["import"] = []
     s["import_static"] = []
-    s["import_all"] = []
-    s["import_items"] = []
-    s["import_as"] = []
-    s["import_item"] = []
     # -- structure ---------------------------------------------------------
     s["module"] = [[1, "nary"]]
     s["do"] = [[1, "body"]]
@@ -148,22 +145,22 @@ fn _build_specs() -> dict:
     s["array"] = [[1, "nary"]]
     s["list"] = [[1, "nary"]]
     s["dict"] = [[1, "entries"]]
-    s["expr_stmt"] = [[1, "node"]]
     # -- expressions -------------------------------------------------------
     s["attr"] = [[1, "node"]]
     s["index"] = [[1, "node"], [2, "node"]]
-    s["call"] = [[1, "node"], [2, "nodes"]]
-    s["message"] = [[1, "node"], [3, "nodes"]]
+    s["apply"] = [[1, "nary"]]
+    s["bind_msg"] = [[1, "node"]]
     s["not"] = [[1, "node"]]
     s["neg"] = [[1, "node"]]
     s["pos"] = [[1, "node"]]
-    s["invert"] = [[1, "node"]]
-    s["exp"] = [[1, "node"], [2, "node"]]
     s["and"] = [[1, "nary"]]
     s["or"] = [[1, "nary"]]
     s["in"] = [[1, "node"], [2, "node"]]
     s["is"] = [[1, "node"]]
-    s["binop"] = [[2, "node"], [3, "node"]]
+    # The canonical operator nodes (ast.md R5): `(op lhs rhs)`, `(~ x)`.
+    for op in BINARY_OPERATORS:
+        s[op] = [[1, "node"], [2, "node"]]
+    s["~"] = [[1, "node"]]
     # -- assignment and declaration ---------------------------------------
     s["define"] = [[3, "node"]]
     s["define_values"] = [[2, "node"]]
@@ -174,8 +171,13 @@ fn _build_specs() -> dict:
     s["static"] = [[3, "node"]]
     # -- control flow ------------------------------------------------------
     s["if"] = [[1, "node"], [2, "body"], [3, "elifs"], [4, "body"]]
+    # `if` is the lowering's view of a `cond` (cond_as_if); children reads
+    # a cond through it.
+    s["cond"] = [[1, "nary"]]
+    s["defer_on"] = [[2, "body"]]
     s["while"] = [[1, "node"], [2, "body"]]
-    s["for"] = [[2, "node"], [3, "body"], [4, "body"]]
+    # (for target iter else body), walked body first as before the reorder.
+    s["for"] = [[2, "node"], [4, "body"], [3, "body"]]
     s["return"] = [[1, "node"]]
     s["yield"] = [[1, "node"]]
     s["yield_from"] = [[1, "node"]]
@@ -186,16 +188,13 @@ fn _build_specs() -> dict:
     s["co_def"] = [[3, "nodes"], [5, "body"]]
     s["lambda"] = [[1, "nodes"], [3, "body"]]
     s["co_lambda"] = [[1, "node"], [3, "body"]]
-    s["co_params"] = [[2, "nodes"]]
-    s["param"] = [[3, "node"]]
     s["class_def"] = [[3, "body"]]
     s["class_expr"] = [[2, "body"]]
     s["slot_def"] = [[3, "node"]]
-    # `defer`'s field 1 is its optional `on <type>` constraint, a type
-    # expression and not a name reference, so only the body is walked.
-    s["defer"] = [[2, "body"]]
-    s["decorated"] = [[1, "nodes"], [2, "node"]]
-    s["decorator"] = [[2, "nodes"]]
+    # defer/defer_on: only the body is walked (children, defer_parts); a
+    # `defer_on` constraint is a type, not a name reference.
+    s["defer"] = [[1, "body"]]
+    s["decorate"] = [[2, "nary"]]
     return s
 
 SPECS := _build_specs()
@@ -327,6 +326,9 @@ fn is_name_ref(node) -> bool:
 # module gives are unaffected in every case but a first statement of
 # `list`/`dict`/`type`/... used as a bare name reference, which no corpus
 # fixture does.
+#
+# A `(do s...)` body (ast.md R2: a block of two or more statements) is its
+# statements, spliced.
 fn body_statements(body) -> list:
     out := []
     if body is nil:
@@ -338,6 +340,12 @@ fn body_statements(body) -> list:
     if not (body is pair):
         # a bare-symbol single statement: `fn f(): x`
         out ! append(body)
+        return out
+    if car(body) == 'do:
+        p0 := cdr(body)
+        while p0 is pair:
+            out ! append(car(p0))
+            p0 = cdr(p0)
         return out
     if is_known_kind(car(body)):
         out ! append(body)
@@ -387,6 +395,24 @@ fn children(node) -> list:
         return out
     kind := car(node)
     if not (kind is sym):
+        return out
+    if kind == 'do:
+        return body_statements(node)
+    if kind == 'cond:
+        return children(cond_as_if(node))
+    if (kind == 'defer) or (kind == 'defer_on):
+        return body_statements(defer_parts(node)[1])
+    if kind in FN_LIKE:
+        # Parameter defaults, then the body: the nodes a definition holds.
+        parts := fn_parts(node)
+        p := parts[2]
+        while p is pair:
+            default := param_parts(car(p))[3]
+            if not (default is nil):
+                out ! append(default)
+            p = cdr(p)
+        for statement in body_statements(parts[5]):
+            out ! append(statement)
         return out
     for rule in _spec_for(kind):
         index := rule[0]
@@ -489,6 +515,8 @@ fn walk_all_body(body) -> list:
 fn block_bodies(node) -> list:
     out := []
     kind := node_kind(node)
+    if kind == 'cond:
+        return block_bodies(cond_as_if(node))
     if kind == 'if:
         out ! append((_field(node, 2) catch nil))
         clauses := (_field(node, 3) catch nil)
@@ -504,10 +532,11 @@ fn block_bodies(node) -> list:
     elif kind == 'while:
         out ! append((_field(node, 2) catch nil))
     elif kind == 'do:
-        out ! append((_field(node, 1) catch nil))
+        # A `do` is its own body (see body_statements), in either shape.
+        out ! append(node)
     elif kind == 'for:
-        out ! append((_field(node, 3) catch nil))
-        orelse := (_field(node, 4) catch nil)
+        out ! append((_field(node, 4) catch nil))
+        orelse := (_field(node, 3) catch nil)
         if not (orelse is nil):
             out ! append(orelse)
     return out
@@ -531,6 +560,8 @@ fn block_children(node) -> list:
     kind := node_kind(node)
     if not (kind in BLOCK_OWNERS):
         return children(node)
+    if kind == 'cond:
+        return block_children(cond_as_if(node))
     out := []
     if kind == 'if:
         cond := (_field(node, 1) catch nil)
@@ -660,49 +691,176 @@ fn block_scopes(body, enclosing) -> list:
     return scopes
 
 # ---------------------------------------------------------------------------
+# canonical forms read through the lowering's own shapes
+
+# `(cond (test body)... (else body))` (ast.md) as the lowering's `(if test
+# body elifs else)`, whose elifs are `(test body)` pairs. The bodies are the
+# cond's own nodes, so scope owners match either way.
+fn cond_as_if(node):
+    clauses := cdr(node)
+    first := car(clauses)
+    elifs := []
+    orelse := nil
+    p := cdr(clauses)
+    while p is pair:
+        clause := car(p)
+        if car(clause) == 'else:
+            orelse = car(cdr(clause))
+        else:
+            elifs ! append(clause)
+        p = cdr(p)
+    return $['if, car(first), car(cdr(first)), chain(elifs), orelse]
+
+# A defer's `[constraint, body]`: `(defer body)` and `(defer_on type body)`
+# (ast.md).
+fn defer_parts(node) -> list:
+    if node_kind(node) == 'defer_on:
+        return [(_field(node, 1) catch nil), (_field(node, 2) catch nil)]
+    return [nil, (_field(node, 1) catch nil)]
+
+# ---------------------------------------------------------------------------
+# functions: the canonical forms (ast.md) read through one view
+
+fn pair_length(p) -> int:
+    n := 0
+    while p is pair:
+        n = n + 1
+        p = cdr(p)
+    return n
+
+# A parameter entry as `[kind, name, type, default]`, kind 'param,
+# 'var_positional or 'var_keyword: `(n type default)`, `(* n type)` and
+# `(** n type)` (ast.md). `*`/`**` can't be parameter names, so the marker
+# entries can't be confused with named ones.
+fn param_parts(entry) -> list:
+    head := car(entry)
+    size := pair_length(entry)
+    f1 := (_field(entry, 1) catch nil)
+    f2 := (_field(entry, 2) catch nil)
+    if (head == '*) and (size == 3):
+        return ['var_positional, f1, f2, nil]
+    if (head == '**) and (size == 3):
+        return ['var_keyword, f1, f2, nil]
+    return ['param, head, f1, f2]
+
+# A fn_def/co_def/lambda/co_lambda as `[name, dispatch, params, send, ret,
+# body]`: (fn_def name dispatch params ret body), (co_def name dispatch
+# params send ret body), (lambda params ret body), (co_lambda params send
+# ret body) (ast.md).
+fn fn_parts(node) -> list:
+    kind := node_kind(node)
+    f1 := (_field(node, 1) catch nil)
+    f2 := (_field(node, 2) catch nil)
+    f3 := (_field(node, 3) catch nil)
+    f4 := (_field(node, 4) catch nil)
+    if kind == 'fn_def:
+        return [f1, f2, f3, nil, f4, (_field(node, 5) catch nil)]
+    if kind == 'co_def:
+        return [f1, f2, f3, f4, (_field(node, 5) catch nil), (_field(node, 6) catch nil)]
+    if kind == 'lambda:
+        return [nil, nil, f1, nil, f2, f3]
+    if kind == 'co_lambda:
+        return [nil, nil, f1, f2, f3, f4]
+    return [nil, nil, nil, nil, nil, nil]
+
+# A definition's dispatch targets, (dispatch (type T)...) (ast.md), as a
+# pair list of the type names; nil for none.
+fn dispatch_names(dispatch):
+    if dispatch is nil:
+        return nil
+    out := []
+    p := cdr(dispatch)
+    while p is pair:
+        out ! append((_field(car(p), 1) catch nil))
+        p = cdr(p)
+    return chain(out)
+
+# A path `(:: a b c)` (ast.md).
+fn is_path_node(node) -> bool:
+    kind := node_kind(node)
+    return (kind is sym) and (str(kind) == "::")
+
+# ---------------------------------------------------------------------------
+# implicit names (syntax.md G4)
+
+# Names every method binds implicitly. Like any name they appear bare in a
+# tree, but nothing may declare or assign them. The messages are the
+# conformance compile-errors prefixes; positions come with the span table.
+IMPLICIT_NAMES := ['this, 'super]
+
+fn _implicit_error(name, verb: str):
+    if (name is sym) and (name in IMPLICIT_NAMES):
+        return error("`" + str(name) + "` can't be " + verb)
+    return nil
+
+# The first target in a `define_values`/`set_values` target list that is an
+# implicit name, as an error; targets are names or `(name type)` entries.
+fn _implicit_target_error(targets, verb: str):
+    p := targets
+    while p is pair:
+        target := car(p)
+        if target is pair:
+            target = car(target)
+        e := _implicit_error(target, verb)
+        if not (e is nil):
+            return e
+        p = cdr(p)
+    return nil
+
+fn _implicit_node_error(node):
+    kind := node_kind(node)
+    if (kind == 'define) or (kind == 'set) or (kind == 'if_set) or (kind == 'static):
+        return _implicit_error((_field(node, 1) catch nil), "assigned")
+    if (kind == 'define_values) or (kind == 'set_values):
+        return _implicit_target_error((_field(node, 1) catch nil), "assigned")
+    if (kind == 'for) or (kind == 'class_def) or (kind == 'fn_def) or (kind == 'co_def):
+        e := _implicit_error((_field(node, 1) catch nil), "declared")
+        if not (e is nil):
+            return e
+    for name in param_names(boundary_params(node)):
+        e2 := _implicit_error(name, "declared")
+        if not (e2 is nil):
+            return e2
+    return nil
+
+# The first declaration or assignment of an implicit name in the statement
+# pair list `body`, nested scopes included, as an error; nil when none.
+fn check_implicit_names(body) -> nil | error:
+    p := body
+    while p is pair:
+        for node in walk_all(car(p)):
+            e := _implicit_node_error(node)
+            if not (e is nil):
+                return e
+        p = cdr(p)
+    return nil
+
+# ---------------------------------------------------------------------------
 # free names, assigned names, cells
 
-# The declared names of a `param` list (`$[$['param, name, type, default],
-# ...]`), including `*rest`/`**kwargs`.
+# The declared names of a parameter list (`((name type default) ...)`),
+# including `*rest`/`**kwargs`.
 fn param_names(params) -> list:
     names := []
     p := params
     while p is pair:
-        entry := car(p)
-        kind := node_kind(entry)
-        if (kind == 'param) or (kind == 'var_positional) or (kind == 'var_keyword):
-            note_name(names, (_field(entry, 1) catch nil))
+        note_name(names, param_parts(car(p))[1])
         p = cdr(p)
     return names
 
-# The `params` field of a scope boundary, as a pair list of param nodes.
-# `co_lambda`/`co_def` carry theirs inside a `co_params` node (whose first
-# field is the send type).
+# The `params` field of a scope boundary, as a pair list of param entries.
 fn boundary_params(node) -> pair | nil:
-    kind := node_kind(node)
-    if (kind == 'fn_def) or (kind == 'co_def):
-        params := (_field(node, 3) catch nil)
-        if (kind == 'co_def) and (node_kind(params) == 'co_params):
-            return (_field(params, 2) catch nil)
-        return params
-    if kind == 'lambda:
-        return (_field(node, 1) catch nil)
-    if kind == 'co_lambda:
-        head := (_field(node, 1) catch nil)
-        if node_kind(head) == 'co_params:
-            return (_field(head, 2) catch nil)
-        return head
+    if node_kind(node) in FN_LIKE:
+        return fn_parts(node)[2]
     return nil
 
 # The body of a scope boundary, as a statement body (not yet normalized).
 fn boundary_body(node):
     kind := node_kind(node)
-    if (kind == 'fn_def) or (kind == 'co_def):
-        return (_field(node, 5) catch nil)
-    if (kind == 'lambda) or (kind == 'co_lambda):
-        return (_field(node, 3) catch nil)
-    if kind == 'defer:
-        return (_field(node, 2) catch nil)
+    if kind in FN_LIKE:
+        return fn_parts(node)[5]
+    if (kind == 'defer) or (kind == 'defer_on):
+        return defer_parts(node)[1]
     if kind == 'class_def:
         return (_field(node, 3) catch nil)
     if kind == 'class_expr:
@@ -730,7 +888,7 @@ fn free_names(params, body) -> list:
                 for name in inner:
                     if not (name in bound):
                         note_name(used, name)
-            elif kind == 'defer:
+            elif (kind == 'defer) or (kind == 'defer_on):
                 inner := free_names([], boundary_body(node))
                 for name in inner:
                     if not (name in bound):
@@ -779,7 +937,7 @@ fn cell_names(params, body) -> list:
         if kind in FN_LIKE:
             note_all(captured, free_names(param_names(boundary_params(node)),
                                           boundary_body(node)))
-        elif kind == 'defer:
+        elif (kind == 'defer) or (kind == 'defer_on):
             note_all(captured, free_names([], boundary_body(node)))
     if len(captured) == 0:
         return []

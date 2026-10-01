@@ -43,7 +43,7 @@ fn first_fn(src: str) -> pair:
 fn first_nested(fn_node: pair):
     for node in walk_body(boundary_body(fn_node)):
         kind := node_kind(node)
-        if (kind in FN_LIKE) or (kind == 'defer):
+        if (kind in FN_LIKE) or (kind == 'defer) or (kind == 'defer_on):
             return node
     return nil
 
@@ -133,13 +133,14 @@ check("blocks: else arm", scopes_5[4][1], ['o])
 check("blocks: arm enclosing", scopes_5[2][2], ['i, 'e])
 
 # ---------------------------------------------------------------------------
-# case 6: hand-built trees, so the shape dispatch is pinned independently
-# of whatever the parser does today.
+# case 6: hand-built canonical trees (ast.md), so the walks are pinned
+# independently of the parser.
 
-HAND := $['fn_def, 'h, nil, $[$['param, 'p, nil, nil]], nil,
-           $[$['define, 'boxed, $['type, 'auto], $['int, 0]],
-             $['lambda, $[$['param, 'q, nil, nil]], nil,
-                $[$['set, 'boxed, $['binop, '+, 'boxed, 'q]],
+AUTO := $['type, 'auto]
+HAND := $['fn_def, 'h, nil, $[$['p, AUTO, nil]], AUTO,
+           $['do, $['define, 'boxed, AUTO, $['int, 0]],
+             $['lambda, $[$['q, AUTO, nil]], AUTO,
+                $['do, $['set, 'boxed, $['+, 'boxed, 'q]],
                   $['set, $['attr, 'obj, 'f], 'p]]],
              $['return, 'boxed]]]
 
@@ -150,10 +151,10 @@ check("hand: assigned", assigned_names(boundary_body(HAND)), ['boxed])
 check("hand: cells", fn_cells(HAND), ['boxed])
 
 # a literal-heavy tree: nothing in it is a name reference
-LITERALS := $['fn_def, 'lits, nil, nil, nil,
-              $[$['define, 'd, $['type, 'auto], $['dict, $["k", $['int, 1]]]],
-                $['define, 'a, $['type, 'auto], $['array, $['str, "s"], $['sym, 'tag]]],
-                $['return, 'nil]]]
+LITERALS := $['fn_def, 'lits, nil, nil, AUTO,
+              $['do, $['define, 'd, AUTO, $['dict, $[$['str, "k"], $['int, 1]]]],
+                $['define, 'a, AUTO, $['array, $['str, "s"], $['sym, 'tag]]],
+                $['return, $['nil]]]]
 
 check("literals: declared", declared_names(boundary_body(LITERALS)), ['d, 'a])
 check("literals: free", fn_free(LITERALS), [])

@@ -1,1 +1,1 @@
-$['module, $['class_def, 'Widget, nil, $[$['slot_def, 'width, nil, nil, nil], $['slot_def, 'height, $['type, 'int], nil, nil], $['slot_def, 'color, nil, $['str, "red"], nil], $['slot_def, 'depth, $['type, 'int], $['int, 1], nil]]]]
+(module (class_def Widget () (do (slot_def width (type auto) () ()) (slot_def height (type int) () ()) (slot_def color (type auto) (str "red") ()) (slot_def depth (type int) (int 1) ()))))

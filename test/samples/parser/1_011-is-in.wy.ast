@@ -1,1 +1,1 @@
-$['module, $['is, 'x, $['type, 'int]], $['not, $['is, 'x, $['type, 'int]]], $['is, 'x, $['type, 'union, $['type, 'int], $['type, 'str]]], $['in, 'd, 'lst], $['not, $['in, 'd, 'lst]]]
+(module (is x (type int)) (not (is x (type int))) (is x (type int str)) (in d lst) (not (in d lst)))

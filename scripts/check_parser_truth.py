@@ -2,11 +2,12 @@
 """Diff fresh parser output against test/samples/parser/*.wy.ast truth files.
 
 Epic 8 M4's comparing golden runner. For every `.wy` in
-test/samples/parser/, parses it with the self-hosted wyrm parser
-(the external wyrm, see wytest_env.py, run with -m wyrm::tools::parse_dump,
-matching update_sample_parser_truth.py's invocation) and diffs the output against
-the committed `.ast` file. Exits non-zero with a unified diff on any
-mismatch, or if a `.wy` is missing its `.ast` counterpart.
+test/samples/parser/, parses it with the build tree's own parser
+(wytest_env.parse_dump_argv: `parse_dump --scheme`, the D2 Scheme form,
+matching update_sample_parser_truth.py) and diffs the output against the
+committed `.ast` file. Exits non-zero with a unified diff on any mismatch,
+or if a `.wy` is missing its `.ast` counterpart; skips (77) when the tree is
+not built.
 """
 
 import difflib
@@ -22,8 +23,8 @@ SAMPLES_DIR = os.path.join(REPO_ROOT, "test", "samples", "parser")
 
 
 def main():
-    wyrm = wytest_env.require_reference("check_parser_truth")
-    if wyrm is None:
+    if wytest_env.local_wyrm() is None:
+        print("check_parser_truth: the build tree has no wyrm binary - skipped", flush=True)
         return wytest_env.SKIP
 
     failures = 0
@@ -39,7 +40,7 @@ def main():
             continue
 
         result = subprocess.run(
-            wyrm + ["-m", "wyrm::tools::parse_dump", wy_path],
+            wytest_env.parse_dump_argv(wy_path),
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,

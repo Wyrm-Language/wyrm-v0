@@ -1,7 +1,7 @@
 # wy/wyrm/compiler/expansion.wy - epic 10a M4
 #
 # The decorator-expansion driver `compile_module` calls (its `expander`
-# argument) when a tree still holds a `'decorated` node. It lives outside
+# argument) when a tree still holds a `decorate` node. It lives outside
 # module.wy so that module.wy stays importable by pypoc's interpreter (this
 # file needs the C VM's `std::expand` and wyrm::image).
 #

@@ -1,1 +1,1 @@
-$['module, $['class_def, 'Person, nil, $[$['slot_def, 'name, $['type, 'str], nil, nil]]], $['class_def, 'FamilyMember, $['Person], $[$['slot_def, 'relation, $['type, 'str], nil, nil]]]]
+(module (class_def Person () (slot_def name (type str) () ())) (class_def FamilyMember Person (slot_def relation (type str) () ())))

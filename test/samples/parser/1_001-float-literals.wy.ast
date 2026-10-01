@@ -1,1 +1,1 @@
-$['module, $['float, 1.5], $['float, 4.0], $['float, 1e-09], $['float, 1.2345687e-09], $['float, 6.022e+23]]
+(module (float 1.5) (float 4.0) (float 1e-9) (float 1.2345687e-9) (float 6.022e23))

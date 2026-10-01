@@ -16,8 +16,8 @@
 #     qualified name - a never-filled global, the latent bug this pins);
 #   - `::$ast` errors name the problem: unknown definition, non-name
 #     operand, quoted-data trap;
-#   - an `@template` under an outer decorator is still refused (the
-#     pre-pass peels only the innermost decorator; real expansion is M3).
+#   - a decorated module compiled with no expander is refused (there is
+#     no predefined decorator to fall back on).
 import wyrm::parser::*
 import wyrm::compiler::context::*
 import wyrm::compiler::module::*
@@ -66,8 +66,16 @@ fn parse(src: str):
         exit(1)
     return tree
 
+# `src` parsed, with its first statement wrapped the way `@template`
+# (wyrm::template, syntax.md G7) answers it: these checks compile without a
+# decorator expander, so they build the annotation themselves.
+fn templated(src: str):
+    tree := parse(src)
+    first := car(cdr(tree))
+    return cons('module, cons($['annotate, 'template, $['true], first], cdr(cdr(tree))))
+
 # --- 1. a `@template` fn using `this` compiles, stubbed as a template ----
-img := compile_module(parse("@template\nfn uses_this():\n    return this\n\nfn caller():\n    return 0\n"), "m")
+img := compile_module(templated("fn uses_this():\n    return this\n\nfn caller():\n    return 0\n"), "m")
 if img is error:
     println("FAIL template-with-this refused: " + str(img))
     exit(1)
@@ -82,7 +90,7 @@ expect_fail("unmarked-this is refused (strict default)",
 
 # --- 3. a template that lowers compiles exactly as unmarked --------------
 plain := compile_module(parse("fn f(x):\n    return x * 2\n"), "m")
-marked := compile_module(parse("@template\nfn f(x):\n    return x * 2\n"), "m")
+marked := compile_module(templated("fn f(x):\n    return x * 2\n"), "m")
 if (plain is error) or (marked is error):
     println("FAIL lowering-template round trip: " + str(plain) + " / " + str(marked))
     exit(1)
@@ -112,8 +120,8 @@ expect_fail("astref on a non-definition name",
             parse("n := 5\n\nfn uses():\n    t := n::$ast\n    return t\n"),
             "names no fn, co or class")
 
-# --- 6. an outer decorator still refuses (M3) ----------------------------
-expect_fail("outer decorator around a template is refused",
+# --- 6. decorators need an expander --------------------------------------
+expect_fail("decorators without an expander are refused",
             parse("@outer\n@template\nfn f():\n    return 1\n"), "decorator")
 
 println("test_compiler_templates: done")

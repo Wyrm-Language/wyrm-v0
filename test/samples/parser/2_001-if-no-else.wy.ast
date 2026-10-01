@@ -1,1 +1,1 @@
-$['module, $['if, 'ready, $[$['int, 1]], nil, nil]]
+(module (cond (ready (int 1))))

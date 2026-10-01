@@ -21,7 +21,7 @@ endif
 # wyrm itself, not this project's C VM). Skipped when none is available.
 run_wy_tests = find_program('scripts/run_wy_tests.py', required: false)
 if run_wy_tests.found()
-    test('wy-tests', run_wy_tests, suite: 'wy')
+    test('wy-tests', run_wy_tests, suite: 'wy', timeout: 600)
 endif
 
 # Behavioral conformance: every test/corpus source, run from source by this
@@ -30,6 +30,27 @@ endif
 run_behavior = find_program('scripts/run_behavior.py', required: false)
 if run_behavior.found()
     test('behavior', run_behavior, suite: 'behavior', timeout: 600, workdir: meson.project_source_root(),
+         env: {'WYRM_BUILD_DIR': meson.project_build_root()})
+endif
+
+# The shared AST conformance corpus (the sibling project repo's conformance/,
+# when it is checked out): this tree's parser, through
+# `wyrm::tools::parse_dump --scheme`, against the canonical trees. Cases this
+# repo does not implement yet carry a `wyrm-v0` line in their `.skip` file.
+conformance_check = find_program(meson.project_source_root() / '../project/conformance/check.py',
+                                 required: false)
+if conformance_check.found()
+    test('conformance', conformance_check, suite: 'conformance', timeout: 600,
+         args: ['--producer', 'wyrm-v0', '--root', meson.project_source_root(),
+                '--build', meson.project_build_root(), '--json'])
+endif
+
+# The parser's golden trees: test/samples/parser/*.wy against their committed
+# .wy.ast (D2 Scheme form, this tree's own parser). Regenerate with
+# scripts/update_sample_parser_truth.py after a deliberate parser change.
+check_parser_truth = find_program('scripts/check_parser_truth.py', required: false)
+if check_parser_truth.found()
+    test('parser-truth', check_parser_truth, suite: 'parser', workdir: meson.project_source_root(),
          env: {'WYRM_BUILD_DIR': meson.project_build_root()})
 endif
 

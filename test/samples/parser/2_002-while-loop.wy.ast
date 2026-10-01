@@ -1,1 +1,1 @@
-$['module, $['define, 'n, $['type, 'auto], $['int, 10]], $['while, $['>, 'n, $['int, 0]], $[$['set, 'n, $['binop, '-, 'n, $['int, 1]]]]]]
+(module (define n (type auto) (int 10)) (while (> n (int 0)) (set n (- n (int 1)))))

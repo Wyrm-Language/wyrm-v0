@@ -21,443 +21,85 @@ fn n_set(target: sym | pair, value: pair) -> pair:
 fn n_set_values(targets: pair, value: pair) -> pair:
     return $['set_values, targets, value]
 
-##### SEXPR Manipulation
-
-# Valid for:
-#     'unop unary ops
-#     'binop binary ops
-#     'call
 # ---------------------------------------------------------------------------
-# Tree shapes (epic 10a). Two producers exist: pypoc's compiler (`'fn`,
-# `$['name, x]`, `'msg`, lists as native `[...]`) and this repo's own parser
-# (`'fn_def`, bare-symbol names, `'message`, pair lists). The DSL in _dsl.wy
-# runs under whichever built it and must read and write THAT shape, so every
-# shape-dependent read/build goes through this file. The shape is detected
-# from a template of this very module: `::$ast` yields a `'fn` tree when
-# pypoc compiled it and a `'fn_def` tree when the port did.
-fn _shape_probe():
-    pass
+# Reading trees. The shapes are the canonical ones: the project's
+# design/ast.md, and its conformance/ast/schema.sexp as data. Names are bare
+# symbols, lists are pair lists, and every other node is headed by its kind.
 
-WY_SHAPE := car(sexpr(_shape_probe::$ast)) == 'fn_def
-
-# Pair list of `items` (a native list or pair list); nil stays nil. The port's
-# trees hold pair lists where pypoc's hold native lists.
-fn _s_plist(items):
-    if items is list:
-        return chain(items)
-    return items
-
-# The elements of a list-shaped field as a native list (either shape).
+# The elements of a pair list as a native list.
 fn s_items(field) -> list:
     out := []
-    if field is list:
-        for x in field:
-            out ! append(x)
-    else:
-        cur := field
-        while cur is pair:
-            out ! append(car(cur))
-            cur = cdr(cur)
+    cur := field
+    while cur is pair:
+        out ! append(car(cur))
+        cur = cdr(cur)
     return out
 
-# The kind of a node; a bare symbol is a name reference in the port's trees.
+# The kind of a node; a bare symbol is a name reference.
 fn s_kind(node):
     if node is pair:
         return car(node)
-    if WY_SHAPE and (node is sym):
+    if node is sym:
         return 'name
     return nil
 
-fn s_op_name(e):
-    return cadr(e)
-
-fn s_unary_target(e):
-    # pypoc: ('unop OP target); port: ('invert target)
-    if WY_SHAPE:
-        return cadr(e)
-    return caddr(e)
-
-fn s_binop_lhs(e):
-    # Current form ('binop [OP] LHS RHS)
-    return caddr(e)
-
-fn s_binop_rhs(e):
-    # Current form ('binop [OP] LHS RHS)
-    return car(cdddr(e))
-
-# A reference to the identifier `name`?
-fn s_is_name_match(literal, name) -> bool:
-    if WY_SHAPE:
-        return (literal is sym) and (literal == name)
-    return ((car(literal) == 'name) and (cadr(literal) == name)) catch false
-
 # The identifier a name reference spells.
 fn s_get_name(literal) -> sym:
-    if WY_SHAPE and (literal is sym):
+    if literal is sym:
         return literal
-    if car(literal) != 'name:
-        return error("name expected")
-    return cadr(literal)
+    return error("name expected")
 
-# The callee of a call node (a name reference).
+# `~x`: (~ x).
+fn s_unary_target(e):
+    return cadr(e)
+
+fn s_is_drop(node) -> bool:
+    return (node is pair) and (car(node) == '~)
+
+# `lhs OP rhs`: (OP lhs rhs).
+fn s_binop_op(e):
+    return car(e)
+
+fn s_binop_lhs(e):
+    return cadr(e)
+
+fn s_binop_rhs(e):
+    return caddr(e)
+
+# A call: (apply callee arg...).
 fn s_call_target(call):
     return cadr(call)
 
-# The arguments of a call node, as a native list.
 fn s_call_args(call) -> list:
-    return s_items(caddr(call))
+    return s_items(cddr(call))
 
-# `~x`: pypoc ('unop ~ x), port ('invert x).
-fn s_is_drop(node) -> bool:
-    if not (node is pair):
-        return false
-    if WY_SHAPE:
-        return car(node) == 'invert
-    if car(node) == 'unop and s_op_name(node) == '~:
-        return true
-    return false
-
-# `$[a, b, ...]`: pypoc ('pairlist [a, b, ...]), port ('list a b ...).
+# `$[a, b, ...]`: (list a b ...).
 fn s_is_pairlist(node) -> bool:
-    if not (node is pair):
-        return false
-    if WY_SHAPE:
-        return car(node) == 'list
-    return car(node) == 'pairlist
+    return (node is pair) and (car(node) == 'list)
 
 fn s_pairlist_items(node) -> list:
-    if WY_SHAPE:
-        return s_items(cdr(node))
-    return s_items(cadr(node))
+    return s_items(cdr(node))
 
-_FN_NAME := 1
-_FN_RESULTS := 2
-_FN_REST := 3
-_FN_KWARGS := 4
-_FN_PARAMS := 5
-_FN_DISPATCH := 6
-_FN_BODY := 7
-# The port's 'fn_def: (fn_def name dispatch params ret_type body)
+# (fn_def name dispatch params ret body)
 _FN_DEF_BODY := 5
 
 fn s_fn_body(e):
-    tree := sexpr(e)
-    if car(tree) == 'fn_def:
-        return car(list_tail(tree, _FN_DEF_BODY))
-    return car(list_tail(tree, _FN_BODY))
+    return car(list_tail(sexpr(e), _FN_DEF_BODY))
 
-fn s_fn_with_body(node, body) -> pair:
-    return $['fn, field(node, _FN_NAME), field(node, _FN_RESULTS), field(node, _FN_REST),
-             field(node, _FN_KWARGS), field(node, _FN_PARAMS), field(node, _FN_DISPATCH), body]
-
-fn test_parse(s: str) -> pair:
-    return cadr(sexpr(parse(s)))
+# A body's statements, as a native list: a body is one form or (do s...)
+# (ast.md R2).
+fn s_body_items(body) -> list:
+    if body is nil:
+        return []
+    if (body is pair) and (car(body) == 'do):
+        return s_items(cdr(body))
+    return [body]
 
 # ---------------------------------------------------------------------------
-# Node-kind table
-#
-# Every node kind wy/wyrm/parser.wy's self-hosted parser actually emits in
-# its final output tree, as `kind -> (field, field, ...)`. Transient tags
-# used mid-parse and folded away before the tree reaches a caller (postfix
-# `attr_op`/`call_op`/`index_op`/`message_op`, and the assignment-operator
-# tags `assign`/`assign_bind`/`assign_qeq`) are NOT listed here - see
-# "Transient (not in the table)" below for what happens to each.
-#
-# `DIVERGES(reason)` marks a kind where wyrm's parser output differs from
-# pypoc's canonical sexpr table (`pypoc/wypoc/sexpr.py`'s `ROWS` plus its
-# `_ENCODERS`/`_DECODERS`), per doc-llm/history/wypoc-vm-port/README.md's corpus convention - this
-# is documentation of the current mismatch, not a fix (that's epic 8 M2+).
-#
-# A bare `sym` (no `$['kind, ...]` wrapper) is itself a valid node: every
-# unqualified identifier reference (`a`, `COUNT`, ...) is emitted as a plain
-# symbol, not as pypoc's `$['name, id]`. DIVERGES(pypoc always wraps a name
-# reference in a `'name` node; wyrm's parser never constructs a `'name` node
-# at all - `ast.wy`'s `mk_name` helper is kept for a future caller but has no
-# parser.wy call site today).
-#
-# -- Literals and atoms -----------------------------------------------------
-# sym      -> (value)                    symbol literal, 'foo
-# str      -> (value)                    decoded string
-# int      -> (value)                    decoded integer
-# float    -> (value)                    decoded float
-# nil      -> ()                         a BARE SYMBOL 'nil, not a wrapped
-#                                         $['nil] node - value('nil, ...)'s
-#                                         repl substitutes the symbol
-#                                         directly (the parser DSL's own
-#                                         `value(sym, subseq)` doc comment
-#                                         says "replace subseq with the
-#                                         literal node $[sym]", which reads
-#                                         as if it wraps; it doesn't -
-#                                         verified: `x := nil` parses to
-#                                         $['define, 'x, ..., 'nil], the last
-#                                         field a bare symbol). Still matches
-#                                         pypoc's own bare-symbol convention
-#                                         for this case.
-# true     -> ()                         bare symbol 'true, same as nil above
-# false    -> ()                         bare symbol 'false, same as nil above
-#
-# -- Structure ---------------------------------------------------------------
-# module        -> (stmt, stmt, ...)     flat, n-ary; matches pypoc's 'module
-# do            -> (body)                body is a block result (see block's
-#                                         known bug below)
-# tuple         -> (item, item, ...)     flat n-ary; matches pypoc's 'tuple
-# array         -> (item, item, ...)     flat n-ary; matches pypoc's 'list
-#                                         DIVERGES(name only: wyrm calls this
-#                                         kind 'array, pypoc's Row keys the
-#                                         same shape as 'list)
-# list          -> (item, item, ...)     flat n-ary, `$[...]` pair-literal
-#                                         syntax; pypoc has no separate kind
-#                                         for this literal form (its 'list
-#                                         Row is wyrm's 'array - see above)
-# dict          -> (pair, pair, ...)     each pair is a bare 2-element list
-#                                         $[key, value], no head symbol.
-#                                         DIVERGES(pypoc's DictEntry wraps
-#                                         each entry as $['pair, key, value])
-# qualified_name -> (seg, seg, ...)      flat n-ary of syms, 2+ segments only
-#                                         (a single segment collapses to a
-#                                         bare sym, matching pypoc's
-#                                         `_encode_type`/type_atom behavior)
-#
-# -- Expressions --------------------------------------------------------------
-# attr     -> (obj, name)                fixed (epic 8 M2): $_mk_postfix used
-#                                         cdr(op) where cadr(op) was needed
-#                                         (message_op already used the
-#                                         correct cadr/cddr), which
-#                                         double-wrapped name/index_expr in a
-#                                         one-item list. Verified: `a.b` now
-#                                         parses to $['attr, 'a, 'b].
-# index    -> (obj, index_expr)          fixed alongside attr above; `a[0]`
-#                                         now parses to $['index, 'a, $['int, 0]].
-# call     -> (target, args)             args is a flat list (nil if none);
-#                                         matches pypoc's 'call
-# message  -> (target, name, args)       matches pypoc's 'msg (name only)
-# not      -> (operand)                  matches pypoc's 'not
-# neg      -> (operand)                  DIVERGES(pypoc has no 'neg/'pos/
-# pos      -> (operand)                  'invert kinds; it encodes unary
-# invert   -> (operand)                  +/-/~ as a single 'unop kind with
-#                                         an op symbol field: $['unop, OP,
-#                                         operand])
-# exp      -> (base, exponent)           `**`; DIVERGES(pypoc treats `**` as
-#                                         an ordinary 'binop, no 'exp kind)
-# and      -> (operand, operand, ...)    flat n-ary chain.
-#                                         DIVERGES(pypoc's 'and' Row is
-#                                         strictly binary: left, right - a
-#                                         chain nests BinOp, it isn't flat)
-# or       -> (operand, operand, ...)    flat n-ary chain; same DIVERGES as
-#                                         'and above
-# in       -> (value, target)            fixed (epic 8 M2): $_mk_in used bare
-#                                         `[...]` array-literal syntax instead
-#                                         of `$[...]` (parser.wy, missing the
-#                                         `$` pair-literal sigil), so this
-#                                         node was a real array, not a pair
-#                                         list like every other kind. pypoc
-#                                         has no 'in kind at all (DIVERGES on
-#                                         content, not shape).
-# is       -> (value, type)              fixed alongside 'in above (same
-#                                         missing-`$` mistake in $_mk_is).
-#                                         type_expression's union-type fix
-#                                         (below) also means `is` now carries
-#                                         a real $['type, 'union, ...] node
-#                                         for `x is int | str`, matching
-#                                         pypoc's 'is Row carrying a list of
-#                                         type nodes in spirit (DIVERGES on
-#                                         exact shape: pypoc's is a bare list,
-#                                         wyrm's is a 'union-tagged 'type node
-#                                         - see the 'type entry below).
-# binop    -> (op, lhs, rhs)             fixed (epic 8 M2): $_binary_expr
-#                                         returned the raw flat parse sequence
-#                                         (operand op operand op ...) with no
-#                                         'binop head at all for more than one
-#                                         operand. Now folds left-associatively
-#                                         into nested $['binop, op, lhs, rhs]
-#                                         per pair, matching mk_binop/
-#                                         s_binop_lhs/s_binop_rhs's shape
-#                                         exactly and pypoc's own binary-op
-#                                         convention (matches, no DIVERGES).
-#                                         `1 + 2 + 3` -> $['binop, '+,
-#                                         $['binop, '+, $['int,1], $['int,2]],
-#                                         $['int,3]].
-#
-# -- Assignment and declaration ----------------------------------------------
-# define        -> (name, type, init)          matches pypoc's 'define
-# define_values -> ([[name, type], ...], init) matches pypoc's 'define_values
-# set           -> (target, value)             matches pypoc's 'set
-# if_set        -> (target, value)             `?=`; matches pypoc's 'if_set
-# set_values    -> ([target, ...], value)      matches pypoc's 'set_values
-# target        -> (base, indices)             trailing `[i][j]...` on an
-#                                               attr/name assignment target.
-#                                               DIVERGES(pypoc has no 'target
-#                                               kind; it represents the same
-#                                               construct as nested 'index
-#                                               nodes over the base)
-# static        -> (name, type, init)          DIVERGES(pypoc's 'static Row
-#                                               takes only (name, default);
-#                                               the type isn't carried on the
-#                                               wire there, so a 3-field
-#                                               'static fails pypoc's decode)
-#
-# -- Types --------------------------------------------------------------------
-# type -> (name)  or  type -> (qualified_name_node)  or  (union, type, type, ...)
-#      matches pypoc's 'type (bare name, or nested 'qualified_name for a
-#      `::`-qualified one); `$['type, 'auto]` is the no-annotation sentinel,
-#      also matching pypoc. `$['type, 'union, type1, type2, ...]` (fixed
-#      epic 8 M2, was discarded to 'auto - see type_expression's former
-#      FIXME) is wyrm-only: pypoc's 'type Row has no union representation at
-#      all, so anything reading a 'type node still has to special-case
-#      'union (nothing does yet, per the epic's own scope: only stop
-#      discarding it, not make every consumer understand it).
-#
-# -- Control flow ---------------------------------------------------------------
-# if       -> (cond, body, elifs, else_block)  DIVERGES(pypoc's 'if Row is
-#                                               strictly 3 fields - cond,
-#                                               then, orelse - and folds an
-#                                               elif chain into nested 'if
-#                                               nodes in the orelse position;
-#                                               wyrm keeps a separate elifs
-#                                               list field instead, so a
-#                                               4-field 'if fails pypoc's
-#                                               decode)
-# while    -> (cond, body)                     matches pypoc's 'while
-# for      -> (var, iterable, body, else_block) DIVERGES(pypoc's 'for Row/
-#                                               decoder takes exactly 3
-#                                               fields and has no for/else
-#                                               support; a 4-field 'for fails
-#                                               pypoc's decode)
-# return   -> (value)                          matches pypoc's 'return
-# yield    -> (value)                          not in pypoc's ROWS (Yield is
-#                                               in pypoc's _CANNOT_CROSS list)
-# yield_from -> (value)                        same, not representable yet
-# break    -> ()                                a BARE SYMBOL 'break, same
-#                                               representation as nil/true/
-#                                               false above, not a wrapped
-#                                               $['break] node (verified:
-#                                               `while true: continue` body
-#                                               is $['continue], a one-
-#                                               statement list whose sole
-#                                               statement is the bare symbol
-#                                               'continue - easy to misread
-#                                               as "the continue node's
-#                                               contents leaked into the
-#                                               body list" if you expect a
-#                                               wrapped node here, but it
-#                                               isn't a bug, see epic 8 M3's
-#                                               report). DIVERGES(pypoc's
-#                                               'break Row takes a reserved-
-#                                               nil value field; wyrm's is a
-#                                               bare symbol with none, so
-#                                               field counts still happen to
-#                                               agree at decode time since
-#                                               the reserved field just stays
-#                                               nil)
-# continue -> ()                                bare symbol 'continue, same
-#                                               as break above; matches
-#                                               pypoc's 'continue
-# pass     -> ()                                bare symbol 'pass, same as
-#                                               break above; matches pypoc's
-#                                               'pass
-# try      -> (expr)                             matches pypoc's 'try
-# catch    -> (value, handler)                   matches pypoc's irregular
-#                                                 'catch encoder/decoder
-#
-# -- Functions, coroutines, classes -----------------------------------------
-# (Most of this section has no pypoc counterpart at all: class/slot/co
-# definitions are in pypoc's `_CANNOT_CROSS` list - "cannot cross into a
-# decorator yet" - so every DIVERGES below is "pypoc doesn't carry this
-# construct yet", not a field-shape disagreement, unless noted otherwise.)
-#
-# fn_def   -> (name, dispatch, params, ret_type, body)
-#             DIVERGES(pypoc's matching construct is keyed 'fn, not
-#             'fn_def, with a different 7-field shape: name, results, rest,
-#             kwargs-reserved, params, dispatch, body - rest/kwargs come
-#             out of the params list on wyrm's side instead of being split
-#             into their own fields)
-# param    -> (name, type, default)      DIVERGES(pypoc's 'param Row is only
-#                                         2 fields, name and type; it has no
-#                                         wire slot for a default expression)
-# var_positional -> (name)               `*rest`; no pypoc counterpart (rest
-#                                         is folded into 'fn's own rest slot
-#                                         there, never a param-list entry)
-# var_keyword    -> (name)               `**kwargs`; pypoc explicitly
-#                                         refuses to encode this (SexprError)
-# co_def     -> (name, dispatch, params, ret_type, body)   no pypoc kind
-# co_params  -> (send_type, params)                        no pypoc kind
-# co_lambda  -> (params, ret_type, body)                   no pypoc kind
-# lambda     -> (params, ret_type, body)                   no pypoc kind
-#                                         (pypoc's Lambda is _CANNOT_CROSS)
-# class_def   -> (name, bases, body)     no pypoc kind (_CANNOT_CROSS)
-# class_expr  -> (bases, body)           anonymous class; no pypoc kind
-# slot_def    -> (name, type, init, options)  no pypoc kind (_CANNOT_CROSS)
-# slot_option -> (kind, value)           kind is 'setter/'getter/'undefined;
-#                                         no pypoc kind
-# decorator  -> (name, args)             matches pypoc's 'decorator
-# decorated  -> (decorators, stmt)       DIVERGES(pypoc's 'decorated Row
-#                                         takes one decorator NODE; wyrm
-#                                         gives a LIST of decorators, since
-#                                         `stmt_line` collects every stacked
-#                                         `@decorator` line at once instead
-#                                         of nesting one 'decorated per
-#                                         decorator)
-# template   -> (tree)                   no pypoc kind (epic 10a M0: the
-#                                         predefined `@template` decorator's
-#                                         rewrite - `$['template, X]` wrapping
-#                                         the decorated statement X, wrapper
-#                                         removed by compiler/predefined.wy's
-#                                         pre-pass for the sole or innermost
-#                                         decorator). Produced by decoration,
-#                                         never by parsing, so parser-truth
-#                                         checks against pypoc's sexpr.py are
-#                                         unaffected: pypoc's `@template` is a
-#                                         pass-through that never emits it
-#                                         (`_decorator_template` answers the
-#                                         tree unchanged).
-#
-# -- Modules and imports ------------------------------------------------------
-# (wyrm's import shape is structurally different from pypoc's: pypoc has one
-# flat 'import Row with optional fields for every narrowing form; wyrm
-# instead nests a narrowing kind - import_all/import_items/import_as/a bare
-# qualified_name - inside an outer import/import_static wrapper. All of the
-# following DIVERGE from pypoc's single-kind 'import shape.)
-# import          -> (body)              body is one of the narrowing kinds
-#                                         below, or a bare qualified_name
-# import_static   -> (body)              `import static ...`
-# import_all      -> (path, except_names_or_nil)   `path::*[except ...]`
-# import_items    -> (path, item_list)             `path::(a, b as c)`
-# import_as       -> (path, alias)                 `path as alias`
-# import_item     -> (name, alias_or_nil)          one entry of item_list
-#
-# -- Transient (not in the table) --------------------------------------------
-# call_op, index_op, attr_op, message_op: postfix-chain tags, each pushed by
-# its own rule (parser.wy:1102-1112) and consumed by `$_mk_postfix`
-# (parser.wy:1060-1081), which folds the whole chain into nested
-# 'call/'index/'attr/'message nodes before postfix_expr() returns. None of
-# the four `_op` tags survive into the final tree.
-#
-# assign, assign_bind, assign_qeq: the `=`/`:=`/`?=` operator tag from
-# `assign_op()` (parser.wy:530-531), consumed immediately by `$_mk_assign`
-# (parser.wy:452-469), which dispatches to 'define/'define_values/'if_set/
-# 'set/'set_values and never keeps the tag itself.
-#
-# -- Known bug affecting most bodies -----------------------------------------
-# `stmt_list()` (parser.wy:198-199) does not wrap its statements into a
-# clean list: `$[ stmt_line, many(...), opt(stmt_sep) ]` returns the raw
-# 3-part parse sequence, not a flattened statement list, and its trailing
-# `opt(stmt_sep)` is not discarded (no `~`), so today a block's body is
-# `$[first_stmt, more_stmts_or_nil, consumed_separator_token_or_nil]`
-# instead of a flat list of statements - e.g. `if x:\n    1\n` parses to
-# `$['if, 'x, $[$['int, 1], nil, <Token ...>], nil, nil]`. This affects the
-# `body` field of every construct that uses `block()`: if/while/for/fn_def/
-# co_def/class_def/lambda/co_lambda/do. `program()`'s own statement list
-# (`_mk_module`) is a separate, correct implementation and is not affected.
-# Flag for M2 - real parser surgery, not a docs fix.
-#
-# ---------------------------
-# Creators
-# NOTE: These are generally _ALL_ faulty; this is all based
-# on the wyrm poc code, and that's really broken.
-# ---------------------------
+# Building trees. Lists of nodes are pair lists.
+
+# The literal nil (ast.md R3).
 NIL_EXPR := $['nil]
-if WY_SHAPE:
-    NIL_EXPR = 'nil
 
 fn mk_sym(s: sym) -> pair:
     return $['sym, s]
@@ -468,74 +110,63 @@ fn mk_str(s: str) -> pair:
 fn mk_type(s: sym) -> pair:
     return $['type, s]
 
-fn mk_binop(lhs: pair, op: sym, rhs: pair):
-    return $['binop, op, lhs, rhs]
+# `lhs op rhs`
+fn mk_binop(lhs, op: sym, rhs):
+    return $[op, lhs, rhs]
 
 # A reference to the identifier `name`.
 fn mk_name(name: sym):
-    if WY_SHAPE:
-        return name
-    return $['name, name]
+    return name
 
-# A call of the callee expression `target` (already a node) on `args`.
+# A call of the callee expression `target` on the pair list `args`.
 fn mk_call_expr(target, args):
-    if WY_SHAPE:
-        return $['call, target, _s_plist(args)]
-    return $['call, target, args]
+    return cons('apply, cons(target, args))
 
-fn mk_call(func: sym, args: list) -> pair:
-    return mk_call_expr(mk_name(func), args)
+fn mk_call(func: sym, args) -> pair:
+    return mk_call_expr(func, args)
 
-fn mk_expr_stmt(stmt: pair) -> pair:
-    return $['expr_stmt, stmt]
+# A body of the pair list of statements `stmts`: one form, or (do s...)
+# for more; nil for none (ast.md R2).
+fn _s_body(stmts):
+    if stmts is nil:
+        return nil
+    if cdr(stmts) is nil:
+        return car(stmts)
+    return cons('do, stmts)
 
-fn mk_do(block):
-    if WY_SHAPE:
-        return $['do, _s_plist(block)]
-    return $['do, block]
+# `do:` over the pair list of statements `stmts`.
+fn mk_do(stmts):
+    return cons('do, stmts)
 
-fn mk_if(cond, then_block, else_block):
-    if WY_SHAPE:
-        # (if cond body elifs else)
-        return $['if, cond, _s_plist(then_block), nil, _s_plist(else_block)]
-    return $['if, cond, then_block, else_block]
-
-fn mk_or(lhs, rhs):
-    return $['or, lhs, rhs]
+# `if cond: then else: else`, each branch a pair list of statements (the
+# else one may be nil): (cond (test body) (else body)).
+fn mk_if(cond, then_stmts, else_stmts):
+    orelse := _s_body(else_stmts)
+    if orelse is nil:
+        return $['cond, $[cond, _s_body(then_stmts)]]
+    return $['cond, $[cond, _s_body(then_stmts)], $['else, orelse]]
 
 # `lhs is <typename>`
 fn mk_is_type(lhs, typename: sym):
-    if WY_SHAPE:
-        return $['is, lhs, mk_type(typename)]
-    return $['is, lhs, [mk_type(typename)]]
-
-fn mk_is(lhs, rhs):
-    return $['is, lhs, rhs]
+    return $['is, lhs, mk_type(typename)]
 
 # `obj[idx]`
 fn mk_index(obj, idx):
     return $['index, obj, idx]
 
-# `this ! name()`: a send of the bare message `name` to `this`, no arguments.
+# `this ! name()`: a send of the message `name` to `this`, no arguments.
 fn mk_this_send(name: sym):
-    if WY_SHAPE:
-        return $['message, 'this, name, nil, 'send]
-    return $['msg, $['name, 'this], name, []]
+    return $['apply, $['bind_msg, 'this, name]]
 
 # The identifier-name positions of these nodes are not references, so a
 # template substitution must leave them alone (the port's names are bare
 # symbols: `tok.kind` must not lose its `kind` when a hole is named `kind`).
-# attr and message fields name members.
+# attr and bind_msg fields name members.
 fn _s_subst(node, hole, repl):
     if node is sym:
         if node == hole:
             return repl
         return node
-    if node is list:
-        out := []
-        for x in node:
-            out ! append(_s_subst(x, hole, repl))
-        return out
     if not (node is pair):
         return node
     head := car(node)
@@ -544,10 +175,9 @@ fn _s_subst(node, hole, repl):
     if head == 'attr:
         # (attr obj name)
         return $['attr, _s_subst(cadr(node), hole, repl), caddr(node)]
-    if head == 'message:
-        # (message target name args send)
-        return $['message, _s_subst(cadr(node), hole, repl), caddr(node),
-                 _s_subst_tail(car(cdddr(node)), hole, repl), car(cdr(cdddr(node)))]
+    if head == 'bind_msg:
+        # (bind_msg receiver selector)
+        return $['bind_msg, _s_subst(cadr(node), hole, repl), caddr(node)]
     # Any other pair - a node or a list of nodes/names alike; a kind symbol
     # never equals a hole, so every element (the head too) is substituted.
     return _s_subst_tail(node, hole, repl)
@@ -561,24 +191,21 @@ fn _s_subst_tail(cells, hole, repl):
 
 # `tree` with every reference to `hole` replaced by `repl`.
 fn s_substitute(tree, hole, repl):
-    if WY_SHAPE:
-        return _s_subst(tree, hole, repl)
-    return replace(fn(node) { s_is_name_match(node, hole) }, repl, tree)
+    return _s_subst(tree, hole, repl)
 
-# Given a template function, substitute the given arguments
-# and return a newly created pair list suitable for
-# s_fn_with_body or a general block.
+# Given a template function, substitute the given arguments into its body
+# and answer the statements as a `do`.
 fn mk_expand_n(tmpl_ast, *subs) -> pair:
     body := s_fn_body(sexpr(tmpl_ast))
     out := []
-    for stmt in s_items(body):
+    for stmt in s_body_items(body):
         expanded := stmt
         for sub in subs:
             hole := try (car(sub) catch sub[0])
             repl := try (cdr(sub) catch sub[1])
             expanded = s_substitute(expanded, hole, repl)
         out ! append(expanded)
-    return mk_do(out)
+    return mk_do(chain(out))
 
 # @brief Build expansion of template function AST (1 type)
 fn mk_expand(tmpl_ast, name, replace) -> pair:

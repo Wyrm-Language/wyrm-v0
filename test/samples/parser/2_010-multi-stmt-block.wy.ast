@@ -1,1 +1,1 @@
-$['module, $['if, 'flag, $[$['define, 'a, $['type, 'auto], $['int, 1]], $['define, 'b, $['type, 'auto], $['int, 2]], $['define, 'c, $['type, 'auto], $['binop, '+, 'a, 'b]], $['call, 'print, $['c]]], nil, nil]]
+(module (cond (flag (do (define a (type auto) (int 1)) (define b (type auto) (int 2)) (define c (type auto) (+ a b)) (apply print c)))))

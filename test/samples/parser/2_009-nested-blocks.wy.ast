@@ -1,1 +1,1 @@
-$['module, $['for, 'x, 'xs, $[$['while, $['>, 'x, $['int, 0]], $[$['if, $['==, 'x, $['int, 1]], $[$['set, 'x, $['int, 0]]], nil, nil], $['set, 'x, $['binop, '-, 'x, $['int, 1]]]]]], nil]]
+(module (for x xs () (while (> x (int 0)) (do (cond ((== x (int 1)) (set x (int 0)))) (set x (- x (int 1)))))))

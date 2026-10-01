@@ -1,1 +1,1 @@
-$['module, $['define, 'AnonPerson, $['type, 'auto], $['class_expr, nil, $[$['slot_def, 'name, $['type, 'str], nil, nil], $['slot_def, 'age, $['type, 'int], nil, nil]]]]]
+(module (define AnonPerson (type auto) (class_expr () (do (slot_def name (type str) () ()) (slot_def age (type int) () ())))))

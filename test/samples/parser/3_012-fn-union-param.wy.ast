@@ -1,1 +1,1 @@
-$['module, $['fn_def, 'identify, nil, $[$['param, 'value, $['type, 'union, $['type, 'int], $['type, 'str]], nil]], $['type, 'str], $[$['return, 'value]]]]
+(module (fn_def identify () ((value (type int str) ())) (type str) (return value)))

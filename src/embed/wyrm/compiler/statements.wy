@@ -158,7 +158,7 @@ fn _emit_pairable(frame: FnContext, op, primary: int = 0, secondary: int = 0) ->
 
 # Constructs whose own lowering writes the statement's value; everything
 # else is worth `lnil` when it lands in the value position.
-VALUE_PRODUCING := ['expr_stmt, 'if, 'yield]
+VALUE_PRODUCING := ['cond, 'yield]
 
 # Constructs that never fall through to the next statement, so a `lnil`
 # ahead of one would be dead code.
@@ -168,7 +168,15 @@ NO_FALLTHROUGH := ['return, 'break, 'continue]
 # entry points
 
 fn compile_statement(node, frame: FnContext, result = nil):
+    if is_expression_statement(node):
+        return compile_expr(node, frame, result)
     return dispatch(STATEMENT_HANDLERS, node, frame, result)
+
+# Whether the statement `node` is an expression, valued like `do`'s last
+# statement and otherwise discarded: any node no statement handler claims
+# (ast.md R2: there is no statement wrapper).
+fn is_expression_statement(node) -> bool:
+    return not supported(STATEMENT_HANDLERS, node)
 
 # Compile a statement list, releasing each statement's temps after it.
 #
@@ -194,7 +202,7 @@ fn compile_body(body, frame: FnContext, result = nil) -> nil | error:
         wants_value := last and not (result is nil)
         mark := frame ! mark()
         kind := node_kind(node)
-        if wants_value and not (kind in VALUE_PRODUCING):
+        if wants_value and not ((kind in VALUE_PRODUCING) or is_expression_statement(node)):
             if not (kind in NO_FALLTHROUGH):
                 e := _emit_pack(frame, 'lnil, a0=result)
                 if e is error:
@@ -454,7 +462,7 @@ fn _assign(targets: list, values: list, frame: FnContext) -> nil | error:
     if len(values) != 1:
         return error(str(len(targets)) + " target(s) but " + str(len(values)) + " value(s)")
     value := values[0]
-    if node_kind(value) == 'call:
+    if (node_kind(value) == 'apply) and (node_kind((_field(value, 1) catch nil)) != 'bind_msg):
         return _assign_from_call(targets, value, frame)
     if node_kind(value) == 'tuple:
         items := _pairlist((_tail(value, 1) catch nil))
@@ -624,10 +632,6 @@ fn _set_if_unset(name, value_node, frame: FnContext) -> nil | error:
 fn _pass(node, frame: FnContext, result):
     return nil
 
-fn _expr_stmt(node, frame: FnContext, result):
-    value := (_field(node, 1) catch nil)
-    return compile_expr(value, frame, result)
-
 # `return e` returns one value from wherever it landed; `return a, b`
 # returns a window of them; bare `return` returns a single nil, so a
 # caller asking for one result gets nil rather than a zero-value backfill.
@@ -716,6 +720,12 @@ fn _if_lower(node, frame: FnContext, result) -> nil | error:
 fn _if_stmt(node, frame: FnContext, result):
     return _if_lower(node, frame, result)
 
+fn _cond_stmt(node, frame: FnContext, result):
+    return _if_stmt(cond_as_if(node), frame, result)
+
+fn _cond_expr(node, frame: FnContext, dst):
+    return _if_expr(cond_as_if(node), frame, dst)
+
 # `if` is an expression as well as a statement (wyrm.gram's `if_expr`), and
 # it is the same node either way - so it is the same lowering, with the
 # branch values landing in the register the expression was asked for.
@@ -786,8 +796,8 @@ fn _for(node, frame: FnContext, result) -> nil | error:
 fn _compile_for(node, frame: FnContext) -> nil | error:
     var_name := (_field(node, 1) catch nil)
     iter_node := (_field(node, 2) catch nil)
-    body := (_field(node, 3) catch nil)
-    orelse := (_field(node, 4) catch nil)
+    orelse := (_field(node, 3) catch nil)
+    body := (_field(node, 4) catch nil)
     mark := frame ! mark()
     source := compile_expr(iter_node, frame, nil)
     if source is error:
@@ -846,9 +856,21 @@ fn _compile_for(node, frame: FnContext) -> nil | error:
         return me
     return frame ! free_to(mark)
 
+# `break` or `break <value>`. A loop has no value register of its own yet
+# (a loop is never in VALUE_PRODUCING position), so the value is evaluated
+# for its effects and dropped.
 fn _break(node, frame: FnContext, result):
     if len(frame.loops) == 0:
         return error("`break` outside a loop")
+    value := (_field(node, 1) catch nil)
+    if not (value is nil):
+        mark := frame ! mark()
+        reg := compile_expr(value, frame, nil)
+        if reg is error:
+            return reg
+        fe := frame ! free_to(mark)
+        if fe is error:
+            return fe
     top := frame.loops[len(frame.loops) - 1]
     return frame ! emit_jump('jmp, top[1])
 
@@ -910,7 +932,7 @@ fn _defer(node, frame: FnContext, result):
         return error("`defer` needs functions.wy's compile_defer (M4); import wyrm::compiler::functions before compiling a module with `defer`")
     return _defer_compiler(node, frame)
 
-# A `'template` wrapper around a statement (predefined.wy's rewrite of
+# A `'template` wrapper around a statement (module.wy's _lower_annotations of
 # `@template X`, epic 10a M0): a nested definition compiles with the
 # marking handed down - its body may stub instead of failing the module -
 # and anything else compiles exactly as written, because the marking only
@@ -935,9 +957,8 @@ register_statement(['set], _set_stmt)
 register_statement(['if_set], _if_set_stmt)
 register_statement(['set_values], _set_values_stmt)
 register_statement(['pass], _pass)
-register_statement(['expr_stmt], _expr_stmt)
 register_statement(['return], _return)
-register_statement(['if], _if_stmt)
+register_statement(['cond], _cond_stmt)
 register_statement(['while], _while)
 register_statement(['for], _for)
 register_statement(['break], _break)
@@ -945,10 +966,10 @@ register_statement(['continue], _continue)
 register_statement(['yield], _yield_stmt)
 register_statement(['static], _static_decl)
 register_statement(['fn_def, 'co_def], _nested_fn)
-register_statement(['defer], _defer)
+register_statement(['defer, 'defer_on], _defer)
 register_statement(['template], _template_stmt)
 
-register_expression(['if], _if_expr)
+register_expression(['cond], _cond_expr)
 
 # Close the `_do` loop (deviation 6): expressions.wy's `'do` handler calls
 # through this hook once it is installed.

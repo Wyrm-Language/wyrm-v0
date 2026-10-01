@@ -1,1 +1,1 @@
-$['module, $['class_def, 'Account, nil, $[$['slot_def, 'balance, $['type, 'int], nil, $[$['slot_option, 'getter, $['int, 0]], $['slot_option, 'setter, 'undefined]]]]]]
+(module (class_def Account () (do (slot_def _balance (type int) (int 0) ()) (slot_def balance (type int) () (do (fn_def getter () () (type auto) (attr this _balance)) (fn_def setter () ((v (type int) ())) (type auto) (set (attr this _balance) v)))))))

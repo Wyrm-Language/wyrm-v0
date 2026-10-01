@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Regenerate parser AST truth files for test/samples/parser/*.wy."""
+"""Regenerate parser AST truth files for test/samples/parser/*.wy.
+
+Each `.wy.ast` is the build tree's parser output in D2 Scheme form
+(`parse_dump --scheme`). Check the new trees against the project's
+conformance corpus (or the aligned wypoc's `--dump-ast`) before committing:
+the truth files pin the parser, they don't define it."""
 
 import os
 import subprocess
@@ -13,15 +18,15 @@ SAMPLES_DIR = os.path.join(REPO_ROOT, "test", "samples", "parser")
 
 
 def main():
-    wyrm = wytest_env.require_reference("update_sample_parser_truth")
-    if wyrm is None:
+    if wytest_env.local_wyrm() is None:
+        print("update_sample_parser_truth: build the tree first", file=sys.stderr)
         return 1
     for name in sorted(os.listdir(SAMPLES_DIR)):
         if not name.endswith(".wy"):
             continue
         path = os.path.join(SAMPLES_DIR, name)
         result = subprocess.run(
-            wyrm + ["-m", "wyrm::tools::parse_dump", path],
+            wytest_env.parse_dump_argv(path),
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,

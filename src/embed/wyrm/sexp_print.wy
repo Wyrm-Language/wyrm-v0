@@ -1,0 +1,137 @@
+# Scheme s-expression printing of trees (the D2 form, project design
+# plans/00-overview.md). The one spec shared with the VM's println/str of a
+# pair list (src/builtin/builtins.c format_value_f) and wypoc's sexp_print.py:
+#
+#     proper pair list   (a b c); the empty list, nil, is ()
+#     improper pair      (a . b)
+#     symbol             its bare spelling: define, +, ::, $ast
+#     str                "...", with \\ \" \n \r \t escaped and any other
+#                        control character as \xHH
+#     int                decimal
+#     float              shortest round-trip form, always with a `.` or an
+#                        exponent: 1.0, 1.5e3
+#
+# A value with no D2 spelling still prints, marked so that a reader sees it
+# is not wire data: a native list as #native(...), a tuple as #tuple(...),
+# anything else as #<...> (a bool as #<true>).
+#
+# No string escapes below: the backslash and the double quote are built from
+# their codes, so the module reads the same under every wyrm front end.
+
+fn _sp_ascii(code: int) -> str:
+    b := bytes(1)
+    b!pack_u8(0, code)
+    return b!to_str()
+
+_SP_BACKSLASH := _sp_ascii(\\)
+_SP_QUOTE := _sp_ascii(\")
+_SP_HEX := "0123456789ABCDEF"
+
+# `code` (0..255) as \xHH.
+fn _sp_hex_escape(code: int) -> str:
+    return _SP_BACKSLASH + "x" + (_SP_HEX!substr(code >> 4, 1)) + (_SP_HEX!substr(code & 15, 1))
+
+# `text` as a D2 string: double-quoted and escaped.
+fn quote(text: str) -> str:
+    out := _SP_QUOTE
+    n := len(text)
+    run_start := 0
+    i := 0
+    while i < n:
+        c := text[i]
+        esc := nil
+        if c == \\:
+            esc = _SP_BACKSLASH + _SP_BACKSLASH
+        elif c == \":
+            esc = _SP_BACKSLASH + _SP_QUOTE
+        elif c == \newline:
+            esc = _SP_BACKSLASH + "n"
+        elif c == \return:
+            esc = _SP_BACKSLASH + "r"
+        elif c == \tab:
+            esc = _SP_BACKSLASH + "t"
+        elif c < 32 or c == 127:
+            esc = _sp_hex_escape(c)
+        if esc is nil:
+            i = i + 1
+        else:
+            if run_start < i:
+                out = out + (text!substr(run_start, i - run_start))
+            out = out + esc
+            i = i + 1
+            run_start = i
+    if run_start < n:
+        out = out + (text!substr(run_start, n - run_start))
+    return out + _SP_QUOTE
+
+# A float's shortest round-trip spelling with the exponent written the D2
+# way: `str` gives Python's `1e+20` / `1.5e-07`, D2 writes `1e20` / `1.5e-7`.
+fn spell_float(value: float) -> str:
+    text := str(value)
+    n := len(text)
+    i := 0
+    while i < n:
+        if text[i] == \e:
+            return (text!substr(0, i + 1)) + _sp_exponent(text!substr(i + 1, n - i - 1))
+        i = i + 1
+    return text
+
+# An exponent `+20`/`-07` as `20`/`-7`: sign kept only when negative, zeros
+# dropped. Not through int(), whose strtol reads a leading 0 as octal.
+fn _sp_exponent(exp: str) -> str:
+    sign := ""
+    start := 0
+    if exp[0] == \-:
+        sign = "-"
+        start = 1
+    elif exp[0] == \+:
+        start = 1
+    n := len(exp)
+    while (start < n - 1) and (exp[start] == \0):
+        start = start + 1
+    return sign + (exp!substr(start, n - start))
+
+fn _sp_items(items) -> str:
+    out := ""
+    first := true
+    for x in items:
+        if not first:
+            out = out + " "
+        out = out + write(x)
+        first = false
+    return out
+
+# `value` in D2 form, on one line.
+fn write(value) -> str:
+    if value is nil:
+        return "()"
+    if value is pair:
+        out := "("
+        cursor := value
+        first := true
+        while cursor is pair:
+            if not first:
+                out = out + " "
+            out = out + write(car(cursor))
+            first = false
+            cursor = cdr(cursor)
+        if cursor is not nil:
+            out = out + " . " + write(cursor)
+        return out + ")"
+    if value is sym:
+        return str(value)
+    if value is str:
+        return quote(value)
+    if value is bool:
+        if value:
+            return "#<true>"
+        return "#<false>"
+    if value is int:
+        return str(value)
+    if value is float:
+        return spell_float(value)
+    if value is list:
+        return "#native(" + _sp_items(value) + ")"
+    if value is tuple:
+        return "#tuple(" + _sp_items(value) + ")"
+    return "#<object>"

@@ -185,10 +185,10 @@ fn compile_function(node, module, name = nil, flags: int = 0, enclosing = nil, t
     fn_name := name
     if fn_name is nil:
         fn_name = str((_field(node, 1) catch nil))
-    # A `co_def` carries its parameters inside a `co_params` node (its
-    # first field is the send type); boundary_params unwraps both shapes.
+    # fn_parts reads every definition shape (a coroutine's send type is
+    # its own field, or stage0's co_params wrapper).
     params := boundary_params(node)
-    body := (_field(node, 5) catch nil)
+    body := boundary_body(node)
     return compile_callable(module, fn_name, params, body, nil, f, enclosing, [], nil, tolerant)
 
 # ---------------------------------------------------------------------------
@@ -206,25 +206,25 @@ fn param_spec(params, module = nil) -> list | error:
     seen_collector := false
     p := params
     while p is pair:
-        param := car(p)
-        kind := node_kind(param)
+        parts := param_parts(car(p))
+        kind := parts[0]
         if kind == 'var_positional:
             flags = flags | FN_VARARGS
             seen_collector = true
-            name := (_field(param, 1) catch nil)
+            name := parts[1]
             names ! append(name)
             entries ! append(make_fn_param(str(name), nil))
         elif kind == 'var_keyword:
             flags = flags | FN_KWARGS
             seen_collector = true
-            name2 := (_field(param, 1) catch nil)
+            name2 := parts[1]
             names ! append(name2)
             entries ! append(make_fn_param(str(name2), nil))
         else:
-            name3 := (_field(param, 1) catch nil)
+            name3 := parts[1]
             if seen_collector:
                 return error("parameter '" + str(name3) + "' follows a collecting parameter")
-            default_node := (_field(param, 3) catch nil)
+            default_node := parts[3]
             default := nil
             if not (default_node is nil):
                 value := _constant_value(default_node)
@@ -260,6 +260,12 @@ fn _constant_value(node):
             return false
         return error("not a constant")
     kind := node_kind(node)
+    if kind == 'nil:
+        return nil
+    if kind == 'true:
+        return true
+    if kind == 'false:
+        return false
     if (kind == 'str) or (kind == 'int) or (kind == 'float) or (kind == 'char):
         return (_field(node, 1) catch nil)
     return error("not a constant")
@@ -629,8 +635,9 @@ fn compile_nested_fn(node, frame: FnContext, pos = nil, tolerant: bool = false) 
 # doc/wyc-format.md 6.3) is a POC-vs-spec gap this epic does not close
 # either (out of scope per the epic's own "already documented" carve-out).
 fn compile_defer(node, frame: FnContext) -> nil | error:
-    constraint := (_field(node, 1) catch nil)
-    body := (_field(node, 2) catch nil)
+    parts := defer_parts(node)
+    constraint := parts[0]
+    body := parts[1]
     result := compile_callable(frame.module, "<defer>", [], body, nil, 0, frame, [], nil)
     if result is error:
         return result

@@ -1,1 +1,1 @@
-$['module, $['attr, 'a, 'b], $['index, 'a, $['int, 0]], $['call, 'a, $[$['int, 1], $['int, 2]]], $['message, 'a, 'c, $[$['int, 1]]], $['message, $['index, $['attr, 'a, 'b], $['int, 0]], 'c, $[$['int, 1]]]]
+(module (attr a b) (index a (int 0)) (apply a (int 1) (int 2)) (apply (bind_msg a c) (int 1)) (apply (bind_msg (index (attr a b) (int 0)) c) (int 1)))

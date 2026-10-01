@@ -1,1 +1,1 @@
-$['module, $['decorated, $[$['decorator, 'final, nil]], $['class_def, 'Singleton, nil, $[$['slot_def, 'instance, nil, nil, nil]]]], $['decorated, $[$['decorator, 'cached, nil]], $['define, 'x, $['type, 'auto], $['call, 'compute, nil]]]]
+(module (decorate final (class_def Singleton () (slot_def instance (type auto) () ()))) (decorate cached (define x (type auto) (apply compute))))

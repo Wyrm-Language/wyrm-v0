@@ -1,1 +1,1 @@
-$['module, $['exp, 'a, 'b], $['exp, $['int, 2], $['exp, $['int, 3], $['int, 4]]]]
+(module (** a b) (** (int 2) (** (int 3) (int 4))))

@@ -280,6 +280,64 @@ TEST_SUITE("builtins") {
         CHECK(g_output.empty());
     }
 
+    TEST_CASE("println and str render a pair list in D2 Scheme form") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        ctx->io.write = capture_write;
+        g_output.clear();
+        wy_module* module;
+        REQUIRE_EQ(wy_builtins_new(ctx, &module), WY_ERR_NONE);
+        auto* println = find_native(module, ctx, "println");
+        auto* str = find_native(module, ctx, "str");
+        auto obj = [](auto* p, wy_type_tag tag) { return wy_value_object(tag, reinterpret_cast<wy_object*>(p)); };
+        auto cons = [&](wy_value a, wy_value b) { return obj(wy_pair_cons_f(ctx, a, b), WY_TYPE_TAG_PAIR); };
+        wy_symbol a_sym = WY_NULL;
+        REQUIRE_EQ(wy_context_intern(ctx, "a", 1, &a_sym), WY_ERR_NONE);
+        wy_string* text = WY_NULL;
+        REQUIRE_EQ(wy_string_strdup(ctx, "q\"b\\s\n\x01", &text), WY_ERR_NONE);
+
+        // $[1, $[2, 3], 'a, "q\"b\\s\n\x01", $[], 1.5e3, 1e20]
+        wy_value tail = cons(wy_value_float(1e20), wy_value_nil());
+        tail = cons(wy_value_float(1500.0), tail);
+        tail = cons(wy_value_nil(), tail);
+        tail = cons(obj(text, WY_TYPE_TAG_STR), tail);
+        tail = cons(wy_value_symbol(a_sym), tail);
+        tail = cons(cons(wy_value_word(2), cons(wy_value_word(3), wy_value_nil())), tail);
+        wy_value list = cons(wy_value_word(1), tail);
+        const char* expected = "(1 (2 3) a \"q\\\"b\\\\s\\n\\x01\" () 1500.0 1e20)";
+
+        wy_value out[1];
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, println, &list, 1, out, 1), WY_ERR_NONE);
+        CHECK_EQ(g_output, std::string(expected) + "\n");
+
+        g_output.clear();
+        wy_value improper = cons(wy_value_word(1), cons(wy_value_word(2), wy_value_word(3)));
+        wy_value args[2] = {list, improper};
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &args[0], 1, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(out[0].type, WY_TYPE_TAG_STR);
+        CHECK_EQ(std::string(out[0].data.str->str, out[0].data.str->len), expected);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &args[1], 1, out, 1), WY_ERR_NONE);
+        CHECK_EQ(std::string(out[0].data.str->str, out[0].data.str->len), "(1 2 . 3)");
+        CHECK(g_output.empty());
+    }
+
+    TEST_CASE("float formatting follows Python's repr layout") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_module* module;
+        REQUIRE_EQ(wy_builtins_new(ctx, &module), WY_ERR_NONE);
+        auto* str = find_native(module, ctx, "str");
+        double values[] = {1500.0, 1e15, 1e16, 0.0001, 1e-5, -2.5e-7, 0.1, 1e20};
+        const char* expected[] = {"1500.0", "1000000000000000.0", "1e+16", "0.0001", "1e-05",
+            "-2.5e-07", "0.1", "1e+20"};
+        for (unsigned i = 0; i < 8; i++) {
+            wy_value in = wy_value_float(values[i]);
+            wy_value out;
+            REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &in, 1, &out, 1), WY_ERR_NONE);
+            CHECK_EQ(std::string(out.data.str->str, out.data.str->len), expected[i]);
+        }
+    }
+
     TEST_CASE("len counts elements of every collection type, matching Python len") {
         test_fiber_fixture fix;
         auto* ctx = fix.get_context_ptr();

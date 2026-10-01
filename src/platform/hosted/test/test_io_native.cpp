@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <unistd.h>
+
 #include <cstring>
 #include <filesystem>
 #include <string>

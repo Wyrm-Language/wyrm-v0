@@ -40,14 +40,14 @@ fn compile_source(src: str, name: str, path: str):
 # assumptions and faults on the C VM (known gap, see the epic report); use
 # `wyrm --disasm` for listings. Prints "wyrm: wrote <path>" per file like
 # pypoc's cli. Returns nil, or an error value.
-fn build_bc(src: str, name: str, path: str, out_dir: str, emit: list):
+fn build_bc(src: str, name: str, path: str, out_dir: str, emit_kinds: list):
     tree := Parser(src)!program()
     if tree is error:
         return error("parse: " + str(error_message(tree)))
     img := compile_module(tree, name, path, true, false, false, false, expand_decorators)
     if img is error:
         return error(str(error_message(img)))
-    for kind in emit:
+    for kind in emit_kinds:
         stem := out_dir + "/" + name
         if kind == "wyd":
             blob := to_wyc(img)

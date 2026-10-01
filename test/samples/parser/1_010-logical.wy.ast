@@ -1,1 +1,1 @@
-$['module, $['and, 'a, 'b, 'c], $['or, 'a, 'b, 'c]]
+(module (and a b c) (or a b c))

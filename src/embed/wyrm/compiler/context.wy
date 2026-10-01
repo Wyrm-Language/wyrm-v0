@@ -571,6 +571,7 @@ class FnContext:
     slot scopes: list
     slot scope_stack: list
     slot top_body
+    slot top_body_pushed: bool
     # Epic 10a M0: set on the frame of a definition compiled under a
     # `@template` marking - a body that will not lower becomes a trapping
     # stub (reason recorded) instead of failing the module, even in strict
@@ -613,6 +614,7 @@ class FnContext:
         this.scopes = []
         this.scope_stack = []
         this.top_body = nil
+        this.top_body_pushed = false
         this.tolerant = false
         declared := _or_empty(params)
         captured := _or_empty(captures)
@@ -746,8 +748,14 @@ fn [FnContext] push_block(owner) -> bool:
     # nested scope's entry when the two are structurally equal (a one-
     # statement body whose statement is itself a block), shifting every
     # later push by one - block-scoped locals then resolve to nothing.
-    if not (this.top_body is nil):
+    #
+    # Only the first push of the top body is the frame's own (compile_body,
+    # before any statement): a one-statement body *is* that statement
+    # (ast.md R2), and when it is a `for` the loop pushes the same node as
+    # its own scope right after.
+    if not ((this.top_body is nil) or this.top_body_pushed):
         if same_node(this.top_body, owner):
+            this.top_body_pushed = true
             return false
     i := 0
     n := len(this.block_slots)

@@ -20,13 +20,19 @@ check("xid excludes keyword", Parser("fn")!xid(), 'NO_MATCH)
 
 basic_import := Parser("import std::io")!import_stmt()
 check("basic import parse", cmd_type(basic_import), 'import)
-check("basic import target", cmd_type(car(cadr(basic_import))), 'qualified_name)
+check("basic import target", basic_import, $['import, cons(sym("::"), $['std, 'io])])
+check("import as", Parser("import std::io as io")!import_stmt(),
+    $['import, cons(sym("::"), $['std, 'io]), $['as, 'io]])
+check("import items", Parser("import a::(b, c as d)")!import_stmt(),
+    $['import, 'a, $['items, $['item, 'b, nil], $['item, 'c, 'd]]])
+check("import all except", Parser("import a::* except (b)")!import_stmt(), $['import, 'a, $['all, 'b]])
+check("qualified name", Parser("a::b::c")!expression(), cons(sym("::"), $['a, 'b, 'c]))
 
 p_import_2 := Parser("import std::io 12345")
 r_import_2 := p_import_2!import_stmt()
 check("import with garbage", r_import_2 is error, true)
 
-check("nil parse", Parser("nil")!nil_literal(), 'nil)
+check("nil parse", Parser("nil")!nil_literal(), $['nil])
 
 p_qual_id_1 := Parser("foo::bar::baz::bleet")
 r_qual_id_1 := p_qual_id_1!qualified_name()
@@ -36,8 +42,8 @@ p_qual_id_2 := Parser("**")
 r_qual_id_2 := p_qual_id_2!qualified_name()
 check("qual_id parsed into 'NO_MATCH", r_qual_id_2, 'NO_MATCH)
 
-check("bool true parse", Parser("true")!literal(), 'true)
-check("bool false parse", Parser("false")!bool_literal(), 'false)
+check("bool true parse", Parser("true")!literal(), $['true])
+check("bool false parse", Parser("false")!bool_literal(), $['false])
 check("bool non-parse", Parser("!")!bool_literal(), 'NO_MATCH)
 # #check("bool in paren (primary recurse)", Parser("(true)")!expression(), $['true])
 
@@ -77,31 +83,50 @@ check("catch expr", Parser("a catch b catch c")!expression(),
 
 r_do := Parser("do: 5")!expression()
 check("do expr kind", car(r_do), 'do)
-# A do: block's statements go through stmt_line, so a bare literal body is
-# an expr_stmt node - statement-position expressions are wrapped (see
-# _mk_stmt_expr in parser.wy).
-check("do expr body", cadr(r_do), $[ 'expr_stmt, $[ 'int, 5 ] ])
+# `do:` is always (do s...); there is no statement wrapper (ast.md R2).
+check("do expr body", r_do, $[ 'do, $[ 'int, 5 ] ])
+check("do expr two statements", Parser("do { a; b }")!expression(), $[ 'do, 'a, 'b ])
 
-check("return bare", Parser("return")!expression(), $[ 'return, nil ])
+check("return bare", Parser("return")!expression(), $[ 'return ])
 check("return val", Parser("return a")!expression(), $[ 'return, 'a ])
-check("yield bare", Parser("yield")!expression(), $[ 'yield, nil ])
+check("yield bare", Parser("yield")!expression(), $[ 'yield ])
 check("yield val", Parser("yield a")!expression(), $[ 'yield, 'a ])
 check("yield from", Parser("yield from a")!expression(), $[ 'yield_from, 'a ])
-check("break", Parser("break")!expression(), 'break)
-check("continue", Parser("continue")!expression(), 'continue)
-check("pass", Parser("pass")!expression(), 'pass)
-check("if", Parser("if a: b")!expression(), $[ 'if, 'a, $[ 'expr_stmt, 'b ], nil, nil ])
-check("if else", Parser("if a: b else: c")!expression(), $[ 'if, 'a, $[ 'expr_stmt, 'b ], nil, $[ 'expr_stmt, 'c ] ])
-check("while", Parser("while a: b")!expression(), $[ 'while, 'a, $[ 'expr_stmt, 'b ] ])
-check("for", Parser("for x in a: b")!expression(), $[ 'for, 'x, 'a, $[ 'expr_stmt, 'b ], nil ])
+check("break", Parser("break")!expression(), $['break])
+check("break value", Parser("break a")!expression(), $['break, 'a])
+check("continue", Parser("continue")!expression(), $['continue])
+check("pass", Parser("pass")!expression(), $['pass])
+check("ellipsis", Parser("...")!expression(), $['ellipsis])
+check("if", Parser("if a: b")!expression(), $[ 'cond, $[ 'a, 'b ] ])
+check("if else", Parser("if a: b else: c")!expression(), $[ 'cond, $[ 'a, 'b ], $[ 'else, 'c ] ])
+check("if elif else", Parser("if a: b\nelif c: d\nelse: e")!expression(),
+    $[ 'cond, $[ 'a, 'b ], $[ 'c, 'd ], $[ 'else, 'e ] ])
+check("while", Parser("while a: b")!expression(), $[ 'while, 'a, 'b ])
+check("while two statements", Parser("while a { b; c }")!expression(), $[ 'while, 'a, $[ 'do, 'b, 'c ] ])
+check("for", Parser("for x in a: b")!expression(), $[ 'for, 'x, 'a, nil, 'b ])
+check("for else", Parser("for x in a: b\nelse: c")!expression(), $[ 'for, 'x, 'a, 'c, 'b ])
+check("defer", Parser("defer: a")!stmt_line(), $[ 'defer, 'a ])
+check("defer on", Parser("defer on error: a")!stmt_line(), $[ 'defer_on, $[ 'type, 'error ], 'a ])
+check("static bare", Parser("static n")!stmt_line(), $[ 'static, 'n, $[ 'type, 'auto ], nil ])
 
-# Statement-position expression wrapping: an expression-shaped statement
-# becomes expr_stmt; the keyword-statement primaries (if/while/for/...)
-# keep their own kinds and single-statement bodies are wrapped the same
-# way (checked via the if/while/for expectations above).
-check("bare call is expr_stmt", Parser("f(x)")!stmt_line(), $[ 'expr_stmt, $[ 'call, 'f, $[ 'x ] ] ])
-check("bare name is expr_stmt", Parser("total")!stmt_line(), $[ 'expr_stmt, 'total ])
-check("if stmt stays unwrapped", Parser("if a: b")!stmt_line(), $[ 'if, 'a, $[ 'expr_stmt, 'b ], nil, nil ])
+# No statement wrapper (ast.md R2): an expression in statement position is
+# the expression itself, and a body is one form or (do ...).
+check("bare call statement", Parser("f(x)")!stmt_line(), $[ 'apply, 'f, 'x ])
+check("call no args", Parser("f()")!expression(), $[ 'apply, 'f ])
+check("bind message", Parser("r ! m")!expression(), $[ 'bind_msg, 'r, 'm ])
+check("send", Parser("r ! m(1)")!expression(), $[ 'apply, $[ 'bind_msg, 'r, 'm ], $[ 'int, 1 ] ])
+check("send no args", Parser("r ! m()")!expression(), $[ 'apply, $[ 'bind_msg, 'r, 'm ] ])
+check("curried call", Parser("f(a)(b)")!expression(), $[ 'apply, $[ 'apply, 'f, 'a ], 'b ])
+check("bare name statement", Parser("total")!stmt_line(), 'total)
+check("if statement", Parser("if a: b")!stmt_line(), $[ 'cond, $[ 'a, 'b ] ])
+# Decorators (plan C9c, ast.md): (decorate name target arg...), nested.
+check("decorate statement", Parser("@d f(x)")!stmt_line(), $[ 'decorate, 'd, $[ 'apply, 'f, 'x ] ])
+check("decorate args", Parser("@d(1, k=2) g")!stmt_line(),
+    $[ 'decorate, 'd, 'g, $[ 'int, 1 ], $[ 'kwarg, 'k, $[ 'int, 2 ] ] ])
+check("decorate stacked", Parser("@a(1)\n@b\nfn g(): 1")!stmt_line(),
+    $[ 'decorate, 'a, $[ 'decorate, 'b, $[ 'fn_def, 'g, nil, nil, $[ 'type, 'auto ], $[ 'int, 1 ] ] ], $[ 'int, 1 ] ])
+check("decorate expression", Parser("v := @accept 'TOK_XID")!stmt_line(),
+    $[ 'define, 'v, $[ 'type, 'auto ], $[ 'decorate, 'accept, $[ 'sym, 'TOK_XID ] ] ])
 check("return stmt stays unwrapped", Parser("return 5")!stmt_line(), $[ 'return, $[ 'int, 5 ] ])
 
 # var statement tests
@@ -155,12 +180,45 @@ check("paren pair trailing comma", Parser("(1, 2,)")!expression(), $[ 'tuple, $[
 # Binary operator precedence: * / % bind tighter than + -, which bind tighter
 # than shifts, & , ^ , | (all left-associative).
 check("prec: + then *", Parser("a + b * c")!expression(),
-    $[ 'binop, '+, 'a, $[ 'binop, '*, 'b, 'c ] ])
+    $[ '+, 'a, $[ '*, 'b, 'c ] ])
 check("prec: * then +", Parser("a * b + c")!expression(),
-    $[ 'binop, '+, $[ 'binop, '*, 'a, 'b ], 'c ])
+    $[ '+, $[ '*, 'a, 'b ], 'c ])
 check("prec: left assoc", Parser("a - b - c")!expression(),
-    $[ 'binop, '-, $[ 'binop, '-, 'a, 'b ], 'c ])
+    $[ '-, $[ '-, 'a, 'b ], 'c ])
 check("prec: shift below additive", Parser("a << b + c")!expression(),
-    $[ 'binop, '<<, 'a, $[ 'binop, '+, 'b, 'c ] ])
+    $[ '<<, 'a, $[ '+, 'b, 'c ] ])
 check("prec: and below shift, or below xor", Parser("a | b ^ c & d << e")!expression(),
-    $[ 'binop, '|, 'a, $[ 'binop, '^, 'b, $[ 'binop, '&, 'c, $[ 'binop, '<<, 'd, 'e ] ] ] ])
+    $[ '|, 'a, $[ '^, 'b, $[ '&, 'c, $[ '<<, 'd, 'e ] ] ] ])
+
+# Functions (plan C6, ast.md): params (n type default), (* n type),
+# (** n type); dispatch (dispatch (type T)...); a missing annotation is
+# (type auto); coroutines carry the send type as a field.
+AUTO := $['type, 'auto]
+check("fn_def", Parser("fn f(a: int, b = 2, *r, **k) -> str: a")!stmt_line(),
+    $['fn_def, 'f, nil,
+      $[$['a, $['type, 'int], nil], $['b, AUTO, $['int, 2]], $['*, 'r, AUTO], $['**, 'k, AUTO]],
+      $['type, 'str], 'a])
+check("fn_def dispatch", Parser("fn [T] f(): 1")!stmt_line(),
+    $['fn_def, 'f, $['dispatch, $['type, 'T]], nil, AUTO, $['int, 1]])
+check("co_def send", Parser("co g(<- int, n) -> int: yield n")!stmt_line(),
+    $['co_def, 'g, nil, $[$['n, AUTO, nil]], $['type, 'int], $['type, 'int], $['yield, 'n]])
+check("lambda", Parser("fn(x): x")!expression(), $['lambda, $[$['x, AUTO, nil]], AUTO, 'x])
+check("co_lambda", Parser("co(n): yield n")!expression(),
+    $['co_lambda, $[$['n, AUTO, nil]], AUTO, AUTO, $['yield, 'n]])
+check("union type", Parser("x is int | nil")!expression(), $['is, 'x, $['type, 'int, 'nil]])
+
+# Empty collection literals are headed nodes (plan C7, ast.md R3).
+check("empty array", Parser("[]")!expression(), $['array])
+check("empty list", Parser("$[]")!expression(), $['list])
+check("empty dict", Parser("{}")!expression(), $['dict])
+check("empty tuple", Parser("()")!expression(), $['tuple])
+check("call trailing comma", Parser("f(a, b,)")!expression(), $['apply, 'f, 'a, 'b])
+
+# Classes (plan C9a): one base or nil; a slot's missing type is (type auto).
+check("class base", Parser("class A(B): pass")!stmt_line(), $['class_def, 'A, 'B, $['pass]])
+check("class no base", Parser("class A: pass")!stmt_line(), $['class_def, 'A, nil, $['pass]])
+
+# Slots (plan C9b, syntax.md G3): (slot_def name type init body).
+check("data slot", Parser("slot s = 1")!stmt_line(), $['slot_def, 's, $['type, 'auto], $['int, 1], nil])
+check("virtual slot", Parser("slot v: int:\n    fn getter(): 1\n")!stmt_line(),
+    $['slot_def, 'v, $['type, 'int], nil, $['fn_def, 'getter, nil, nil, $['type, 'auto], $['int, 1]]])

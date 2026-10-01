@@ -23,13 +23,11 @@
 # ---------------------------------------------------------------------------
 # Deviations from classes.py, each forced by the port
 #
-# 1. Shapes. `node` here is a wy/wyrm `class_def` pair list
-#    `(name, bases, body)` (wy/wyrm/ast.wy - no pypoc kind crosses for
-#    classes), not a ClassDef dataclass; members are told apart by kind
-#    symbol (`slot_def`/`fn_def`/`co_def`/`static`/bare `pass`), and a
-#    `slot_def` is `(name, type, init, options)` with `options` a pair list
-#    of `(kind, value)` `slot_option`s, kind `'getter` or `'setter`, value
-#    a lambda node or the bare symbol `undefined`.
+# 1. Shapes. `node` here is a `(class_def name base body)` tree (ast.md),
+#    not a ClassDef dataclass; members are told apart by kind symbol
+#    (`slot_def`/`fn_def`/`co_def`/`static`/`pass`), and a `slot_def` is
+#    `(slot_def name type init body)` with `body` a virtual slot's subscope
+#    defining `fn getter`/`fn setter` (syntax.md G3), nil for a data slot.
 #
 # 2. The lazy `[C]` dispatch. classes.py's `_LazyDispatch` defers
 #    `module.name_slot(class_name)` until the first method asks, so a class
@@ -107,6 +105,12 @@ fn _constant_value(node):
             return false
         return error("not a constant")
     kind := node_kind(node)
+    if kind == 'nil:
+        return nil
+    if kind == 'true:
+        return true
+    if kind == 'false:
+        return false
     if (kind == 'str) or (kind == 'int) or (kind == 'float) or (kind == 'char):
         return (_field(node, 1) catch nil)
     if kind == 'neg:
@@ -155,7 +159,7 @@ fn compile_class(node, module: ModuleContext) -> int | error:
     if class_name is nil:
         return error("a class definition needs a name")
     key := str(class_name)
-    bases := (_field(node, 2) catch nil)
+    bases := _class_bases((_field(node, 2) catch nil))
     if (bases is pair) and (cdr(bases) is pair):
         return error("class " + key + " has more than one base; the image format records one superclass")
 
@@ -214,15 +218,6 @@ fn compile_class(node, module: ModuleContext) -> int | error:
             if r3 is error:
                 return r3
             statics ! append(r3)
-        elif kind == 'expr_stmt:
-            # A bare `pass` line reaches here wrapped (the parser puts
-            # statement-position expressions in expr_stmt, and `pass` is a
-            # primary); anything else an expr_stmt wraps is an expression,
-            # which has no business in a class body.
-            inner := (_field(member, 1) catch nil)
-            if node_kind(inner) == 'pass:
-                continue
-            return error("the bytecode compiler does not support " + construct_name(inner) + " in a class body yet")
         elif kind == 'pass:
             continue
         elif kind is nil:
@@ -297,6 +292,13 @@ fn _dispatch(holder: list, class_name, module: ModuleContext) -> list | error:
 # (spec 6.3): the base may live in another module whose interface at run
 # time is what counts. Absent bases answer nil (the format's "absent =
 # object").
+# A class's base field (one base, a name or a `(:: ...)` path, or nil;
+# ast.md) as the list the checks below read.
+fn _class_bases(base):
+    if base is nil:
+        return nil
+    return cons(base, nil)
+
 fn _superclass_slot(bases, node, module: ModuleContext) -> int | nil | error:
     if bases is nil:
         return nil
@@ -331,48 +333,49 @@ fn _slot(member, class_name, module: ModuleContext, dispatch: list) -> dict | er
         default = idx
     get_fn := nil
     set_fn := nil
-    options := (_field(member, 4) catch nil)
-    if not (options is nil):
-        p := options
-        while p is pair:
-            r := _accessor(car(p), member, class_name, module, dispatch)
-            if r is error:
-                return r
-            option_kind := (_field(car(p), 1) catch nil)
-            if option_kind == 'getter:
-                get_fn = r
-            else:
-                set_fn = r
-            p = cdr(p)
+    subscope := (_field(member, 4) catch nil)
+    if not (subscope is nil):
+        # A virtual slot (syntax.md G3).
+        if not (default_node is nil):
+            return error("slot " + str((_field(member, 1) catch nil)) + ": a virtual slot has no default")
+        accessors := _subscope_accessors(subscope, member, class_name, module, dispatch)
+        if accessors is error:
+            return accessors
+        get_fn = accessors[0]
+        set_fn = accessors[1]
     slot_name2 := (_field(member, 1) catch nil)
     return make_class_slot(str(slot_name2), default, get_fn, set_fn)
 
-# A virtual slot's getter/setter, compiled as a message on this class.
-#
-# `undefined` means the slot has no accessor of that kind, which the format
-# says by leaving the key out (D7 - there are no sentinels). Otherwise only
-# a literal function body can become one: the format records a function
-# *index*, so a value computed at run time has nowhere to live.
-fn _accessor(option, member, class_name, module: ModuleContext, dispatch: list) -> int | nil | error:
-    value := (_field(option, 2) catch nil)
-    if value == 'undefined:
-        return nil
-    if node_kind(value) != 'lambda:
-        slot_name := (_field(member, 1) catch nil)
-        option_kind := (_field(option, 1) catch nil)
-        return error("slot " + str(slot_name) + ": a " + str(option_kind) + " must be written as a function literal")
-    params := boundary_params(value)
-    body := boundary_body(value)
-    slot_name2 := (_field(member, 1) catch nil)
-    option_kind2 := (_field(option, 1) catch nil)
-    d := _dispatch(dispatch, class_name, module)
-    if d is error:
-        return d
-    r := compile_callable(module, str(class_name) + "." + str(slot_name2) + "." + str(option_kind2),
-        params, body, nil, FN_MESSAGE, nil, d, str(class_name))
-    if r is error:
-        return r
-    return r[0]
+# A virtual slot's subscope (syntax.md G3) as `[getter, setter]` function
+# indexes, nil where the block defines none (the VM makes a slot without a
+# setter read-only, without a getter write-only). The block may hold only
+# `fn getter`/`fn setter` and helper bindings (G3-c); bindings are not
+# lowered yet.
+fn _subscope_accessors(body, member, class_name, module: ModuleContext, dispatch: list) -> list | error:
+    slot_name := str((_field(member, 1) catch nil))
+    found := [nil, nil]
+    for stmt in body_statements(body):
+        kind := node_kind(stmt)
+        fn_name := nil
+        if kind == 'fn_def:
+            fn_name = (_field(stmt, 1) catch nil)
+        if (fn_name == 'getter) or (fn_name == 'setter):
+            d := _dispatch(dispatch, class_name, module)
+            if d is error:
+                return d
+            r := compile_callable(module, str(class_name) + "." + slot_name + "." + str(fn_name),
+                boundary_params(stmt), boundary_body(stmt), nil, FN_MESSAGE, nil, d, str(class_name))
+            if r is error:
+                return r
+            if fn_name == 'getter:
+                found[0] = r[0]
+            else:
+                found[1] = r[0]
+        elif (kind == 'fn_def) or (kind == 'co_def) or (kind == 'define) or (kind == 'define_values):
+            return error("slot " + slot_name + ": helper bindings in a slot subscope are not supported yet")
+        else:
+            return error("slot " + slot_name + ": a slot subscope holds only fn getter, fn setter and bindings")
+    return found
 
 # One method: an ordinary function carrying FN_MESSAGE (and FN_COROUTINE
 # for a `co`), dispatching on `[C]`, instance in P0 - published through the
@@ -388,8 +391,8 @@ fn _method(member, class_name, module: ModuleContext, dispatch: list) -> int | e
         # A `co` method is an ordinary message carrying the coroutine flag;
         # calling it constructs the coroutine (spec 7.2).
         flags = flags | FN_COROUTINE
-    params := (_field(member, 3) catch nil)
-    body := (_field(member, 5) catch nil)
+    params := boundary_params(member)
+    body := boundary_body(member)
     d := _dispatch(dispatch, class_name, module)
     if d is error:
         return d
@@ -431,7 +434,7 @@ fn _static(member, class_name, module: ModuleContext) -> list | error:
 # `reg_msg` with a closure and a tuple of the type slots' current values.
 fn compile_dispatched_fn_toplevel(node, module: ModuleContext, tolerant: bool = false) -> nil | error:
     fn_name := (_field(node, 1) catch nil)
-    targets := (_field(node, 2) catch nil)
+    targets := dispatch_names((_field(node, 2) catch nil))
     dispatch := []
     names := []
     p := targets
@@ -458,8 +461,8 @@ fn compile_dispatched_fn_toplevel(node, module: ModuleContext, tolerant: bool = 
     flags := FN_MESSAGE
     if node_kind(node) == 'co_def:
         flags = flags | FN_COROUTINE
-    params := (_field(node, 3) catch nil)
-    body := (_field(node, 5) catch nil)
+    params := boundary_params(node)
+    body := boundary_body(node)
     r := compile_callable(module, str(fn_name) + "!", params, body, nil, flags, nil, dispatch, this_class, tolerant)
     if r is error:
         return r

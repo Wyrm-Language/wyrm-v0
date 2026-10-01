@@ -14,6 +14,8 @@ extern const wy_module_image decode_image;
 extern const wy_module_image image_image;
 extern const wy_module_image opcodes_image;
 extern const wy_module_image parser_image;
+extern const wy_module_image sexp_print_image;
+extern const wy_module_image template_image;
 extern const wy_module_image tokenizer_image;
 extern const wy_module_image analysis_image;
 extern const wy_module_image classes_image;
@@ -24,7 +26,6 @@ extern const wy_module_image expressions_image;
 extern const wy_module_image functions_image;
 extern const wy_module_image handlers_image;
 extern const wy_module_image module_image;
-extern const wy_module_image predefined_image;
 extern const wy_module_image statements_image;
 extern const wy_module_image verify_image;
 extern const wy_module_image compiler_image;
@@ -43,6 +44,8 @@ const wy_import_fs_builtin wyrm_builtin_modules[] = {
     { "wyrm::image", &image_image },
     { "wyrm::opcodes", &opcodes_image },
     { "wyrm::parser", &parser_image },
+    { "wyrm::sexp_print", &sexp_print_image },
+    { "wyrm::template", &template_image },
     { "wyrm::tokenizer", &tokenizer_image },
     { "wyrm::compiler::analysis", &analysis_image },
     { "wyrm::compiler::classes", &classes_image },
@@ -53,7 +56,6 @@ const wy_import_fs_builtin wyrm_builtin_modules[] = {
     { "wyrm::compiler::functions", &functions_image },
     { "wyrm::compiler::handlers", &handlers_image },
     { "wyrm::compiler::module", &module_image },
-    { "wyrm::compiler::predefined", &predefined_image },
     { "wyrm::compiler::statements", &statements_image },
     { "wyrm::compiler::verify", &verify_image },
     { "wyrm::compiler", &compiler_image },
@@ -64,4 +66,4 @@ const wy_import_fs_builtin wyrm_builtin_modules[] = {
     { "opcodes", &opcodes_image },
 };
 
-const wy_uword wyrm_builtin_module_count = 29;
+const wy_uword wyrm_builtin_module_count = 30;
