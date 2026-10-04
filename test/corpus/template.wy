@@ -6,10 +6,8 @@
 # arrives raw (the bytecode VM answers the definition's sexpr directly) or
 # boxed (the tree walker hands decorators a TreeBase). `_shadowed` uses
 # `this` in a plain fn - uncompilable unmarked under strict lowering - and
-# is never called; only the marking lets it exist. `@template` is a library
-# decorator (syntax.md G7), so the module imports it.
-
-import wyrm::template::*
+# is never called; only the marking lets it exist. `@template` is
+# predefined (syntax.md G7), so the module needs no import.
 
 @template
 fn twice(x):

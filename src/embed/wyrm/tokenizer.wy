@@ -399,7 +399,7 @@ fn _scan_xid(buffer: str, cur_pos: int) -> int | nil:
 # Operator spellings valid after a symbol literal's quote - longest first, so
 # "**" isn't cut short as "*" and "<=>" isn't cut short as "<=".
 _OPERATOR_SYMBOLS := [
-    "...", "<=>", "**", "<<", ">>", "==", "!=", "<=", ">=",
+    "...", "<=>", "**", "<<", ">>", "==", "!=", "<=", ">=", "::",
     "+", "-", "*", "/", "%", "&", "|", "^", "~", "<", ">"
 ]
 

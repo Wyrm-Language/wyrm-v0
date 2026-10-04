@@ -280,6 +280,19 @@ wy_error wy_vm_is_f(wy_context* ctx, wy_value value, wy_value type_operand, wy_v
     return make_error_value_f(ctx, "invalid type operand for `is`", out);
 }
 
+/* The idx-th cell of a pair chain: `$[a, b, c][2]` walks two cdrs to the cell
+ * holding `c`. WY_NULL when idx is negative or the chain ends first, at nil
+ * or a dotted tail (the tree walker's Pair._node_at). Iterative: no recursion
+ * in VM execution. */
+static wy_pair* pair_cell_at_(wy_pair* head, wy_word idx)
+{
+    wy_pair* cell = (idx < 0) ? WY_NULL : head;
+    for (wy_word i = 0; (cell != WY_NULL) && (i < idx); i++) {
+        cell = (cell->cdr.type == WY_TYPE_TAG_PAIR) ? (wy_pair*) cell->cdr.data.gc_object : WY_NULL;
+    }
+    return cell;
+}
+
 wy_error wy_vm_getidx_f(wy_context* ctx, wy_value obj, wy_value idx, wy_value* out)
 {
     if (obj.type == WY_TYPE_TAG_LIST) {
@@ -328,8 +341,9 @@ wy_error wy_vm_getidx_f(wy_context* ctx, wy_value obj, wy_value idx, wy_value* o
         if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
             return make_error_value_f(ctx, "pair index must be an integer", out);
         }
-        if (as_word_(idx) != 0) return make_error_value_f(ctx, "pair index out of range", out);
-        *out = ((wy_pair*) obj.data.gc_object)->car;
+        wy_pair* cell = pair_cell_at_((wy_pair*) obj.data.gc_object, as_word_(idx));
+        if (!cell) return make_error_value_f(ctx, "pair index out of range", out);
+        *out = cell->car;
         return WY_ERR_NONE;
     }
     if (obj.type == WY_TYPE_TAG_BYTES) {
@@ -366,8 +380,9 @@ wy_error wy_vm_setidx_f(wy_context* ctx, wy_value obj, wy_value idx, wy_value sr
         if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
             return make_error_value_f(ctx, "pair index must be an integer", &dummy);
         }
-        if (as_word_(idx) != 0) return make_error_value_f(ctx, "pair index out of range", &dummy);
-        ((wy_pair*) obj.data.gc_object)->car = src;
+        wy_pair* cell = pair_cell_at_((wy_pair*) obj.data.gc_object, as_word_(idx));
+        if (!cell) return make_error_value_f(ctx, "pair index out of range", &dummy);
+        cell->car = src;
         return WY_ERR_NONE;
     }
     if (obj.type == WY_TYPE_TAG_BYTES) {

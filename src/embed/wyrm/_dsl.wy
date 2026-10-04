@@ -106,7 +106,6 @@
 # parsed.
 
 import wyrm::ast::*
-import wyrm::template::*
 import std::pairs::(replace, chain, cadr)
 
 # The sexpr for the `'NO_MATCH` symbol literal - the failure sentinel every

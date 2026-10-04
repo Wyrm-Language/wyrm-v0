@@ -1,0 +1,7 @@
+# int(str) reads an integer literal: 0x/0o/0b prefixes in either case, `_`
+# between digits or after the prefix, an optional sign and surrounding
+# whitespace. A decimal with a leading 0 is not octal.
+import std::io::*
+
+for s in ["0", "00", "0_0", "42", "-5", "+7", " 12 ", "1_000", "0x1F", "0X1f", "0xff_ff", "0x_ff", "-0x10", "0o17", "0b10", "0B11", "9223372036854775807", "-9223372036854775808"]:
+    println(s + " -> " + str(int(s)))

@@ -17,8 +17,8 @@
 #
 # 1. Decorator expansion is the caller's. compile_module takes an `expander`
 #    (wyrm::compiler::expansion runs decorators in a throwaway VM, epic 10a
-#    M3); there are no predefined decorators. `@template` is wyrm::template's
-#    library decorator (syntax.md G7): it answers `(annotate template (true)
+#    M3). `@template` is predefined (syntax.md G7): expansion.wy imports
+#    wyrm::template into every expansion scope. It answers `(annotate template (true)
 #    X)`, which _lower_annotations turns into the `'template` wrapper the
 #    handlers here and in statements.wy hand down to the definition's frame,
 #    so `_compile_or_stub` can stub a body that will not lower.
@@ -632,7 +632,7 @@ fn _has_decorate(node) -> bool:
 # image.wy's `to_wyc` serializes), verifying it first unless `check` is
 # false. Lowering is strict since 10a M0: a function body that will not
 # lower fails the whole module, unless the definition is under a
-# `@template` marking (wyrm::template's annotation) - then the body becomes a
+# `@template` marking (the predefined decorator's annotation) - then the body becomes a
 # trapping stub with the reason recorded on the image. Anything outside a
 # function body is a refusal either way.
 fn compile_module(program_node, module_name: str, source_file = nil, check: bool = true,
@@ -645,9 +645,8 @@ fn compile_module(program_node, module_name: str, source_file = nil, check: bool
     if node_kind(program_node) != 'module:
         return error("compile_module needs a 'module node")
 
-    # Decorators expand before lowering, by the caller's expander (there
-    # are no predefined ones: `@template` is wyrm::template's, syntax.md
-    # G7). Modules without any pay nothing. Annotations, which expansion
+    # Decorators expand before lowering, by the caller's expander (which
+    # predefines `@template`, syntax.md G7). Modules without any pay nothing. Annotations, which expansion
     # or a hand-built tree leaves, are lowered after it.
     if _has_decorate(body):
         if expander is nil:
@@ -741,7 +740,7 @@ class SessionContext:
     slot last_code_len
     # Every import statement of the inputs so far: an input's decorators
     # expand in the scope of these and its own, as they would in one module
-    # (`import wyrm::template::*`, then `@template fn ...` next input).
+    # (`import m::*`, then `@m_decorator fn ...` next input).
     slot imports: list
 
     fn init():

@@ -12,7 +12,7 @@
 # stacked decorators apply innermost first, then applies its decorator to
 # the result as an ordinary message send (`bind_message` finds the decorator
 # among the scope's messages: a `fn [TreeBase] name(...)` imported by the
-# module, such as wyrm::template's `@template`) and replaces the node with
+# module, or the predefined `@template`) and replaces the node with
 # the answer, then walks the answer until no `decorate` remains.
 #
 # Arguments are FORMS, not values (D9): a pure literal argument arrives as its

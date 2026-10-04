@@ -98,7 +98,9 @@ Symptom -> usual cause seen so far:
   (`src/builtin/builtins.c`); do not add a second mechanism.
 - Imported `fn [T]` messages are adopted at import time (`wy_link_adopt_messages`).
 - Natives must not use `wy_vm_call_sync` (no C recursion).
-- `int(str)` uses strtol base autodetection (leading 0 = octal), unlike Python.
+- `int(str)` reads an integer literal like pypoc's `int(x, 0)`: `0x`/`0o`/`0b`, `_` separators,
+  no implicit octal (`010` is an error). Out of `wy_word` range is an error, not a clamp.
+- Indexing a pair list walks the cdr chain (`$[a, b][1]` is `b`), for reads and `p[i] = v`.
 - `f(x, *rest)` in `call_va` is a known, unfixed gap. (`range` is now a native iterator; the old
   coroutine-prelude gap where `for i in range(...)` never iterated is gone.)
 

@@ -13,8 +13,10 @@ hello.wy	hello.out	matches
 hello_1.wy	hello_1.out	matches	
 hello_2.wy	hello_2.out	matches	
 hello_3.wy	hello_3.out	matches	
+int_text.wy	int_text.out	matches	int(str) reads integer literals like the tree walker's int(x, 0): 0b/0o/0x, `_`, no implicit octal
 messages.wy	messages.out	matches	
 multiret.wy	multiret.out	local-only	the interpreter models `return a, b` as a single tuple value, so `println(f())` prints the whole pair. A VM implementing spec 1.3 honestly drops every result past the first, because the call asked for one. This is doc/llm-bytecode.md 9's multi-value gap, and it is the only divergence any fixture has shown so far.
+pair_index.wy	pair_index.out	matches	indexing a pair list walks the cdr chain, for reads and assignment
 slots.wy	slots.out	matches	G3 virtual slots (plan C9b)
 template.wy	template.out	matches	Added by epic 10a M0: `@template` marks `twice`/`_shadowed`; `_shadowed` uses `this` in a plain fn and exists only under the marking (a trapping stub in both engines' images, never called). `twice::$ast` yields the definition's tree - raw on the C VM, TreeBase-boxed on the walker - and the fixture only inspects it through what both agree on (`is nil`). The marking relieves a lowering failure, not semantics: `twice(21)` still runs. The source is checked in beside these artifacts (a fixture this repo authors, not one inherited from pypoc); the sweep still compiles it from pypoc/test/bytecode, where a copy must exist.
 two_module/geometry.wy	two_module/geometry.out	matches	

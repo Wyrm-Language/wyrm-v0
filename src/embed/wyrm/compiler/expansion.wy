@@ -11,6 +11,9 @@
 # wyrm::compiler::expand there on the tree and answers the fully expanded
 # tree. See doc-llm/addendum-decorator-expansion.md and doc-llm/history/wypoc-vm-port/epic_10a.md.
 #
+# The scope also imports the predefined decorators first: `@template`
+# (wyrm::template, syntax.md G7) needs no import of its own.
+#
 # Requirements on the caller's include path: the `.wyc` images of
 # wyrm::compiler::expand and of every module the compiled module imports (the
 # expansion VM resolves them through the parent's import hook).
@@ -29,10 +32,17 @@ fn _ex_pairs_from(items):
         result = cons(items[i], result)
     return result
 
+# The predefined decorators, imported into every expansion scope ahead of
+# the module's own imports: `import wyrm::template::*`. The path head is
+# built with sym(): stage0's parser does not take `'::` as a symbol literal.
+PREDEFINED_IMPORTS := $[$['import, $[sym("::"), 'wyrm, 'template], $['all]]]
+
 # `body`: the statements of the module being compiled. Answers the expanded
 # `$['module, ...]` tree, or an error value naming the module.
 fn expand_decorators(body, module_name: str):
     imports := []
+    for stmt in PREDEFINED_IMPORTS:
+        imports ! append(stmt)
     for stmt in body:
         kind := node_kind(stmt)
         if (kind == 'import) or (kind == 'import_static):
