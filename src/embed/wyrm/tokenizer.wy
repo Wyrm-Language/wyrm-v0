@@ -7,6 +7,7 @@ import std::ctype::*
 #>  ## Basics
 #>
 #>  Wyrm files shall be encoded in UTF-8.
+#>
 
 # Scanned Token from the Scanner
 #
@@ -99,7 +100,7 @@ _S_CHARS := [
 #>      **and, break, catch, class, co, continue, defer, do, elif,
 #>      else, emit, false, fn, for, from, if, import, in, is,
 #>      nil, not, or, pass, return, signal, slot
-#>      static, task, thread, true, try, var, while, yield**
+#>      static, task, thread, true, try, var, while, with, yield**
 #>
 
 _HARD_KEYWORDS := [
@@ -136,6 +137,7 @@ _HARD_KEYWORDS := [
     ("try", 'TOK_KW_TRY),
     ("var", 'TOK_KW_VAR),
     ("while", 'TOK_KW_WHILE),
+    ("with", 'TOK_KW_WITH),
     ("yield", 'TOK_KW_YIELD)
 ]
 
@@ -244,6 +246,7 @@ fn _scan_to_eol_raw(buffer: str, cur_pos: int) -> int:
 #>  INDENT          ::= (* virtual token: rise in layout column *) ;
 #>  DEDENT          ::= (* virtual token: fall in layout column *) ;
 #>  ```
+#>
 
 # Scan whitespace
 fn _find_end_whitespace(buffer: str, cur_pos: int) -> int:
@@ -758,6 +761,7 @@ class TokenStream:
         while len(car(this.indents)) > len(this.line_ws):
             this.indents = cdr(this.indents)
             this ! _emit('TOK_DEDENT, pos)
+            this ! _emit('TOK_STMT_END, pos)
 
         # The line must land exactly on an enclosing level
         if car(this.indents) != this.line_ws:
