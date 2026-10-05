@@ -11,6 +11,12 @@
 # wyrm::compiler::expand there on the tree and answers the fully expanded
 # tree. See doc-llm/addendum-decorator-expansion.md and doc-llm/history/wypoc-vm-port/epic_10a.md.
 #
+# The scope also imports the predefined decorators first: `@template`
+# (wyrm::template, syntax.md G7) needs no import of its own. It leaves out
+# the module's imports of host modules (HOST_ONLY_IMPORTS): the expansion VM
+# has none, and no decorator can come from one. So a module can still have
+# a `__main` that uses std::io (wyrm::parser does).
+#
 # Requirements on the caller's include path: the `.wyc` images of
 # wyrm::compiler::expand and of every module the compiled module imports (the
 # expansion VM resolves them through the parent's import hook).
@@ -29,13 +35,39 @@ fn _ex_pairs_from(items):
         result = cons(items[i], result)
     return result
 
+# The predefined decorators, imported into every expansion scope ahead of
+# the module's own imports: `import wyrm::template::*`. The path head is
+# built with sym(): stage0's parser does not take `'::` as a symbol literal.
+PREDEFINED_IMPORTS := $[$['import, $[sym("::"), 'wyrm, 'template], $['all]]]
+
+# The host modules an expansion scope skips, as the segments of their paths.
+HOST_ONLY_IMPORTS := [$['std, 'io]]
+
+# Whether `stmt`, an import, imports one of HOST_ONLY_IMPORTS: its path is
+# `(:: seg...)` with the same segments.
+fn _host_only_import(stmt) -> bool:
+    path := car(cdr(stmt))
+    if (not (path is pair)) or (car(path) != sym("::")):
+        return false
+    for host in HOST_ONLY_IMPORTS:
+        segs := cdr(path)
+        want := host
+        while (segs is pair) and (want is pair) and (car(segs) == car(want)):
+            segs = cdr(segs)
+            want = cdr(want)
+        if (segs == nil) and (want == nil):
+            return true
+    return false
+
 # `body`: the statements of the module being compiled. Answers the expanded
 # `$['module, ...]` tree, or an error value naming the module.
 fn expand_decorators(body, module_name: str):
     imports := []
+    for stmt in PREDEFINED_IMPORTS:
+        imports ! append(stmt)
     for stmt in body:
         kind := node_kind(stmt)
-        if (kind == 'import) or (kind == 'import_static):
+        if ((kind == 'import) or (kind == 'import_static)) and not _host_only_import(stmt):
             imports ! append(stmt)
     scope_img := compile_module(cons('module, _ex_pairs_from(imports)), "__expand_scope__")
     if scope_img is error:

@@ -1,5 +1,6 @@
 # Plan C9b (syntax.md G3): a virtual slot is a subscope defining fn getter
-# and/or fn setter; without a setter it is read-only. `with` is a name.
+# and/or fn setter; without a setter it is read-only. (`with` is still a
+# keyword in wyrm's tokenizer, so this no longer shows it as a name.)
 class Person:
     slot birth: int = 1990
     slot age:
@@ -9,9 +10,7 @@ class Person:
     slot id: int:
         fn getter(): this._id
 
-with := "with is an ordinary name"
 p := Person()
 println(p.age, p.id)
 p.age = 30
 println(p.birth, p.age)
-println(with)

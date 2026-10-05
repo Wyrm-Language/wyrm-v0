@@ -1,1 +1,1 @@
-(module (define f (type auto) (lambda ((x (type auto) ()) (y (type auto) ())) (type auto) (return (+ x y)))))
+(module (define f (type auto) (lambda ((param x (type auto) ()) (param y (type auto) ())) (type auto) (return (+ x y)))))

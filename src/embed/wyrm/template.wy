@@ -1,8 +1,6 @@
 # `@template` - marks a definition written to be quoted (project design syntax.md
 # G7): a tree whose code may never run, read through `name::$ast`.
 #
-#     import wyrm::template::*
-#
 #     @template
 #     fn $tmpl(e):
 #         this ! peek(0)
@@ -13,6 +11,10 @@
 # trap in its place instead of an error (this compiler: a trapping stub
 # with the recorded reason). `name::$ast` is the tree without the
 # annotation. The same source as wypoc's corelib/wyrm/template.wy.
+#
+# `@template` is predefined: wyrm::compiler::expansion imports this module
+# into every decorator-expansion scope, so a module needs no import of its
+# own. Importing it explicitly still works.
 
 fn [TreeBase] template():
     return $['annotate, 'template, $['true], sexpr(this)]

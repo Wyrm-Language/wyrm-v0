@@ -34,8 +34,8 @@
 #     manyflat(subseq)      flattened version of many(subseq)
 #     opt(subseq)           one or zero `term`; `nil` if not matched
 #     expect(note, subseq)  expect a token
-#     value(sym, subseq)    if sequence matched, replace with the literal $[sym]
-#     push(sym)             unconditionally match, answering the literal $[sym],
+#     value(sym, subseq)    if sequence matched, answer directly with sym
+#     push(sym)             unconditionally match, answering directly with sym,
 #                            without consuming any tokens
 #     cons(a, b)            match a, then b (exactly 2 terms), answer cons(a, b)
 #                            directly rather than the usual $[a, b] tuple
@@ -106,31 +106,36 @@
 # parsed.
 
 import wyrm::ast::*
-import wyrm::template::*
-import std::pairs::(replace, chain, cadr)
+import std::pairs::(chain, cadr, cddr)
 
 # The sexpr for the `'NO_MATCH` symbol literal - the failure sentinel every
 # generated matcher answers on a miss
 NO_MATCH_EXPR := $['sym, 'NO_MATCH]
 
 
+#: Get symbol if literal is a symbol
+fn _req_name(literal) -> sym:
+    if literal is sym:
+        return literal
+    return error("name expected")
+
 # --- decoding a term into an expression -------------------------------
 
 fn _decode_apply_if(first, rest) -> pair:
-    then_stmts := $[mk_call_expr(first, $[mk_name('_vt)])]
-    matched := mk_binop(mk_name('_vt), '!=, NO_MATCH_EXPR)
-    is_err := mk_is_type(mk_name('_vt), 'error)
+    then_stmts := $[mk_call(first, $['_vt])]
+    matched := mk_binop('_vt, '!=, NO_MATCH_EXPR)
+    is_err := mk_is_type('_vt, 'error)
     return mk_do($[
         n_define('_vt, N_AUTO_TYPE, _build_sequence_expr(rest)),
         mk_if(
             is_err,
-            $[mk_name('_vt)],
+            $['_vt],
             $[mk_if(matched, then_stmts, $[NO_MATCH_EXPR])])
     ])
 
 # --- name - another rule reference
 fn _decode_rule_call(name) -> pair:
-    return mk_this_send(name)
+    return $['apply, $['bind_msg, 'this, name]]
 
 # --- 'sym match a token kind == symbol
 @template
@@ -182,7 +187,7 @@ fn $_expect_tmpl(expect_text, match_expr):
         v
 
 fn _decode_expect(arg_text, arg_subseq) -> pair:
-    return mk_expand_n($_expect_tmpl::$ast, 
+    return mk_expand_n($_expect_tmpl::$ast,
         pair('expect_text, arg_text),
         pair('match_expr, _decode_term(arg_subseq)))
 
@@ -220,19 +225,9 @@ fn $_manyflat(match_expr):
             this ! reset(_mark)
             items = m
             break
-        # No `for` in a template: C5 reorders the for node's fields, and a
-        # template's ::$ast tree can reach a compiler of the other shape
-        # during a stage0 regen.
-        if m is pair or m is nil:
-            _mf_p := m
-            while _mf_p is pair:
-                items = cons(car(_mf_p), items)
-                _mf_p = cdr(_mf_p)
-        elif m is list:
-            _mf_i := 0
-            while _mf_i < len(m):
-                items = cons(m[_mf_i], items)
-                _mf_i = _mf_i + 1
+        if m is pair or m is list or m is nil:
+            for x in m:
+                items = cons(x, items)
         else:
             items = cons(m, items)
     reverse(items)
@@ -256,10 +251,7 @@ fn _tmpl_bool(match_expr):
 fn _decode_bool(arg) -> pair:
     return mk_expand(_tmpl_bool::$ast, 'match_expr, _build_sequence_expr(arg))
 
-# --- value(sym, subseq) replace subseq with the bare symbol `sym` itself if
-# matched (NOT a wrapped $[sym] node - `repl` substitutes directly; see any
-# caller like true/false/nil/break/continue/pass in parser.wy, all of which
-# end up as a bare symbol in the final tree, not a one-element list)
+# --- value(sym, subseq)
 @template
 fn $_tmpl_value(repl, match_expr):
     v := match_expr
@@ -315,11 +307,11 @@ fn $_tmpl_cons(a_expr, b_expr):
             cons(a, b)
 
 fn _decode_cons(args) -> pair:
-    if len(args) != 2:
+    if (cdr(args) is nil) or (cddr(args) is not nil):
         return error("cons(): exactly 2 arguments required")
     return mk_expand_n($_tmpl_cons::$ast,
-        pair('a_expr, _decode_term(args[0])),
-        pair('b_expr, _decode_term(args[1]))
+        pair('a_expr, _decode_term(car(args))),
+        pair('b_expr, _decode_term(cadr(args)))
     )
 
 # --- opt(subseq) optional subsequence
@@ -341,7 +333,7 @@ fn _decode_call(node) -> pair:
     callee := s_call_target(node)
     args := s_call_args(node)
 
-    cname := s_get_name(callee)
+    cname := _req_name(callee)
     if cname == 'apply_if:
         return _decode_apply_if(car(args), cdr(args))
     if cname == 'many:
@@ -351,15 +343,15 @@ fn _decode_call(node) -> pair:
     if cname == 'opt:
         return _decode_opt(args)
     if cname == 'text:
-        return _decode_text(args[0])
+        return _decode_text(car(args))
     if cname == 'expect:
-        return _decode_expect(args[0], args[1])
+        return _decode_expect(car(args), cadr(args))
     if cname == 'bool:
         return _decode_bool(args)
     if cname == 'value:
         return _decode_value(car(args), cdr(args))
     if cname == 'push:
-        return _decode_push(args[0])
+        return _decode_push(car(args))
     if cname == 'cons:
         return _decode_cons(args)
     return error("@accept: unknown term form '" + str(cname) + "'")
@@ -397,7 +389,7 @@ fn _decode_binop(node) -> pair:
 fn _decode_term(node) -> pair:
     kind := s_kind(node)
     if kind == 'name:
-        return _decode_rule_call(s_get_name(node))
+        return _decode_rule_call(_req_name(node))
     if kind == 'sym:
         return _decode_token_kind(cadr(node))
     if kind == 'str:
@@ -411,7 +403,7 @@ fn _decode_term(node) -> pair:
     return error("@accept: this is not something the notation can match yet")
 
 fn _is_drop(node) -> bool:
-    return s_is_drop(node)
+    return (node is pair) and (car(node) == '~)
 
 # Each step is:
 #
@@ -427,9 +419,9 @@ fn _build_sequence_steps(remaining, n_capture_count) -> pair:
         if n_capture_count == 0:
             return NIL_EXPR
         if n_capture_count == 1:
-            return mk_index(mk_name('_acc), $['int, 0])
+            return mk_index('_acc, $['int, 0])
         else:
-            return mk_call('reverse, $[mk_name('_acc)])
+            return mk_call('reverse, $['_acc])
 
     term := car(remaining)
     capture_inc := 1
@@ -439,12 +431,12 @@ fn _build_sequence_steps(remaining, n_capture_count) -> pair:
         term = s_unary_target(term)
         capture_inc = 0
     else:
-        then_stmts!append(n_set('_acc, mk_call('cons, $[mk_name('_t), mk_name('_acc)])))
+        then_stmts!append(n_set('_acc, mk_call('cons, $['_t, '_acc])))
 
     rest := _build_sequence_steps(cdr(remaining), n_capture_count + capture_inc)
     then_stmts!append(rest)
-    matched := mk_binop(mk_name('_t), '!=, NO_MATCH_EXPR)
-    is_err := mk_is_type(mk_name('_t), 'error)
+    matched := mk_binop('_t, '!=, NO_MATCH_EXPR)
+    is_err := mk_is_type('_t, 'error)
 
     # _t = <<term>>;
     # if _t is error:
@@ -458,7 +450,7 @@ fn _build_sequence_steps(remaining, n_capture_count) -> pair:
         n_set('_t, _decode_term(term)),
         mk_if(
             is_err,
-            $[mk_name('_t)],
+            $['_t],
             $[mk_if(matched, chain(then_stmts), $[NO_MATCH_EXPR])])
     ])
 
@@ -468,14 +460,14 @@ fn _build_sequence_expr(elements) -> pair:
     return mk_do($[
         n_define('_acc, N_AUTO_TYPE, NIL_EXPR),
         n_define('_t, N_AUTO_TYPE, NIL_EXPR),
-        _build_sequence_steps(chain(elements), 0)
+        _build_sequence_steps(elements, 0)
     ])
 
 # a bare term is a one-term sequence
-fn _sequence_elements(node) -> list:
+fn _sequence_elements(node) -> pair:
     if s_is_pairlist(node):
         return s_pairlist_items(node)
-    return [node]
+    return $[node]
 
 # -----------------------------------------------------------------------------
 # Decorators

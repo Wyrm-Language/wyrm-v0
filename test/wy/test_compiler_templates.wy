@@ -16,8 +16,9 @@
 #     qualified name - a never-filled global, the latent bug this pins);
 #   - `::$ast` errors name the problem: unknown definition, non-name
 #     operand, quoted-data trap;
-#   - a decorated module compiled with no expander is refused (there is
-#     no predefined decorator to fall back on).
+#   - a decorated module compiled with no expander is refused (the
+#     predefined `@template` lives in the expander's scope, so there is
+#     nothing to fall back on).
 import wyrm::parser::*
 import wyrm::compiler::context::*
 import wyrm::compiler::module::*
@@ -67,7 +68,7 @@ fn parse(src: str):
     return tree
 
 # `src` parsed, with its first statement wrapped the way `@template`
-# (wyrm::template, syntax.md G7) answers it: these checks compile without a
+# (predefined, syntax.md G7) answers it: these checks compile without a
 # decorator expander, so they build the annotation themselves.
 fn templated(src: str):
     tree := parse(src)

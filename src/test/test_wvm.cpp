@@ -1023,6 +1023,33 @@ TEST_SUITE("wvm milestone 1") {
         CHECK_EQ(out[1].data.word, 99);
     }
 
+    TEST_CASE("PAIR getidx/setidx walk the chain") {
+        test_fiber_fixture ctx;
+        const wy_u32 code[] = {
+            enc1(WY_OP_I8, 11, 0),
+            enc1(WY_OP_I8, 22, 1),
+            enc1(WY_OP_I8, 33, 2),
+            enc2a(WY_OP_PLIST, 3, 3), enc2b(0, 0),    // L3 <- (11 22 33)
+            enc1(WY_OP_I8, 1, 4),
+            enc1(WY_OP_I8, 2, 5),
+            enc1(WY_OP_I8, 3, 6),
+            enc1(WY_OP_I8, -1, 7),
+            enc1(WY_OP_I8, 99, 8),
+            enc2a(WY_OP_GETIDX, 0, 10), enc2b(3, 5),  // L10 <- L3[2] = 33
+            enc2a(WY_OP_SETIDX, 0, 3), enc2b(4, 8),   // L3[1] <- 99
+            enc2a(WY_OP_GETIDX, 0, 11), enc2b(3, 4),  // L11 <- L3[1] = 99
+            enc2a(WY_OP_GETIDX, 0, 12), enc2b(3, 6),  // L12 <- L3[3]: past the end
+            enc2a(WY_OP_GETIDX, 0, 13), enc2b(3, 7),  // L13 <- L3[-1]: negative
+            enc1(WY_OP_RETURN, 4, 10),                // return L10..L13
+        };
+        wy_value out[4];
+        REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 14, 0, WY_NULL, 0, out, 4), WY_ERR_NONE);
+        CHECK_EQ(out[0].data.word, 33);
+        CHECK_EQ(out[1].data.word, 99);
+        CHECK(wy_value_is_error(out[2]));
+        CHECK(wy_value_is_error(out[3]));
+    }
+
     TEST_CASE("iteration over list") {
         test_fiber_fixture ctx;
         const wy_u32 code[] = {

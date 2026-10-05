@@ -1,0 +1,16 @@
+# Indexing a pair list walks its cdr chain: `p[i]` is the i-th car, and
+# `p[i] = v` replaces it in place. Past the end, a negative index or a
+# dotted tail is a catchable error.
+import std::io::*
+
+p := $['a, 'b, 'c]
+println(p[0])
+println(p[1])
+println(p[2])
+println(p[3] catch "past the end")
+println(p[-1] catch "negative")
+p[1] = 'x
+println(p)
+d := cons(1, 2)
+println(d[0])
+println(d[1] catch "dotted tail")

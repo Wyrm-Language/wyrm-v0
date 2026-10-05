@@ -1329,14 +1329,106 @@ static wy_error builtin_sym_(wy_context* context, wy_value* args, wy_uword argc,
     return WY_ERR_NONE;
 }
 
-/* `int(text)` - the numeric cast: a string parsed with C strtol-style base
- * auto-detection (0x/0o/0b prefixes, like pypoc's `int(value, 0)`; a bare
- * leading 0 reads octal - a delta from Python's stricter int(x, 0),
- * documented in the epic report), a float truncated toward zero, an
- * integer answering itself. What decode.wy's `decode_int` and every
- * numeric-literal transform take for granted on the front-end side. */
+WY_INLINE bool int_text_space_(char c)
+{
+    return (c == ' ') || (c == '\t') || (c == '\n') || (c == '\r') || (c == '\f') || (c == '\v');
+}
+
+/* The value of digit `c` in `base`, or -1 when `c` isn't one. */
+static int int_text_digit_(char c, int base)
+{
+    int d = -1;
+    if ((c >= '0') && (c <= '9')) { d = c - '0'; }
+    else if ((c >= 'a') && (c <= 'z')) { d = (c - 'a') + 10; }
+    else if ((c >= 'A') && (c <= 'Z')) { d = (c - 'A') + 10; }
+    return (d < base) ? d : -1;
+}
+
+/* Parse `text` as an integer literal, by the tree walker's rules (Python's
+ * `int(text, 0)`): surrounding whitespace, an optional sign, then a `0x`,
+ * `0o` or `0b` prefix (either case) or a decimal number. A single `_` may
+ * separate digits, or follow the prefix. A decimal number with a leading 0
+ * must be all zeros (`010` is an error, not octal). WY_ERR_BAD_TYPE for
+ * malformed text, WY_ERR_RANGE when the value doesn't fit a wy_word. */
+static wy_error int_from_text_(const char* text, wy_uword len, wy_word* out)
+{
+    wy_uword i = 0;
+    while ((len > 0) && int_text_space_(text[len - 1])) { len--; }
+    while ((i < len) && int_text_space_(text[i])) { i++; }
+
+    bool negative = false;
+    if ((i < len) && ((text[i] == '+') || (text[i] == '-'))) {
+        negative = (text[i] == '-');
+        i++;
+    }
+
+    int base = 10;
+    bool prefixed = false;
+    if (((i + 1) < len) && (text[i] == '0')) {
+        char p = text[i + 1];
+        if ((p == 'x') || (p == 'X')) { base = 16; }
+        else if ((p == 'o') || (p == 'O')) { base = 8; }
+        else if ((p == 'b') || (p == 'B')) { base = 2; }
+        else { /* decimal */ }
+        if (base != 10) {
+            prefixed = true;
+            i += 2;
+        }
+    }
+
+    /* The magnitude limit: |WY_WORD_MIN| for a negative value. */
+    const wy_uword limit = negative ? ((wy_uword) WY_WORD_MAX + 1u) : (wy_uword) WY_WORD_MAX;
+    wy_uword magnitude = 0;
+    wy_uword digits = 0;
+    bool leading_zero = false;
+    bool nonzero = false;
+    bool after_underscore = false;
+    wy_error err = WY_ERR_NONE;
+    for (; (i < len) && (err == WY_ERR_NONE); i++) {
+        char c = text[i];
+        if (c == '_') {
+            /* After a digit or the prefix (`0x_ff`), never twice in a row. */
+            if (((digits == 0) && !prefixed) || after_underscore) { err = WY_ERR_BAD_TYPE; }
+            after_underscore = true;
+            continue;
+        }
+        int d = int_text_digit_(c, base);
+        if (d < 0) {
+            err = WY_ERR_BAD_TYPE;
+            continue;
+        }
+        if ((digits == 0) && (d == 0)) { leading_zero = true; }
+        if (d != 0) { nonzero = true; }
+        if (magnitude > ((limit - (wy_uword) d) / (wy_uword) base)) {
+            err = WY_ERR_RANGE;
+            continue;
+        }
+        magnitude = (magnitude * (wy_uword) base) + (wy_uword) d;
+        digits++;
+        after_underscore = false;
+    }
+    if (err == WY_ERR_NONE) {
+        if ((digits == 0) || after_underscore) { err = WY_ERR_BAD_TYPE; }
+        else if ((base == 10) && leading_zero && nonzero) { err = WY_ERR_BAD_TYPE; }
+        else if (negative) {
+            /* -(magnitude) without overflowing at the most negative word. */
+            *out = (magnitude == ((wy_uword) WY_WORD_MAX + 1u)) ? (-WY_WORD_MAX - 1) : -(wy_word) magnitude;
+        } else {
+            *out = (wy_word) magnitude;
+        }
+    }
+    return err;
+}
+
+/* `int(text)` - the numeric cast: a string parsed as an integer literal
+ * (int_from_text_: 0x/0o/0b prefixes, `_` separators, no implicit octal,
+ * an error rather than a clamp on overflow; the tree walker's
+ * `int(value, 0)`), a float truncated toward zero, an integer answering
+ * itself. What decode.wy's `decode_int` and every numeric-literal
+ * transform take for granted on the front-end side. */
 static wy_error builtin_int_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
 {
+    WY_UNUSED(context);
     WY_UNUSED(argc);
     if (nres == 0) { return WY_ERR_NONE; }
     wy_value value = args[0];
@@ -1347,17 +1439,10 @@ static wy_error builtin_int_(wy_context* context, wy_value* args, wy_uword argc,
     }
     if (value.type == WY_TYPE_TAG_STR) {
         wy_string* text = (wy_string*) value.data.gc_object;
-        char buffer[64];
-        wy_uword len = text->len;
-        if (len == 0 || len >= sizeof(buffer)) { return WY_ERR_RANGE; }
-        wy_memcpy(buffer, text->str, len);
-        buffer[len] = '\0';
-        char* end = WY_NULL;
-        long long parsed = strtoll(buffer, &end, 0);
-        if (end == buffer) { return WY_ERR_BAD_TYPE; }
-        while (*end == ' ' || *end == '\t') { end++; }
-        if (*end != '\0') { return WY_ERR_BAD_TYPE; }
-        out[0] = wy_value_word((wy_word) parsed);
+        wy_word parsed = 0;
+        wy_error err = int_from_text_(text->str, text->len, &parsed);
+        if (err != WY_ERR_NONE) { return err; }
+        out[0] = wy_value_word(parsed);
         return WY_ERR_NONE;
     }
     return WY_ERR_BAD_TYPE;
