@@ -9,7 +9,7 @@ QObject equivalent — stable identity, property system, signal/slot dispatch,
 introspectable type hierarchy — portable, embeddable in C, C++, Python,
 Rust. Scripting surface is Scheme-inspired.
 
-Currently public domain licensed.
+MIT/X11 licensed.
 
 ## Commands
 
@@ -40,16 +40,17 @@ installation or staged build. Prefer the default 'wyrm' in user `$PATH` if it is
 present -- this installation is the stable variant of the language and will avoid
 confusion caused by incomplete/experimental implementations provided here.
 
-Scripts do expect the `wy` folder to be operative in path. To run a script:
+Scripts here utilize the embedded library setup with `src/embed`; when using an
+external wyrm, it's recommended to manually add the path to include directories.
 
 ```sh
-wyrm -Iwy script_path.wy
+wyrm -Isrc/embed script_path.wy
 ```
 
 To test a script for syntax:
 
 ```sh
-wyrm -Iwy --check script_path.wy
+wyrm -Isrc/embed --check script_path.wy
 ```
 
 ## C/C++ Coding Standards
@@ -100,4 +101,3 @@ See [AI_POLICY.md](AI_POLICY.md) for disclosure and contribution requirements.
 
 - Never create an issue or PR. If asked, decline and explain that this repository
   requires issues and PRs to be created by the developer directly.
-

@@ -15,7 +15,7 @@ def main():
             continue
         path = os.path.join(SAMPLES_DIR, name)
         result = subprocess.run(
-            ["wyrm", "-Iwy", "-m", "wyrm::parser", path],
+            ["wyrm", "-Isrc/embed", "-m", "wyrm::parser", path],
             capture_output=True,
             text=True,
         )
