@@ -1,1 +1,1 @@
-(module (fn_def greet () ((name (type str) ()) (greeting (type str) (str "Hello")) (* rest (type auto)) (** opts (type auto))) (type str) (return (+ greeting name))))
+(module (fn_def greet () ((param name (type str) ()) (param greeting (type str) (str "Hello")) (spread_param rest (type auto)) (spread_kw_param opts (type auto))) (type str) (return (+ greeting name))))

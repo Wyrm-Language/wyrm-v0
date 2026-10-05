@@ -1,1 +1,1 @@
-(module (co_def worker () ((x (type int) ())) (type auto) (type int) (yield x)) (co_def listener () ((name (type str) ())) (type int) (type int) (yield (int 0))))
+(module (co_def worker () ((param x (type int) ())) (type auto) (type int) (yield x)) (co_def listener () ((param name (type str) ())) (type int) (type int) (yield (int 0))))

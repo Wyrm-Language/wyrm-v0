@@ -70,15 +70,17 @@ fn s_binop_rhs(e):
 fn s_call_target(call):
     return cadr(call)
 
-fn s_call_args(call) -> list:
-    return s_items(cddr(call))
+# The arguments as the pair list the tree holds (wyrm's _dsl walks it with
+# car/cdr).
+fn s_call_args(call):
+    return cddr(call)
 
 # `$[a, b, ...]`: (list a b ...).
 fn s_is_pairlist(node) -> bool:
     return (node is pair) and (car(node) == 'list)
 
-fn s_pairlist_items(node) -> list:
-    return s_items(cdr(node))
+fn s_pairlist_items(node):
+    return cdr(node)
 
 # (fn_def name dispatch params ret body)
 _FN_DEF_BODY := 5

@@ -137,9 +137,9 @@ check("blocks: arm enclosing", scopes_5[2][2], ['i, 'e])
 # independently of the parser.
 
 AUTO := $['type, 'auto]
-HAND := $['fn_def, 'h, nil, $[$['p, AUTO, nil]], AUTO,
+HAND := $['fn_def, 'h, nil, $[$['param, 'p, AUTO, nil]], AUTO,
            $['do, $['define, 'boxed, AUTO, $['int, 0]],
-             $['lambda, $[$['q, AUTO, nil]], AUTO,
+             $['lambda, $[$['param, 'q, AUTO, nil]], AUTO,
                 $['do, $['set, 'boxed, $['+, 'boxed, 'q]],
                   $['set, $['attr, 'obj, 'f], 'p]]],
              $['return, 'boxed]]]

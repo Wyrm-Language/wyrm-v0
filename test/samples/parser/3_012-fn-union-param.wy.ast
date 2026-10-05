@@ -1,1 +1,1 @@
-(module (fn_def identify () ((value (type int str) ())) (type str) (return value)))
+(module (fn_def identify () ((param value (type int str) ())) (type str) (return value)))

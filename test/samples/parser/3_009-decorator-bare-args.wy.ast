@@ -1,1 +1,1 @@
-(module (decorate memoize (fn_def square () ((x (type int) ())) (type int) (return (* x x)))) (decorate route (fn_def handler () () (type auto) (return (nil))) (str "/home") (str "GET")))
+(module (decorate memoize (fn_def square () ((param x (type int) ())) (type int) (return (* x x)))) (decorate route (fn_def handler () () (type auto) (return (nil))) (str "/home") (str "GET")))

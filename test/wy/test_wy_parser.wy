@@ -28,8 +28,10 @@ check("import items", Parser("import a::(b, c as d)")!import_stmt(),
 check("import all except", Parser("import a::* except (b)")!import_stmt(), $['import, 'a, $['all, 'b]])
 check("qualified name", Parser("a::b::c")!expression(), cons(sym("::"), $['a, 'b, 'c]))
 
+# import_stmt stops at the path; the trailing tokens are an error at the
+# statement level, where no separator follows
 p_import_2 := Parser("import std::io 12345")
-r_import_2 := p_import_2!import_stmt()
+r_import_2 := p_import_2!program()
 check("import with garbage", r_import_2 is error, true)
 
 check("nil parse", Parser("nil")!nil_literal(), $['nil])
@@ -98,64 +100,67 @@ check("continue", Parser("continue")!expression(), $['continue])
 check("pass", Parser("pass")!expression(), $['pass])
 check("ellipsis", Parser("...")!expression(), $['ellipsis])
 check("if", Parser("if a: b")!expression(), $[ 'cond, $[ 'a, 'b ] ])
-check("if else", Parser("if a: b else: c")!expression(), $[ 'cond, $[ 'a, 'b ], $[ 'else, 'c ] ])
+check("if else", Parser("if a: b; else: c")!expression(), $[ 'cond, $[ 'a, 'b ], $[ 'else, 'c ] ])
+check("if else braces", Parser("if a { b } else { c }")!expression(), $[ 'cond, $[ 'a, 'b ], $[ 'else, 'c ] ])
+# A one-line block must end its statement before the else (design syntax.md G10)
+check("if else no separator", Parser("if a: b else: c")!program() is error, true)
 check("if elif else", Parser("if a: b\nelif c: d\nelse: e")!expression(),
     $[ 'cond, $[ 'a, 'b ], $[ 'c, 'd ], $[ 'else, 'e ] ])
 check("while", Parser("while a: b")!expression(), $[ 'while, 'a, 'b ])
 check("while two statements", Parser("while a { b; c }")!expression(), $[ 'while, 'a, $[ 'do, 'b, 'c ] ])
 check("for", Parser("for x in a: b")!expression(), $[ 'for, 'x, 'a, nil, 'b ])
 check("for else", Parser("for x in a: b\nelse: c")!expression(), $[ 'for, 'x, 'a, 'c, 'b ])
-check("defer", Parser("defer: a")!stmt_line(), $[ 'defer, 'a ])
-check("defer on", Parser("defer on error: a")!stmt_line(), $[ 'defer_on, $[ 'type, 'error ], 'a ])
-check("static bare", Parser("static n")!stmt_line(), $[ 'static, 'n, $[ 'type, 'auto ], nil ])
+check("defer", Parser("defer: a")!stmt(), $[ 'defer, 'a ])
+check("defer on", Parser("defer on error: a")!stmt(), $[ 'defer_on, $[ 'type, 'error ], 'a ])
+check("static bare", Parser("static n")!stmt(), $[ 'static, 'n, $[ 'type, 'auto ], nil ])
 
 # No statement wrapper (ast.md R2): an expression in statement position is
 # the expression itself, and a body is one form or (do ...).
-check("bare call statement", Parser("f(x)")!stmt_line(), $[ 'apply, 'f, 'x ])
+check("bare call statement", Parser("f(x)")!stmt(), $[ 'apply, 'f, 'x ])
 check("call no args", Parser("f()")!expression(), $[ 'apply, 'f ])
 check("bind message", Parser("r ! m")!expression(), $[ 'bind_msg, 'r, 'm ])
 check("send", Parser("r ! m(1)")!expression(), $[ 'apply, $[ 'bind_msg, 'r, 'm ], $[ 'int, 1 ] ])
 check("send no args", Parser("r ! m()")!expression(), $[ 'apply, $[ 'bind_msg, 'r, 'm ] ])
 check("curried call", Parser("f(a)(b)")!expression(), $[ 'apply, $[ 'apply, 'f, 'a ], 'b ])
-check("bare name statement", Parser("total")!stmt_line(), 'total)
-check("if statement", Parser("if a: b")!stmt_line(), $[ 'cond, $[ 'a, 'b ] ])
+check("bare name statement", Parser("total")!stmt(), 'total)
+check("if statement", Parser("if a: b")!stmt(), $[ 'cond, $[ 'a, 'b ] ])
 # Decorators (plan C9c, ast.md): (decorate name target arg...), nested.
-check("decorate statement", Parser("@d f(x)")!stmt_line(), $[ 'decorate, 'd, $[ 'apply, 'f, 'x ] ])
-check("decorate args", Parser("@d(1, k=2) g")!stmt_line(),
+check("decorate statement", Parser("@d f(x)")!stmt(), $[ 'decorate, 'd, $[ 'apply, 'f, 'x ] ])
+check("decorate args", Parser("@d(1, k=2) g")!stmt(),
     $[ 'decorate, 'd, 'g, $[ 'int, 1 ], $[ 'kwarg, 'k, $[ 'int, 2 ] ] ])
-check("decorate stacked", Parser("@a(1)\n@b\nfn g(): 1")!stmt_line(),
+check("decorate stacked", Parser("@a(1)\n@b\nfn g(): 1")!stmt(),
     $[ 'decorate, 'a, $[ 'decorate, 'b, $[ 'fn_def, 'g, nil, nil, $[ 'type, 'auto ], $[ 'int, 1 ] ] ], $[ 'int, 1 ] ])
-check("decorate expression", Parser("v := @accept 'TOK_XID")!stmt_line(),
+check("decorate expression", Parser("v := @accept 'TOK_XID")!stmt(),
     $[ 'define, 'v, $[ 'type, 'auto ], $[ 'decorate, 'accept, $[ 'sym, 'TOK_XID ] ] ])
-check("return stmt stays unwrapped", Parser("return 5")!stmt_line(), $[ 'return, $[ 'int, 5 ] ])
+check("return stmt stays unwrapped", Parser("return 5")!stmt(), $[ 'return, $[ 'int, 5 ] ])
 
 # var statement tests
 #
 # A single target lowers to n_define ($['define, name, type, init]); more
 # than one lowers to n_set_values' $['define_values, targets, init] with
 # one $[name, type] per target. An omitted type is the auto type node.
-check("var simple", Parser("var x")!stmt_line(), $[ 'define, 'x, $[ 'type, 'auto ], nil ])
-check("var with type", Parser("var x: int")!stmt_line(), $[ 'define, 'x, $[ 'type, 'int ], nil ])
+check("var simple", Parser("var x")!stmt(), $[ 'define, 'x, $[ 'type, 'auto ], nil ])
+check("var with type", Parser("var x: int")!stmt(), $[ 'define, 'x, $[ 'type, 'int ], nil ])
 
-r_var_init := Parser("var x = 5")!stmt_line()
+r_var_init := Parser("var x = 5")!stmt()
 check("var with init target", $[ car(r_var_init), cadr(r_var_init), caddr(r_var_init) ],
     $[ 'define, 'x, $[ 'type, 'auto ] ])
 check("var with init value", is_num_lit(car(cdddr(r_var_init))), true)
 
-r_var_type_init := Parser("var x: int = 5")!stmt_line()
+r_var_type_init := Parser("var x: int = 5")!stmt()
 check("var with type and init target", $[ car(r_var_type_init), cadr(r_var_type_init), caddr(r_var_type_init) ],
     $[ 'define, 'x, $[ 'type, 'int ] ])
 check("var with type and init value", is_num_lit(car(cdddr(r_var_type_init))), true)
 
-check("var multiple", Parser("var x, y")!stmt_line(),
+check("var multiple", Parser("var x, y")!stmt(),
     $[ 'define_values, $[ $[ 'x, $[ 'type, 'auto ] ], $[ 'y, $[ 'type, 'auto ] ] ], nil ])
 
-r_var_multi_init := Parser("var x, y = 5")!stmt_line()
+r_var_multi_init := Parser("var x, y = 5")!stmt()
 check("var multiple with init target", $[ car(r_var_multi_init), cadr(r_var_multi_init) ],
     $[ 'define_values, $[ $[ 'x, $[ 'type, 'auto ] ], $[ 'y, $[ 'type, 'auto ] ] ] ])
 check("var multiple with init value", is_num_lit(caddr(r_var_multi_init)), true)
 
-r_var_mixed := Parser("var x: int, y, z: str = 10")!stmt_line()
+r_var_mixed := Parser("var x: int, y, z: str = 10")!stmt()
 check("var multiple mixed target", $[ car(r_var_mixed), cadr(r_var_mixed) ],
     $[ 'define_values, $[ $[ 'x, $[ 'type, 'int ] ], $[ 'y, $[ 'type, 'auto ] ], $[ 'z, $[ 'type, 'str ] ] ] ])
 check("var multiple mixed value", is_num_lit(caddr(r_var_mixed)), true)
@@ -190,21 +195,21 @@ check("prec: shift below additive", Parser("a << b + c")!expression(),
 check("prec: and below shift, or below xor", Parser("a | b ^ c & d << e")!expression(),
     $[ '|, 'a, $[ '^, 'b, $[ '&, 'c, $[ '<<, 'd, 'e ] ] ] ])
 
-# Functions (plan C6, ast.md): params (n type default), (* n type),
-# (** n type); dispatch (dispatch (type T)...); a missing annotation is
+# Functions (plan C6, ast.md C-4): params (param n type default),
+# (spread_param n type), (spread_kw_param n type); dispatch (dispatch (type T)...); a missing annotation is
 # (type auto); coroutines carry the send type as a field.
 AUTO := $['type, 'auto]
-check("fn_def", Parser("fn f(a: int, b = 2, *r, **k) -> str: a")!stmt_line(),
+check("fn_def", Parser("fn f(a: int, b = 2, *r, **k) -> str: a")!stmt(),
     $['fn_def, 'f, nil,
-      $[$['a, $['type, 'int], nil], $['b, AUTO, $['int, 2]], $['*, 'r, AUTO], $['**, 'k, AUTO]],
+      $[$['param, 'a, $['type, 'int], nil], $['param, 'b, AUTO, $['int, 2]], $['spread_param, 'r, AUTO], $['spread_kw_param, 'k, AUTO]],
       $['type, 'str], 'a])
-check("fn_def dispatch", Parser("fn [T] f(): 1")!stmt_line(),
+check("fn_def dispatch", Parser("fn [T] f(): 1")!stmt(),
     $['fn_def, 'f, $['dispatch, $['type, 'T]], nil, AUTO, $['int, 1]])
-check("co_def send", Parser("co g(<- int, n) -> int: yield n")!stmt_line(),
-    $['co_def, 'g, nil, $[$['n, AUTO, nil]], $['type, 'int], $['type, 'int], $['yield, 'n]])
-check("lambda", Parser("fn(x): x")!expression(), $['lambda, $[$['x, AUTO, nil]], AUTO, 'x])
+check("co_def send", Parser("co g(<- int, n) -> int: yield n")!stmt(),
+    $['co_def, 'g, nil, $[$['param, 'n, AUTO, nil]], $['type, 'int], $['type, 'int], $['yield, 'n]])
+check("lambda", Parser("fn(x): x")!expression(), $['lambda, $[$['param, 'x, AUTO, nil]], AUTO, 'x])
 check("co_lambda", Parser("co(n): yield n")!expression(),
-    $['co_lambda, $[$['n, AUTO, nil]], AUTO, AUTO, $['yield, 'n]])
+    $['co_lambda, $[$['param, 'n, AUTO, nil]], AUTO, AUTO, $['yield, 'n]])
 check("union type", Parser("x is int | nil")!expression(), $['is, 'x, $['type, 'int, 'nil]])
 
 # Empty collection literals are headed nodes (plan C7, ast.md R3).
@@ -215,10 +220,10 @@ check("empty tuple", Parser("()")!expression(), $['tuple])
 check("call trailing comma", Parser("f(a, b,)")!expression(), $['apply, 'f, 'a, 'b])
 
 # Classes (plan C9a): one base or nil; a slot's missing type is (type auto).
-check("class base", Parser("class A(B): pass")!stmt_line(), $['class_def, 'A, 'B, $['pass]])
-check("class no base", Parser("class A: pass")!stmt_line(), $['class_def, 'A, nil, $['pass]])
+check("class base", Parser("class A(B): pass")!stmt(), $['class_def, 'A, 'B, $['pass]])
+check("class no base", Parser("class A: pass")!stmt(), $['class_def, 'A, nil, $['pass]])
 
 # Slots (plan C9b, syntax.md G3): (slot_def name type init body).
-check("data slot", Parser("slot s = 1")!stmt_line(), $['slot_def, 's, $['type, 'auto], $['int, 1], nil])
-check("virtual slot", Parser("slot v: int:\n    fn getter(): 1\n")!stmt_line(),
+check("data slot", Parser("slot s = 1")!stmt(), $['slot_def, 's, $['type, 'auto], $['int, 1], nil])
+check("virtual slot", Parser("slot v: int:\n    fn getter(): 1\n")!stmt(),
     $['slot_def, 'v, $['type, 'int], nil, $['fn_def, 'getter, nil, nil, $['type, 'auto], $['int, 1]]])

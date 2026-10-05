@@ -1,6 +1,8 @@
 import wyrm::tokenizer::*
 import wyrm::decode::*
 import wyrm::ast
+import wyrm::ast::(n_set)
+import std::pairs::(cadr, caddr, cdddr)
 import std::io::*
 
 import wyrm::_dsl::*
@@ -135,8 +137,22 @@ fn [Parser] number_literal():
 #>
 #>  _Example_: `\a`, `\newline`
 #>
+# Character names for the `\newline`-style escapes - the same table the
+# interpreter's eval_char_literal consults (wypoc's CHAR_NAMES).
+_CHAR_NAMES := {"newline": 10, "space": 32, "tab": 9, "return": 13, "backspace": 8, "formfeed": 12, "null": 0}
+
+# A char literal's node: `(char codepoint)` (design ast.md), not the token.
+fn _mk_char(text):
+    body := text ! substr(1, len(text) - 1)
+    if len(body) == 1:
+        return $['char, body[0]]
+    named := (_CHAR_NAMES[body] catch nil)
+    if named is nil:
+        return error("unknown character name " + text)
+    return $['char, named]
+
 fn [Parser] char_literal():
-    @accept 'TOK_LITERAL_CHAR
+    @accept apply_if(_mk_char, text('TOK_LITERAL_CHAR))
 
 # -----------------------------------------------------------------------------
 #>  ## Program Structure
@@ -454,7 +470,8 @@ fn $_mk_return(expr):
 #>    return_stmt     ::= "return" , [ expression ] ;
 #>  ```
 fn [Parser] return_stmt():
-    @accept apply_if($_mk_return, ~'TOK_KW_RETURN, opt(expression))
+    # tuple_expression: `return a, b` is (return (tuple a b)) (design ast.md).
+    @accept apply_if($_mk_return, ~'TOK_KW_RETURN, opt(tuple_expression))
 
 fn $_mk_break(expr):
     if expr == nil:
@@ -968,16 +985,18 @@ fn [Parser] class_def():
     @accept apply_if($_mk_class_def,
         ~'TOK_KW_CLASS, xid, opt($[~'TOK_LPAREN, opt(arg_list), ~'TOK_RPAREN]), block)
 
+# A virtual slot's body is a subscope defining `fn getter`/`fn setter`
+# (design syntax.md G3): (slot_def name type init body).
 fn $_mk_slot_def(expr):
     name := car(expr)
     type_c := cadr(expr)
     init := caddr(expr)
-    options := car(cdddr(expr))
-    return $['slot_def, name, _mk_type_or_auto(type_c), init, options]
+    body := car(cdddr(expr))
+    return $['slot_def, name, _mk_type_or_auto(type_c), init, body]
 
 #>  ```ebnf
 #>    slot_def        ::= "slot" , identifier , [ ":" , type_constraint ] ,
-#>                         [ "=" , expression ] , [ "with" , slot_options ] ;
+#>                         [ "=" , expression ] , [ block ] ;
 #>  ```
 #>
 #>  _Example_:
@@ -985,9 +1004,8 @@ fn $_mk_slot_def(expr):
 #>  ```wyrm
 #>  slot name: str = "John Doe"
 #>
-#>  slot name: str = "John Doe" with:
-#>      setter = fn (value) { this.name = value; }
-#>      getter = undefined;
+#>  slot age: int:
+#>      fn getter() -> int: 2026 - this.birth
 #>  ```
 #>
 fn [Parser] slot_def():
@@ -995,7 +1013,7 @@ fn [Parser] slot_def():
         ~'TOK_KW_SLOT, xid,
         opt($[~'TOK_COLON, type_expression]),
         opt($[~'TOK_EQUAL, expression]),
-        opt($[~'TOK_KW_WITH, slot_options]))
+        opt(block))
 
 #>  ```ebnf
 #>    slot_options    ::= ":" , NEWLINE , INDENT , { slot_option , stmt_sep } , DEDENT

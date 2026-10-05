@@ -66,8 +66,8 @@ shadow an outer one. Each input is a scope nested inside the ones before it, so:
 A compile error prints `error: ...` and changes nothing: numbering, definitions and state
 are exactly as before, so the next input can reuse them. A run-time fault prints
 `fault: ...`; whatever the input had already stored stays stored. Neither ends the session.
-A syntax error says only "syntax error: the input could not be parsed" (there is no
-location yet).
+A syntax error says only what the parser expected, such as "parse: statement end" (there
+is no location yet).
 
 `trap()` (or `trap(n)`) is a deliberate breakpoint: it faults with "debugger break".
 

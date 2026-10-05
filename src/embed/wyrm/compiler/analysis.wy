@@ -729,19 +729,18 @@ fn pair_length(p) -> int:
     return n
 
 # A parameter entry as `[kind, name, type, default]`, kind 'param,
-# 'var_positional or 'var_keyword: `(n type default)`, `(* n type)` and
-# `(** n type)` (ast.md). `*`/`**` can't be parameter names, so the marker
-# entries can't be confused with named ones.
+# 'var_positional or 'var_keyword: `(param n type default)`,
+# `(spread_param n type)` and `(spread_kw_param n type)` (ast.md C-4,
+# revised 2026-10-04: every entry has a head).
 fn param_parts(entry) -> list:
     head := car(entry)
-    size := pair_length(entry)
     f1 := (_field(entry, 1) catch nil)
     f2 := (_field(entry, 2) catch nil)
-    if (head == '*) and (size == 3):
+    if head == 'spread_param:
         return ['var_positional, f1, f2, nil]
-    if (head == '**) and (size == 3):
+    if head == 'spread_kw_param:
         return ['var_keyword, f1, f2, nil]
-    return ['param, head, f1, f2]
+    return ['param, f1, f2, (_field(entry, 3) catch nil)]
 
 # A fn_def/co_def/lambda/co_lambda as `[name, dispatch, params, send, ret,
 # body]`: (fn_def name dispatch params ret body), (co_def name dispatch
@@ -838,7 +837,7 @@ fn check_implicit_names(body) -> nil | error:
 # ---------------------------------------------------------------------------
 # free names, assigned names, cells
 
-# The declared names of a parameter list (`((name type default) ...)`),
+# The declared names of a parameter list (`((param name type default) ...)`),
 # including `*rest`/`**kwargs`.
 fn param_names(params) -> list:
     names := []
