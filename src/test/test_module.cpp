@@ -140,10 +140,13 @@ TEST_SUITE("module")
         CHECK_EQ(wy_slot_dict_get(&module->exports, intern(ctx.get_context_ptr(), "pretty")), 2);
         CHECK_EQ(wy_slot_dict_get(&module->exports, intern(ctx.get_context_ptr(), "summary")), 3);
 
-        CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx.get_context_ptr(), "geometry::area")), 4);
-        CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx.get_context_ptr(), "geometry::label")), 5);
-        CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx.get_context_ptr(), "println")), 6);
-        CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx.get_context_ptr(), "geometry::UNITS")), 7);
+        // An item import is its member's free slot, exported under the name
+        // it binds (design/modules.md M2): `area` and `pretty` *are*
+        // geometry's `area` and `label`.
+        CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx.get_context_ptr(), "geometry::area")), 1);
+        CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx.get_context_ptr(), "geometry::label")), 2);
+        CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx.get_context_ptr(), "println")), 4);
+        CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx.get_context_ptr(), "geometry::UNITS")), 5);
     }
 
     TEST_CASE("an embedded .c image loads through wy_module_load_image")

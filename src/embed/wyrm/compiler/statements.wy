@@ -397,6 +397,9 @@ fn _storage(name, frame: FnContext) -> list | error:
         # is this module's copy of a name, not a handle on the other
         # module's storage).
         return error("cannot assign to '" + str(name) + "': it is not declared in this module")
+    if (where[0] == "global") and ((frame.module) ! is_imported(name)):
+        # Only the module that defines a name assigns it (M2).
+        return error("cannot assign to '" + str(name) + "': it is imported, and only the module that defines it assigns it")
     return where
 
 # ---------------------------------------------------------------------------

@@ -1120,6 +1120,8 @@ fn _scope(node, frame: FnContext, dst):
                 return e
             return reg
         if not ((frame.module) ! is_local_class(parts[0])):
+            # `b::V` after `import a::b` names `a::b::V` (M2).
+            parts = (frame.module) ! canonical_path(parts)
             free := (frame.module) ! declare_free_global(_join_parts(parts))
             if free is error:
                 return free

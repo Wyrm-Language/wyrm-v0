@@ -3,9 +3,13 @@
 # assigned it twice.
 import counter
 import counter::*
-import counter::(bump as step)
+import counter::(bump as step, count as c)
+import tools::gauge
 
 bump()
 step()
 println(count)
+println(c)
 println(counter::count)
+# `gauge::LEVEL` names tools::gauge's LEVEL: the leaf an import binds.
+println(gauge::LEVEL)

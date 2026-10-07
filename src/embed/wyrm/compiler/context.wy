@@ -1125,6 +1125,14 @@ class ModuleContext:
     slot session_pending
     slot session_undo
     slot session_filled
+    # design/modules.md M2. `imported`: an item import's binding name -> the
+    # free slot of the member it names (`import a::(x as y)`: "y" -> the
+    # slot of "a::x"), so `y` *is* that binding rather than a copy of it.
+    # `import_paths`: a name an import binds to a module -> that module's
+    # path parts (`import a::b` binds "a" -> [a] and "b" -> [a, b]), so
+    # `b::V` is spelled `a::b::V`, the spelling the import fills.
+    slot imported: dict
+    slot import_paths: dict
 
     fn init(module_name: str, source_file = nil):
         this.image = ModuleImage(module_name)
@@ -1148,6 +1156,8 @@ class ModuleContext:
         this.session_pending = {}
         this.session_undo = []
         this.session_filled = []
+        this.imported = {}
+        this.import_paths = {}
 
 # ---------------------------------------------------------------------------
 # ModuleContext's methods.
@@ -1255,15 +1265,60 @@ fn [ModuleContext] declare_free_global(name) -> int | error:
 # and the reason a top-level `x := 5` could not compile before this
 # normalization.
 fn [ModuleContext] name_slot(name) -> int | error:
-    index := (this.globals[str(name)] catch nil)
+    index := this ! global_index(name)
     if not (index is nil):
         return index
     return (this.image) ! add_free_global(str(name))
 
 
-# This module's own global slot for `name`, or nil.
+# This module's own global slot for `name`, or nil. An item-imported name
+# answers its shared free slot; a definition of the same name is the
+# module's own and wins (it is checked first).
 fn [ModuleContext] global_index(name):
-    return (this.globals[str(name)] catch nil)
+    key := str(name)
+    index := (this.globals[key] catch nil)
+    if index is nil:
+        index = (this.imported[key] catch nil)
+    return index
+
+
+# True when `name` is an item import this module doesn't redefine: the
+# exporter's binding, which only the exporter assigns (M2).
+fn [ModuleContext] is_imported(name) -> bool:
+    key := str(name)
+    return (key in this.imported) and not (key in this.globals)
+
+
+# Bind `binding` to member `member` of the module at `parts`
+# (`import a::b::(x as y)`): the free slot `a::b::x`, filled - as a shared
+# binding - by the import of `a::b`.
+fn [ModuleContext] import_item(binding, parts: list, member) -> int | error:
+    spelling := ""
+    for part in parts:
+        spelling = spelling + str(part) + "::"
+    index := (this.image) ! add_free_global(spelling + str(member))
+    if index is error:
+        return index
+    this.imported[str(binding)] = index
+    return index
+
+
+# `parts` with its first name replaced by the module path an import bound it
+# to, when it was one: after `import a::b`, [b, V] is [a, b, V].
+fn [ModuleContext] canonical_path(parts: list) -> list:
+    if len(parts) < 2:
+        return parts
+    prefix := (this.import_paths[str(parts[0])] catch nil)
+    if prefix is nil:
+        return parts
+    out := []
+    for p in prefix:
+        out ! append(p)
+    i := 1
+    while i < len(parts):
+        out ! append(parts[i])
+        i = i + 1
+    return out
 
 
 fn [ModuleContext] is_local_class(name) -> bool:

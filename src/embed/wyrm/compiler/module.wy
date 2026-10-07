@@ -239,6 +239,10 @@ fn _declare_module_names(body, module: ModuleContext) -> nil | error:
             index := module ! declare_global(parts[0])
             if index is error:
                 return index
+            path_strs := []
+            for part in parts:
+                path_strs ! append(str(part))
+            module.import_paths[str(parts[0])] = [path_strs[0]]
             if not shape[3]:
                 # A wildcard binds no leaf name; every other form binds
                 # root and leaf (or alias), plus each item's binding.
@@ -248,9 +252,14 @@ fn _declare_module_names(body, module: ModuleContext) -> nil | error:
                 index2 := module ! declare_global(leaf)
                 if index2 is error:
                     return index2
+                module.import_paths[str(leaf)] = path_strs
                 if not (shape[2] is nil):
                     for item in shape[2]:
-                        index3 := module ! declare_global(item[1])
+                        # An item is the member's own binding (M2), not a
+                        # global of this module: its free slot, filled by
+                        # the import (in a REPL session, by the refill
+                        # after each input).
+                        index3 := module ! import_item(item[1], parts, item[0])
                         if index3 is error:
                             return index3
         elif kind == 'class_def:
@@ -423,9 +432,7 @@ fn _hoist_imports(body, module: ModuleContext) -> list | error:
         e2 := _import_module(parts, alias, true, module)
         if e2 is error:
             return e2
-        if not (items is nil):
-            for item in items:
-                pending ! append([parts, item[0], item[1]])
+        # Items need nothing here: each is its member's free slot (M2).
     return pending
 
 # `import a::(x, y as z)`: a free slot named by the whole path - filled by
@@ -575,6 +582,11 @@ fn _assemble(module: ModuleContext) -> dict | error:
         if gslot["free"]:
             free[gslot["name"]] = i
         i = i + 1
+    # An item import is exported under its binding name, as the member's
+    # own binding: a package re-exports what it imports (M1 rule 6, M2).
+    for name in module.imported:
+        if not (name in exports):
+            exports[name] = module.imported[name]
     uses := []
     for u in init.uses:
         uses ! append(u)
@@ -785,7 +797,7 @@ fn _session_snapshot(session: SessionContext) -> dict:
     snap := {}
     snap["lens"] = [len(image.statics), len(image.symbols), len(image.messages), len(image.globals), len(image.functions), len(image.classes), len(m.static_imports)]
     snap["image_dicts"] = [copy(image._static_index), copy(image._symbol_index), copy(image._message_index), copy(image._global_index), copy(image._free_index)]
-    snap["module_dicts"] = [copy(m.globals), copy(m.classes), copy(m.class_statics), copy(m.slot_names), copy(m.superclasses), copy(m.definitions), copy(m.promoted_arities), copy(m.session_pending)]
+    snap["module_dicts"] = [copy(m.globals), copy(m.classes), copy(m.class_statics), copy(m.slot_names), copy(m.superclasses), copy(m.definitions), copy(m.promoted_arities), copy(m.session_pending), copy(m.imported), copy(m.import_paths)]
     snap["wildcard"] = m.has_wildcard_import
     snap["imports"] = len(session.imports)
     return snap
@@ -825,6 +837,8 @@ fn _session_restore(session: SessionContext, snap: dict) -> nil:
     m.definitions = e[5]
     m.promoted_arities = e[6]
     m.session_pending = e[7]
+    m.imported = e[8]
+    m.import_paths = e[9]
     m.has_wildcard_import = snap["wildcard"]
     m.session_undo = []
     m.session_filled = []

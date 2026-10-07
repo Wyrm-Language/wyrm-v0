@@ -27,7 +27,8 @@ wildcard/paint.wy	wildcard/paint.out	matches
 wildcard/palette.wy	wildcard/palette.out	matches	
 packages/main.wy	packages/main.out	local-only	design/modules.md M1: a package's __init__.wy imports and re-exports its own child (a pass-through, not a cycle), the child imports a sibling during the package's init, and `ns` is a namespace package with no __init__.wy. wypoc agrees from its m1-packages branch on; an older external wyrm reports the cycle.
 shared/counter.wy	shared/counter.out	matches	
-shared/main.wy	shared/main.out	local-only	design/modules.md M2: wildcard, item and qualified imports all read the exporter's own binding, so they see `bump`'s later assignments. wypoc agrees from its m1-packages branch on (it copied values before).
+shared/tools/gauge.wy	shared/tools/gauge.out	matches	
+shared/main.wy	shared/main.out	local-only	design/modules.md M2: wildcard, item and qualified imports all read the exporter's own binding, so they see `bump`'s later assignments; `gauge::LEVEL` after `import tools::gauge` is tools::gauge's own. wypoc agrees from its m1-packages branch on (it copied values before).
 samples/basics.wy	-	REFUSED	`with` has been removed from the language
 samples/classes.wy	-	REFUSED	a fragment: `canvas` comes from the test harness, not the file
 samples/control_flow.wy	-	REFUSED	a fragment: `condition` comes from the test harness
