@@ -1,0 +1,9 @@
+# design/modules.md M1. `pkg` is a package whose __init__.wy imports and
+# re-exports its own child; that child imports a sibling while `pkg` is
+# still initialising. `ns` is a namespace package: a directory with no
+# __init__.wy.
+import pkg
+import ns::leaf
+
+println(pkg::compile(21))
+println(ns::leaf::NAME)

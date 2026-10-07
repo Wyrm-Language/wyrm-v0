@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -46,9 +47,12 @@ wy_error import_(wy_context* ctx, const char* path, wy_uword len, wy_u8** out, w
 {
     std::string relative(path, len);
     for (std::size_t pos = 0; (pos = relative.find("::", pos)) != std::string::npos;) { relative.replace(pos, 2, "/"); }
-    std::string file = *static_cast<std::string*>(ud) + "/" + relative + ".wyd";
-    std::ifstream f(file, std::ios::binary);
-    if (f.good()) {
+    // design/modules.md M1, as the hosted hook does it: a package's
+    // __init__ beats a module, and a bare directory is a namespace package.
+    std::string base = *static_cast<std::string*>(ud) + "/" + relative;
+    for (const std::string& file : {base + "/__init__.wyd", base + ".wyd"}) {
+        std::ifstream f(file, std::ios::binary);
+        if (!f.good()) { continue; }
         std::ostringstream ss;
         ss << f.rdbuf();
         std::string bytes = ss.str();
@@ -58,13 +62,17 @@ wy_error import_(wy_context* ctx, const char* path, wy_uword len, wy_u8** out, w
         *out_len = bytes.size();
         return WY_ERR_NONE;
     }
+    bool children = false;
     for (wy_uword i = 0; i < wyrm_builtin_module_count; i++) {
-        if (std::strlen(wyrm_builtin_modules[i].path) == len && std::memcmp(wyrm_builtin_modules[i].path, path, len) == 0) {
+        const char* row = wyrm_builtin_modules[i].path;
+        if (std::strlen(row) == len && std::memcmp(row, path, len) == 0) {
             *out_image = wyrm_builtin_modules[i].image;
             return WY_ERR_NONE;
         }
+        children = children || (std::strlen(row) > len + 2 && std::memcmp(row, path, len) == 0 && row[len] == ':' && row[len + 1] == ':');
     }
-    return WY_ERR_UNBOUND;
+    // A namespace package: a directory, or rows under it with no row of its own.
+    return children || std::filesystem::is_directory(base) ? WY_ERR_NONE : WY_ERR_UNBOUND;
 }
 
 struct harness

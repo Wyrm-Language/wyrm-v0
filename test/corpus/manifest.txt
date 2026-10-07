@@ -25,6 +25,7 @@ two_module/shapes.wy	two_module/shapes.out	matches	Added by epic 10's cross-modu
 two_module/shapes_main.wy	two_module/shapes_main.out	local-only	See two_module/shapes.wy's note: `square ! describe()`/`corners()` dispatch through inherited entries on the defining module's message objects; `area()` is the importer seeing an own-class override. [local-only: the external wyrm resolves `shapes` to its own corelib module, not the fixture]
 wildcard/paint.wy	wildcard/paint.out	matches	
 wildcard/palette.wy	wildcard/palette.out	matches	
+packages/main.wy	packages/main.out	local-only	design/modules.md M1: a package's __init__.wy imports and re-exports its own child (a pass-through, not a cycle), the child imports a sibling during the package's init, and `ns` is a namespace package with no __init__.wy. wypoc agrees from its m1-packages branch on; an older external wyrm reports the cycle.
 samples/basics.wy	-	REFUSED	`with` has been removed from the language
 samples/classes.wy	-	REFUSED	a fragment: `canvas` comes from the test harness, not the file
 samples/control_flow.wy	-	REFUSED	a fragment: `condition` comes from the test harness

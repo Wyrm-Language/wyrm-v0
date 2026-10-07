@@ -22,8 +22,10 @@ typedef struct wy_import_fs_builtin
 /**
  * A filesystem module search path (the `-I dir` roots of the CLI), plus the
  * builtin module table always consulted last (epic 11's resolution order:
- * per root - .wy source through the cache, then .wyd, then .wyc - then the
- * table; a disk module shadows a builtin).
+ * per root - `<path>/__init__` then `<path>`, each as .wy source through the
+ * cache, then .wyd, then .wyc - then the table; a disk module shadows a
+ * builtin; a bare directory or table rows under the path make a namespace
+ * package, answered only when nothing else is).
  *
  * Owns its strings and its root table, both allocated through the
  * `wy_allocator` handed to wy_import_fs_add_root. The table is not owned -
@@ -73,7 +75,10 @@ void wy_import_fs_search_path_finalize_f(wy_allocator* allocator, wy_import_fs_s
 
 /**
  * The hosted `wy_import_hook`: resolve `path` (a `::`-joined module path,
- * `len` bytes) under each root in order, first hit wins:
+ * `len` bytes) under each root in order, first hit wins. Within a root a
+ * package beats a module (design/modules.md M1, Python's order): the steps
+ * below are tried at `<base>/__init__` when `<base>` is a directory, then
+ * at `<base>` itself, where `<base>` is `<root>/<path-with-slashes>`.
  *
  *   1. `<root>/<path-with-slashes>.wy` - a source file, compiled through
  *      the .wyd cache (epic 11 M3): a valid `<dir>/__wycache__/<name>.wyd`
@@ -84,10 +89,12 @@ void wy_import_fs_search_path_finalize_f(wy_allocator* allocator, wy_import_fs_s
  *   3. `<root>/<path-with-slashes>.wyc` - a precompiled pypoc image.
  *
  * .wyd comes before .wyc so a stale pypoc artifact never shadows a fresh
- * port build in a mixed tree. There is no further fallback. After the last
- * root, the search path's builtin table is scanned (epic 11): a hit is
- * answered through `out_image` as a static image, leaving `out_bytes`
- * untouched.
+ * port build in a mixed tree. After the last root, the search path's
+ * builtin table is scanned (epic 11): a hit is answered through `out_image`
+ * as a static image, leaving `out_bytes` untouched. Failing that, a path
+ * that is a directory on some root, or that has table rows filed under it
+ * (`path::...`), is a namespace package: WY_ERR_NONE with neither output
+ * set (see wy_import_hook).
  *
  * On the bytes path the bytes are allocated through wy_context_gc_alloc and
  * ownership transfers to the loader (also on a malformed image), matching

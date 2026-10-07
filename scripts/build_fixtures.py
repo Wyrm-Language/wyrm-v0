@@ -11,7 +11,9 @@ OUT_DIR/<dir>/<stem>.wyd for
   * every manifest row that is expected to run (status matches/local-only),
   * everything under test/corpus/expand/ (expansion-native fixtures; they
     locate their sibling images through __ARGS[0]),
-  * everything under test/corpus/embedded/ (import-resolution fixtures).
+  * everything under test/corpus/embedded/ (import-resolution fixtures),
+  * everything under test/corpus/packages/ (the packages a manifest row
+    imports: design/modules.md M1).
 
 Writes OUT_DIR/STAMP last. Exit 1 if any expected-to-compile source fails.
 """
@@ -34,7 +36,7 @@ def sources():
             src, _out, status = (line.split("\t") + ["", ""])[:3]
             if status in ("matches", "local-only"):
                 seen.append(src)
-    for sub in ("expand", "embedded"):
+    for sub in ("expand", "embedded", "packages"):
         for dirpath, dirs, files in os.walk(os.path.join(CORPUS, sub)):
             dirs.sort()
             for name in sorted(files):

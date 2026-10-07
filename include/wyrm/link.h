@@ -45,5 +45,13 @@ wy_error wy_link_seed_global(wy_context* context, wy_module* module, const char*
  * must initialise a LOADED result inline on its current fiber. */
 wy_error wy_link_import(wy_context* context, wy_string* path, wy_module** out);
 
+/**
+ * wy_link_import for the first `len` bytes of `path`. `prefix` marks a
+ * package loaded on the way to one of its children (design/modules.md M1):
+ * one that is still initialising is then answered as it is, INITIALISING,
+ * instead of WY_ERR_CYCLE, and the caller must neither run nor fill from it.
+ */
+wy_error wy_link_import_ex(wy_context* context, wy_string* path, wy_uword len, bool prefix, wy_module** out);
+
 WY_END_DECLS
 #endif

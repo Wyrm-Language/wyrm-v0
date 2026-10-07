@@ -321,7 +321,9 @@ fn _collect_definitions(body, module: ModuleContext) -> nil | error:
 # `import a::b::c`: load each prefix in turn, then bind the root package
 # and the leaf (or its alias) to module globals. The path is a constant
 # string, not a table entry: the instruction reads it, splits it, and hands
-# it to the loader.
+# it to the loader. A prefix is spelled with a trailing "::" ("a::",
+# "a::b::"): a package loaded on the way to a child, which the loader passes
+# through if it is still initialising (design/modules.md M1).
 fn _import_module(parts, alias, bind_leaf: bool, module: ModuleContext) -> nil | error:
     init := module.init_ctx
     mark := init ! mark()
@@ -331,7 +333,10 @@ fn _import_module(parts, alias, bind_leaf: bool, module: ModuleContext) -> nil |
     depth := 1
     n := len(parts)
     while depth <= n:
-        idx := (module.image) ! add_static(_join_path(_prefix(parts, depth)))
+        spelling := _join_path(_prefix(parts, depth))
+        if depth < n:
+            spelling = spelling + "::"
+        idx := (module.image) ! add_static(spelling)
         if idx is error:
             return idx
         e := _emit_pairable(init, 'import, idx, reg)

@@ -1,0 +1,5 @@
+# A sibling import while the package initialises.
+import pkg::helpers
+
+fn compile(x):
+    return x * pkg::helpers::FACTOR

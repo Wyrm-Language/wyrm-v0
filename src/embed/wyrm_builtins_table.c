@@ -28,7 +28,6 @@ extern const wy_module_image handlers_image;
 extern const wy_module_image module_image;
 extern const wy_module_image statements_image;
 extern const wy_module_image verify_image;
-extern const wy_module_image compiler_image;
 extern const wy_module_image compile_source_image;
 extern const wy_module_image compiler_main_image;
 extern const wy_module_image __init___image;
@@ -58,7 +57,6 @@ const wy_import_fs_builtin wyrm_builtin_modules[] = {
     { "wyrm::compiler::module", &module_image },
     { "wyrm::compiler::statements", &statements_image },
     { "wyrm::compiler::verify", &verify_image },
-    { "wyrm::compiler", &compiler_image },
     { "wyrm::tools::compile_source", &compile_source_image },
     { "wyrm::tools::compiler_main", &compiler_main_image },
     { "wyrm", &__init___image },
@@ -66,4 +64,4 @@ const wy_import_fs_builtin wyrm_builtin_modules[] = {
     { "opcodes", &opcodes_image },
 };
 
-const wy_uword wyrm_builtin_module_count = 30;
+const wy_uword wyrm_builtin_module_count = 29;

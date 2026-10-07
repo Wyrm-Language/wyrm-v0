@@ -27,7 +27,6 @@ Skipped (77) when the build tree's wyrm binary is not built.
 
 import filecmp
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -39,8 +38,8 @@ ROOT = wytest_env.REPO_ROOT
 WYRM = wytest_env.LOCAL_WYRM
 
 # The compiler's own sources, relative to src/embed/ - the front end and
-# compiler modules, plus the package marker, the package root, and the entry
-# point itself.
+# compiler modules, plus the package root (wyrm/__init__.wy) and the entry
+# point itself. wyrm::compiler has no file: it is a namespace package.
 SELF_SOURCES = [
     "std/pairs.wy",
     "std/ctype.wy",
@@ -64,7 +63,6 @@ SELF_SOURCES = [
     "wyrm/compiler/module.wy",
     "wyrm/compiler/expansion.wy",
     "wyrm/parser.wy",
-    "wyrm/compiler.wy",
     "wyrm/__init__.wy",
     "wyrm/tools/compiler_main.wy",
 ]
@@ -72,13 +70,6 @@ SELF_SOURCES = [
 def ensure_dirs(tree, rels):
     for rel in rels:
         os.makedirs(os.path.join(tree, os.path.dirname(rel)), exist_ok=True)
-
-
-def root_package_alias(tree):
-    """The C VM resolves the `wyrm` package root via <root>/wyrm.wyd."""
-    src = os.path.join(tree, "wyrm", "__init__.wyd")
-    if os.path.exists(src):
-        shutil.copyfile(src, os.path.join(tree, "wyrm.wyd"))
 
 
 def wy_roots():
@@ -136,7 +127,6 @@ def compile_tree(driver, roots, out_tree, src_root, cache_dir=None):
     tstubs = [line for line in r.stdout.splitlines() if line.startswith("TSTUB ")]
     for line in tstubs:
         print("  (template stub: %s)" % line.strip())
-    root_package_alias(out_tree)
     return out_tree
 
 

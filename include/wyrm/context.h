@@ -54,7 +54,10 @@ typedef struct wy_context_io
  * table): store the image pointer through `out_image` and leave `out_bytes`
  * untouched. The loader then takes the module through wy_module_load_image,
  * zero-copy - the image must outlive every context that loads it (static
- * storage does). Exactly one of the two outputs must be set on success. */
+ * storage does). At most one of the two outputs may be set on success;
+ * setting neither answers a namespace package (design/modules.md M1): a
+ * directory of modules with no code of its own, which the loader publishes
+ * as an empty module that needs no init. */
 typedef wy_error (*wy_import_hook)(wy_context*, const char* path, wy_uword len,
     wy_u8** out_bytes, wy_uword* out_len, const struct wy_module_image** out_image, void* ud);
 

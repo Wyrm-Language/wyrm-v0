@@ -1,0 +1,3 @@
+# Importing its own child walks through `pkg` while `pkg` is still running:
+# a pass-through, not a cycle.
+import pkg::impl::(compile)

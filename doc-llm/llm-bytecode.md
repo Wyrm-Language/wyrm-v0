@@ -195,7 +195,7 @@ the register moves to `f`/`a1`.
 | `0x44`/`0xC4` | `rget` **[INV]** | `a0`=reloc idx, `f`=dst reg8 | `a1`=dst | dst ← the bound value of the relocation entry — a plain table read; resolution already happened at scope start (§6.2), so an entry that failed to resolve yields its NotFound error here |
 | `0x45`/`0xC5` | `lsym` **[INV]** | `a0`=symbol idx, `f`=dst reg8 | `a1`=dst | dst ← interned symbol |
 | `0x46`/`0xC6` | `lconst` **[INV]** | `a0`=static idx, `f`=dst reg8 | `a1`=dst | dst ← static pool value |
-| `0x47`/`0xC7` | `import` **[INV]** | `a0`=reloc idx (module), `f`=dst reg8 | `a1`=dst | dst ← module object, triggering the dependency's load and init on first import |
+| `0x47`/`0xC7` | `import` **[INV]** | `a0`=reloc idx (module), `f`=dst reg8 | `a1`=dst | dst ← module object, triggering the dependency's load and init on first import. A path spelled with a trailing `::` (`"a::b::"`) is a package loaded on the way to a child: if it is still initialising it is bound as it is, without init or fills, instead of faulting as a cycle (design/modules.md M1) |
 | `0x48`/`0xC8` | `neg` | `a0`=dst, `f`=src reg8 | `a1`=src | dst ← −src |
 | `0x49`/`0xC9` | `inv` | same | same | dst ← ~src |
 | `0x4A`/`0xCA` | `not` | same | same | dst ← boolean not (uses `__bool__`) |
@@ -590,10 +590,12 @@ Given an image, the loader:
 4. Allocates the relocation bind table (`nrelocs` slots, all *unbound*).
 5. Registers `functions` and `classes` as prototypes (no execution).
 6. Publishes the module object under its name, **then** runs code offset 0
-   as a zero-arg call. (Publishing first makes import cycles observable
-   rather than divergent — a cyclic importer sees the module with whatever
-   globals its init has populated so far, which matches the POC
-   interpreter's behavior.)
+   as a zero-arg call. (Publishing first is what detects an import cycle:
+   an import that finds the module still initialising faults. The one
+   exception is a prefix load - the trailing-`::` spelling `import` emits
+   for each package on a path - which passes through a package that is
+   still running its own init, so a package can import its own children;
+   design/modules.md M1.)
 
 ### 6.2 Name resolution
 
@@ -730,7 +732,7 @@ the expression temp stack (§8.3); labels are patched to §2.2 offsets.
 | `defer:` block | block → closure (captures by the closure rules); `closure T, fn#, caps; defer_reg T, 0`. v1 arms at **frame** granularity — defers run at function return, a deliberate narrowing of the spec's "containing block" (Appendix C) |
 | `defer on error:` | mode 1; `defer on error \| nil:` mode 2 |
 | `pass` | nothing |
-| `import mod::a::b` | relocs for each prefix; module init: `import` op into the globals for `mod`, `mod::a` alias chain per spec; `as` aliases are compile-time renames only. All imports are hoisted to the top of module init, ahead of the `resolve` point (§6.2) |
+| `import mod::a::b` | relocs for each prefix (spelled `mod::`, `mod::a::`, then `mod::a::b`); module init: `import` op into the globals for `mod`, `mod::a` alias chain per spec; `as` aliases are compile-time renames only. All imports are hoisted to the top of module init, ahead of the `resolve` point (§6.2) |
 | `import mod::*` / `except (...)` | one wildcard reloc (t = 5, except-list in `x`); module init: `import_star`. From then on, an identifier the compiler can't resolve compiles to a single-component relocation searched at bind time (§6.2) instead of a `CompileError` |
 | `import static ...` | same lowering as `import` — `static` marks a dependency wanted at compile time only, not a runtime one, so nothing changes at the bytecode level; the compiler enforces the static-import usage restrictions (no closures / ctors / runtime messages) as `CompileError`s |
 | top-level `fn name` | `closure T, fn#, 0; gset g(name), T` in module init |

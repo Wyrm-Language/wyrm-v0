@@ -224,25 +224,6 @@ static const char* error_text_(wy_value v)
  * The expansion VM
  * ------------------------------------------------------------------------- */
 
-/** Register the implicit parent package `std` unless already present. */
-static wy_error ensure_std_package_(wy_context* context)
-{
-    for (wy_uword i = 0; i < context->module_count; i++) {
-        wy_module* m = wy_context_get_module(context, i);
-        if (m != WY_NULL && m->import_path != WY_NULL && m->import_path->len == 3 && wy_memcmp(m->import_path->str, "std", 3) == 0) {
-            return WY_ERR_NONE;
-        }
-    }
-    wy_module* module = wy_module_new_f(context);
-    if (module == WY_NULL) { return WY_ERR_NOMEM; }
-    module->state = WY_MODULE_BUILTIN;
-    wy_error err = wy_string_strdup(context, "std", &module->import_path);
-    if (err != WY_ERR_NONE) { return err; }
-    err = wy_context_intern(context, "std", 3, &module->name);
-    if (err != WY_ERR_NONE) { return err; }
-    return wy_context_module_register(context, module, WY_NULL);
-}
-
 static wy_uword leaked_bytes_ = 0;
 
 wy_uword wy_expand_leaked_bytes(void)
@@ -459,11 +440,10 @@ wy_error wy_expand_module_install(wy_context* context)
 {
     if (context == WY_NULL) { return WY_ERR_INVAL; }
 
-    wy_error err = ensure_std_package_(context);
-    if (err != WY_ERR_NONE) { return err; }
-
+    /* No `std` module of its own: registering `std::expand` makes `std` a
+     * namespace package (design/modules.md M1, wy_link_import_ex). */
     wy_module* module = WY_NULL;
-    err = wy_expand_module_new(context, &module);
+    wy_error err = wy_expand_module_new(context, &module);
     if (err != WY_ERR_NONE) { return err; }
 
     err = wy_string_strdup(context, "std::expand", &module->import_path);

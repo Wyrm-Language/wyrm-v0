@@ -413,6 +413,46 @@ TEST_SUITE("link") {
         CHECK_EQ(wy_link_import(ctx, path, &found), WY_ERR_IMAGE);
         CHECK_EQ(ctx->module_count, 0);
     }
+
+    TEST_CASE("a prefix import passes through an initialising package; a whole path is a cycle") {
+        // design/modules.md M1: `pkg/__init__.wy` importing `pkg::child`
+        // walks through `pkg` while `pkg` is still running.
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        const wy_u32 code[] = {enc1(WY_OP_RETURN, 0, 0)};
+        auto* pkg = named_module(ctx, "pkg", 0, code, std::size(code));
+        pkg->state = WY_MODULE_INITIALISING;
+        wy_string* path;
+        REQUIRE_EQ(wy_string_strdup(ctx, "pkg::", &path), WY_ERR_NONE);
+        wy_module* found = nullptr;
+        CHECK_EQ(wy_link_import_ex(ctx, path, 3, true, &found), WY_ERR_NONE);
+        CHECK_EQ(found, pkg);
+        CHECK_EQ(wy_link_import_ex(ctx, path, 3, false, &found), WY_ERR_CYCLE);
+        // The "::" spelling is only the VM's; the loader sees a bad path.
+        CHECK_EQ(wy_link_import(ctx, path, &found), WY_ERR_INVAL);
+    }
+
+    TEST_CASE("a path with registered children is a namespace package") {
+        // A host that registers `std::expand` itself makes `std` importable.
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        const wy_u32 code[] = {enc1(WY_OP_RETURN, 0, 0)};
+        auto* child = named_module(ctx, "std::expand", 0, code, std::size(code));
+        REQUIRE_EQ(wy_string_strdup(ctx, "std::expand", &child->import_path), WY_ERR_NONE);
+        wy_string* path;
+        REQUIRE_EQ(wy_string_strdup(ctx, "std", &path), WY_ERR_NONE);
+        wy_module* found = nullptr;
+        REQUIRE_EQ(wy_link_import(ctx, path, &found), WY_ERR_NONE);
+        CHECK_EQ(found->state, WY_MODULE_BUILTIN);
+        CHECK_EQ(found->code_len, 0u);
+        // Published once: a second import finds the same module.
+        wy_module* again = nullptr;
+        CHECK_EQ(wy_link_import(ctx, path, &again), WY_ERR_NONE);
+        CHECK_EQ(again, found);
+        // "st" is not a package of "std::expand".
+        REQUIRE_EQ(wy_string_strdup(ctx, "st", &path), WY_ERR_NONE);
+        CHECK_EQ(wy_link_import(ctx, path, &found), WY_ERR_UNBOUND);
+    }
 }
 
 TEST_SUITE("link") {
@@ -498,6 +538,21 @@ TEST_SUITE("builtin_table") {
         // The shadow fixture is `x := 1` compiled by this build - a handful of
         // words, not the embedded compiler module's thousand-plus.
         CHECK_LT(module->code_len, 100u);
+    }
+
+    TEST_CASE("wyrm::compiler is a namespace package: no table row, no code") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_import_fs_search_path search = table_search_path();
+        ctx->import_hook = wy_import_fs_hook;
+        ctx->import_ud = &search;
+
+        wy_module* module = nullptr;
+        wy_string* path;
+        REQUIRE_EQ(wy_string_strdup(ctx, "wyrm::compiler", &path), WY_ERR_NONE);
+        REQUIRE_EQ(wy_link_import(ctx, path, &module), WY_ERR_NONE);
+        CHECK_EQ(module->state, WY_MODULE_BUILTIN);
+        CHECK_EQ(module->code_len, 0u);
     }
 
     TEST_CASE("a module in neither a root nor the table stays WY_ERR_UNBOUND") {

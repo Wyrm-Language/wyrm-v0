@@ -18,6 +18,10 @@
  * `.wyc` in the same root, no `.wy` source fallback. The builtin module
  * table (epic 11) is consulted last and answers a static image. Any bytes at
  * a resolved path round-trip so the tests need no compiler.
+ *
+ * Packages (design/modules.md M1): within a root `<path>/__init__` beats
+ * `<path>`, and a bare directory (or table rows filed under the path) is a
+ * namespace package, answered with neither output set.
  */
 
 namespace {
@@ -450,5 +454,85 @@ TEST_SUITE("import_fs")
         CHECK_EQ(wy_import_fs_hook(ctx, path.data(), path.size(), &none, &none_len, &image, &search2), WY_ERR_NONE);
         REQUIRE_NE(none, WY_NULL);
         CHECK_EQ(read_out(none, none_len), "stale pypoc image");
+    }
+
+    TEST_CASE("a package's __init__ beats a module of the same name in its root") {
+        test_fiber_fixture fix;
+        wy_context* ctx = fix.get_context_ptr();
+        temp_dir tmp;
+        write_file(tmp.root / "pkg" / "__init__.wyc", "package");
+        write_file(tmp.root / "pkg.wyc", "module");
+
+        wy_import_fs_search_path search;
+        wy_import_fs_search_path_init_s(&search);
+        REQUIRE_EQ(wy_import_fs_add_root(wy_context_get_machine(ctx)->allocator, &search,
+            tmp.root.string().c_str()), WY_ERR_NONE);
+
+        const std::string path = "pkg";
+        wy_u8* bytes = WY_NULL;
+        wy_uword len = 0;
+        const wy_module_image* image = WY_NULL;
+        CHECK_EQ(wy_import_fs_hook(ctx, path.data(), path.size(), &bytes, &len, &image, &search), WY_ERR_NONE);
+        REQUIRE_NE(bytes, WY_NULL);
+        CHECK_EQ(read_out(bytes, len), "package");
+
+        wy_import_fs_search_path_finalize_f(wy_context_get_machine(ctx)->allocator, &search);
+    }
+
+    TEST_CASE("a bare directory is a namespace package; a module in a later root beats it") {
+        test_fiber_fixture fix;
+        wy_context* ctx = fix.get_context_ptr();
+        temp_dir first;
+        temp_dir second;
+        write_file(first.root / "ns" / "leaf.wyc", "leaf");
+
+        wy_import_fs_search_path search;
+        wy_import_fs_search_path_init_s(&search);
+        REQUIRE_EQ(wy_import_fs_add_root(wy_context_get_machine(ctx)->allocator, &search,
+            first.root.string().c_str()), WY_ERR_NONE);
+        REQUIRE_EQ(wy_import_fs_add_root(wy_context_get_machine(ctx)->allocator, &search,
+            second.root.string().c_str()), WY_ERR_NONE);
+
+        const std::string path = "ns";
+        wy_u8* bytes = WY_NULL;
+        wy_uword len = 0;
+        const wy_module_image* image = WY_NULL;
+        CHECK_EQ(wy_import_fs_hook(ctx, path.data(), path.size(), &bytes, &len, &image, &search), WY_ERR_NONE);
+        CHECK_EQ(bytes, WY_NULL);
+        CHECK_EQ(image, WY_NULL);
+
+        write_file(second.root / "ns.wyc", "module");
+        CHECK_EQ(wy_import_fs_hook(ctx, path.data(), path.size(), &bytes, &len, &image, &search), WY_ERR_NONE);
+        REQUIRE_NE(bytes, WY_NULL);
+        CHECK_EQ(read_out(bytes, len), "module");
+
+        wy_import_fs_search_path_finalize_f(wy_context_get_machine(ctx)->allocator, &search);
+    }
+
+    TEST_CASE("builtin table rows filed under a path make it a namespace package") {
+        test_fiber_fixture fix;
+        wy_context* ctx = fix.get_context_ptr();
+
+        static const wy_module_image dummy_image = { "dummy", {} };
+        const wy_import_fs_builtin table[] = {
+            { "std::thing", &dummy_image },
+        };
+
+        wy_import_fs_search_path search;
+        wy_import_fs_search_path_init_s(&search);
+        search.builtins = table;
+        search.builtin_count = 1;
+
+        const std::string path = "std";
+        wy_u8* bytes = WY_NULL;
+        wy_uword len = 0;
+        const wy_module_image* image = WY_NULL;
+        CHECK_EQ(wy_import_fs_hook(ctx, path.data(), path.size(), &bytes, &len, &image, &search), WY_ERR_NONE);
+        CHECK_EQ(bytes, WY_NULL);
+        CHECK_EQ(image, WY_NULL);
+
+        // "st" is a prefix of the row's spelling, not a package of it.
+        const std::string partial = "st";
+        CHECK_EQ(wy_import_fs_hook(ctx, partial.data(), partial.size(), &bytes, &len, &image, &search), WY_ERR_UNBOUND);
     }
 }

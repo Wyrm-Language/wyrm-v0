@@ -230,43 +230,92 @@ wy_error wy_link_seed_global(wy_context* ctx, wy_module* module, const char* nam
 
 wy_error wy_link_import(wy_context* ctx, wy_string* path, wy_module** out)
 {
-    if (ctx == WY_NULL || path == WY_NULL || out == WY_NULL || path->len == 0) { return WY_ERR_INVAL; }
+    if (path == WY_NULL) { return WY_ERR_INVAL; }
+    return wy_link_import_ex(ctx, path, path->len, false, out);
+}
+
+/** True when a registered module lives under `path` (`path::...`): a host
+ * that registers `std::expand` itself makes `std` a namespace package. */
+static bool has_registered_children_(wy_context* ctx, const char* path, wy_uword len)
+{
+    for (wy_uword i = 0; i < ctx->module_count; i++) {
+        wy_module* module = wy_context_get_module(ctx, i);
+        if (module == WY_NULL || module->import_path == WY_NULL) { continue; }
+        const wy_string* other = module->import_path;
+        if (other->len > len + 2 && memcmp(other->str, path, len) == 0 &&
+            other->str[len] == ':' && other->str[len + 1] == ':') {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** A module that is a namespace package: no code, nothing to initialise. */
+static wy_error namespace_module_(wy_context* ctx, wy_module** out)
+{
+    wy_module* dep = wy_module_new_f(ctx);
+    if (dep == WY_NULL) { return WY_ERR_NOMEM; }
+    dep->state = WY_MODULE_BUILTIN;
+    *out = dep;
+    return WY_ERR_NONE;
+}
+
+wy_error wy_link_import_ex(wy_context* ctx, wy_string* path, wy_uword len, bool prefix, wy_module** out)
+{
+    if (ctx == WY_NULL || path == WY_NULL || out == WY_NULL || len == 0 || len > path->len) { return WY_ERR_INVAL; }
     /* Reject empty components and embedded NULs before handing the path to a host. */
     wy_uword start = 0;
-    for (wy_uword i = 0; i < path->len; i++) {
+    for (wy_uword i = 0; i < len; i++) {
         if (path->str[i] == '\0') { return WY_ERR_INVAL; }
         if (path->str[i] == ':') {
-            if (i == start || i + 1 >= path->len || path->str[i + 1] != ':') { return WY_ERR_INVAL; }
+            if (i == start || i + 1 >= len || path->str[i + 1] != ':') { return WY_ERR_INVAL; }
             i++;
             start = i + 1;
         }
     }
-    if (start == path->len) { return WY_ERR_INVAL; }
+    if (start == len) { return WY_ERR_INVAL; }
     for (wy_uword i = 0; i < ctx->module_count; i++) {
         wy_module* module = wy_context_get_module(ctx, i);
         if (module == WY_NULL) { continue; }  /* unregistered */
-        bool match = module->import_path ? wy_string_eq_f(module->import_path, path) :
-            (module->name && strlen(module->name) == path->len && memcmp(module->name, path->str, path->len) == 0);
+        bool match = module->import_path ?
+            (module->import_path->len == len && memcmp(module->import_path->str, path->str, len) == 0) :
+            (module->name && strlen(module->name) == len && memcmp(module->name, path->str, len) == 0);
         if (!match) { continue; }
-        if (module->state == WY_MODULE_INITIALISING) { return WY_ERR_CYCLE; }
+        if (module->state == WY_MODULE_INITIALISING) {
+            /* design/modules.md M1: a package still running its own init is
+             * passed through on the way to one of its children; only the
+             * whole path of an import can close a cycle. */
+            if (!prefix) { return WY_ERR_CYCLE; }
+            *out = module;
+            return WY_ERR_NONE;
+        }
         if (module->state == WY_MODULE_FAILED) { return WY_ERR_LINK; }
         *out = module;
         return WY_ERR_NONE;
     }
-    if (ctx->import_hook == WY_NULL) { return WY_ERR_UNBOUND; }
     wy_u8* bytes = WY_NULL;
-    wy_uword len = 0;
+    wy_uword bytes_len = 0;
     const wy_module_image* image = WY_NULL;
-    wy_error err = ctx->import_hook(ctx, path->str, path->len, &bytes, &len, &image, ctx->import_ud);
+    wy_error err = ctx->import_hook == WY_NULL ? WY_ERR_UNBOUND :
+        ctx->import_hook(ctx, path->str, len, &bytes, &bytes_len, &image, ctx->import_ud);
+    if (err == WY_ERR_UNBOUND && has_registered_children_(ctx, path->str, len)) { err = WY_ERR_NONE; }
     if (err != WY_ERR_NONE) { return err; }
     wy_module* dep = WY_NULL;
     if (image != WY_NULL) {
         /* Static image (builtin module table): zero-copy, nothing to free. */
         err = wy_module_load_image(ctx, image, &dep);
         if (err != WY_ERR_NONE) { return err; }
-    } else {
-        err = wy_module_load_bytes(ctx, bytes, len, true, &dep);
+    } else if (bytes != WY_NULL) {
+        err = wy_module_load_bytes(ctx, bytes, bytes_len, true, &dep);
         if (err != WY_ERR_NONE) { wy_context_gc_free(ctx, bytes); return err; }
+    } else {
+        err = namespace_module_(ctx, &dep);
+        if (err != WY_ERR_NONE) { return err; }
+    }
+    if (len != path->len) {
+        /* A prefix spelling: the module's own path is the leading part. */
+        err = wy_string_new(ctx, path->str, len, &path);
+        if (err != WY_ERR_NONE) { return err; }
     }
     dep->import_path = path;
     err = wy_context_intern(ctx, path->str, path->len, &dep->name);

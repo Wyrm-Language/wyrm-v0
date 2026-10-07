@@ -26,7 +26,6 @@
 #include "wyrm/compiler/module.c"
 #include "wyrm/compiler/statements.c"
 #include "wyrm/compiler/verify.c"
-#include "wyrm/compiler.c"
 #include "wyrm/tools/compile_source.c"
 #include "wyrm/tools/compiler_main.c"
 #include "wyrm/__init__.c"

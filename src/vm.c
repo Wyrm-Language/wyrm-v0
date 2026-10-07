@@ -884,13 +884,19 @@ reload:;
                 goto do_fault;
             }
             wy_string* path = mod->statics[a0].data.str;
+            /* A trailing "::" marks a package loaded on the way to one of its
+             * children (`import a::b::c` emits "a::", "a::b::", "a::b::c"):
+             * design/modules.md M1's pass-through. */
+            bool prefix = op != WY_OP_IMPORT_STAR && path->len > 2 &&
+                path->str[path->len - 1] == ':' && path->str[path->len - 2] == ':';
+            wy_uword path_len = prefix ? path->len - 2 : path->len;
             wy_module* dep = WY_NULL;
-            wy_error err = wy_link_import(ctx, path, &dep);
+            wy_error err = wy_link_import_ex(ctx, path, path_len, prefix, &dep);
             if (err != WY_ERR_NONE) {
                 char msg[WY_VM_CALL_FAULT_MSG];
                 snprintf(msg, sizeof(msg), "import %s: '%s' -> '%.*s' (error %d)",
                     err == WY_ERR_CYCLE ? "cycle" : "failed", mod->name ? mod->name : "<module>",
-                    (int) path->len, path->str, (int) err);
+                    (int) path_len, path->str, (int) err);
                 fault_v = fault_value_f(ctx, msg);
                 if (fault_v.type == WY_TYPE_TAG_ERROR) { ((wy_error_obj*) fault_v.data.gc_object)->code = err; }
                 goto do_fault;
@@ -911,11 +917,19 @@ reload:;
                     goto do_fault;
                 }
             }
+            if (dep->state == WY_MODULE_INITIALISING) {
+                /* Passed through (only a prefix gets here): bound so its
+                 * children are reachable, but none of its own members are
+                 * there to fill yet. */
+                *dst = wy_value_object(WY_TYPE_TAG_MODULE, (wy_object*) dep);
+                ip = next_ip;
+                break;
+            }
             if (dep->state == WY_MODULE_READY || dep->state == WY_MODULE_BUILTIN) {
                 if (star) { err = wy_link_fill_from_wildcard(ctx, mod, &mod->wildcards[wildcard_index]); }
                 else {
                     wy_symbol spelling;
-                    err = wy_context_intern(ctx, path->str, path->len, &spelling);
+                    err = wy_context_intern(ctx, path->str, path_len, &spelling);
                     if (err == WY_ERR_NONE) { err = wy_link_fill_from_import(ctx, mod, spelling, dep); }
                 }
                 if (err == WY_ERR_NONE) { err = wy_link_adopt_messages(ctx, mod, dep); }
@@ -2196,7 +2210,12 @@ do_return: {
             err = wy_link_fill_from_wildcard(ctx, importer, &importer->wildcards[fr->aux.data.uword]);
         } else {
             wy_symbol path;
-            err = wy_context_intern(ctx, fr->aux.data.str->str, fr->aux.data.str->len, &path);
+            const wy_string* spelling = fr->aux.data.str;
+            wy_uword spelling_len = spelling->len;
+            if (spelling_len > 2 && spelling->str[spelling_len - 1] == ':' && spelling->str[spelling_len - 2] == ':') {
+                spelling_len -= 2;  /* a prefix load (see WY_OP_IMPORT) */
+            }
+            err = wy_context_intern(ctx, spelling->str, spelling_len, &path);
             if (err == WY_ERR_NONE) { err = wy_link_fill_from_import(ctx, importer, path, mod); }
         }
         if (err == WY_ERR_NONE) { err = wy_link_adopt_messages(ctx, importer, mod); }
