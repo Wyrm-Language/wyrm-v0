@@ -26,21 +26,59 @@ static bool identical_(wy_value a, wy_value b)
     }
 }
 
-wy_error wy_link_fill(wy_context* ctx, wy_module* module, wy_uword slot,
-    wy_value value, wy_u8 layer, wy_symbol source)
+wy_value* wy_link_binding(wy_module* module, wy_uword slot)
+{
+    if (module->fill_layer != WY_NULL && module->aliases != WY_NULL &&
+        (module->fill_layer[slot] & WY_LINK_ALIAS) && module->aliases[slot] != WY_NULL) {
+        return module->aliases[slot];
+    }
+    return &module->globals[slot];
+}
+
+/* Two fills of one slot agree when they are the same binding, or when both
+ * hold the same module: a module binding names the module itself, so two
+ * wildcards that each pass on `std` are not ambiguous. */
+static bool same_binding_(const wy_value* a, wy_value a_value, const wy_value* b, wy_value b_value)
+{
+    if (a != WY_NULL && a == b) { return true; }
+    if (a_value.type == WY_TYPE_TAG_MODULE && b_value.type == WY_TYPE_TAG_MODULE) {
+        return a_value.data.gc_object == b_value.data.gc_object;
+    }
+    /* Plain values (builtins, a module reached as a whole path) keep the
+     * old rule: the same value from two sources is one thing. */
+    return a == WY_NULL && b == WY_NULL && identical_(a_value, b_value);
+}
+
+static wy_error fill_(wy_context* ctx, wy_module* module, wy_uword slot,
+    wy_value value, wy_value* binding, wy_u8 layer, wy_symbol source)
 {
     if (ctx == WY_NULL || module == WY_NULL || slot >= module->global_count ||
         layer < 1 || layer > 3) { return WY_ERR_INVAL; }
+    if (binding != WY_NULL && module->aliases == WY_NULL) {
+        /* No aliases table (a module that never imports): copy. */
+        value = *binding;
+        binding = WY_NULL;
+    }
     wy_u8 current = module->fill_layer[slot] & WY_LINK_LAYER_MASK;
     if (current == 0 || layer < current) {
-        module->globals[slot] = value;
-        module->fill_layer[slot] = layer;
+        if (binding != WY_NULL) {
+            module->aliases[slot] = binding;
+            module->globals[slot] = wy_value_unset();
+            module->fill_layer[slot] = (wy_u8) (layer | WY_LINK_ALIAS);
+        } else {
+            if (module->aliases != WY_NULL) { module->aliases[slot] = WY_NULL; }
+            module->globals[slot] = value;
+            module->fill_layer[slot] = layer;
+        }
         module->fill_source[slot] = source;
         return WY_ERR_NONE;
     }
-    if (layer > current || module->fill_source[slot] == source ||
-        identical_(module->globals[slot], value)) { return WY_ERR_NONE; }
+    if (layer > current || module->fill_source[slot] == source) { return WY_ERR_NONE; }
     if (module->fill_layer[slot] & WY_LINK_AMBIGUOUS) { return WY_ERR_NONE; }
+    wy_value* held = (module->fill_layer[slot] & WY_LINK_ALIAS) ? module->aliases[slot] : WY_NULL;
+    wy_value held_value = held != WY_NULL ? *held : module->globals[slot];
+    wy_value new_value = binding != WY_NULL ? *binding : value;
+    if (same_binding_(held, held_value, binding, new_value)) { return WY_ERR_NONE; }
 
     wy_symbol name = "<global>";
     for (wy_uword i = 0; i < module->free_names.capacity; i++) {
@@ -59,8 +97,22 @@ wy_error wy_link_fill(wy_context* ctx, wy_module* module, wy_uword slot,
     if (err != WY_ERR_NONE) { return err; }
     marker->code = WY_ERR_AMBIGUOUS;
     module->globals[slot] = wy_value_object(WY_TYPE_TAG_ERROR, (wy_object*) marker);
-    module->fill_layer[slot] |= WY_LINK_AMBIGUOUS;
+    if (module->aliases != WY_NULL) { module->aliases[slot] = WY_NULL; }
+    module->fill_layer[slot] = (wy_u8) ((module->fill_layer[slot] & WY_LINK_LAYER_MASK) | WY_LINK_AMBIGUOUS);
     return WY_ERR_NONE;
+}
+
+wy_error wy_link_fill(wy_context* ctx, wy_module* module, wy_uword slot,
+    wy_value value, wy_u8 layer, wy_symbol source)
+{
+    return fill_(ctx, module, slot, value, WY_NULL, layer, source);
+}
+
+wy_error wy_link_fill_binding(wy_context* ctx, wy_module* module, wy_uword slot,
+    wy_value* binding, wy_u8 layer, wy_symbol source)
+{
+    if (binding == WY_NULL) { return WY_ERR_INVAL; }
+    return fill_(ctx, module, slot, wy_value_unset(), binding, layer, source);
 }
 
 wy_error wy_link_scope_member(wy_value owner, wy_symbol name, wy_value** out)
@@ -88,7 +140,9 @@ wy_error wy_link_scope_member(wy_value owner, wy_symbol name, wy_value** out)
     if (module == WY_NULL) { return WY_ERR_UNBOUND; }
     wy_uword slot = wy_slot_dict_get(slots, name);
     if (slot == WY_SLOT_INVALID || slot >= module->global_count) { return WY_ERR_UNBOUND; }
-    *out = &module->globals[slot];
+    /* An exported name that is itself imported stands for the original
+     * binding (a re-export, design/modules.md M2). */
+    *out = wy_link_binding(module, slot);
     return WY_ERR_NONE;
 }
 
@@ -117,6 +171,7 @@ wy_error wy_link_fill_from_import(wy_context* ctx, wy_module* module, wy_symbol 
         const char* name = entry->symbol;
         if (name == WY_SYMBOL_INVALID || strncmp(name, path, len) != 0) { continue; }
         wy_value value = wy_value_object(WY_TYPE_TAG_MODULE, (wy_object*) dep);
+        wy_value* found = WY_NULL;  /* the member's binding; NULL for the module itself */
         if (name[len] != '\0') {
             if (name[len] != ':' || name[len + 1] != ':') { continue; }
             const char* step = name + len + 2;
@@ -128,13 +183,17 @@ wy_error wy_link_fill_from_import(wy_context* ctx, wy_module* module, wy_symbol 
                 if (err != WY_ERR_NONE) { return err; }
                 wy_value* binding;
                 if (wy_link_scope_member(value, symbol, &binding) != WY_ERR_NONE) { missing = true; break; }
+                found = binding;
                 value = *binding;
                 if (end == WY_NULL) { break; }
                 step = end + 2;
             }
             if (missing) { continue; }
         }
-        wy_error err = wy_link_fill(ctx, module, entry->slot, value, 1, path);
+        /* A member is its own binding, shared, not a copy (design/modules.md
+         * M2); only the module itself is a plain value. */
+        wy_error err = found != WY_NULL ? wy_link_fill_binding(ctx, module, entry->slot, found, 1, path) :
+            wy_link_fill(ctx, module, entry->slot, value, 1, path);
         if (err != WY_ERR_NONE) { return err; }
     }
     return WY_ERR_NONE;
@@ -153,7 +212,7 @@ wy_error wy_link_fill_from_wildcard(wy_context* ctx, wy_module* module, const wy
         if (excluded) { continue; }
         wy_value* value;
         if (wy_link_scope_member(wy_value_object(WY_TYPE_TAG_MODULE, (wy_object*) wildcard->target), entry->symbol, &value) != WY_ERR_NONE) { continue; }
-        wy_error err = wy_link_fill(ctx, module, entry->slot, *value, 2, wildcard->target->name);
+        wy_error err = wy_link_fill_binding(ctx, module, entry->slot, value, 2, wildcard->target->name);
         if (err != WY_ERR_NONE) { return err; }
     }
     return WY_ERR_NONE;

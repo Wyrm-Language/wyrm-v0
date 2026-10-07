@@ -164,13 +164,16 @@ static wy_error module_load_section_header_(wy_context* context, wy_module* modu
     module->globals = wy_context_gc_alloc(context, sizeof(wy_value) * module->global_count);
     module->fill_layer = wy_context_gc_alloc(context, sizeof(wy_u8) * module->global_count);
     module->fill_source = wy_context_gc_alloc(context, sizeof(wy_symbol) * module->global_count);
-    if (module->globals == WY_NULL || module->fill_layer == WY_NULL || module->fill_source == WY_NULL) {
+    module->aliases = wy_context_gc_alloc(context, sizeof(wy_value*) * module->global_count);
+    if (module->globals == WY_NULL || module->fill_layer == WY_NULL || module->fill_source == WY_NULL ||
+        module->aliases == WY_NULL) {
         return WY_ERR_NOMEM;
     }
     for (wy_uword i = 0; i < module->global_count; i++) {
         module->globals[i] = wy_value_unset();
         module->fill_layer[i] = 0;
         module->fill_source[i] = WY_NULL;
+        module->aliases[i] = WY_NULL;
     }
     return WY_ERR_NONE;
 }
@@ -945,6 +948,7 @@ static void finalize(wy_context* context, wy_object* self_s)
     free_table_(context, self, self->globals);
     free_table_(context, self, self->fill_layer);
     free_table_(context, self, self->fill_source);
+    free_table_(context, self, self->aliases);
     free_table_(context, self, self->statics);
     free_table_(context, self, self->symbols);
     for (wy_uword i = 0; i < self->wildcard_count; i++) {
@@ -1243,6 +1247,7 @@ wy_error wy_module_extend(wy_context* context, wy_module* module, const wy_modul
         module->globals[g] = wy_value_unset();
         module->fill_layer[g] = 0;
         module->fill_source[g] = WY_NULL;
+        module->aliases[g] = WY_NULL;
     }
     module->global_count = d.globals_after;
 

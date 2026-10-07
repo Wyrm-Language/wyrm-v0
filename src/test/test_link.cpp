@@ -198,6 +198,75 @@ TEST_SUITE("link") {
         CHECK_EQ(mod->fill_layer[0], 1);
     }
 
+    TEST_CASE("an imported name is the exporter's binding, not a copy (design/modules.md M2)") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        auto* mod = make_module_with_globals(ctx, 2);
+        REQUIRE_EQ(wy_context_set_root(ctx, mod), WY_ERR_NONE);
+        mod->aliases = static_cast<wy_value**>(wy_context_gc_alloc(ctx, 2 * sizeof(wy_value*)));
+        mod->aliases[0] = nullptr;
+        mod->aliases[1] = nullptr;
+        name_slot(ctx, &mod->free_names, "count", 0);
+        auto a = symbol(ctx, "a");
+        auto b = symbol(ctx, "b");
+        wy_value exporter_a = wy_value_word(1);
+        wy_value exporter_b = wy_value_word(1);
+
+        REQUIRE_EQ(wy_link_fill_binding(ctx, mod, 0, &exporter_a, 2, a), WY_ERR_NONE);
+        CHECK((mod->fill_layer[0] & WY_LINK_ALIAS) != 0);
+        CHECK_EQ(wy_link_binding(mod, 0), &exporter_a);
+        exporter_a = wy_value_word(5);  // the exporter assigns later; the importer sees it
+        // L0 <- count; own global 1 <- L0
+        const wy_u32 code[] = {enc1(WY_OP_GGET, 0, 0), enc1(WY_OP_GSET, 0, 1), enc1(WY_OP_RETURN, 0, 0)};
+        mod->code = code;
+        mod->code_len = std::size(code);
+        mod->init_nlocals = 1;
+        REQUIRE_EQ(wy_module_run_init(ctx, mod), WY_ERR_NONE);
+        CHECK_EQ(mod->globals[1].data.word, 5);
+
+        // The same binding reached through a second wildcard agrees ...
+        REQUIRE_EQ(wy_link_fill_binding(ctx, mod, 0, &exporter_a, 2, b), WY_ERR_NONE);
+        CHECK((mod->fill_layer[0] & WY_LINK_AMBIGUOUS) == 0);
+        // ... a different binding with an equal value does not.
+        REQUIRE_EQ(wy_link_fill_binding(ctx, mod, 0, &exporter_b, 2, b), WY_ERR_NONE);
+        CHECK((mod->fill_layer[0] & WY_LINK_AMBIGUOUS) != 0);
+    }
+
+    TEST_CASE("a store into an imported binding faults") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        auto* mod = make_module_with_globals(ctx, 1);
+        REQUIRE_EQ(wy_context_set_root(ctx, mod), WY_ERR_NONE);
+        mod->aliases = static_cast<wy_value**>(wy_context_gc_alloc(ctx, sizeof(wy_value*)));
+        mod->aliases[0] = nullptr;
+        name_slot(ctx, &mod->free_names, "count", 0);
+        wy_value exporter = wy_value_word(1);
+        REQUIRE_EQ(wy_link_fill_binding(ctx, mod, 0, &exporter, 1, symbol(ctx, "m")), WY_ERR_NONE);
+        const wy_u32 code[] = {enc1(WY_OP_LNIL, 0, 0), enc1(WY_OP_GSET, 0, 0), enc1(WY_OP_RETURN, 0, 0)};
+        mod->code = code;
+        mod->code_len = std::size(code);
+        mod->init_nlocals = 1;
+        CHECK_EQ(wy_module_run_init(ctx, mod), WY_ERR_FAULT);
+        CHECK_EQ(exporter.data.word, 1);
+    }
+
+    TEST_CASE("two module bindings holding the same module agree; no aliases table copies") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        auto* mod = make_module_with_globals(ctx, 1);
+        REQUIRE_EQ(wy_context_set_root(ctx, mod), WY_ERR_NONE);
+        name_slot(ctx, &mod->free_names, "std", 0);
+        auto* std_module = make_module_with_globals(ctx, 0);
+        wy_value left = wy_value_object(WY_TYPE_TAG_MODULE, (wy_object*) std_module);
+        wy_value right = left;
+        // No aliases table: the fill copies the value.
+        REQUIRE_EQ(wy_link_fill_binding(ctx, mod, 0, &left, 2, symbol(ctx, "left")), WY_ERR_NONE);
+        CHECK((mod->fill_layer[0] & WY_LINK_ALIAS) == 0);
+        CHECK_EQ(mod->globals[0].data.gc_object, (wy_object*) std_module);
+        REQUIRE_EQ(wy_link_fill_binding(ctx, mod, 0, &right, 2, symbol(ctx, "right")), WY_ERR_NONE);
+        CHECK((mod->fill_layer[0] & WY_LINK_AMBIGUOUS) == 0);
+    }
+
     TEST_CASE("two_module synthetic import runs dependency inline once and fills qualified names") {
         test_fiber_fixture fix;
         auto* ctx = fix.get_context_ptr();

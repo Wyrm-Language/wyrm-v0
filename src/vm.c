@@ -847,10 +847,14 @@ reload:;
         case WY_OP_GGET: case WY_OP_GGET_WIDE: {
             wy_uword dst = (op == WY_OP_GGET) ? f : a1;
             wy_value g = G[a0];
-            if (mod->fill_layer != WY_NULL && (mod->fill_layer[a0] & WY_LINK_AMBIGUOUS)) {
-                fr->ip = next_ip;
-                fault_v = g;
-                goto do_fault;
+            if (mod->fill_layer != WY_NULL && (mod->fill_layer[a0] & (WY_LINK_AMBIGUOUS | WY_LINK_ALIAS))) {
+                if (mod->fill_layer[a0] & WY_LINK_AMBIGUOUS) {
+                    fr->ip = next_ip;
+                    fault_v = g;
+                    goto do_fault;
+                }
+                /* An imported binding: the defining module's own global. */
+                g = *mod->aliases[a0];
             }
             if (wy_value_is_unset(g)) {
                 /* Only a free slot nothing filled is unbound (interp.py
@@ -871,6 +875,16 @@ reload:;
         }
         case WY_OP_GSET: case WY_OP_GSET_WIDE: {
             wy_uword src = (op == WY_OP_GSET) ? f : a1;
+            if (mod->fill_layer != WY_NULL && (mod->fill_layer[a0] & WY_LINK_ALIAS)) {
+                /* Only the defining module assigns its names (M2). */
+                fr->ip = next_ip;
+                wy_symbol name = free_slot_name_f(mod, a0);
+                char msg[WY_VM_CALL_FAULT_MSG];
+                snprintf(msg, sizeof(msg), "cannot assign to imported name '%s'",
+                    name != WY_SYMBOL_INVALID ? name : "<global>");
+                fault_v = fault_value_f(ctx, msg);
+                goto do_fault;
+            }
             G[a0] = *wy_vm_reg8_f(fr, (wy_u8) src);
             if (mod->fill_layer != WY_NULL) { mod->fill_layer[a0] &= WY_LINK_LAYER_MASK; }
             ip = next_ip;

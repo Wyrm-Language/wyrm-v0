@@ -1,0 +1,6 @@
+# The exporter: `bump` assigns its own `count`.
+count := 0
+
+fn bump():
+    count = count + 1
+    return count

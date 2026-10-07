@@ -68,10 +68,11 @@ wy_error wy_module_session_new(wy_context* context, const wy_session_config* con
     wy_value* globals = (wy_value*) reserve_(allocator, cap[WY_SESSION_GLOBALS], sizeof(wy_value));
     wy_u8* fill_layer = (wy_u8*) reserve_(allocator, cap[WY_SESSION_GLOBALS], sizeof(wy_u8));
     wy_symbol* fill_source = (wy_symbol*) reserve_(allocator, cap[WY_SESSION_GLOBALS], sizeof(wy_symbol));
+    wy_value** aliases = (wy_value**) reserve_(allocator, cap[WY_SESSION_GLOBALS], sizeof(wy_value*));
     wy_message_ref* messages = (wy_message_ref*) reserve_(allocator, cap[WY_SESSION_MESSAGES], sizeof(wy_message_ref));
 
     bool ok = session && code && functions && class_protos && classes && statics && symbols && globals
-        && fill_layer && fill_source && messages;
+        && fill_layer && fill_source && aliases && messages;
     wy_module* module = WY_NULL;
     if (ok) {
         module = wy_module_new_f(context);
@@ -88,6 +89,7 @@ wy_error wy_module_session_new(wy_context* context, const wy_session_config* con
         wy_allocator_free(allocator, globals);
         wy_allocator_free(allocator, fill_layer);
         wy_allocator_free(allocator, fill_source);
+        wy_allocator_free(allocator, aliases);
         wy_allocator_free(allocator, messages);
         return WY_ERR_NOMEM;
     }
@@ -111,6 +113,7 @@ wy_error wy_module_session_new(wy_context* context, const wy_session_config* con
     module->globals = globals;
     module->fill_layer = fill_layer;
     module->fill_source = fill_source;
+    module->aliases = aliases;
     module->global_count = 0;
     module->messages = messages;
     module->message_count = 0;

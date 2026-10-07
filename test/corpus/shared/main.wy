@@ -1,0 +1,11 @@
+# design/modules.md M2: an imported name is the exporter's binding, not a
+# copy. Every spelling below reads counter's own `count`, after `bump`
+# assigned it twice.
+import counter
+import counter::*
+import counter::(bump as step)
+
+bump()
+step()
+println(count)
+println(counter::count)

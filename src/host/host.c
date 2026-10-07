@@ -249,7 +249,7 @@ static bool export_fn_(wy_host* host, const char* name, wy_value* out)
     if (wy_context_intern(host->context, name, strlen(name), &sym) != WY_ERR_NONE) { return false; }
     wy_uword slot = wy_slot_dict_get(&host->compiler->exports, sym);
     if (slot == WY_SLOT_INVALID) { return false; }
-    *out = host->compiler->globals[slot];
+    *out = *wy_link_binding(host->compiler, slot);
     return out->type == WY_TYPE_TAG_FUNCTION;
 }
 
@@ -536,18 +536,18 @@ bool wy_host_has(wy_host* host, const char* name)
 {
     if (host == WY_NULL || !valid_name_(name)) { return false; }
     wy_uword slot = slot_of_(host, name);
-    return slot != WY_SLOT_INVALID && !wy_value_is_unset(host->session_module->globals[slot]);
+    return slot != WY_SLOT_INVALID && !wy_value_is_unset(*wy_link_binding(host->session_module, slot));
 }
 
 wy_error wy_host_get(wy_host* host, const char* name, wy_value* out)
 {
     if (host == WY_NULL || out == WY_NULL || !valid_name_(name)) { return WY_ERR_INVAL; }
     wy_uword slot = slot_of_(host, name);
-    if (slot == WY_SLOT_INVALID || wy_value_is_unset(host->session_module->globals[slot])) {
+    if (slot == WY_SLOT_INVALID || wy_value_is_unset(*wy_link_binding(host->session_module, slot))) {
         set_error_(host, "no variable named '%s'", name);
         return WY_ERR_UNBOUND;
     }
-    *out = host->session_module->globals[slot];
+    *out = *wy_link_binding(host->session_module, slot);
     return WY_ERR_NONE;
 }
 
@@ -570,6 +570,10 @@ wy_error wy_host_set(wy_host* host, const char* name, wy_value value)
         if (err == WY_ERR_NONE) { slot = slot_of_(host, name); }
     }
     if (err == WY_ERR_NONE && slot == WY_SLOT_INVALID) { err = WY_ERR_UNBOUND; }
+    if (err == WY_ERR_NONE && wy_link_binding(host->session_module, slot) != &host->session_module->globals[slot]) {
+        set_error_(host, "'%s' is imported; only the module that defines it assigns it", name);
+        err = WY_ERR_INVAL;
+    }
     if (err == WY_ERR_NONE) { host->session_module->globals[slot] = held; }
     wy_context_root_pop_f(host->context);
     return err;

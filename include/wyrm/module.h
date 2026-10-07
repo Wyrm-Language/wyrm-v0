@@ -152,6 +152,13 @@ struct wy_module
     wy_uword global_count;
     wy_u8* fill_layer;       /**< global_count entries: winning §7.2 layer; 0 = unfilled, high bit = ambiguity */
     wy_symbol* fill_source;  /**< global_count entries: winning source spelling, for ambiguity faults */
+    /**
+     * global_count entries, or NULL for a module that never imports (the
+     * builtins): where fill_layer has WY_LINK_ALIAS, the imported binding
+     * this slot *is* - the defining module's own global, never a copy of its
+     * value (project design/modules.md M2, Lisp semantics).
+     */
+    wy_value** aliases;
 
     wy_value* statics;
     wy_uword static_count;

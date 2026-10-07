@@ -6,14 +6,28 @@
 WY_BEGIN_DECLS
 
 /** Low bits are the winning layer; the high bit marks a deferred ambiguity
- * fault stored in globals[slot]. An ordinary error value has no marker. */
-enum { WY_LINK_AMBIGUOUS = 128, WY_LINK_LAYER_MASK = 127 };
+ * fault stored in globals[slot]. An ordinary error value has no marker.
+ * WY_LINK_ALIAS marks a slot that is an imported binding: reads follow
+ * module->aliases[slot], and a store faults (design/modules.md M2). */
+enum { WY_LINK_AMBIGUOUS = 128, WY_LINK_ALIAS = 64, WY_LINK_LAYER_MASK = 63 };
 
 /** Stronger (lower numbered) layer wins. Same-source/identical-value fills
  * are no-ops, including after ambiguity. Allocation errors return immediately;
  * ambiguity itself is deferred until the global is read. */
 wy_error wy_link_fill(wy_context* context, wy_module* module, wy_uword slot,
     wy_value value, wy_u8 layer, wy_symbol source);
+/** Fill `slot` with an imported binding rather than a value: the slot becomes
+ * an alias of `binding` (another module's global), so later assignments there
+ * are seen here. Falls back to copying `*binding` for a module with no
+ * aliases table. Same precedence and ambiguity rules as wy_link_fill; two
+ * fills agree when they reach the same binding, or the same module value. */
+wy_error wy_link_fill_binding(wy_context* context, wy_module* module, wy_uword slot,
+    wy_value* binding, wy_u8 layer, wy_symbol source);
+
+/** The binding a module's global slot stands for: the aliased global for an
+ * imported name, otherwise the slot itself. */
+wy_value* wy_link_binding(wy_module* module, wy_uword slot);
+
 wy_error wy_link_fill_from_builtins(wy_context* context, wy_module* module, wy_module* builtins);
 wy_error wy_link_fill_from_import(wy_context* context, wy_module* module, wy_symbol path, wy_module* dep);
 wy_error wy_link_fill_from_wildcard(wy_context* context, wy_module* module, const wy_wildcard* wildcard);
