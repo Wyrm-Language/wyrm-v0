@@ -1,0 +1,3 @@
+# design/modules.md M2: `m::x` must name something m exports.
+import std::io
+std::io::printline("never runs")

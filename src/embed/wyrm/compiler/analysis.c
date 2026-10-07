@@ -6,7 +6,7 @@
 static const uint8_t analysis_header[] = {
     0x2A, 0x00, 0x00, 0x00, 0x02, 0x6E, 0x00, 0x09, 0x00, 0x00, 0x00, 0x61,
     0x6E, 0x61, 0x6C, 0x79, 0x73, 0x69, 0x73, 0x00, 0x10, 0x76, 0x00, 0x01,
-    0x00, 0x00, 0x00, 0x10, 0x67, 0x00, 0x41, 0x00, 0x00, 0x00, 0x10, 0x6C,
+    0x00, 0x00, 0x00, 0x10, 0x67, 0x00, 0x4A, 0x00, 0x00, 0x00, 0x10, 0x6C,
     0x00, 0x13, 0x00, 0x00, 0x00, 0x00,
 };
 
@@ -522,7 +522,7 @@ static const uint8_t analysis_messages[] = {
 };
 
 static const uint8_t analysis_exports[] = {
-    0x0F, 0x04, 0x00, 0x00, 0x10, 0x73, 0x74, 0x64, 0x00, 0x00, 0x00, 0x00,
+    0x98, 0x04, 0x00, 0x00, 0x10, 0x73, 0x74, 0x64, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x10, 0x5F, 0x74, 0x61, 0x69, 0x6C, 0x00, 0x01, 0x00, 0x00, 0x00,
     0x10, 0x5F, 0x66, 0x69, 0x65, 0x6C, 0x64, 0x00, 0x02, 0x00, 0x00, 0x00,
     0x10, 0x5F, 0x62, 0x75, 0x69, 0x6C, 0x64, 0x5F, 0x73, 0x70, 0x65, 0x63,
@@ -608,17 +608,37 @@ static const uint8_t analysis_exports[] = {
     0x00, 0x00, 0x00, 0x10, 0x5F, 0x55, 0x4E, 0x4B, 0x4E, 0x4F, 0x57, 0x4E,
     0x5F, 0x53, 0x50, 0x45, 0x43, 0x00, 0x38, 0x00, 0x00, 0x00, 0x10, 0x49,
     0x4D, 0x50, 0x4C, 0x49, 0x43, 0x49, 0x54, 0x5F, 0x4E, 0x41, 0x4D, 0x45,
-    0x53, 0x00, 0x39, 0x00, 0x00, 0x00, 0x00,
+    0x53, 0x00, 0x39, 0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x64, 0x64, 0x72,
+    0x00, 0x3A, 0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x64, 0x72, 0x00, 0x3B,
+    0x00, 0x00, 0x00, 0x10, 0x63, 0x64, 0x64, 0x64, 0x72, 0x00, 0x3C, 0x00,
+    0x00, 0x00, 0x10, 0x63, 0x64, 0x64, 0x72, 0x00, 0x3D, 0x00, 0x00, 0x00,
+    0x10, 0x63, 0x68, 0x61, 0x69, 0x6E, 0x00, 0x3E, 0x00, 0x00, 0x00, 0x10,
+    0x66, 0x69, 0x65, 0x6C, 0x64, 0x00, 0x3F, 0x00, 0x00, 0x00, 0x10, 0x6C,
+    0x69, 0x73, 0x74, 0x5F, 0x68, 0x65, 0x61, 0x64, 0x00, 0x40, 0x00, 0x00,
+    0x00, 0x10, 0x6C, 0x69, 0x73, 0x74, 0x5F, 0x74, 0x61, 0x69, 0x6C, 0x00,
+    0x41, 0x00, 0x00, 0x00, 0x10, 0x70, 0x61, 0x69, 0x72, 0x5F, 0x61, 0x70,
+    0x70, 0x65, 0x6E, 0x64, 0x00, 0x42, 0x00, 0x00, 0x00, 0x10, 0x72, 0x65,
+    0x70, 0x6C, 0x61, 0x63, 0x65, 0x00, 0x43, 0x00, 0x00, 0x00, 0x10, 0x74,
+    0x6F, 0x5F, 0x6C, 0x69, 0x73, 0x74, 0x00, 0x44, 0x00, 0x00, 0x00, 0x00,
 };
 
 static const uint8_t analysis_free[] = {
-    0x49, 0x00, 0x00, 0x00, 0x10, 0x65, 0x72, 0x72, 0x6F, 0x72, 0x00, 0x3A,
-    0x00, 0x00, 0x00, 0x10, 0x63, 0x64, 0x72, 0x00, 0x3B, 0x00, 0x00, 0x00,
-    0x10, 0x63, 0x61, 0x72, 0x00, 0x3C, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x65,
-    0x6E, 0x00, 0x3D, 0x00, 0x00, 0x00, 0x10, 0x73, 0x74, 0x72, 0x00, 0x3E,
-    0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x64, 0x72, 0x00, 0x3F, 0x00, 0x00,
-    0x00, 0x10, 0x63, 0x68, 0x61, 0x69, 0x6E, 0x00, 0x40, 0x00, 0x00, 0x00,
-    0x00,
+    0xBD, 0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x64, 0x64, 0x72, 0x00, 0x3A,
+    0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x64, 0x72, 0x00, 0x3B, 0x00, 0x00,
+    0x00, 0x10, 0x63, 0x64, 0x64, 0x64, 0x72, 0x00, 0x3C, 0x00, 0x00, 0x00,
+    0x10, 0x63, 0x64, 0x64, 0x72, 0x00, 0x3D, 0x00, 0x00, 0x00, 0x10, 0x63,
+    0x68, 0x61, 0x69, 0x6E, 0x00, 0x3E, 0x00, 0x00, 0x00, 0x10, 0x66, 0x69,
+    0x65, 0x6C, 0x64, 0x00, 0x3F, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x69, 0x73,
+    0x74, 0x5F, 0x68, 0x65, 0x61, 0x64, 0x00, 0x40, 0x00, 0x00, 0x00, 0x10,
+    0x6C, 0x69, 0x73, 0x74, 0x5F, 0x74, 0x61, 0x69, 0x6C, 0x00, 0x41, 0x00,
+    0x00, 0x00, 0x10, 0x70, 0x61, 0x69, 0x72, 0x5F, 0x61, 0x70, 0x70, 0x65,
+    0x6E, 0x64, 0x00, 0x42, 0x00, 0x00, 0x00, 0x10, 0x72, 0x65, 0x70, 0x6C,
+    0x61, 0x63, 0x65, 0x00, 0x43, 0x00, 0x00, 0x00, 0x10, 0x74, 0x6F, 0x5F,
+    0x6C, 0x69, 0x73, 0x74, 0x00, 0x44, 0x00, 0x00, 0x00, 0x10, 0x65, 0x72,
+    0x72, 0x6F, 0x72, 0x00, 0x45, 0x00, 0x00, 0x00, 0x10, 0x63, 0x64, 0x72,
+    0x00, 0x46, 0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x72, 0x00, 0x47, 0x00,
+    0x00, 0x00, 0x10, 0x6C, 0x65, 0x6E, 0x00, 0x48, 0x00, 0x00, 0x00, 0x10,
+    0x73, 0x74, 0x72, 0x00, 0x49, 0x00, 0x00, 0x00, 0x00,
 };
 
 static const uint32_t analysis_code[] = {
@@ -793,11 +813,11 @@ static const uint32_t analysis_code[] = {
     0x00030097, 0x00000002,    /* 00E4  is L3 <- L0 is L2 */
     0x0004034A,                /* 00E6  not L4 <- L3 */
     0x0005044B,                /* 00E7  jf L4, +5 */
-    0x003A0242,                /* 00E8  gget L2 <- g58   (error) */
+    0x00450242,                /* 00E8  gget L2 <- g69   (error) */
     0x00030346,                /* 00E9  lconst L3 <- static#3   ("index out of range") */
     0x000201A0, 0x00010000,    /* 00EA  call base=L2 argc=1 nres=1 */
     0x00020102,                /* 00EC  return L2 count=1 */
-    0x003B0242,                /* 00ED  gget L2 <- g59   (cdr) */
+    0x00460242,                /* 00ED  gget L2 <- g70   (cdr) */
     0x00030041,                /* 00EE  move L3 <- L0 */
     0x000201A0, 0x00010000,    /* 00EF  call base=L2 argc=1 nres=1 */
     0x00000241,                /* 00F1  move L0 <- L2 */
@@ -814,7 +834,7 @@ static const uint32_t analysis_code[] = {
     0x00020097, 0x00000001,    /* 00FE  is L2 <- L0 is L1 */
     0x0001024B,                /* 0100  jf L2, +1 */
     0x00000102,                /* 0101  return L0 count=1 */
-    0x003C0142,                /* 0102  gget L1 <- g60   (car) */
+    0x00470142,                /* 0102  gget L1 <- g71   (car) */
     0x00020041,                /* 0103  move L2 <- L0 */
     0x000101A0, 0x00010000,    /* 0104  call base=L1 argc=1 nres=1 */
     0x00010102,                /* 0106  return L1 count=1 */
@@ -1293,20 +1313,20 @@ static const uint32_t analysis_code[] = {
     0x00030097, 0x80010002,    /* 03A1  is L3 <- P1 is L2 */
     0x001A034B,                /* 03A3  jf L3, +26 */
     0x00040342,                /* 03A4  gget L3 <- g4   (same_node) */
-    0x003C0442,                /* 03A5  gget L4 <- g60   (car) */
+    0x00470442,                /* 03A5  gget L4 <- g71   (car) */
     0x00058041,                /* 03A6  move L5 <- P0 */
     0x000401A0, 0x00010000,    /* 03A7  call base=L4 argc=1 nres=1 */
-    0x003C0542,                /* 03A9  gget L5 <- g60   (car) */
+    0x00470542,                /* 03A9  gget L5 <- g71   (car) */
     0x00068141,                /* 03AA  move L6 <- P1 */
     0x000501A0, 0x00010000,    /* 03AB  call base=L5 argc=1 nres=1 */
     0x000302A0, 0x00010000,    /* 03AD  call base=L3 argc=2 nres=1 */
     0x00020341,                /* 03AF  move L2 <- L3 */
     0x000C024B,                /* 03B0  jf L2, +12 */
     0x00040342,                /* 03B1  gget L3 <- g4   (same_node) */
-    0x003B0442,                /* 03B2  gget L4 <- g59   (cdr) */
+    0x00460442,                /* 03B2  gget L4 <- g70   (cdr) */
     0x00058041,                /* 03B3  move L5 <- P0 */
     0x000401A0, 0x00010000,    /* 03B4  call base=L4 argc=1 nres=1 */
-    0x003B0542,                /* 03B6  gget L5 <- g59   (cdr) */
+    0x00460542,                /* 03B6  gget L5 <- g70   (cdr) */
     0x00068141,                /* 03B7  move L6 <- P1 */
     0x000501A0, 0x00010000,    /* 03B8  call base=L5 argc=1 nres=1 */
     0x000302A0, 0x00010000,    /* 03BA  call base=L3 argc=2 nres=1 */
@@ -1325,10 +1345,10 @@ static const uint32_t analysis_code[] = {
     0x002C0246,                /* 03CA  lconst L2 <- static#44   ("list") */
     0x00030097, 0x80010002,    /* 03CB  is L3 <- P1 is L2 */
     0x0027034B,                /* 03CD  jf L3, +39 */
-    0x003D0242,                /* 03CE  gget L2 <- g61   (len) */
+    0x00480242,                /* 03CE  gget L2 <- g72   (len) */
     0x00038041,                /* 03CF  move L3 <- P0 */
     0x000201A0, 0x00010000,    /* 03D0  call base=L2 argc=1 nres=1 */
-    0x003D0342,                /* 03D2  gget L3 <- g61   (len) */
+    0x00480342,                /* 03D2  gget L3 <- g72   (len) */
     0x00048141,                /* 03D3  move L4 <- P1 */
     0x000301A0, 0x00010000,    /* 03D4  call base=L3 argc=1 nres=1 */
     0x00040090, 0x00020003,    /* 03D6  ne L4 <- L2 != L3 */
@@ -1336,7 +1356,7 @@ static const uint32_t analysis_code[] = {
     0x00020004,                /* 03D9  lbool L2 <- 0 */
     0x00020102,                /* 03DA  return L2 count=1 */
     0x00000040,                /* 03DB  i8 L0 <- 0 */
-    0x003D0242,                /* 03DC  gget L2 <- g61   (len) */
+    0x00480242,                /* 03DC  gget L2 <- g72   (len) */
     0x00038041,                /* 03DD  move L3 <- P0 */
     0x000201A0, 0x00010000,    /* 03DE  call base=L2 argc=1 nres=1 */
     0x00010241,                /* 03E0  move L1 <- L2 */
@@ -1417,7 +1437,7 @@ static const uint32_t analysis_code[] = {
     0x0002024B,                /* 0443  jf L2, +2 */
     0x00000004,                /* 0444  lbool L0 <- 0 */
     0x00000102,                /* 0445  return L0 count=1 */
-    0x003E0042,                /* 0446  gget L0 <- g62   (str) */
+    0x00490042,                /* 0446  gget L0 <- g73   (str) */
     0x00018041,                /* 0447  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 0448  call base=L0 argc=1 nres=1 */
     0x00370142,                /* 044A  gget L1 <- g55   (SPECS) */
@@ -1437,7 +1457,7 @@ static const uint32_t analysis_code[] = {
     0x00020146,                /* 045B  lconst L1 <- static#2   ("pair") */
     0x00020097, 0x80000001,    /* 045C  is L2 <- P0 is L1 */
     0x000A024B,                /* 045E  jf L2, +10 */
-    0x003C0142,                /* 045F  gget L1 <- g60   (car) */
+    0x00470142,                /* 045F  gget L1 <- g71   (car) */
     0x00028041,                /* 0460  move L2 <- P0 */
     0x000101A0, 0x00010000,    /* 0461  call base=L1 argc=1 nres=1 */
     0x00000141,                /* 0463  move L0 <- L1 */
@@ -1478,13 +1498,13 @@ static const uint32_t analysis_code[] = {
     0x00048041,                /* 048D  move L4 <- P0 */
     0x000301A2, 0x00000001,    /* 048E  msg base=L3 argc=1 msg#0 nres=1   (append) */
     0x00000102,                /* 0490  return L0 count=1 */
-    0x003C0342,                /* 0491  gget L3 <- g60   (car) */
+    0x00470342,                /* 0491  gget L3 <- g71   (car) */
     0x00048041,                /* 0492  move L4 <- P0 */
     0x000301A0, 0x00010000,    /* 0493  call base=L3 argc=1 nres=1 */
     0x000C0445,                /* 0495  lsym L4 <- sym#12   ("do") */
     0x0005008F, 0x00030004,    /* 0496  eq L5 <- L3 == L4 */
     0x0017054B,                /* 0498  jf L5, +23 */
-    0x003B0342,                /* 0499  gget L3 <- g59   (cdr) */
+    0x00460342,                /* 0499  gget L3 <- g70   (cdr) */
     0x00048041,                /* 049A  move L4 <- P0 */
     0x000301A0, 0x00010000,    /* 049B  call base=L3 argc=1 nres=1 */
     0x00020341,                /* 049D  move L2 <- L3 */
@@ -1492,18 +1512,18 @@ static const uint32_t analysis_code[] = {
     0x00040097, 0x00020003,    /* 049F  is L4 <- L2 is L3 */
     0x000D044B,                /* 04A1  jf L4, +13 */
     0x00030041,                /* 04A2  move L3 <- L0 */
-    0x003C0442,                /* 04A3  gget L4 <- g60   (car) */
+    0x00470442,                /* 04A3  gget L4 <- g71   (car) */
     0x00050241,                /* 04A4  move L5 <- L2 */
     0x000401A0, 0x00010000,    /* 04A5  call base=L4 argc=1 nres=1 */
     0x000301A2, 0x00000001,    /* 04A7  msg base=L3 argc=1 msg#0 nres=1   (append) */
-    0x003B0342,                /* 04A9  gget L3 <- g59   (cdr) */
+    0x00460342,                /* 04A9  gget L3 <- g70   (cdr) */
     0x00040241,                /* 04AA  move L4 <- L2 */
     0x000301A0, 0x00010000,    /* 04AB  call base=L3 argc=1 nres=1 */
     0x00020341,                /* 04AD  move L2 <- L3 */
     0xFFEF004F,                /* 04AE  jmp -17 */
     0x00000102,                /* 04AF  return L0 count=1 */
     0x00090342,                /* 04B0  gget L3 <- g9   (is_known_kind) */
-    0x003C0442,                /* 04B1  gget L4 <- g60   (car) */
+    0x00470442,                /* 04B1  gget L4 <- g71   (car) */
     0x00058041,                /* 04B2  move L5 <- P0 */
     0x000401A0, 0x00010000,    /* 04B3  call base=L4 argc=1 nres=1 */
     0x000301A0, 0x00010000,    /* 04B5  call base=L3 argc=1 nres=1 */
@@ -1517,18 +1537,18 @@ static const uint32_t analysis_code[] = {
     0x00040097, 0x00010003,    /* 04BF  is L4 <- L1 is L3 */
     0x000D044B,                /* 04C1  jf L4, +13 */
     0x00030041,                /* 04C2  move L3 <- L0 */
-    0x003C0442,                /* 04C3  gget L4 <- g60   (car) */
+    0x00470442,                /* 04C3  gget L4 <- g71   (car) */
     0x00050141,                /* 04C4  move L5 <- L1 */
     0x000401A0, 0x00010000,    /* 04C5  call base=L4 argc=1 nres=1 */
     0x000301A2, 0x00000001,    /* 04C7  msg base=L3 argc=1 msg#0 nres=1   (append) */
-    0x003B0342,                /* 04C9  gget L3 <- g59   (cdr) */
+    0x00460342,                /* 04C9  gget L3 <- g70   (cdr) */
     0x00040141,                /* 04CA  move L4 <- L1 */
     0x000301A0, 0x00010000,    /* 04CB  call base=L3 argc=1 nres=1 */
     0x00010341,                /* 04CD  move L1 <- L3 */
     0xFFEF004F,                /* 04CE  jmp -17 */
     0x00000102,                /* 04CF  return L0 count=1 */
     0x00370142,                /* 04D0  gget L1 <- g55   (SPECS) */
-    0x003E0242,                /* 04D1  gget L2 <- g62   (str) */
+    0x00490242,                /* 04D1  gget L2 <- g73   (str) */
     0x00038041,                /* 04D2  move L3 <- P0 */
     0x000201A0, 0x00010000,    /* 04D3  call base=L2 argc=1 nres=1 */
     0x00000098, 0x00010002,    /* 04D5  getidx L0 <- L1[L2] */
@@ -1545,11 +1565,11 @@ static const uint32_t analysis_code[] = {
     0x00020097, 0x00000001,    /* 04E2  is L2 <- L0 is L1 */
     0x000D024B,                /* 04E4  jf L2, +13 */
     0x00018041,                /* 04E5  move L1 <- P0 */
-    0x003C0242,                /* 04E6  gget L2 <- g60   (car) */
+    0x00470242,                /* 04E6  gget L2 <- g71   (car) */
     0x00030041,                /* 04E7  move L3 <- L0 */
     0x000201A0, 0x00010000,    /* 04E8  call base=L2 argc=1 nres=1 */
     0x000101A2, 0x00000001,    /* 04EA  msg base=L1 argc=1 msg#0 nres=1   (append) */
-    0x003B0142,                /* 04EC  gget L1 <- g59   (cdr) */
+    0x00460142,                /* 04EC  gget L1 <- g70   (cdr) */
     0x00020041,                /* 04ED  move L2 <- L0 */
     0x000101A0, 0x00010000,    /* 04EE  call base=L1 argc=1 nres=1 */
     0x00000141,                /* 04F0  move L0 <- L1 */
@@ -1583,7 +1603,7 @@ static const uint32_t analysis_code[] = {
     0x001E1D4A,                /* 0514  not L30 <- L29 */
     0x00011E4B,                /* 0515  jf L30, +1 */
     0x00000102,                /* 0516  return L0 count=1 */
-    0x003C1C42,                /* 0517  gget L28 <- g60   (car) */
+    0x00471C42,                /* 0517  gget L28 <- g71   (car) */
     0x001D8041,                /* 0518  move L29 <- P0 */
     0x001C01A0, 0x00010000,    /* 0519  call base=L28 argc=1 nres=1 */
     0x00011C41,                /* 051B  move L1 <- L28 */
@@ -1636,7 +1656,7 @@ static const uint32_t analysis_code[] = {
     0x001D0097, 0x0003001C,    /* 0558  is L29 <- L3 is L28 */
     0x00191D4B,                /* 055A  jf L29, +25 */
     0x00241C42,                /* 055B  gget L28 <- g36   (param_parts) */
-    0x003C1D42,                /* 055C  gget L29 <- g60   (car) */
+    0x00471D42,                /* 055C  gget L29 <- g71   (car) */
     0x001E0341,                /* 055D  move L30 <- L3 */
     0x001D01A0, 0x00010000,    /* 055E  call base=L29 argc=1 nres=1 */
     0x001C01A0, 0x00010000,    /* 0560  call base=L28 argc=1 nres=1 */
@@ -1649,7 +1669,7 @@ static const uint32_t analysis_code[] = {
     0x001C0041,                /* 056A  move L28 <- L0 */
     0x001D0441,                /* 056B  move L29 <- L4 */
     0x001C01A2, 0x00000001,    /* 056C  msg base=L28 argc=1 msg#0 nres=1   (append) */
-    0x003B1C42,                /* 056E  gget L28 <- g59   (cdr) */
+    0x00461C42,                /* 056E  gget L28 <- g70   (cdr) */
     0x001D0341,                /* 056F  move L29 <- L3 */
     0x001C01A0, 0x00010000,    /* 0570  call base=L28 argc=1 nres=1 */
     0x00031C41,                /* 0572  move L3 <- L28 */
@@ -1754,7 +1774,7 @@ static const uint32_t analysis_code[] = {
     0x00021E46,                /* 05F1  lconst L30 <- static#2   ("pair") */
     0x001F0097, 0x0010001E,    /* 05F2  is L31 <- L16 is L30 */
     0x00261F4B,                /* 05F4  jf L31, +38 */
-    0x003C1E42,                /* 05F5  gget L30 <- g60   (car) */
+    0x00471E42,                /* 05F5  gget L30 <- g71   (car) */
     0x001F1041,                /* 05F6  move L31 <- L16 */
     0x001E01A0, 0x00010000,    /* 05F7  call base=L30 argc=1 nres=1 */
     0x00111E41,                /* 05F9  move L17 <- L30 */
@@ -1762,11 +1782,11 @@ static const uint32_t analysis_code[] = {
     0x001F0097, 0x0011001E,    /* 05FB  is L31 <- L17 is L30 */
     0x00171F4B,                /* 05FD  jf L31, +23 */
     0x001E0041,                /* 05FE  move L30 <- L0 */
-    0x003C1F42,                /* 05FF  gget L31 <- g60   (car) */
+    0x00471F42,                /* 05FF  gget L31 <- g71   (car) */
     0x00201141,                /* 0600  move L32 <- L17 */
     0x001F01A0, 0x00010000,    /* 0601  call base=L31 argc=1 nres=1 */
     0x001E01A2, 0x00000001,    /* 0603  msg base=L30 argc=1 msg#0 nres=1   (append) */
-    0x003B1E42,                /* 0605  gget L30 <- g59   (cdr) */
+    0x00461E42,                /* 0605  gget L30 <- g70   (cdr) */
     0x001F1141,                /* 0606  move L31 <- L17 */
     0x001E01A0, 0x00010000,    /* 0607  call base=L30 argc=1 nres=1 */
     0x00121E41,                /* 0609  move L18 <- L30 */
@@ -1774,11 +1794,11 @@ static const uint32_t analysis_code[] = {
     0x001F0097, 0x0012001E,    /* 060B  is L31 <- L18 is L30 */
     0x00071F4B,                /* 060D  jf L31, +7 */
     0x001E0041,                /* 060E  move L30 <- L0 */
-    0x003C1F42,                /* 060F  gget L31 <- g60   (car) */
+    0x00471F42,                /* 060F  gget L31 <- g71   (car) */
     0x00201241,                /* 0610  move L32 <- L18 */
     0x001F01A0, 0x00010000,    /* 0611  call base=L31 argc=1 nres=1 */
     0x001E01A2, 0x00000001,    /* 0613  msg base=L30 argc=1 msg#0 nres=1   (append) */
-    0x003B1E42,                /* 0615  gget L30 <- g59   (cdr) */
+    0x00461E42,                /* 0615  gget L30 <- g70   (cdr) */
     0x001F1041,                /* 0616  move L31 <- L16 */
     0x001E01A0, 0x00010000,    /* 0617  call base=L30 argc=1 nres=1 */
     0x00101E41,                /* 0619  move L16 <- L30 */
@@ -1798,14 +1818,14 @@ static const uint32_t analysis_code[] = {
     0x00021E46,                /* 0629  lconst L30 <- static#2   ("pair") */
     0x001F0097, 0x0014001E,    /* 062A  is L31 <- L20 is L30 */
     0x00321F4B,                /* 062C  jf L31, +50 */
-    0x003C1E42,                /* 062D  gget L30 <- g60   (car) */
+    0x00471E42,                /* 062D  gget L30 <- g71   (car) */
     0x001F1441,                /* 062E  move L31 <- L20 */
     0x001E01A0, 0x00010000,    /* 062F  call base=L30 argc=1 nres=1 */
     0x00151E41,                /* 0631  move L21 <- L30 */
     0x00021E46,                /* 0632  lconst L30 <- static#2   ("pair") */
     0x001F0097, 0x0015001E,    /* 0633  is L31 <- L21 is L30 */
     0x00231F4B,                /* 0635  jf L31, +35 */
-    0x003C1E42,                /* 0636  gget L30 <- g60   (car) */
+    0x00471E42,                /* 0636  gget L30 <- g71   (car) */
     0x001F1541,                /* 0637  move L31 <- L21 */
     0x001E01A0, 0x00010000,    /* 0638  call base=L30 argc=1 nres=1 */
     0x001B1F46,                /* 063A  lconst L31 <- static#27   ("nil") */
@@ -1813,12 +1833,12 @@ static const uint32_t analysis_code[] = {
     0x0021204A,                /* 063D  not L33 <- L32 */
     0x0007214B,                /* 063E  jf L33, +7 */
     0x001E0041,                /* 063F  move L30 <- L0 */
-    0x003C1F42,                /* 0640  gget L31 <- g60   (car) */
+    0x00471F42,                /* 0640  gget L31 <- g71   (car) */
     0x00201541,                /* 0641  move L32 <- L21 */
     0x001F01A0, 0x00010000,    /* 0642  call base=L31 argc=1 nres=1 */
     0x001E01A2, 0x00000001,    /* 0644  msg base=L30 argc=1 msg#0 nres=1   (append) */
     0x000C1E42,                /* 0646  gget L30 <- g12   (body_statements) */
-    0x003F2042,                /* 0647  gget L32 <- g63   (cadr) */
+    0x003B2042,                /* 0647  gget L32 <- g59   (cadr) */
     0x00211541,                /* 0648  move L33 <- L21 */
     0x002001A0, 0x00010000,    /* 0649  call base=L32 argc=1 nres=1 */
     0x001F2041,                /* 064B  move L31 <- L32 */
@@ -1831,7 +1851,7 @@ static const uint32_t analysis_code[] = {
     0x00211641,                /* 0655  move L33 <- L22 */
     0x002001A2, 0x00000001,    /* 0656  msg base=L32 argc=1 msg#0 nres=1   (append) */
     0xFFF9004F,                /* 0658  jmp -7 */
-    0x003B1E42,                /* 0659  gget L30 <- g59   (cdr) */
+    0x00461E42,                /* 0659  gget L30 <- g70   (cdr) */
     0x001F1441,                /* 065A  move L31 <- L20 */
     0x001E01A0, 0x00010000,    /* 065B  call base=L30 argc=1 nres=1 */
     0x00141E41,                /* 065D  move L20 <- L30 */
@@ -1857,7 +1877,7 @@ static const uint32_t analysis_code[] = {
     0x00010003,                /* 0675  lnil L1 */
     0x00010102,                /* 0676  return L1 count=1 */
     0x00110142,                /* 0677  gget L1 <- g17   (is_scope_boundary) */
-    0x003C0242,                /* 0678  gget L2 <- g60   (car) */
+    0x00470242,                /* 0678  gget L2 <- g71   (car) */
     0x00038041,                /* 0679  move L3 <- P0 */
     0x000201A0, 0x00010000,    /* 067A  call base=L2 argc=1 nres=1 */
     0x000101A0, 0x00010000,    /* 067C  call base=L1 argc=1 nres=1 */
@@ -1970,7 +1990,7 @@ static const uint32_t analysis_code[] = {
     0x00020846,                /* 0709  lconst L8 <- static#2   ("pair") */
     0x00090097, 0x00040008,    /* 070A  is L9 <- L4 is L8 */
     0x0019094B,                /* 070C  jf L9, +25 */
-    0x003C0842,                /* 070D  gget L8 <- g60   (car) */
+    0x00470842,                /* 070D  gget L8 <- g71   (car) */
     0x00090441,                /* 070E  move L9 <- L4 */
     0x000801A0, 0x00010000,    /* 070F  call base=L8 argc=1 nres=1 */
     0x00060841,                /* 0711  move L6 <- L8 */
@@ -1978,14 +1998,14 @@ static const uint32_t analysis_code[] = {
     0x00090097, 0x00060008,    /* 0713  is L9 <- L6 is L8 */
     0x000A094B,                /* 0715  jf L9, +10 */
     0x00080041,                /* 0716  move L8 <- L0 */
-    0x003F0A42,                /* 0717  gget L10 <- g63   (cadr) */
+    0x003B0A42,                /* 0717  gget L10 <- g59   (cadr) */
     0x000B0641,                /* 0718  move L11 <- L6 */
     0x000A01A0, 0x00010000,    /* 0719  call base=L10 argc=1 nres=1 */
     0x00090A41,                /* 071B  move L9 <- L10 */
     0x0001094E,                /* 071C  jnerr L9, +1 */
     0x00090003,                /* 071D  lnil L9 */
     0x000801A2, 0x00000001,    /* 071E  msg base=L8 argc=1 msg#0 nres=1   (append) */
-    0x003B0842,                /* 0720  gget L8 <- g59   (cdr) */
+    0x00460842,                /* 0720  gget L8 <- g70   (cdr) */
     0x00090441,                /* 0721  move L9 <- L4 */
     0x000801A0, 0x00010000,    /* 0722  call base=L8 argc=1 nres=1 */
     0x00040841,                /* 0724  move L4 <- L8 */
@@ -2102,14 +2122,14 @@ static const uint32_t analysis_code[] = {
     0x00020B46,                /* 07AD  lconst L11 <- static#2   ("pair") */
     0x000C0097, 0x0006000B,    /* 07AE  is L12 <- L6 is L11 */
     0x00320C4B,                /* 07B0  jf L12, +50 */
-    0x003C0B42,                /* 07B1  gget L11 <- g60   (car) */
+    0x00470B42,                /* 07B1  gget L11 <- g71   (car) */
     0x000C0641,                /* 07B2  move L12 <- L6 */
     0x000B01A0, 0x00010000,    /* 07B3  call base=L11 argc=1 nres=1 */
     0x00070B41,                /* 07B5  move L7 <- L11 */
     0x00020B46,                /* 07B6  lconst L11 <- static#2   ("pair") */
     0x000C0097, 0x0007000B,    /* 07B7  is L12 <- L7 is L11 */
     0x00230C4B,                /* 07B9  jf L12, +35 */
-    0x003C0B42,                /* 07BA  gget L11 <- g60   (car) */
+    0x00470B42,                /* 07BA  gget L11 <- g71   (car) */
     0x000C0741,                /* 07BB  move L12 <- L7 */
     0x000B01A0, 0x00010000,    /* 07BC  call base=L11 argc=1 nres=1 */
     0x001B0C46,                /* 07BE  lconst L12 <- static#27   ("nil") */
@@ -2117,12 +2137,12 @@ static const uint32_t analysis_code[] = {
     0x000E0D4A,                /* 07C1  not L14 <- L13 */
     0x00070E4B,                /* 07C2  jf L14, +7 */
     0x000B0141,                /* 07C3  move L11 <- L1 */
-    0x003C0C42,                /* 07C4  gget L12 <- g60   (car) */
+    0x00470C42,                /* 07C4  gget L12 <- g71   (car) */
     0x000D0741,                /* 07C5  move L13 <- L7 */
     0x000C01A0, 0x00010000,    /* 07C6  call base=L12 argc=1 nres=1 */
     0x000B01A2, 0x00000001,    /* 07C8  msg base=L11 argc=1 msg#0 nres=1   (append) */
     0x000C0B42,                /* 07CA  gget L11 <- g12   (body_statements) */
-    0x003F0D42,                /* 07CB  gget L13 <- g63   (cadr) */
+    0x003B0D42,                /* 07CB  gget L13 <- g59   (cadr) */
     0x000E0741,                /* 07CC  move L14 <- L7 */
     0x000D01A0, 0x00010000,    /* 07CD  call base=L13 argc=1 nres=1 */
     0x000C0D41,                /* 07CF  move L12 <- L13 */
@@ -2135,7 +2155,7 @@ static const uint32_t analysis_code[] = {
     0x000E0841,                /* 07D9  move L14 <- L8 */
     0x000D01A2, 0x00000001,    /* 07DA  msg base=L13 argc=1 msg#0 nres=1   (append) */
     0xFFF9004F,                /* 07DC  jmp -7 */
-    0x003B0B42,                /* 07DD  gget L11 <- g59   (cdr) */
+    0x00460B42,                /* 07DD  gget L11 <- g70   (cdr) */
     0x000C0641,                /* 07DE  move L12 <- L6 */
     0x000B01A0, 0x00010000,    /* 07DF  call base=L11 argc=1 nres=1 */
     0x00060B41,                /* 07E1  move L6 <- L11 */
@@ -2187,7 +2207,7 @@ static const uint32_t analysis_code[] = {
     0x00010003,                /* 0819  lnil L1 */
     0x00010102,                /* 081A  return L1 count=1 */
     0x00110142,                /* 081B  gget L1 <- g17   (is_scope_boundary) */
-    0x003C0242,                /* 081C  gget L2 <- g60   (car) */
+    0x00470242,                /* 081C  gget L2 <- g71   (car) */
     0x00038041,                /* 081D  move L3 <- P0 */
     0x000201A0, 0x00010000,    /* 081E  call base=L2 argc=1 nres=1 */
     0x000101A0, 0x00010000,    /* 0820  call base=L1 argc=1 nres=1 */
@@ -2269,7 +2289,7 @@ static const uint32_t analysis_code[] = {
     0x00020546,                /* 087E  lconst L5 <- static#2   ("pair") */
     0x00060097, 0x00020005,    /* 087F  is L6 <- L2 is L5 */
     0x001D064B,                /* 0881  jf L6, +29 */
-    0x003C0542,                /* 0882  gget L5 <- g60   (car) */
+    0x00470542,                /* 0882  gget L5 <- g71   (car) */
     0x00060241,                /* 0883  move L6 <- L2 */
     0x000501A0, 0x00010000,    /* 0884  call base=L5 argc=1 nres=1 */
     0x00030541,                /* 0886  move L3 <- L5 */
@@ -2278,7 +2298,7 @@ static const uint32_t analysis_code[] = {
     0x0009064B,                /* 088A  jf L6, +9 */
     0x00050542,                /* 088B  gget L5 <- g5   (note_name) */
     0x00068141,                /* 088C  move L6 <- P1 */
-    0x003C0742,                /* 088D  gget L7 <- g60   (car) */
+    0x00470742,                /* 088D  gget L7 <- g71   (car) */
     0x00080341,                /* 088E  move L8 <- L3 */
     0x000701A0, 0x00010000,    /* 088F  call base=L7 argc=1 nres=1 */
     0x000502A0, 0x00010000,    /* 0891  call base=L5 argc=2 nres=1 */
@@ -2287,7 +2307,7 @@ static const uint32_t analysis_code[] = {
     0x00068141,                /* 0895  move L6 <- P1 */
     0x00070341,                /* 0896  move L7 <- L3 */
     0x000502A0, 0x00010000,    /* 0897  call base=L5 argc=2 nres=1 */
-    0x003B0542,                /* 0899  gget L5 <- g59   (cdr) */
+    0x00460542,                /* 0899  gget L5 <- g70   (cdr) */
     0x00060241,                /* 089A  move L6 <- L2 */
     0x000501A0, 0x00010000,    /* 089B  call base=L5 argc=1 nres=1 */
     0x00020541,                /* 089D  move L2 <- L5 */
@@ -2441,35 +2461,35 @@ static const uint32_t analysis_code[] = {
     0xFFA1004F,                /* 0961  jmp -95 */
     0xFF98004F,                /* 0962  jmp -104 */
     0x00000102,                /* 0963  return L0 count=1 */
-    0x003B0642,                /* 0964  gget L6 <- g59   (cdr) */
+    0x00460642,                /* 0964  gget L6 <- g70   (cdr) */
     0x00078041,                /* 0965  move L7 <- P0 */
     0x000601A0, 0x00010000,    /* 0966  call base=L6 argc=1 nres=1 */
     0x00000641,                /* 0968  move L0 <- L6 */
-    0x003C0642,                /* 0969  gget L6 <- g60   (car) */
+    0x00470642,                /* 0969  gget L6 <- g71   (car) */
     0x00070041,                /* 096A  move L7 <- L0 */
     0x000601A0, 0x00010000,    /* 096B  call base=L6 argc=1 nres=1 */
     0x00010641,                /* 096D  move L1 <- L6 */
     0x00020082, 0x00060000,    /* 096E  list L2 <- L6, 0 items */
     0x00030003,                /* 0970  lnil L3 */
-    0x003B0642,                /* 0971  gget L6 <- g59   (cdr) */
+    0x00460642,                /* 0971  gget L6 <- g70   (cdr) */
     0x00070041,                /* 0972  move L7 <- L0 */
     0x000601A0, 0x00010000,    /* 0973  call base=L6 argc=1 nres=1 */
     0x00040641,                /* 0975  move L4 <- L6 */
     0x00020646,                /* 0976  lconst L6 <- static#2   ("pair") */
     0x00070097, 0x00040006,    /* 0977  is L7 <- L4 is L6 */
     0x0020074B,                /* 0979  jf L7, +32 */
-    0x003C0642,                /* 097A  gget L6 <- g60   (car) */
+    0x00470642,                /* 097A  gget L6 <- g71   (car) */
     0x00070441,                /* 097B  move L7 <- L4 */
     0x000601A0, 0x00010000,    /* 097C  call base=L6 argc=1 nres=1 */
     0x00050641,                /* 097E  move L5 <- L6 */
-    0x003C0642,                /* 097F  gget L6 <- g60   (car) */
+    0x00470642,                /* 097F  gget L6 <- g71   (car) */
     0x00070541,                /* 0980  move L7 <- L5 */
     0x000601A0, 0x00010000,    /* 0981  call base=L6 argc=1 nres=1 */
     0x00110745,                /* 0983  lsym L7 <- sym#17   ("else") */
     0x0008008F, 0x00060007,    /* 0984  eq L8 <- L6 == L7 */
     0x0009084B,                /* 0986  jf L8, +9 */
-    0x003C0642,                /* 0987  gget L6 <- g60   (car) */
-    0x003B0742,                /* 0988  gget L7 <- g59   (cdr) */
+    0x00470642,                /* 0987  gget L6 <- g71   (car) */
+    0x00460742,                /* 0988  gget L7 <- g70   (cdr) */
     0x00080541,                /* 0989  move L8 <- L5 */
     0x000701A0, 0x00010000,    /* 098A  call base=L7 argc=1 nres=1 */
     0x000601A0, 0x00010000,    /* 098C  call base=L6 argc=1 nres=1 */
@@ -2478,21 +2498,21 @@ static const uint32_t analysis_code[] = {
     0x00060241,                /* 0990  move L6 <- L2 */
     0x00070541,                /* 0991  move L7 <- L5 */
     0x000601A2, 0x00000001,    /* 0992  msg base=L6 argc=1 msg#0 nres=1   (append) */
-    0x003B0642,                /* 0994  gget L6 <- g59   (cdr) */
+    0x00460642,                /* 0994  gget L6 <- g70   (cdr) */
     0x00070441,                /* 0995  move L7 <- L4 */
     0x000601A0, 0x00010000,    /* 0996  call base=L6 argc=1 nres=1 */
     0x00040641,                /* 0998  move L4 <- L6 */
     0xFFDC004F,                /* 0999  jmp -36 */
     0x00090645,                /* 099A  lsym L6 <- sym#9   ("if") */
-    0x003C0742,                /* 099B  gget L7 <- g60   (car) */
+    0x00470742,                /* 099B  gget L7 <- g71   (car) */
     0x00080141,                /* 099C  move L8 <- L1 */
     0x000701A0, 0x00010000,    /* 099D  call base=L7 argc=1 nres=1 */
-    0x003C0842,                /* 099F  gget L8 <- g60   (car) */
-    0x003B0942,                /* 09A0  gget L9 <- g59   (cdr) */
+    0x00470842,                /* 099F  gget L8 <- g71   (car) */
+    0x00460942,                /* 09A0  gget L9 <- g70   (cdr) */
     0x000A0141,                /* 09A1  move L10 <- L1 */
     0x000901A0, 0x00010000,    /* 09A2  call base=L9 argc=1 nres=1 */
     0x000801A0, 0x00010000,    /* 09A4  call base=L8 argc=1 nres=1 */
-    0x00400942,                /* 09A6  gget L9 <- g64   (chain) */
+    0x003E0942,                /* 09A6  gget L9 <- g62   (chain) */
     0x000A0241,                /* 09A7  move L10 <- L2 */
     0x000901A0, 0x00010000,    /* 09A8  call base=L9 argc=1 nres=1 */
     0x000A0341,                /* 09AA  move L10 <- L3 */
@@ -2536,13 +2556,13 @@ static const uint32_t analysis_code[] = {
     0x0009024B,                /* 09D9  jf L2, +9 */
     0x00010140,                /* 09DA  i8 L1 <- 1 */
     0x00000085, 0x00000001,    /* 09DB  add L0 <- L0 + L1 */
-    0x003B0142,                /* 09DD  gget L1 <- g59   (cdr) */
+    0x00460142,                /* 09DD  gget L1 <- g70   (cdr) */
     0x00028041,                /* 09DE  move L2 <- P0 */
     0x000101A0, 0x00010000,    /* 09DF  call base=L1 argc=1 nres=1 */
     0x80000141,                /* 09E1  move P0 <- L1 */
     0xFFF3004F,                /* 09E2  jmp -13 */
     0x00000102,                /* 09E3  return L0 count=1 */
-    0x003C0342,                /* 09E4  gget L3 <- g60   (car) */
+    0x00470342,                /* 09E4  gget L3 <- g71   (car) */
     0x00048041,                /* 09E5  move L4 <- P0 */
     0x000301A0, 0x00010000,    /* 09E6  call base=L3 argc=1 nres=1 */
     0x00000341,                /* 09E8  move L0 <- L3 */
@@ -2698,7 +2718,7 @@ static const uint32_t analysis_code[] = {
     0x00020003,                /* 0A98  lnil L2 */
     0x00020102,                /* 0A99  return L2 count=1 */
     0x00000082, 0x00020000,    /* 0A9A  list L0 <- L2, 0 items */
-    0x003B0242,                /* 0A9C  gget L2 <- g59   (cdr) */
+    0x00460242,                /* 0A9C  gget L2 <- g70   (cdr) */
     0x00038041,                /* 0A9D  move L3 <- P0 */
     0x000201A0, 0x00010000,    /* 0A9E  call base=L2 argc=1 nres=1 */
     0x00010241,                /* 0AA0  move L1 <- L2 */
@@ -2707,7 +2727,7 @@ static const uint32_t analysis_code[] = {
     0x0014034B,                /* 0AA4  jf L3, +20 */
     0x00020041,                /* 0AA5  move L2 <- L0 */
     0x00020442,                /* 0AA6  gget L4 <- g2   (_field) */
-    0x003C0542,                /* 0AA7  gget L5 <- g60   (car) */
+    0x00470542,                /* 0AA7  gget L5 <- g71   (car) */
     0x00060141,                /* 0AA8  move L6 <- L1 */
     0x000501A0, 0x00010000,    /* 0AA9  call base=L5 argc=1 nres=1 */
     0x00060140,                /* 0AAB  i8 L6 <- 1 */
@@ -2716,12 +2736,12 @@ static const uint32_t analysis_code[] = {
     0x0001034E,                /* 0AAF  jnerr L3, +1 */
     0x00030003,                /* 0AB0  lnil L3 */
     0x000201A2, 0x00000001,    /* 0AB1  msg base=L2 argc=1 msg#0 nres=1   (append) */
-    0x003B0242,                /* 0AB3  gget L2 <- g59   (cdr) */
+    0x00460242,                /* 0AB3  gget L2 <- g70   (cdr) */
     0x00030141,                /* 0AB4  move L3 <- L1 */
     0x000201A0, 0x00010000,    /* 0AB5  call base=L2 argc=1 nres=1 */
     0x00010241,                /* 0AB7  move L1 <- L2 */
     0xFFE8004F,                /* 0AB8  jmp -24 */
-    0x00400242,                /* 0AB9  gget L2 <- g64   (chain) */
+    0x003E0242,                /* 0AB9  gget L2 <- g62   (chain) */
     0x00030041,                /* 0ABA  move L3 <- L0 */
     0x000201A0, 0x00010000,    /* 0ABB  call base=L2 argc=1 nres=1 */
     0x00020102,                /* 0ABD  return L2 count=1 */
@@ -2732,7 +2752,7 @@ static const uint32_t analysis_code[] = {
     0x00170246,                /* 0AC3  lconst L2 <- static#23   ("sym") */
     0x00010097, 0x00000002,    /* 0AC4  is L1 <- L0 is L2 */
     0x0007014B,                /* 0AC6  jf L1, +7 */
-    0x003E0242,                /* 0AC7  gget L2 <- g62   (str) */
+    0x00490242,                /* 0AC7  gget L2 <- g73   (str) */
     0x00030041,                /* 0AC8  move L3 <- L0 */
     0x000201A0, 0x00010000,    /* 0AC9  call base=L2 argc=1 nres=1 */
     0x00230346,                /* 0ACB  lconst L3 <- static#35   ("::") */
@@ -2744,9 +2764,9 @@ static const uint32_t analysis_code[] = {
     0x00390142,                /* 0AD3  gget L1 <- g57   (IMPLICIT_NAMES) */
     0x00000096, 0x80000001,    /* 0AD4  in L0 <- P0 in L1 */
     0x0011004B,                /* 0AD6  jf L0, +17 */
-    0x003A0042,                /* 0AD7  gget L0 <- g58   (error) */
+    0x00450042,                /* 0AD7  gget L0 <- g69   (error) */
     0x00570146,                /* 0AD8  lconst L1 <- static#87   ("`") */
-    0x003E0242,                /* 0AD9  gget L2 <- g62   (str) */
+    0x00490242,                /* 0AD9  gget L2 <- g73   (str) */
     0x00038041,                /* 0ADA  move L3 <- P0 */
     0x000201A0, 0x00010000,    /* 0ADB  call base=L2 argc=1 nres=1 */
     0x00030085, 0x00010002,    /* 0ADD  add L3 <- L1 + L2 */
@@ -2762,14 +2782,14 @@ static const uint32_t analysis_code[] = {
     0x00020346,                /* 0AEB  lconst L3 <- static#2   ("pair") */
     0x00040097, 0x00000003,    /* 0AEC  is L4 <- L0 is L3 */
     0x0020044B,                /* 0AEE  jf L4, +32 */
-    0x003C0342,                /* 0AEF  gget L3 <- g60   (car) */
+    0x00470342,                /* 0AEF  gget L3 <- g71   (car) */
     0x00040041,                /* 0AF0  move L4 <- L0 */
     0x000301A0, 0x00010000,    /* 0AF1  call base=L3 argc=1 nres=1 */
     0x00010341,                /* 0AF3  move L1 <- L3 */
     0x00020346,                /* 0AF4  lconst L3 <- static#2   ("pair") */
     0x00040097, 0x00010003,    /* 0AF5  is L4 <- L1 is L3 */
     0x0005044B,                /* 0AF7  jf L4, +5 */
-    0x003C0342,                /* 0AF8  gget L3 <- g60   (car) */
+    0x00470342,                /* 0AF8  gget L3 <- g71   (car) */
     0x00040141,                /* 0AF9  move L4 <- L1 */
     0x000301A0, 0x00010000,    /* 0AFA  call base=L3 argc=1 nres=1 */
     0x00010341,                /* 0AFC  move L1 <- L3 */
@@ -2783,7 +2803,7 @@ static const uint32_t analysis_code[] = {
     0x0005044A,                /* 0B06  not L5 <- L4 */
     0x0001054B,                /* 0B07  jf L5, +1 */
     0x00020102,                /* 0B08  return L2 count=1 */
-    0x003B0342,                /* 0B09  gget L3 <- g59   (cdr) */
+    0x00460342,                /* 0B09  gget L3 <- g70   (cdr) */
     0x00040041,                /* 0B0A  move L4 <- L0 */
     0x000301A0, 0x00010000,    /* 0B0B  call base=L3 argc=1 nres=1 */
     0x00000341,                /* 0B0D  move L0 <- L3 */
@@ -2887,7 +2907,7 @@ static const uint32_t analysis_code[] = {
     0x00040097, 0x00000003,    /* 0B87  is L4 <- L0 is L3 */
     0x001D044B,                /* 0B89  jf L4, +29 */
     0x00160342,                /* 0B8A  gget L3 <- g22   (walk_all) */
-    0x003C0442,                /* 0B8B  gget L4 <- g60   (car) */
+    0x00470442,                /* 0B8B  gget L4 <- g71   (car) */
     0x00050041,                /* 0B8C  move L5 <- L0 */
     0x000401A0, 0x00010000,    /* 0B8D  call base=L4 argc=1 nres=1 */
     0x000301A0, 0x00010000,    /* 0B8F  call base=L3 argc=1 nres=1 */
@@ -2903,7 +2923,7 @@ static const uint32_t analysis_code[] = {
     0x0001074B,                /* 0B9E  jf L7, +1 */
     0x00020102,                /* 0B9F  return L2 count=1 */
     0xFFF2004F,                /* 0BA0  jmp -14 */
-    0x003B0342,                /* 0BA1  gget L3 <- g59   (cdr) */
+    0x00460342,                /* 0BA1  gget L3 <- g70   (cdr) */
     0x00040041,                /* 0BA2  move L4 <- L0 */
     0x000301A0, 0x00010000,    /* 0BA3  call base=L3 argc=1 nres=1 */
     0x00000341,                /* 0BA5  move L0 <- L3 */
@@ -2918,7 +2938,7 @@ static const uint32_t analysis_code[] = {
     0x00050242,                /* 0BB0  gget L2 <- g5   (note_name) */
     0x00030041,                /* 0BB1  move L3 <- L0 */
     0x00240442,                /* 0BB2  gget L4 <- g36   (param_parts) */
-    0x003C0542,                /* 0BB3  gget L5 <- g60   (car) */
+    0x00470542,                /* 0BB3  gget L5 <- g71   (car) */
     0x00060141,                /* 0BB4  move L6 <- L1 */
     0x000501A0, 0x00010000,    /* 0BB5  call base=L5 argc=1 nres=1 */
     0x000401A0, 0x00010000,    /* 0BB7  call base=L4 argc=1 nres=1 */
@@ -2926,7 +2946,7 @@ static const uint32_t analysis_code[] = {
     0x00060098, 0x00040005,    /* 0BBA  getidx L6 <- L4[L5] */
     0x00040641,                /* 0BBC  move L4 <- L6 */
     0x000202A0, 0x00010000,    /* 0BBD  call base=L2 argc=2 nres=1 */
-    0x003B0242,                /* 0BBF  gget L2 <- g59   (cdr) */
+    0x00460242,                /* 0BBF  gget L2 <- g70   (cdr) */
     0x00030141,                /* 0BC0  move L3 <- L1 */
     0x000201A0, 0x00010000,    /* 0BC1  call base=L2 argc=1 nres=1 */
     0x00010241,                /* 0BC3  move L1 <- L2 */
@@ -3121,7 +3141,7 @@ static const uint32_t analysis_code[] = {
     0x00020A46,                /* 0CB9  lconst L10 <- static#2   ("pair") */
     0x000B0097, 0x0005000A,    /* 0CBA  is L11 <- L5 is L10 */
     0x00140B4B,                /* 0CBC  jf L11, +20 */
-    0x003C0A42,                /* 0CBD  gget L10 <- g60   (car) */
+    0x00470A42,                /* 0CBD  gget L10 <- g71   (car) */
     0x000B0541,                /* 0CBE  move L11 <- L5 */
     0x000A01A0, 0x00010000,    /* 0CBF  call base=L10 argc=1 nres=1 */
     0x00060A41,                /* 0CC1  move L6 <- L10 */
@@ -3132,7 +3152,7 @@ static const uint32_t analysis_code[] = {
     0x000B0041,                /* 0CC7  move L11 <- L0 */
     0x000C0641,                /* 0CC8  move L12 <- L6 */
     0x000A02A0, 0x00010000,    /* 0CC9  call base=L10 argc=2 nres=1 */
-    0x003B0A42,                /* 0CCB  gget L10 <- g59   (cdr) */
+    0x00460A42,                /* 0CCB  gget L10 <- g70   (cdr) */
     0x000B0541,                /* 0CCC  move L11 <- L5 */
     0x000A01A0, 0x00010000,    /* 0CCD  call base=L10 argc=1 nres=1 */
     0x00050A41,                /* 0CCF  move L5 <- L10 */
@@ -3182,7 +3202,7 @@ static const uint32_t analysis_code[] = {
     0x000802A0, 0x00010000,    /* 0D0A  call base=L8 argc=2 nres=1 */
     0x000602A0, 0x00010000,    /* 0D0C  call base=L6 argc=2 nres=1 */
     0xFFCC004F,                /* 0D0E  jmp -52 */
-    0x003D0442,                /* 0D0F  gget L4 <- g61   (len) */
+    0x00480442,                /* 0D0F  gget L4 <- g72   (len) */
     0x00050041,                /* 0D10  move L5 <- L0 */
     0x000401A0, 0x00010000,    /* 0D11  call base=L4 argc=1 nres=1 */
     0x00050040,                /* 0D13  i8 L5 <- 0 */

@@ -6,7 +6,7 @@
 static const uint8_t verify_header[] = {
     0x28, 0x00, 0x00, 0x00, 0x02, 0x6E, 0x00, 0x07, 0x00, 0x00, 0x00, 0x76,
     0x65, 0x72, 0x69, 0x66, 0x79, 0x00, 0x10, 0x76, 0x00, 0x01, 0x00, 0x00,
-    0x00, 0x10, 0x67, 0x00, 0x17, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x00, 0x01,
+    0x00, 0x10, 0x67, 0x00, 0x36, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x00, 0x01,
     0x00, 0x00, 0x00, 0x00,
 };
 
@@ -320,7 +320,7 @@ static const uint8_t verify_messages[] = {
 };
 
 static const uint8_t verify_exports[] = {
-    0x03, 0x01, 0x00, 0x00, 0x10, 0x77, 0x79, 0x72, 0x6D, 0x00, 0x00, 0x00,
+    0xF2, 0x02, 0x00, 0x00, 0x10, 0x77, 0x79, 0x72, 0x6D, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x10, 0x76, 0x65, 0x72, 0x69, 0x66, 0x79, 0x00, 0x01, 0x00,
     0x00, 0x00, 0x10, 0x5F, 0x72, 0x65, 0x67, 0x69, 0x6F, 0x6E, 0x73, 0x00,
     0x02, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x76, 0x65, 0x72, 0x69, 0x66, 0x79,
@@ -341,18 +341,96 @@ static const uint8_t verify_exports[] = {
     0x0C, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x77, 0x69, 0x6E, 0x64, 0x6F, 0x77,
     0x73, 0x00, 0x0D, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x6D, 0x61, 0x78, 0x31,
     0x00, 0x0E, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x73, 0x69, 0x67, 0x6E, 0x65,
-    0x64, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00,
+    0x64, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x10, 0x42, 0x59, 0x5F, 0x4E, 0x41,
+    0x4D, 0x45, 0x00, 0x10, 0x00, 0x00, 0x00, 0x10, 0x42, 0x59, 0x5F, 0x56,
+    0x41, 0x4C, 0x55, 0x45, 0x00, 0x11, 0x00, 0x00, 0x00, 0x10, 0x43, 0x4F,
+    0x52, 0x45, 0x00, 0x12, 0x00, 0x00, 0x00, 0x10, 0x44, 0x49, 0x47, 0x49,
+    0x54, 0x53, 0x00, 0x13, 0x00, 0x00, 0x00, 0x10, 0x4C, 0x00, 0x14, 0x00,
+    0x00, 0x00, 0x10, 0x4C, 0x4F, 0x4E, 0x47, 0x00, 0x15, 0x00, 0x00, 0x00,
+    0x10, 0x4C, 0x4F, 0x4E, 0x47, 0x5F, 0x53, 0x54, 0x41, 0x52, 0x54, 0x00,
+    0x16, 0x00, 0x00, 0x00, 0x10, 0x4F, 0x50, 0x53, 0x00, 0x17, 0x00, 0x00,
+    0x00, 0x10, 0x50, 0x00, 0x18, 0x00, 0x00, 0x00, 0x10, 0x50, 0x41, 0x49,
+    0x52, 0x41, 0x42, 0x4C, 0x45, 0x00, 0x19, 0x00, 0x00, 0x00, 0x10, 0x50,
+    0x5F, 0x42, 0x49, 0x54, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x49,
+    0x4E, 0x44, 0x49, 0x43, 0x45, 0x53, 0x00, 0x1B, 0x00, 0x00, 0x00, 0x10,
+    0x5F, 0x62, 0x75, 0x69, 0x6C, 0x64, 0x5F, 0x69, 0x6E, 0x64, 0x65, 0x78,
+    0x00, 0x1C, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x63, 0x68, 0x61, 0x72, 0x5F,
+    0x66, 0x72, 0x6F, 0x6D, 0x5F, 0x63, 0x70, 0x00, 0x1D, 0x00, 0x00, 0x00,
+    0x10, 0x5F, 0x63, 0x68, 0x65, 0x63, 0x6B, 0x5F, 0x66, 0x69, 0x65, 0x6C,
+    0x64, 0x00, 0x1E, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x64, 0x65, 0x63, 0x6F,
+    0x64, 0x65, 0x5F, 0x6F, 0x70, 0x65, 0x72, 0x61, 0x6E, 0x64, 0x00, 0x1F,
+    0x00, 0x00, 0x00, 0x10, 0x5F, 0x66, 0x33, 0x32, 0x5F, 0x74, 0x65, 0x78,
+    0x74, 0x00, 0x20, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x66, 0x6D, 0x74, 0x5F,
+    0x72, 0x65, 0x74, 0x75, 0x72, 0x6E, 0x00, 0x21, 0x00, 0x00, 0x00, 0x10,
+    0x5F, 0x68, 0x65, 0x78, 0x32, 0x00, 0x22, 0x00, 0x00, 0x00, 0x10, 0x5F,
+    0x68, 0x65, 0x78, 0x5F, 0x64, 0x69, 0x67, 0x69, 0x74, 0x73, 0x00, 0x23,
+    0x00, 0x00, 0x00, 0x10, 0x5F, 0x70, 0x6C, 0x75, 0x73, 0x5F, 0x73, 0x69,
+    0x67, 0x6E, 0x65, 0x64, 0x00, 0x24, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x72,
+    0x65, 0x6E, 0x64, 0x65, 0x72, 0x5F, 0x66, 0x6D, 0x74, 0x00, 0x25, 0x00,
+    0x00, 0x00, 0x10, 0x5F, 0x76, 0x61, 0x6C, 0x75, 0x65, 0x5F, 0x66, 0x6F,
+    0x72, 0x5F, 0x6E, 0x61, 0x6D, 0x65, 0x00, 0x26, 0x00, 0x00, 0x00, 0x10,
+    0x64, 0x69, 0x73, 0x61, 0x73, 0x73, 0x65, 0x6D, 0x62, 0x6C, 0x65, 0x00,
+    0x27, 0x00, 0x00, 0x00, 0x10, 0x64, 0x69, 0x73, 0x61, 0x73, 0x73, 0x65,
+    0x6D, 0x62, 0x6C, 0x65, 0x5F, 0x6F, 0x6E, 0x65, 0x00, 0x28, 0x00, 0x00,
+    0x00, 0x10, 0x66, 0x69, 0x74, 0x73, 0x5F, 0x69, 0x31, 0x36, 0x00, 0x29,
+    0x00, 0x00, 0x00, 0x10, 0x66, 0x69, 0x74, 0x73, 0x5F, 0x69, 0x38, 0x00,
+    0x2A, 0x00, 0x00, 0x00, 0x10, 0x66, 0x72, 0x6F, 0x6D, 0x5F, 0x72, 0x65,
+    0x67, 0x38, 0x00, 0x2B, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x70,
+    0x00, 0x2C, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x6F, 0x6F, 0x6B, 0x75, 0x70,
+    0x00, 0x2D, 0x00, 0x00, 0x00, 0x10, 0x70, 0x61, 0x63, 0x6B, 0x00, 0x2E,
+    0x00, 0x00, 0x00, 0x10, 0x72, 0x65, 0x67, 0x5F, 0x69, 0x6E, 0x64, 0x65,
+    0x78, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x10, 0x72, 0x65, 0x67, 0x5F, 0x6E,
+    0x61, 0x6D, 0x65, 0x00, 0x30, 0x00, 0x00, 0x00, 0x10, 0x74, 0x6F, 0x5F,
+    0x72, 0x65, 0x67, 0x38, 0x00, 0x31, 0x00, 0x00, 0x00, 0x10, 0x75, 0x6E,
+    0x70, 0x61, 0x63, 0x6B, 0x00, 0x32, 0x00, 0x00, 0x00, 0x00,
 };
 
 static const uint8_t verify_free[] = {
-    0x56, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x65, 0x6E, 0x00, 0x10, 0x00, 0x00,
-    0x00, 0x10, 0x75, 0x6E, 0x70, 0x61, 0x63, 0x6B, 0x00, 0x11, 0x00, 0x00,
-    0x00, 0x10, 0x65, 0x72, 0x72, 0x6F, 0x72, 0x00, 0x12, 0x00, 0x00, 0x00,
-    0x10, 0x73, 0x74, 0x72, 0x00, 0x13, 0x00, 0x00, 0x00, 0x10, 0x66, 0x72,
-    0x6F, 0x6D, 0x5F, 0x72, 0x65, 0x67, 0x38, 0x00, 0x14, 0x00, 0x00, 0x00,
-    0x10, 0x72, 0x65, 0x67, 0x5F, 0x69, 0x6E, 0x64, 0x65, 0x78, 0x00, 0x15,
-    0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x70, 0x00, 0x16, 0x00, 0x00,
-    0x00, 0x00,
+    0x11, 0x02, 0x00, 0x00, 0x10, 0x42, 0x59, 0x5F, 0x4E, 0x41, 0x4D, 0x45,
+    0x00, 0x10, 0x00, 0x00, 0x00, 0x10, 0x42, 0x59, 0x5F, 0x56, 0x41, 0x4C,
+    0x55, 0x45, 0x00, 0x11, 0x00, 0x00, 0x00, 0x10, 0x43, 0x4F, 0x52, 0x45,
+    0x00, 0x12, 0x00, 0x00, 0x00, 0x10, 0x44, 0x49, 0x47, 0x49, 0x54, 0x53,
+    0x00, 0x13, 0x00, 0x00, 0x00, 0x10, 0x4C, 0x00, 0x14, 0x00, 0x00, 0x00,
+    0x10, 0x4C, 0x4F, 0x4E, 0x47, 0x00, 0x15, 0x00, 0x00, 0x00, 0x10, 0x4C,
+    0x4F, 0x4E, 0x47, 0x5F, 0x53, 0x54, 0x41, 0x52, 0x54, 0x00, 0x16, 0x00,
+    0x00, 0x00, 0x10, 0x4F, 0x50, 0x53, 0x00, 0x17, 0x00, 0x00, 0x00, 0x10,
+    0x50, 0x00, 0x18, 0x00, 0x00, 0x00, 0x10, 0x50, 0x41, 0x49, 0x52, 0x41,
+    0x42, 0x4C, 0x45, 0x00, 0x19, 0x00, 0x00, 0x00, 0x10, 0x50, 0x5F, 0x42,
+    0x49, 0x54, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x49, 0x4E, 0x44,
+    0x49, 0x43, 0x45, 0x53, 0x00, 0x1B, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x62,
+    0x75, 0x69, 0x6C, 0x64, 0x5F, 0x69, 0x6E, 0x64, 0x65, 0x78, 0x00, 0x1C,
+    0x00, 0x00, 0x00, 0x10, 0x5F, 0x63, 0x68, 0x61, 0x72, 0x5F, 0x66, 0x72,
+    0x6F, 0x6D, 0x5F, 0x63, 0x70, 0x00, 0x1D, 0x00, 0x00, 0x00, 0x10, 0x5F,
+    0x63, 0x68, 0x65, 0x63, 0x6B, 0x5F, 0x66, 0x69, 0x65, 0x6C, 0x64, 0x00,
+    0x1E, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65,
+    0x5F, 0x6F, 0x70, 0x65, 0x72, 0x61, 0x6E, 0x64, 0x00, 0x1F, 0x00, 0x00,
+    0x00, 0x10, 0x5F, 0x66, 0x33, 0x32, 0x5F, 0x74, 0x65, 0x78, 0x74, 0x00,
+    0x20, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x66, 0x6D, 0x74, 0x5F, 0x72, 0x65,
+    0x74, 0x75, 0x72, 0x6E, 0x00, 0x21, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x68,
+    0x65, 0x78, 0x32, 0x00, 0x22, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x68, 0x65,
+    0x78, 0x5F, 0x64, 0x69, 0x67, 0x69, 0x74, 0x73, 0x00, 0x23, 0x00, 0x00,
+    0x00, 0x10, 0x5F, 0x70, 0x6C, 0x75, 0x73, 0x5F, 0x73, 0x69, 0x67, 0x6E,
+    0x65, 0x64, 0x00, 0x24, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x72, 0x65, 0x6E,
+    0x64, 0x65, 0x72, 0x5F, 0x66, 0x6D, 0x74, 0x00, 0x25, 0x00, 0x00, 0x00,
+    0x10, 0x5F, 0x76, 0x61, 0x6C, 0x75, 0x65, 0x5F, 0x66, 0x6F, 0x72, 0x5F,
+    0x6E, 0x61, 0x6D, 0x65, 0x00, 0x26, 0x00, 0x00, 0x00, 0x10, 0x64, 0x69,
+    0x73, 0x61, 0x73, 0x73, 0x65, 0x6D, 0x62, 0x6C, 0x65, 0x00, 0x27, 0x00,
+    0x00, 0x00, 0x10, 0x64, 0x69, 0x73, 0x61, 0x73, 0x73, 0x65, 0x6D, 0x62,
+    0x6C, 0x65, 0x5F, 0x6F, 0x6E, 0x65, 0x00, 0x28, 0x00, 0x00, 0x00, 0x10,
+    0x66, 0x69, 0x74, 0x73, 0x5F, 0x69, 0x31, 0x36, 0x00, 0x29, 0x00, 0x00,
+    0x00, 0x10, 0x66, 0x69, 0x74, 0x73, 0x5F, 0x69, 0x38, 0x00, 0x2A, 0x00,
+    0x00, 0x00, 0x10, 0x66, 0x72, 0x6F, 0x6D, 0x5F, 0x72, 0x65, 0x67, 0x38,
+    0x00, 0x2B, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x70, 0x00, 0x2C,
+    0x00, 0x00, 0x00, 0x10, 0x6C, 0x6F, 0x6F, 0x6B, 0x75, 0x70, 0x00, 0x2D,
+    0x00, 0x00, 0x00, 0x10, 0x70, 0x61, 0x63, 0x6B, 0x00, 0x2E, 0x00, 0x00,
+    0x00, 0x10, 0x72, 0x65, 0x67, 0x5F, 0x69, 0x6E, 0x64, 0x65, 0x78, 0x00,
+    0x2F, 0x00, 0x00, 0x00, 0x10, 0x72, 0x65, 0x67, 0x5F, 0x6E, 0x61, 0x6D,
+    0x65, 0x00, 0x30, 0x00, 0x00, 0x00, 0x10, 0x74, 0x6F, 0x5F, 0x72, 0x65,
+    0x67, 0x38, 0x00, 0x31, 0x00, 0x00, 0x00, 0x10, 0x75, 0x6E, 0x70, 0x61,
+    0x63, 0x6B, 0x00, 0x32, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x65, 0x6E, 0x00,
+    0x33, 0x00, 0x00, 0x00, 0x10, 0x65, 0x72, 0x72, 0x6F, 0x72, 0x00, 0x34,
+    0x00, 0x00, 0x00, 0x10, 0x73, 0x74, 0x72, 0x00, 0x35, 0x00, 0x00, 0x00,
+    0x00,
 };
 
 static const uint32_t verify_code[] = {
@@ -429,7 +507,7 @@ static const uint32_t verify_code[] = {
     0x001401A2, 0x00000001,    /* 0063  msg base=L20 argc=1 msg#0 nres=1   (append) */
     0xFFF2004F,                /* 0065  jmp -14 */
     0x00020140,                /* 0066  i8 L2 <- 1 */
-    0x00101142,                /* 0067  gget L17 <- g16   (len) */
+    0x00331142,                /* 0067  gget L17 <- g51   (len) */
     0x00120041,                /* 0068  move L18 <- L0 */
     0x001101A0, 0x00010000,    /* 0069  call base=L17 argc=1 nres=1 */
     0x00120091, 0x00020011,    /* 006B  lt L18 <- L2 < L17 */
@@ -467,7 +545,7 @@ static const uint32_t verify_code[] = {
     0x00110140,                /* 009D  i8 L17 <- 1 */
     0x00020085, 0x00020011,    /* 009E  add L2 <- L2 + L17 */
     0xFFC6004F,                /* 00A0  jmp -58 */
-    0x00101142,                /* 00A1  gget L17 <- g16   (len) */
+    0x00331142,                /* 00A1  gget L17 <- g51   (len) */
     0x00051246,                /* 00A2  lconst L18 <- static#5   ("code") */
     0x00130098, 0x80000012,    /* 00A3  getidx L19 <- P0[L18] */
     0x00121341,                /* 00A5  move L18 <- L19 */
@@ -475,7 +553,7 @@ static const uint32_t verify_code[] = {
     0x00031141,                /* 00A8  move L3 <- L17 */
     0x00040082, 0x00110000,    /* 00A9  list L4 <- L17, 0 items */
     0x00050341,                /* 00AB  move L5 <- L3 */
-    0x00101142,                /* 00AC  gget L17 <- g16   (len) */
+    0x00331142,                /* 00AC  gget L17 <- g51   (len) */
     0x00120041,                /* 00AD  move L18 <- L0 */
     0x001101A0, 0x00010000,    /* 00AE  call base=L17 argc=1 nres=1 */
     0x00120040,                /* 00B0  i8 L18 <- 0 */
@@ -504,7 +582,7 @@ static const uint32_t verify_code[] = {
     0x00121E41,                /* 00CC  move L18 <- L30 */
     0x001101A2, 0x00000001,    /* 00CD  msg base=L17 argc=1 msg#0 nres=1   (append) */
     0x00060040,                /* 00CF  i8 L6 <- 0 */
-    0x00101142,                /* 00D0  gget L17 <- g16   (len) */
+    0x00331142,                /* 00D0  gget L17 <- g51   (len) */
     0x00120041,                /* 00D1  move L18 <- L0 */
     0x001101A0, 0x00010000,    /* 00D2  call base=L17 argc=1 nres=1 */
     0x00120091, 0x00060011,    /* 00D4  lt L18 <- L6 < L17 */
@@ -513,7 +591,7 @@ static const uint32_t verify_code[] = {
     0x000C0341,                /* 00D9  move L12 <- L3 */
     0x00110140,                /* 00DA  i8 L17 <- 1 */
     0x00120085, 0x00060011,    /* 00DB  add L18 <- L6 + L17 */
-    0x00101342,                /* 00DD  gget L19 <- g16   (len) */
+    0x00331342,                /* 00DD  gget L19 <- g51   (len) */
     0x00140041,                /* 00DE  move L20 <- L0 */
     0x001301A0, 0x00010000,    /* 00DF  call base=L19 argc=1 nres=1 */
     0x00140091, 0x00120013,    /* 00E1  lt L20 <- L18 < L19 */
@@ -534,11 +612,11 @@ static const uint32_t verify_code[] = {
     0x00120097, 0x000E0011,    /* 00F6  is L18 <- L14 is L17 */
     0x0013124A,                /* 00F8  not L19 <- L18 */
     0x0005134B,                /* 00F9  jf L19, +5 */
-    0x00101142,                /* 00FA  gget L17 <- g16   (len) */
+    0x00331142,                /* 00FA  gget L17 <- g51   (len) */
     0x00120E41,                /* 00FB  move L18 <- L14 */
     0x001101A0, 0x00010000,    /* 00FC  call base=L17 argc=1 nres=1 */
     0x000F1141,                /* 00FE  move L15 <- L17 */
-    0x00101142,                /* 00FF  gget L17 <- g16   (len) */
+    0x00331142,                /* 00FF  gget L17 <- g51   (len) */
     0x00121246,                /* 0100  lconst L18 <- static#18   ("params") */
     0x00130098, 0x000B0012,    /* 0101  getidx L19 <- L11[L18] */
     0x00121341,                /* 0103  move L18 <- L19 */
@@ -579,7 +657,7 @@ static const uint32_t verify_code[] = {
     0x00240098, 0x80010023,    /* 0133  getidx L36 <- P1[L35] */
     0x00250091, 0x00020024,    /* 0135  lt L37 <- L2 < L36 */
     0x0057254B,                /* 0137  jf L37, +87 */
-    0x00112342,                /* 0138  gget L35 <- g17   (unpack) */
+    0x00322342,                /* 0138  gget L35 <- g50   (unpack) */
     0x00052446,                /* 0139  lconst L36 <- static#5   ("code") */
     0x00250098, 0x80000024,    /* 013A  getidx L37 <- P0[L36] */
     0x00242541,                /* 013C  move L36 <- L37 */
@@ -589,20 +667,20 @@ static const uint32_t verify_code[] = {
     0x00022346,                /* 0141  lconst L35 <- static#2   ("error") */
     0x00240097, 0x00040023,    /* 0142  is L36 <- L4 is L35 */
     0x001D244B,                /* 0144  jf L36, +29 */
-    0x00122342,                /* 0145  gget L35 <- g18   (error) */
+    0x00342342,                /* 0145  gget L35 <- g52   (error) */
     0x00132446,                /* 0146  lconst L36 <- static#19   ("verify: ") */
     0x00062546,                /* 0147  lconst L37 <- static#6   ("name") */
     0x00260098, 0x80010025,    /* 0148  getidx L38 <- P1[L37] */
     0x00270085, 0x00240026,    /* 014A  add L39 <- L36 + L38 */
     0x00142846,                /* 014C  lconst L40 <- static#20   (" at word ") */
     0x00290085, 0x00270028,    /* 014D  add L41 <- L39 + L40 */
-    0x00132A42,                /* 014F  gget L42 <- g19   (str) */
+    0x00352A42,                /* 014F  gget L42 <- g53   (str) */
     0x002B0241,                /* 0150  move L43 <- L2 */
     0x002A01A0, 0x00010000,    /* 0151  call base=L42 argc=1 nres=1 */
     0x002B0085, 0x0029002A,    /* 0153  add L43 <- L41 + L42 */
     0x00152C46,                /* 0155  lconst L44 <- static#21   (": ") */
     0x002D0085, 0x002B002C,    /* 0156  add L45 <- L43 + L44 */
-    0x00132E42,                /* 0158  gget L46 <- g19   (str) */
+    0x00352E42,                /* 0158  gget L46 <- g53   (str) */
     0x002F0441,                /* 0159  move L47 <- L4 */
     0x002E01A0, 0x00010000,    /* 015A  call base=L46 argc=1 nres=1 */
     0x002F0085, 0x002D002E,    /* 015C  add L47 <- L45 + L46 */
@@ -692,7 +770,7 @@ static const uint32_t verify_code[] = {
     0x001E2546,                /* 01D5  lconst L37 <- static#30   ("reg8") */
     0x0026008F, 0x00110025,    /* 01D6  eq L38 <- L17 == L37 */
     0x0005264B,                /* 01D8  jf L38, +5 */
-    0x00142542,                /* 01D9  gget L37 <- g20   (from_reg8) */
+    0x002B2542,                /* 01D9  gget L37 <- g43   (from_reg8) */
     0x00261241,                /* 01DA  move L38 <- L18 */
     0x002501A0, 0x00010000,    /* 01DB  call base=L37 argc=1 nres=1 */
     0x00192541,                /* 01DD  move L25 <- L37 */
@@ -800,26 +878,26 @@ static const uint32_t verify_code[] = {
     0x000B2542,                /* 0259  gget L37 <- g11   (_fail) */
     0x00268141,                /* 025A  move L38 <- P1 */
     0x00270741,                /* 025B  move L39 <- L7 */
-    0x00132842,                /* 025C  gget L40 <- g19   (str) */
+    0x00352842,                /* 025C  gget L40 <- g53   (str) */
     0x00062946,                /* 025D  lconst L41 <- static#6   ("name") */
     0x002A0098, 0x00080029,    /* 025E  getidx L42 <- L8[L41] */
     0x00292A41,                /* 0260  move L41 <- L42 */
     0x002801A0, 0x00010000,    /* 0261  call base=L40 argc=1 nres=1 */
     0x00282946,                /* 0263  lconst L41 <- static#40   (" ") */
     0x002A0085, 0x00280029,    /* 0264  add L42 <- L40 + L41 */
-    0x00132B42,                /* 0266  gget L43 <- g19   (str) */
+    0x00352B42,                /* 0266  gget L43 <- g53   (str) */
     0x002C0F41,                /* 0267  move L44 <- L15 */
     0x002B01A0, 0x00010000,    /* 0268  call base=L43 argc=1 nres=1 */
     0x002C0085, 0x002A002B,    /* 026A  add L44 <- L42 + L43 */
     0x00292D46,                /* 026C  lconst L45 <- static#41   (" is index ") */
     0x002E0085, 0x002C002D,    /* 026D  add L46 <- L44 + L45 */
-    0x00132F42,                /* 026F  gget L47 <- g19   (str) */
+    0x00352F42,                /* 026F  gget L47 <- g53   (str) */
     0x00301241,                /* 0270  move L48 <- L18 */
     0x002F01A0, 0x00010000,    /* 0271  call base=L47 argc=1 nres=1 */
     0x00300085, 0x002E002F,    /* 0273  add L48 <- L46 + L47 */
     0x002A3146,                /* 0275  lconst L49 <- static#42   (", but there are only ") */
     0x00320085, 0x00300031,    /* 0276  add L50 <- L48 + L49 */
-    0x00133342,                /* 0278  gget L51 <- g19   (str) */
+    0x00353342,                /* 0278  gget L51 <- g53   (str) */
     0x00273446,                /* 0279  lconst L52 <- static#39   ("globals") */
     0x00350098, 0x80000034,    /* 027A  getidx L53 <- P0[L52] */
     0x00343541,                /* 027C  move L52 <- L53 */
@@ -900,11 +978,11 @@ static const uint32_t verify_code[] = {
     0x00260341,                /* 02DA  move L38 <- L3 */
     0x002303A0, 0x00010000,    /* 02DB  call base=L35 argc=3 nres=1 */
     0x00230102,                /* 02DD  return L35 count=1 */
-    0x00150142,                /* 02DE  gget L1 <- g21   (reg_index) */
+    0x002F0142,                /* 02DE  gget L1 <- g47   (reg_index) */
     0x00028441,                /* 02DF  move L2 <- P4 */
     0x000101A0, 0x00010000,    /* 02E0  call base=L1 argc=1 nres=1 */
     0x00000141,                /* 02E2  move L0 <- L1 */
-    0x00160142,                /* 02E3  gget L1 <- g22   (is_p) */
+    0x002C0142,                /* 02E3  gget L1 <- g44   (is_p) */
     0x00028441,                /* 02E4  move L2 <- P4 */
     0x000101A0, 0x00010000,    /* 02E5  call base=L1 argc=1 nres=1 */
     0x0036014B,                /* 02E7  jf L1, +54 */
@@ -915,26 +993,26 @@ static const uint32_t verify_code[] = {
     0x000B0142,                /* 02EE  gget L1 <- g11   (_fail) */
     0x00028041,                /* 02EF  move L2 <- P0 */
     0x00038141,                /* 02F0  move L3 <- P1 */
-    0x00130442,                /* 02F1  gget L4 <- g19   (str) */
+    0x00350442,                /* 02F1  gget L4 <- g53   (str) */
     0x00060546,                /* 02F2  lconst L5 <- static#6   ("name") */
     0x00060098, 0x80020005,    /* 02F3  getidx L6 <- P2[L5] */
     0x00050641,                /* 02F5  move L5 <- L6 */
     0x000401A0, 0x00010000,    /* 02F6  call base=L4 argc=1 nres=1 */
     0x00280546,                /* 02F8  lconst L5 <- static#40   (" ") */
     0x00060085, 0x00040005,    /* 02F9  add L6 <- L4 + L5 */
-    0x00130742,                /* 02FB  gget L7 <- g19   (str) */
+    0x00350742,                /* 02FB  gget L7 <- g53   (str) */
     0x00088341,                /* 02FC  move L8 <- P3 */
     0x000701A0, 0x00010000,    /* 02FD  call base=L7 argc=1 nres=1 */
     0x00080085, 0x00060007,    /* 02FF  add L8 <- L6 + L7 */
     0x002F0946,                /* 0301  lconst L9 <- static#47   (" is P") */
     0x000A0085, 0x00080009,    /* 0302  add L10 <- L8 + L9 */
-    0x00130B42,                /* 0304  gget L11 <- g19   (str) */
+    0x00350B42,                /* 0304  gget L11 <- g53   (str) */
     0x000C0041,                /* 0305  move L12 <- L0 */
     0x000B01A0, 0x00010000,    /* 0306  call base=L11 argc=1 nres=1 */
     0x000C0085, 0x000A000B,    /* 0308  add L12 <- L10 + L11 */
     0x00300D46,                /* 030A  lconst L13 <- static#48   (", but the P frame holds ") */
     0x000E0085, 0x000C000D,    /* 030B  add L14 <- L12 + L13 */
-    0x00130F42,                /* 030D  gget L15 <- g19   (str) */
+    0x00350F42,                /* 030D  gget L15 <- g53   (str) */
     0x000C1046,                /* 030E  lconst L16 <- static#12   ("pframe") */
     0x00110098, 0x80000010,    /* 030F  getidx L17 <- P0[L16] */
     0x00101141,                /* 0311  move L16 <- L17 */
@@ -953,26 +1031,26 @@ static const uint32_t verify_code[] = {
     0x000B0142,                /* 0324  gget L1 <- g11   (_fail) */
     0x00028041,                /* 0325  move L2 <- P0 */
     0x00038141,                /* 0326  move L3 <- P1 */
-    0x00130442,                /* 0327  gget L4 <- g19   (str) */
+    0x00350442,                /* 0327  gget L4 <- g53   (str) */
     0x00060546,                /* 0328  lconst L5 <- static#6   ("name") */
     0x00060098, 0x80020005,    /* 0329  getidx L6 <- P2[L5] */
     0x00050641,                /* 032B  move L5 <- L6 */
     0x000401A0, 0x00010000,    /* 032C  call base=L4 argc=1 nres=1 */
     0x00280546,                /* 032E  lconst L5 <- static#40   (" ") */
     0x00060085, 0x00040005,    /* 032F  add L6 <- L4 + L5 */
-    0x00130742,                /* 0331  gget L7 <- g19   (str) */
+    0x00350742,                /* 0331  gget L7 <- g53   (str) */
     0x00088341,                /* 0332  move L8 <- P3 */
     0x000701A0, 0x00010000,    /* 0333  call base=L7 argc=1 nres=1 */
     0x00080085, 0x00060007,    /* 0335  add L8 <- L6 + L7 */
     0x00320946,                /* 0337  lconst L9 <- static#50   (" is L") */
     0x000A0085, 0x00080009,    /* 0338  add L10 <- L8 + L9 */
-    0x00130B42,                /* 033A  gget L11 <- g19   (str) */
+    0x00350B42,                /* 033A  gget L11 <- g53   (str) */
     0x000C0041,                /* 033B  move L12 <- L0 */
     0x000B01A0, 0x00010000,    /* 033C  call base=L11 argc=1 nres=1 */
     0x000C0085, 0x000A000B,    /* 033E  add L12 <- L10 + L11 */
     0x00330D46,                /* 0340  lconst L13 <- static#51   (", but the frame holds ") */
     0x000E0085, 0x000C000D,    /* 0341  add L14 <- L12 + L13 */
-    0x00130F42,                /* 0343  gget L15 <- g19   (str) */
+    0x00350F42,                /* 0343  gget L15 <- g53   (str) */
     0x000A1046,                /* 0344  lconst L16 <- static#10   ("nlocals") */
     0x00110098, 0x80000010,    /* 0345  getidx L17 <- P0[L16] */
     0x00101141,                /* 0347  move L16 <- L17 */
@@ -985,22 +1063,22 @@ static const uint32_t verify_code[] = {
     0x00010102,                /* 0352  return L1 count=1 */
     0x00010003,                /* 0353  lnil L1 */
     0x00010102,                /* 0354  return L1 count=1 */
-    0x00160042,                /* 0355  gget L0 <- g22   (is_p) */
+    0x002C0042,                /* 0355  gget L0 <- g44   (is_p) */
     0x00018341,                /* 0356  move L1 <- P3 */
     0x000001A0, 0x00010000,    /* 0357  call base=L0 argc=1 nres=1 */
     0x001D004B,                /* 0359  jf L0, +29 */
     0x000B0042,                /* 035A  gget L0 <- g11   (_fail) */
     0x00018041,                /* 035B  move L1 <- P0 */
     0x00028141,                /* 035C  move L2 <- P1 */
-    0x00130342,                /* 035D  gget L3 <- g19   (str) */
+    0x00350342,                /* 035D  gget L3 <- g53   (str) */
     0x00060446,                /* 035E  lconst L4 <- static#6   ("name") */
     0x00050098, 0x80020004,    /* 035F  getidx L5 <- P2[L4] */
     0x00040541,                /* 0361  move L4 <- L5 */
     0x000301A0, 0x00010000,    /* 0362  call base=L3 argc=1 nres=1 */
     0x00340446,                /* 0364  lconst L4 <- static#52   (" window base is P") */
     0x00050085, 0x00030004,    /* 0365  add L5 <- L3 + L4 */
-    0x00130642,                /* 0367  gget L6 <- g19   (str) */
-    0x00150742,                /* 0368  gget L7 <- g21   (reg_index) */
+    0x00350642,                /* 0367  gget L6 <- g53   (str) */
+    0x002F0742,                /* 0368  gget L7 <- g47   (reg_index) */
     0x00088341,                /* 0369  move L8 <- P3 */
     0x000701A0, 0x00010000,    /* 036A  call base=L7 argc=1 nres=1 */
     0x000601A0, 0x00010000,    /* 036C  call base=L6 argc=1 nres=1 */
@@ -1018,20 +1096,20 @@ static const uint32_t verify_code[] = {
     0x000B0042,                /* 037F  gget L0 <- g11   (_fail) */
     0x00018041,                /* 0380  move L1 <- P0 */
     0x00028141,                /* 0381  move L2 <- P1 */
-    0x00130342,                /* 0382  gget L3 <- g19   (str) */
+    0x00350342,                /* 0382  gget L3 <- g53   (str) */
     0x00060446,                /* 0383  lconst L4 <- static#6   ("name") */
     0x00050098, 0x80020004,    /* 0384  getidx L5 <- P2[L4] */
     0x00040541,                /* 0386  move L4 <- L5 */
     0x000301A0, 0x00010000,    /* 0387  call base=L3 argc=1 nres=1 */
     0x00360446,                /* 0389  lconst L4 <- static#54   (" window L") */
     0x00050085, 0x00030004,    /* 038A  add L5 <- L3 + L4 */
-    0x00130642,                /* 038C  gget L6 <- g19   (str) */
+    0x00350642,                /* 038C  gget L6 <- g53   (str) */
     0x00078341,                /* 038D  move L7 <- P3 */
     0x000601A0, 0x00010000,    /* 038E  call base=L6 argc=1 nres=1 */
     0x00070085, 0x00050006,    /* 0390  add L7 <- L5 + L6 */
     0x00370846,                /* 0392  lconst L8 <- static#55   ("..L") */
     0x00090085, 0x00070008,    /* 0393  add L9 <- L7 + L8 */
-    0x00130A42,                /* 0395  gget L10 <- g19   (str) */
+    0x00350A42,                /* 0395  gget L10 <- g53   (str) */
     0x000B0085, 0x80038004,    /* 0396  add L11 <- P3 + P4 */
     0x000C0140,                /* 0398  i8 L12 <- 1 */
     0x000D0086, 0x000B000C,    /* 0399  sub L13 <- L11 - L12 */
@@ -1040,7 +1118,7 @@ static const uint32_t verify_code[] = {
     0x000B0085, 0x0009000A,    /* 039E  add L11 <- L9 + L10 */
     0x00380C46,                /* 03A0  lconst L12 <- static#56   (" runs past the ") */
     0x000D0085, 0x000B000C,    /* 03A1  add L13 <- L11 + L12 */
-    0x00130E42,                /* 03A3  gget L14 <- g19   (str) */
+    0x00350E42,                /* 03A3  gget L14 <- g53   (str) */
     0x000A0F46,                /* 03A4  lconst L15 <- static#10   ("nlocals") */
     0x00100098, 0x8000000F,    /* 03A5  getidx L16 <- P0[L15] */
     0x000F1041,                /* 03A7  move L15 <- L16 */
@@ -1076,20 +1154,20 @@ static const uint32_t verify_code[] = {
     0x000B0342,                /* 03D1  gget L3 <- g11   (_fail) */
     0x00048041,                /* 03D2  move L4 <- P0 */
     0x00058141,                /* 03D3  move L5 <- P1 */
-    0x00130642,                /* 03D4  gget L6 <- g19   (str) */
+    0x00350642,                /* 03D4  gget L6 <- g53   (str) */
     0x00060746,                /* 03D5  lconst L7 <- static#6   ("name") */
     0x00080098, 0x80020007,    /* 03D6  getidx L8 <- P2[L7] */
     0x00070841,                /* 03D8  move L7 <- L8 */
     0x000601A0, 0x00010000,    /* 03D9  call base=L6 argc=1 nres=1 */
     0x003B0746,                /* 03DB  lconst L7 <- static#59   (" jumps to word ") */
     0x00080085, 0x00060007,    /* 03DC  add L8 <- L6 + L7 */
-    0x00130942,                /* 03DE  gget L9 <- g19   (str) */
+    0x00350942,                /* 03DE  gget L9 <- g53   (str) */
     0x000A0241,                /* 03DF  move L10 <- L2 */
     0x000901A0, 0x00010000,    /* 03E0  call base=L9 argc=1 nres=1 */
     0x000A0085, 0x00080009,    /* 03E2  add L10 <- L8 + L9 */
     0x003C0B46,                /* 03E4  lconst L11 <- static#60   (", outside the body [") */
     0x000C0085, 0x000A000B,    /* 03E5  add L12 <- L10 + L11 */
-    0x00130D42,                /* 03E7  gget L13 <- g19   (str) */
+    0x00350D42,                /* 03E7  gget L13 <- g53   (str) */
     0x00080E46,                /* 03E8  lconst L14 <- static#8   ("start") */
     0x000F0098, 0x8000000E,    /* 03E9  getidx L15 <- P0[L14] */
     0x000E0F41,                /* 03EB  move L14 <- L15 */
@@ -1097,7 +1175,7 @@ static const uint32_t verify_code[] = {
     0x000E0085, 0x000C000D,    /* 03EE  add L14 <- L12 + L13 */
     0x003D0F46,                /* 03F0  lconst L15 <- static#61   (", ") */
     0x00100085, 0x000E000F,    /* 03F1  add L16 <- L14 + L15 */
-    0x00131142,                /* 03F3  gget L17 <- g19   (str) */
+    0x00351142,                /* 03F3  gget L17 <- g53   (str) */
     0x00091246,                /* 03F4  lconst L18 <- static#9   ("end") */
     0x00130098, 0x80000012,    /* 03F5  getidx L19 <- P0[L18] */
     0x00121341,                /* 03F7  move L18 <- L19 */
@@ -1114,14 +1192,14 @@ static const uint32_t verify_code[] = {
     0x000B0342,                /* 0407  gget L3 <- g11   (_fail) */
     0x00048041,                /* 0408  move L4 <- P0 */
     0x00058141,                /* 0409  move L5 <- P1 */
-    0x00130642,                /* 040A  gget L6 <- g19   (str) */
+    0x00350642,                /* 040A  gget L6 <- g53   (str) */
     0x00060746,                /* 040B  lconst L7 <- static#6   ("name") */
     0x00080098, 0x80020007,    /* 040C  getidx L8 <- P2[L7] */
     0x00070841,                /* 040E  move L7 <- L8 */
     0x000601A0, 0x00010000,    /* 040F  call base=L6 argc=1 nres=1 */
     0x003B0746,                /* 0411  lconst L7 <- static#59   (" jumps to word ") */
     0x00080085, 0x00060007,    /* 0412  add L8 <- L6 + L7 */
-    0x00130942,                /* 0414  gget L9 <- g19   (str) */
+    0x00350942,                /* 0414  gget L9 <- g53   (str) */
     0x000A0241,                /* 0415  move L10 <- L2 */
     0x000901A0, 0x00010000,    /* 0416  call base=L9 argc=1 nres=1 */
     0x000A0085, 0x00080009,    /* 0418  add L10 <- L8 + L9 */
@@ -1137,7 +1215,7 @@ static const uint32_t verify_code[] = {
     0x00020097, 0x80050001,    /* 0425  is L2 <- P5 is L1 */
     0x0003024A,                /* 0427  not L3 <- L2 */
     0x0005034B,                /* 0428  jf L3, +5 */
-    0x00100142,                /* 0429  gget L1 <- g16   (len) */
+    0x00330142,                /* 0429  gget L1 <- g51   (len) */
     0x00028541,                /* 042A  move L2 <- P5 */
     0x000101A0, 0x00010000,    /* 042B  call base=L1 argc=1 nres=1 */
     0x00000141,                /* 042D  move L0 <- L1 */
@@ -1146,26 +1224,26 @@ static const uint32_t verify_code[] = {
     0x000B0142,                /* 0431  gget L1 <- g11   (_fail) */
     0x00028041,                /* 0432  move L2 <- P0 */
     0x00038141,                /* 0433  move L3 <- P1 */
-    0x00130442,                /* 0434  gget L4 <- g19   (str) */
+    0x00350442,                /* 0434  gget L4 <- g53   (str) */
     0x00060546,                /* 0435  lconst L5 <- static#6   ("name") */
     0x00060098, 0x80020005,    /* 0436  getidx L6 <- P2[L5] */
     0x00050641,                /* 0438  move L5 <- L6 */
     0x000401A0, 0x00010000,    /* 0439  call base=L4 argc=1 nres=1 */
     0x00280546,                /* 043B  lconst L5 <- static#40   (" ") */
     0x00060085, 0x00040005,    /* 043C  add L6 <- L4 + L5 */
-    0x00130742,                /* 043E  gget L7 <- g19   (str) */
+    0x00350742,                /* 043E  gget L7 <- g53   (str) */
     0x00088341,                /* 043F  move L8 <- P3 */
     0x000701A0, 0x00010000,    /* 0440  call base=L7 argc=1 nres=1 */
     0x00080085, 0x00060007,    /* 0442  add L8 <- L6 + L7 */
     0x00290946,                /* 0444  lconst L9 <- static#41   (" is index ") */
     0x000A0085, 0x00080009,    /* 0445  add L10 <- L8 + L9 */
-    0x00130B42,                /* 0447  gget L11 <- g19   (str) */
+    0x00350B42,                /* 0447  gget L11 <- g53   (str) */
     0x000C8441,                /* 0448  move L12 <- P4 */
     0x000B01A0, 0x00010000,    /* 0449  call base=L11 argc=1 nres=1 */
     0x000C0085, 0x000A000B,    /* 044B  add L12 <- L10 + L11 */
     0x00400D46,                /* 044D  lconst L13 <- static#64   (", but that table has ") */
     0x000E0085, 0x000C000D,    /* 044E  add L14 <- L12 + L13 */
-    0x00130F42,                /* 0450  gget L15 <- g19   (str) */
+    0x00350F42,                /* 0450  gget L15 <- g53   (str) */
     0x00100041,                /* 0451  move L16 <- L0 */
     0x000F01A0, 0x00010000,    /* 0452  call base=L15 argc=1 nres=1 */
     0x00100085, 0x000E000F,    /* 0454  add L16 <- L14 + L15 */
@@ -1232,24 +1310,24 @@ static const uint32_t verify_code[] = {
     0x00020097, 0x00000001,    /* 04A7  is L2 <- L0 is L1 */
     0x0008024B,                /* 04A9  jf L2, +8 */
     0x00460146,                /* 04AA  lconst L1 <- static#70   ("msg#") */
-    0x00130242,                /* 04AB  gget L2 <- g19   (str) */
+    0x00350242,                /* 04AB  gget L2 <- g53   (str) */
     0x00038141,                /* 04AC  move L3 <- P1 */
     0x000201A0, 0x00010000,    /* 04AD  call base=L2 argc=1 nres=1 */
     0x00030085, 0x00010002,    /* 04AF  add L3 <- L1 + L2 */
     0x00030102,                /* 04B1  return L3 count=1 */
-    0x00100142,                /* 04B2  gget L1 <- g16   (len) */
+    0x00330142,                /* 04B2  gget L1 <- g51   (len) */
     0x00020041,                /* 04B3  move L2 <- L0 */
     0x000101A0, 0x00010000,    /* 04B4  call base=L1 argc=1 nres=1 */
     0x00020094, 0x80010001,    /* 04B6  ge L2 <- P1 >= L1 */
     0x0008024B,                /* 04B8  jf L2, +8 */
     0x00460146,                /* 04B9  lconst L1 <- static#70   ("msg#") */
-    0x00130242,                /* 04BA  gget L2 <- g19   (str) */
+    0x00350242,                /* 04BA  gget L2 <- g53   (str) */
     0x00038141,                /* 04BB  move L3 <- P1 */
     0x000201A0, 0x00010000,    /* 04BC  call base=L2 argc=1 nres=1 */
     0x00030085, 0x00010002,    /* 04BE  add L3 <- L1 + L2 */
     0x00030102,                /* 04C0  return L3 count=1 */
     0x00460146,                /* 04C1  lconst L1 <- static#70   ("msg#") */
-    0x00130242,                /* 04C2  gget L2 <- g19   (str) */
+    0x00350242,                /* 04C2  gget L2 <- g53   (str) */
     0x00038141,                /* 04C3  move L3 <- P1 */
     0x000201A0, 0x00010000,    /* 04C4  call base=L2 argc=1 nres=1 */
     0x00030085, 0x00010002,    /* 04C6  add L3 <- L1 + L2 */
@@ -1267,7 +1345,7 @@ static const uint32_t verify_code[] = {
     0x00090102,                /* 04D9  return L9 count=1 */
     0x00490046,                /* 04DA  lconst L0 <- static#73   ("") */
     0x00010040,                /* 04DB  i8 L1 <- 0 */
-    0x00100342,                /* 04DC  gget L3 <- g16   (len) */
+    0x00330342,                /* 04DC  gget L3 <- g51   (len) */
     0x00048041,                /* 04DD  move L4 <- P0 */
     0x000301A0, 0x00010000,    /* 04DE  call base=L3 argc=1 nres=1 */
     0x00020341,                /* 04E0  move L2 <- L3 */
@@ -1278,7 +1356,7 @@ static const uint32_t verify_code[] = {
     0x0003044B,                /* 04E7  jf L4, +3 */
     0x004A0346,                /* 04E8  lconst L3 <- static#74   ("::") */
     0x00000085, 0x00000003,    /* 04E9  add L0 <- L0 + L3 */
-    0x00130342,                /* 04EB  gget L3 <- g19   (str) */
+    0x00350342,                /* 04EB  gget L3 <- g53   (str) */
     0x00040098, 0x80000001,    /* 04EC  getidx L4 <- P0[L1] */
     0x000301A0, 0x00010000,    /* 04EE  call base=L3 argc=1 nres=1 */
     0x00000085, 0x00000003,    /* 04F0  add L0 <- L0 + L3 */
@@ -1286,14 +1364,14 @@ static const uint32_t verify_code[] = {
     0x00010085, 0x00010003,    /* 04F3  add L1 <- L1 + L3 */
     0xFFEB004F,                /* 04F5  jmp -21 */
     0x00000102,                /* 04F6  return L0 count=1 */
-    0x00120042,                /* 04F7  gget L0 <- g18   (error) */
+    0x00340042,                /* 04F7  gget L0 <- g52   (error) */
     0x00130146,                /* 04F8  lconst L1 <- static#19   ("verify: ") */
     0x00060246,                /* 04F9  lconst L2 <- static#6   ("name") */
     0x00030098, 0x80000002,    /* 04FA  getidx L3 <- P0[L2] */
     0x00040085, 0x00010003,    /* 04FC  add L4 <- L1 + L3 */
     0x00140546,                /* 04FE  lconst L5 <- static#20   (" at word ") */
     0x00060085, 0x00040005,    /* 04FF  add L6 <- L4 + L5 */
-    0x00130742,                /* 0501  gget L7 <- g19   (str) */
+    0x00350742,                /* 0501  gget L7 <- g53   (str) */
     0x00088141,                /* 0502  move L8 <- P1 */
     0x000701A0, 0x00010000,    /* 0503  call base=L7 argc=1 nres=1 */
     0x00080085, 0x00060007,    /* 0505  add L8 <- L6 + L7 */

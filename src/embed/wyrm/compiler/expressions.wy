@@ -342,7 +342,7 @@ fn resolve_name(name, frame: FnContext, dst):
             if fwd is error:
                 return fwd
             return _land_free(frame, dst, fwd)
-    elif (not (module ! is_builtin(name))) and (not module.has_wildcard_import):
+    elif (not (module ! is_builtin(name))) and (not (module ! may_be_imported(name))):
         return error("undefined name '" + str(name) + "'")
     free := module ! declare_free_global(str(name))
     if free is error:
@@ -1122,6 +1122,9 @@ fn _scope(node, frame: FnContext, dst):
         if not ((frame.module) ! is_local_class(parts[0])):
             # `b::V` after `import a::b` names `a::b::V` (M2).
             parts = (frame.module) ! canonical_path(parts)
+            unknown := (frame.module) ! check_member(parts)
+            if unknown is error:
+                return unknown
             free := (frame.module) ! declare_free_global(_join_parts(parts))
             if free is error:
                 return free

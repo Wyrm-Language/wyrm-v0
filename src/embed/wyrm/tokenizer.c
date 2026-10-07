@@ -6,7 +6,7 @@
 static const uint8_t tokenizer_header[] = {
     0x2B, 0x00, 0x00, 0x00, 0x02, 0x6E, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x74,
     0x6F, 0x6B, 0x65, 0x6E, 0x69, 0x7A, 0x65, 0x72, 0x00, 0x10, 0x76, 0x00,
-    0x01, 0x00, 0x00, 0x00, 0x10, 0x67, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x10,
+    0x01, 0x00, 0x00, 0x00, 0x10, 0x67, 0x00, 0x2E, 0x00, 0x00, 0x00, 0x10,
     0x6C, 0x00, 0x26, 0x00, 0x00, 0x00, 0x00,
 };
 
@@ -683,7 +683,7 @@ static const uint8_t tokenizer_messages[] = {
 };
 
 static const uint8_t tokenizer_exports[] = {
-    0x26, 0x02, 0x00, 0x00, 0x10, 0x73, 0x74, 0x64, 0x00, 0x00, 0x00, 0x00,
+    0xFC, 0x02, 0x00, 0x00, 0x10, 0x73, 0x74, 0x64, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x10, 0x5F, 0x6C, 0x6F, 0x6F, 0x6B, 0x75, 0x70, 0x5F, 0x6B, 0x65,
     0x79, 0x77, 0x6F, 0x72, 0x64, 0x00, 0x01, 0x00, 0x00, 0x00, 0x10, 0x54,
     0x6F, 0x6B, 0x65, 0x6E, 0x00, 0x02, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x67,
@@ -728,29 +728,51 @@ static const uint8_t tokenizer_exports[] = {
     0x59, 0x4D, 0x42, 0x4F, 0x4C, 0x53, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x10,
     0x5F, 0x47, 0x52, 0x4F, 0x55, 0x50, 0x5F, 0x53, 0x54, 0x41, 0x52, 0x54,
     0x00, 0x1B, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x47, 0x52, 0x4F, 0x55, 0x50,
-    0x5F, 0x45, 0x4E, 0x44, 0x00, 0x1C, 0x00, 0x00, 0x00, 0x00,
+    0x5F, 0x45, 0x4E, 0x44, 0x00, 0x1C, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73,
+    0x5F, 0x61, 0x6C, 0x70, 0x68, 0x61, 0x00, 0x1D, 0x00, 0x00, 0x00, 0x10,
+    0x69, 0x73, 0x5F, 0x61, 0x6C, 0x70, 0x68, 0x61, 0x5F, 0x6C, 0x6F, 0x77,
+    0x65, 0x72, 0x00, 0x1E, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x61,
+    0x6C, 0x70, 0x68, 0x61, 0x5F, 0x75, 0x70, 0x70, 0x65, 0x72, 0x00, 0x1F,
+    0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x62, 0x69, 0x6E, 0x64, 0x69,
+    0x67, 0x69, 0x74, 0x00, 0x20, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F,
+    0x63, 0x6E, 0x74, 0x72, 0x6C, 0x00, 0x21, 0x00, 0x00, 0x00, 0x10, 0x69,
+    0x73, 0x5F, 0x64, 0x69, 0x67, 0x69, 0x74, 0x00, 0x22, 0x00, 0x00, 0x00,
+    0x10, 0x69, 0x73, 0x5F, 0x68, 0x65, 0x78, 0x64, 0x69, 0x67, 0x69, 0x74,
+    0x00, 0x23, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x73, 0x70, 0x61,
+    0x63, 0x65, 0x00, 0x24, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x77,
+    0x79, 0x5F, 0x78, 0x69, 0x64, 0x5F, 0x63, 0x6F, 0x6E, 0x74, 0x69, 0x6E,
+    0x75, 0x65, 0x00, 0x25, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x77,
+    0x79, 0x5F, 0x78, 0x69, 0x64, 0x5F, 0x73, 0x74, 0x61, 0x72, 0x74, 0x00,
+    0x26, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x78, 0x69, 0x64, 0x5F,
+    0x63, 0x6F, 0x6E, 0x74, 0x69, 0x6E, 0x75, 0x65, 0x00, 0x27, 0x00, 0x00,
+    0x00, 0x10, 0x69, 0x73, 0x5F, 0x78, 0x69, 0x64, 0x5F, 0x73, 0x74, 0x61,
+    0x72, 0x74, 0x00, 0x28, 0x00, 0x00, 0x00, 0x00,
 };
 
 static const uint8_t tokenizer_free[] = {
-    0xE3, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x73, 0x70, 0x61, 0x63,
-    0x65, 0x00, 0x1D, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x64, 0x69,
-    0x67, 0x69, 0x74, 0x00, 0x1E, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F,
-    0x68, 0x65, 0x78, 0x64, 0x69, 0x67, 0x69, 0x74, 0x00, 0x1F, 0x00, 0x00,
-    0x00, 0x10, 0x69, 0x73, 0x5F, 0x62, 0x69, 0x6E, 0x64, 0x69, 0x67, 0x69,
-    0x74, 0x00, 0x20, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x78, 0x69,
-    0x64, 0x5F, 0x73, 0x74, 0x61, 0x72, 0x74, 0x00, 0x21, 0x00, 0x00, 0x00,
-    0x10, 0x69, 0x73, 0x5F, 0x78, 0x69, 0x64, 0x5F, 0x63, 0x6F, 0x6E, 0x74,
-    0x69, 0x6E, 0x75, 0x65, 0x00, 0x22, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x65,
-    0x6E, 0x00, 0x23, 0x00, 0x00, 0x00, 0x10, 0x65, 0x72, 0x72, 0x6F, 0x72,
-    0x00, 0x24, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x61, 0x6C, 0x70,
-    0x68, 0x61, 0x00, 0x25, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x63,
-    0x6E, 0x74, 0x72, 0x6C, 0x00, 0x26, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73,
-    0x5F, 0x77, 0x79, 0x5F, 0x78, 0x69, 0x64, 0x5F, 0x73, 0x74, 0x61, 0x72,
-    0x74, 0x00, 0x27, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x77, 0x79,
-    0x5F, 0x78, 0x69, 0x64, 0x5F, 0x63, 0x6F, 0x6E, 0x74, 0x69, 0x6E, 0x75,
-    0x65, 0x00, 0x28, 0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x72, 0x00, 0x29,
-    0x00, 0x00, 0x00, 0x10, 0x70, 0x61, 0x69, 0x72, 0x00, 0x2A, 0x00, 0x00,
-    0x00, 0x10, 0x63, 0x64, 0x72, 0x00, 0x2B, 0x00, 0x00, 0x00, 0x00,
+    0x0B, 0x01, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x61, 0x6C, 0x70, 0x68,
+    0x61, 0x00, 0x1D, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x61, 0x6C,
+    0x70, 0x68, 0x61, 0x5F, 0x6C, 0x6F, 0x77, 0x65, 0x72, 0x00, 0x1E, 0x00,
+    0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x61, 0x6C, 0x70, 0x68, 0x61, 0x5F,
+    0x75, 0x70, 0x70, 0x65, 0x72, 0x00, 0x1F, 0x00, 0x00, 0x00, 0x10, 0x69,
+    0x73, 0x5F, 0x62, 0x69, 0x6E, 0x64, 0x69, 0x67, 0x69, 0x74, 0x00, 0x20,
+    0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x63, 0x6E, 0x74, 0x72, 0x6C,
+    0x00, 0x21, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x64, 0x69, 0x67,
+    0x69, 0x74, 0x00, 0x22, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x68,
+    0x65, 0x78, 0x64, 0x69, 0x67, 0x69, 0x74, 0x00, 0x23, 0x00, 0x00, 0x00,
+    0x10, 0x69, 0x73, 0x5F, 0x73, 0x70, 0x61, 0x63, 0x65, 0x00, 0x24, 0x00,
+    0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x77, 0x79, 0x5F, 0x78, 0x69, 0x64,
+    0x5F, 0x63, 0x6F, 0x6E, 0x74, 0x69, 0x6E, 0x75, 0x65, 0x00, 0x25, 0x00,
+    0x00, 0x00, 0x10, 0x69, 0x73, 0x5F, 0x77, 0x79, 0x5F, 0x78, 0x69, 0x64,
+    0x5F, 0x73, 0x74, 0x61, 0x72, 0x74, 0x00, 0x26, 0x00, 0x00, 0x00, 0x10,
+    0x69, 0x73, 0x5F, 0x78, 0x69, 0x64, 0x5F, 0x63, 0x6F, 0x6E, 0x74, 0x69,
+    0x6E, 0x75, 0x65, 0x00, 0x27, 0x00, 0x00, 0x00, 0x10, 0x69, 0x73, 0x5F,
+    0x78, 0x69, 0x64, 0x5F, 0x73, 0x74, 0x61, 0x72, 0x74, 0x00, 0x28, 0x00,
+    0x00, 0x00, 0x10, 0x6C, 0x65, 0x6E, 0x00, 0x29, 0x00, 0x00, 0x00, 0x10,
+    0x65, 0x72, 0x72, 0x6F, 0x72, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x10, 0x63,
+    0x61, 0x72, 0x00, 0x2B, 0x00, 0x00, 0x00, 0x10, 0x70, 0x61, 0x69, 0x72,
+    0x00, 0x2C, 0x00, 0x00, 0x00, 0x10, 0x63, 0x64, 0x72, 0x00, 0x2D, 0x00,
+    0x00, 0x00, 0x00,
 };
 
 static const uint32_t tokenizer_code[] = {
@@ -1322,7 +1344,7 @@ static const uint32_t tokenizer_code[] = {
     0x000301A0, 0x00010000,    /* 02C9  call base=L3 argc=1 nres=1 */
     0x0001034B,                /* 02CB  jf L3, +1 */
     0x00000102,                /* 02CC  return L0 count=1 */
-    0x001D0342,                /* 02CD  gget L3 <- g29   (is_space) */
+    0x00240342,                /* 02CD  gget L3 <- g36   (is_space) */
     0x00040141,                /* 02CE  move L4 <- L1 */
     0x000301A0, 0x00010000,    /* 02CF  call base=L3 argc=1 nres=1 */
     0x0004034B,                /* 02D1  jf L3, +4 */
@@ -1360,7 +1382,7 @@ static const uint32_t tokenizer_code[] = {
     0x00500345,                /* 02F7  lsym L3 <- sym#80   ("EOF") */
     0x0002008F, 0x00010003,    /* 02F8  eq L2 <- L1 == L3 */
     0x0005024C,                /* 02FA  jt L2, +5 */
-    0x001E0342,                /* 02FB  gget L3 <- g30   (is_digit) */
+    0x00220342,                /* 02FB  gget L3 <- g34   (is_digit) */
     0x00040141,                /* 02FC  move L4 <- L1 */
     0x000301A0, 0x00010000,    /* 02FD  call base=L3 argc=1 nres=1 */
     0x0002034A,                /* 02FF  not L2 <- L3 */
@@ -1370,7 +1392,7 @@ static const uint32_t tokenizer_code[] = {
     0x00500345,                /* 0303  lsym L3 <- sym#80   ("EOF") */
     0x00020090, 0x00010003,    /* 0304  ne L2 <- L1 != L3 */
     0x0009024B,                /* 0306  jf L2, +9 */
-    0x001E0342,                /* 0307  gget L3 <- g30   (is_digit) */
+    0x00220342,                /* 0307  gget L3 <- g34   (is_digit) */
     0x00040141,                /* 0308  move L4 <- L1 */
     0x000301A0, 0x00010000,    /* 0309  call base=L3 argc=1 nres=1 */
     0x00020341,                /* 030B  move L2 <- L3 */
@@ -1396,7 +1418,7 @@ static const uint32_t tokenizer_code[] = {
     0x00500345,                /* 0323  lsym L3 <- sym#80   ("EOF") */
     0x0002008F, 0x00010003,    /* 0324  eq L2 <- L1 == L3 */
     0x0005024C,                /* 0326  jt L2, +5 */
-    0x001F0342,                /* 0327  gget L3 <- g31   (is_hexdigit) */
+    0x00230342,                /* 0327  gget L3 <- g35   (is_hexdigit) */
     0x00040141,                /* 0328  move L4 <- L1 */
     0x000301A0, 0x00010000,    /* 0329  call base=L3 argc=1 nres=1 */
     0x0002034A,                /* 032B  not L2 <- L3 */
@@ -1407,7 +1429,7 @@ static const uint32_t tokenizer_code[] = {
     0x0004008F, 0x00010003,    /* 0330  eq L4 <- L1 == L3 */
     0x0002044A,                /* 0332  not L2 <- L4 */
     0x0009024B,                /* 0333  jf L2, +9 */
-    0x001F0342,                /* 0334  gget L3 <- g31   (is_hexdigit) */
+    0x00230342,                /* 0334  gget L3 <- g35   (is_hexdigit) */
     0x00040141,                /* 0335  move L4 <- L1 */
     0x000301A0, 0x00010000,    /* 0336  call base=L3 argc=1 nres=1 */
     0x00020341,                /* 0338  move L2 <- L3 */
@@ -1503,7 +1525,7 @@ static const uint32_t tokenizer_code[] = {
     0x00500345,                /* 03A7  lsym L3 <- sym#80   ("EOF") */
     0x0002008F, 0x00010003,    /* 03A8  eq L2 <- L1 == L3 */
     0x0005024C,                /* 03AA  jt L2, +5 */
-    0x00210342,                /* 03AB  gget L3 <- g33   (is_xid_start) */
+    0x00280342,                /* 03AB  gget L3 <- g40   (is_xid_start) */
     0x00040141,                /* 03AC  move L4 <- L1 */
     0x000301A0, 0x00010000,    /* 03AD  call base=L3 argc=1 nres=1 */
     0x0002034A,                /* 03AF  not L2 <- L3 */
@@ -1520,7 +1542,7 @@ static const uint32_t tokenizer_code[] = {
     0x00500345,                /* 03BC  lsym L3 <- sym#80   ("EOF") */
     0x00020090, 0x00010003,    /* 03BD  ne L2 <- L1 != L3 */
     0x0005024B,                /* 03BF  jf L2, +5 */
-    0x00220342,                /* 03C0  gget L3 <- g34   (is_xid_continue) */
+    0x00270342,                /* 03C0  gget L3 <- g39   (is_xid_continue) */
     0x00040141,                /* 03C1  move L4 <- L1 */
     0x000301A0, 0x00010000,    /* 03C2  call base=L3 argc=1 nres=1 */
     0x00020341,                /* 03C4  move L2 <- L3 */
@@ -1537,7 +1559,7 @@ static const uint32_t tokenizer_code[] = {
     0x001A0442,                /* 03D1  gget L4 <- g26   (_OPERATOR_SYMBOLS) */
     0x000500AE, 0x00040000,    /* 03D2  iter L5 <- L4 */
     0x000000AF, 0x00050020,    /* 03D4  itnext L0 <- L5, done +32 */
-    0x00230642,                /* 03D6  gget L6 <- g35   (len) */
+    0x00290642,                /* 03D6  gget L6 <- g41   (len) */
     0x00070041,                /* 03D7  move L7 <- L0 */
     0x000601A0, 0x00010000,    /* 03D8  call base=L6 argc=1 nres=1 */
     0x00010641,                /* 03DA  move L1 <- L6 */
@@ -1578,7 +1600,7 @@ static const uint32_t tokenizer_code[] = {
     0x0001044B,                /* 0409  jf L4, +1 */
     0x00048241,                /* 040A  move L4 <- P2 */
     0x0005044B,                /* 040B  jf L4, +5 */
-    0x00240442,                /* 040C  gget L4 <- g36   (error) */
+    0x002A0442,                /* 040C  gget L4 <- g42   (error) */
     0x003A0546,                /* 040D  lconst L5 <- static#58   ("unexpected stream end") */
     0x000401A0, 0x00010000,    /* 040E  call base=L4 argc=1 nres=1 */
     0x00040102,                /* 0410  return L4 count=1 */
@@ -1601,12 +1623,12 @@ static const uint32_t tokenizer_code[] = {
     0x00500345,                /* 0424  lsym L3 <- sym#80   ("EOF") */
     0x0002008F, 0x00010003,    /* 0425  eq L2 <- L1 == L3 */
     0x000C024C,                /* 0427  jt L2, +12 */
-    0x00250442,                /* 0428  gget L4 <- g37   (is_alpha) */
+    0x001D0442,                /* 0428  gget L4 <- g29   (is_alpha) */
     0x00050141,                /* 0429  move L5 <- L1 */
     0x000401A0, 0x00010000,    /* 042A  call base=L4 argc=1 nres=1 */
     0x00030441,                /* 042C  move L3 <- L4 */
     0x0005034C,                /* 042D  jt L3, +5 */
-    0x001E0442,                /* 042E  gget L4 <- g30   (is_digit) */
+    0x00220442,                /* 042E  gget L4 <- g34   (is_digit) */
     0x00050141,                /* 042F  move L5 <- L1 */
     0x000401A0, 0x00010000,    /* 0430  call base=L4 argc=1 nres=1 */
     0x00030441,                /* 0432  move L3 <- L4 */
@@ -1624,11 +1646,11 @@ static const uint32_t tokenizer_code[] = {
     0xFFDF004F,                /* 0440  jmp -33 */
     0x00000102,                /* 0441  return L0 count=1 */
     0x00008141,                /* 0442  move L0 <- P1 */
-    0x00230542,                /* 0443  gget L5 <- g35   (len) */
+    0x00290542,                /* 0443  gget L5 <- g41   (len) */
     0x00068241,                /* 0444  move L6 <- P2 */
     0x000501A0, 0x00010000,    /* 0445  call base=L5 argc=1 nres=1 */
     0x00010541,                /* 0447  move L1 <- L5 */
-    0x00230542,                /* 0448  gget L5 <- g35   (len) */
+    0x00290542,                /* 0448  gget L5 <- g41   (len) */
     0x00068041,                /* 0449  move L6 <- P0 */
     0x000501A0, 0x00010000,    /* 044A  call base=L5 argc=1 nres=1 */
     0x00020541,                /* 044C  move L2 <- L5 */
@@ -1691,7 +1713,7 @@ static const uint32_t tokenizer_code[] = {
     0x00060102,                /* 0498  return L6 count=1 */
     0x00060140,                /* 0499  i8 L6 <- 1 */
     0x00040085, 0x00000006,    /* 049A  add L4 <- L0 + L6 */
-    0x00230642,                /* 049C  gget L6 <- g35   (len) */
+    0x00290642,                /* 049C  gget L6 <- g41   (len) */
     0x00070241,                /* 049D  move L7 <- L2 */
     0x000601A0, 0x00010000,    /* 049E  call base=L6 argc=1 nres=1 */
     0x00050086, 0x00030006,    /* 04A0  sub L5 <- L3 - L6 */
@@ -1797,7 +1819,7 @@ static const uint32_t tokenizer_code[] = {
     0x000E01A0, 0x00010000,    /* 0529  call base=L14 argc=1 nres=1 */
     0x000D0E41,                /* 052B  move L13 <- L14 */
     0x00050D4C,                /* 052C  jt L13, +5 */
-    0x001D0E42,                /* 052D  gget L14 <- g29   (is_space) */
+    0x00240E42,                /* 052D  gget L14 <- g36   (is_space) */
     0x000F0141,                /* 052E  move L15 <- L1 */
     0x000E01A0, 0x00010000,    /* 052F  call base=L14 argc=1 nres=1 */
     0x000D0E41,                /* 0531  move L13 <- L14 */
@@ -1847,7 +1869,7 @@ static const uint32_t tokenizer_code[] = {
     0x000D04A2, 0x00030001,    /* 056B  msg base=L13 argc=4 msg#3 nres=1   (_advance_with_token_span) */
     0x000D0102,                /* 056D  return L13 count=1 */
     0x000D8041,                /* 056E  move L13 <- P0 */
-    0x00240E42,                /* 056F  gget L14 <- g36   (error) */
+    0x002A0E42,                /* 056F  gget L14 <- g42   (error) */
     0x003D0F46,                /* 0570  lconst L15 <- static#61   ("bad symbol literal") */
     0x000E01A0, 0x00010000,    /* 0571  call base=L14 argc=1 nres=1 */
     0x000F009A, 0x80000052,    /* 0573  getattr L15 <- P0.sym#82   ("cur_pos") */
@@ -2004,10 +2026,10 @@ static const uint32_t tokenizer_code[] = {
     0x000E008F, 0x0002000D,    /* 0646  eq L14 <- L2 == L13 */
     0x000D0E4B,                /* 0648  jf L14, +13 */
     0x000D8041,                /* 0649  move L13 <- P0 */
-    0x00240E42,                /* 064A  gget L14 <- g36   (error) */
+    0x002A0E42,                /* 064A  gget L14 <- g42   (error) */
     0x003E0F46,                /* 064B  lconst L15 <- static#62   ("eof in character literal") */
     0x000E01A0, 0x00010000,    /* 064C  call base=L14 argc=1 nres=1 */
-    0x00230F42,                /* 064E  gget L15 <- g35   (len) */
+    0x00290F42,                /* 064E  gget L15 <- g41   (len) */
     0x0010009A, 0x80000051,    /* 064F  getattr L16 <- P0.sym#81   ("buffer") */
     0x000F01A0, 0x00010000,    /* 0651  call base=L15 argc=1 nres=1 */
     0x000D02A2, 0x00020001,    /* 0653  msg base=L13 argc=2 msg#2 nres=1   (_advance_with_token) */
@@ -2015,18 +2037,18 @@ static const uint32_t tokenizer_code[] = {
     0x000D009A, 0x80000052,    /* 0656  getattr L13 <- P0.sym#82   ("cur_pos") */
     0x000E0240,                /* 0658  i8 L14 <- 2 */
     0x000B0085, 0x000D000E,    /* 0659  add L11 <- L13 + L14 */
-    0x00260E42,                /* 065B  gget L14 <- g38   (is_cntrl) */
+    0x00210E42,                /* 065B  gget L14 <- g33   (is_cntrl) */
     0x000F0241,                /* 065C  move L15 <- L2 */
     0x000E01A0, 0x00010000,    /* 065D  call base=L14 argc=1 nres=1 */
     0x000D0E41,                /* 065F  move L13 <- L14 */
     0x00050D4C,                /* 0660  jt L13, +5 */
-    0x001D0E42,                /* 0661  gget L14 <- g29   (is_space) */
+    0x00240E42,                /* 0661  gget L14 <- g36   (is_space) */
     0x000F0241,                /* 0662  move L15 <- L2 */
     0x000E01A0, 0x00010000,    /* 0663  call base=L14 argc=1 nres=1 */
     0x000D0E41,                /* 0665  move L13 <- L14 */
     0x00090D4B,                /* 0666  jf L13, +9 */
     0x000D8041,                /* 0667  move L13 <- P0 */
-    0x00240E42,                /* 0668  gget L14 <- g36   (error) */
+    0x002A0E42,                /* 0668  gget L14 <- g42   (error) */
     0x003F0F46,                /* 0669  lconst L15 <- static#63   ("unexpected character in character literal") */
     0x000E01A0, 0x00010000,    /* 066A  call base=L14 argc=1 nres=1 */
     0x000F0B41,                /* 066C  move L15 <- L11 */
@@ -2070,7 +2092,7 @@ static const uint32_t tokenizer_code[] = {
     0x00010E4B,                /* 069F  jf L14, +1 */
     0x00000102,                /* 06A0  return L0 count=1 */
     0x000D8041,                /* 06A1  move L13 <- P0 */
-    0x00240E42,                /* 06A2  gget L14 <- g36   (error) */
+    0x002A0E42,                /* 06A2  gget L14 <- g42   (error) */
     0x00400F46,                /* 06A3  lconst L15 <- static#64   ("unexpected token") */
     0x000E01A0, 0x00010000,    /* 06A4  call base=L14 argc=1 nres=1 */
     0x000F009A, 0x80000052,    /* 06A6  getattr L15 <- P0.sym#82   ("cur_pos") */
@@ -2088,7 +2110,7 @@ static const uint32_t tokenizer_code[] = {
     0x00500545,                /* 06B8  lsym L5 <- sym#80   ("EOF") */
     0x0004008F, 0x00010005,    /* 06B9  eq L4 <- L1 == L5 */
     0x0005044C,                /* 06BB  jt L4, +5 */
-    0x00270542,                /* 06BC  gget L5 <- g39   (is_wy_xid_start) */
+    0x00260542,                /* 06BC  gget L5 <- g38   (is_wy_xid_start) */
     0x00060141,                /* 06BD  move L6 <- L1 */
     0x000501A0, 0x00010000,    /* 06BE  call base=L5 argc=1 nres=1 */
     0x0004054A,                /* 06C0  not L4 <- L5 */
@@ -2105,7 +2127,7 @@ static const uint32_t tokenizer_code[] = {
     0x00500545,                /* 06CE  lsym L5 <- sym#80   ("EOF") */
     0x00040090, 0x00010005,    /* 06CF  ne L4 <- L1 != L5 */
     0x0005044B,                /* 06D1  jf L4, +5 */
-    0x00280542,                /* 06D2  gget L5 <- g40   (is_wy_xid_continue) */
+    0x00250542,                /* 06D2  gget L5 <- g37   (is_wy_xid_continue) */
     0x00060141,                /* 06D3  move L6 <- L1 */
     0x000501A0, 0x00010000,    /* 06D4  call base=L5 argc=1 nres=1 */
     0x00040541,                /* 06D6  move L4 <- L5 */
@@ -2178,7 +2200,7 @@ static const uint32_t tokenizer_code[] = {
     0x00040541,                /* 072F  move L4 <- L5 */
     0x0009044B,                /* 0730  jf L4, +9 */
     0x00048041,                /* 0731  move L4 <- P0 */
-    0x00240542,                /* 0732  gget L5 <- g36   (error) */
+    0x002A0542,                /* 0732  gget L5 <- g42   (error) */
     0x00420646,                /* 0733  lconst L6 <- static#66   ("unexpected end-of-line within string") */
     0x000501A0, 0x00010000,    /* 0734  call base=L5 argc=1 nres=1 */
     0x00060041,                /* 0736  move L6 <- L0 */
@@ -2222,7 +2244,7 @@ static const uint32_t tokenizer_code[] = {
     0x005B0545,                /* 0767  lsym L5 <- sym#91   ("TOK_STR") */
     0x00068141,                /* 0768  move L6 <- P1 */
     0x00070041,                /* 0769  move L7 <- L0 */
-    0x00230842,                /* 076A  gget L8 <- g35   (len) */
+    0x00290842,                /* 076A  gget L8 <- g41   (len) */
     0x00098341,                /* 076B  move L9 <- P3 */
     0x000801A0, 0x00010000,    /* 076C  call base=L8 argc=1 nres=1 */
     0x00090085, 0x00000008,    /* 076E  add L9 <- L0 + L8 */
@@ -2361,10 +2383,10 @@ static const uint32_t tokenizer_code[] = {
     0x000B02A2, 0x00020001,    /* 0822  msg base=L11 argc=2 msg#2 nres=1   (_advance_with_token) */
     0x000B0102,                /* 0824  return L11 count=1 */
     0x000A0102,                /* 0825  return L10 count=1 */
-    0x00230042,                /* 0826  gget L0 <- g35   (len) */
+    0x00290042,                /* 0826  gget L0 <- g41   (len) */
     0x00018041,                /* 0827  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 0828  call base=L0 argc=1 nres=1 */
-    0x00230142,                /* 082A  gget L1 <- g35   (len) */
+    0x00290142,                /* 082A  gget L1 <- g41   (len) */
     0x00028141,                /* 082B  move L2 <- P1 */
     0x000101A0, 0x00010000,    /* 082C  call base=L1 argc=1 nres=1 */
     0x00020093, 0x00000001,    /* 082E  gt L2 <- L0 > L1 */
@@ -2373,7 +2395,7 @@ static const uint32_t tokenizer_code[] = {
     0x00000102,                /* 0832  return L0 count=1 */
     0x00008141,                /* 0833  move L0 <- P1 */
     0x00010040,                /* 0834  i8 L1 <- 0 */
-    0x00230242,                /* 0835  gget L2 <- g35   (len) */
+    0x00290242,                /* 0835  gget L2 <- g41   (len) */
     0x00038041,                /* 0836  move L3 <- P0 */
     0x000201A0, 0x00010000,    /* 0837  call base=L2 argc=1 nres=1 */
     0x000002A2, 0x00000001,    /* 0839  msg base=L0 argc=2 msg#0 nres=1   (substr) */
@@ -2403,14 +2425,14 @@ static const uint32_t tokenizer_code[] = {
     0x000101A2, 0x00070001,    /* 085D  msg base=L1 argc=1 msg#7 nres=1   (append) */
     0x00000141,                /* 085F  move L0 <- L1 */
     0x00000102,                /* 0860  return L0 count=1 */
-    0x00290242,                /* 0861  gget L2 <- g41   (car) */
+    0x002B0242,                /* 0861  gget L2 <- g43   (car) */
     0x0003009A, 0x80000069,    /* 0862  getattr L3 <- P0.sym#105   ("indents") */
     0x000201A0, 0x00010000,    /* 0864  call base=L2 argc=1 nres=1 */
     0x00000241,                /* 0866  move L0 <- L2 */
-    0x00230242,                /* 0867  gget L2 <- g35   (len) */
+    0x00290242,                /* 0867  gget L2 <- g41   (len) */
     0x0003009A, 0x80000068,    /* 0868  getattr L3 <- P0.sym#104   ("line_ws") */
     0x000201A0, 0x00010000,    /* 086A  call base=L2 argc=1 nres=1 */
-    0x00230342,                /* 086C  gget L3 <- g35   (len) */
+    0x00290342,                /* 086C  gget L3 <- g41   (len) */
     0x00040041,                /* 086D  move L4 <- L0 */
     0x000301A0, 0x00010000,    /* 086E  call base=L3 argc=1 nres=1 */
     0x00040093, 0x00020003,    /* 0870  gt L4 <- L2 > L3 */
@@ -2422,14 +2444,14 @@ static const uint32_t tokenizer_code[] = {
     0x0003024A,                /* 0879  not L3 <- L2 */
     0x000A034B,                /* 087A  jf L3, +10 */
     0x00028041,                /* 087B  move L2 <- P0 */
-    0x00240342,                /* 087C  gget L3 <- g36   (error) */
+    0x002A0342,                /* 087C  gget L3 <- g42   (error) */
     0x00440446,                /* 087D  lconst L4 <- static#68   ("inconsistent indent") */
     0x000301A0, 0x00010000,    /* 087E  call base=L3 argc=1 nres=1 */
     0x00048141,                /* 0880  move L4 <- P1 */
     0x000202A2, 0x00080001,    /* 0881  msg base=L2 argc=2 msg#8 nres=1   (_emit) */
     0x00020003,                /* 0883  lnil L2 */
     0x00020102,                /* 0884  return L2 count=1 */
-    0x002A0342,                /* 0885  gget L3 <- g42   (pair) */
+    0x002C0342,                /* 0885  gget L3 <- g44   (pair) */
     0x0004009A, 0x80000068,    /* 0886  getattr L4 <- P0.sym#104   ("line_ws") */
     0x0005009A, 0x80000069,    /* 0888  getattr L5 <- P0.sym#105   ("indents") */
     0x000302A0, 0x00010000,    /* 088A  call base=L3 argc=2 nres=1 */
@@ -2441,17 +2463,17 @@ static const uint32_t tokenizer_code[] = {
     0x000202A2, 0x00080001,    /* 0892  msg base=L2 argc=2 msg#8 nres=1   (_emit) */
     0x00020003,                /* 0894  lnil L2 */
     0x00020102,                /* 0895  return L2 count=1 */
-    0x00230242,                /* 0896  gget L2 <- g35   (len) */
-    0x00290342,                /* 0897  gget L3 <- g41   (car) */
+    0x00290242,                /* 0896  gget L2 <- g41   (len) */
+    0x002B0342,                /* 0897  gget L3 <- g43   (car) */
     0x0004009A, 0x80000069,    /* 0898  getattr L4 <- P0.sym#105   ("indents") */
     0x000301A0, 0x00010000,    /* 089A  call base=L3 argc=1 nres=1 */
     0x000201A0, 0x00010000,    /* 089C  call base=L2 argc=1 nres=1 */
-    0x00230342,                /* 089E  gget L3 <- g35   (len) */
+    0x00290342,                /* 089E  gget L3 <- g41   (len) */
     0x0004009A, 0x80000068,    /* 089F  getattr L4 <- P0.sym#104   ("line_ws") */
     0x000301A0, 0x00010000,    /* 08A1  call base=L3 argc=1 nres=1 */
     0x00040093, 0x00020003,    /* 08A3  gt L4 <- L2 > L3 */
     0x0013044B,                /* 08A5  jf L4, +19 */
-    0x002B0342,                /* 08A6  gget L3 <- g43   (cdr) */
+    0x002D0342,                /* 08A6  gget L3 <- g45   (cdr) */
     0x0004009A, 0x80000069,    /* 08A7  getattr L4 <- P0.sym#105   ("indents") */
     0x000301A0, 0x00010000,    /* 08A9  call base=L3 argc=1 nres=1 */
     0x00020341,                /* 08AB  move L2 <- L3 */
@@ -2466,14 +2488,14 @@ static const uint32_t tokenizer_code[] = {
     0x000202A2, 0x00080001,    /* 08B6  msg base=L2 argc=2 msg#8 nres=1   (_emit) */
     0xFFDD004F,                /* 08B8  jmp -35 */
     0x00010003,                /* 08B9  lnil L1 */
-    0x00290242,                /* 08BA  gget L2 <- g41   (car) */
+    0x002B0242,                /* 08BA  gget L2 <- g43   (car) */
     0x0003009A, 0x80000069,    /* 08BB  getattr L3 <- P0.sym#105   ("indents") */
     0x000201A0, 0x00010000,    /* 08BD  call base=L2 argc=1 nres=1 */
     0x0003009A, 0x80000068,    /* 08BF  getattr L3 <- P0.sym#104   ("line_ws") */
     0x00040090, 0x00020003,    /* 08C1  ne L4 <- L2 != L3 */
     0x0009044B,                /* 08C3  jf L4, +9 */
     0x00028041,                /* 08C4  move L2 <- P0 */
-    0x00240342,                /* 08C5  gget L3 <- g36   (error) */
+    0x002A0342,                /* 08C5  gget L3 <- g42   (error) */
     0x00450446,                /* 08C6  lconst L4 <- static#69   ("unindent does not match an enclosing level") */
     0x000301A0, 0x00010000,    /* 08C7  call base=L3 argc=1 nres=1 */
     0x00048141,                /* 08C9  move L4 <- P1 */

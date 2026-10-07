@@ -6,7 +6,7 @@
 static const uint8_t ast_header[] = {
     0x25, 0x00, 0x00, 0x00, 0x02, 0x6E, 0x00, 0x04, 0x00, 0x00, 0x00, 0x61,
     0x73, 0x74, 0x00, 0x10, 0x76, 0x00, 0x01, 0x00, 0x00, 0x00, 0x10, 0x67,
-    0x00, 0x33, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x00, 0x03, 0x00, 0x00, 0x00,
+    0x00, 0x39, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x00, 0x03, 0x00, 0x00, 0x00,
     0x00,
 };
 
@@ -327,7 +327,7 @@ static const uint8_t ast_messages[] = {
 };
 
 static const uint8_t ast_exports[] = {
-    0x67, 0x02, 0x00, 0x00, 0x10, 0x73, 0x74, 0x64, 0x00, 0x00, 0x00, 0x00,
+    0xF0, 0x02, 0x00, 0x00, 0x10, 0x73, 0x74, 0x64, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x10, 0x6E, 0x5F, 0x74, 0x79, 0x70, 0x65, 0x00, 0x01, 0x00, 0x00,
     0x00, 0x10, 0x6E, 0x5F, 0x64, 0x65, 0x66, 0x69, 0x6E, 0x65, 0x00, 0x02,
     0x00, 0x00, 0x00, 0x10, 0x6E, 0x5F, 0x73, 0x65, 0x74, 0x00, 0x03, 0x00,
@@ -378,21 +378,38 @@ static const uint8_t ast_exports[] = {
     0x45, 0x00, 0x25, 0x00, 0x00, 0x00, 0x10, 0x5F, 0x46, 0x4E, 0x5F, 0x44,
     0x45, 0x46, 0x5F, 0x42, 0x4F, 0x44, 0x59, 0x00, 0x26, 0x00, 0x00, 0x00,
     0x10, 0x4E, 0x49, 0x4C, 0x5F, 0x45, 0x58, 0x50, 0x52, 0x00, 0x27, 0x00,
-    0x00, 0x00, 0x00,
+    0x00, 0x00, 0x10, 0x63, 0x61, 0x64, 0x64, 0x72, 0x00, 0x28, 0x00, 0x00,
+    0x00, 0x10, 0x63, 0x61, 0x64, 0x72, 0x00, 0x29, 0x00, 0x00, 0x00, 0x10,
+    0x63, 0x64, 0x64, 0x64, 0x72, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x10, 0x63,
+    0x64, 0x64, 0x72, 0x00, 0x2B, 0x00, 0x00, 0x00, 0x10, 0x63, 0x68, 0x61,
+    0x69, 0x6E, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x10, 0x66, 0x69, 0x65, 0x6C,
+    0x64, 0x00, 0x2D, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x69, 0x73, 0x74, 0x5F,
+    0x68, 0x65, 0x61, 0x64, 0x00, 0x2E, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x69,
+    0x73, 0x74, 0x5F, 0x74, 0x61, 0x69, 0x6C, 0x00, 0x2F, 0x00, 0x00, 0x00,
+    0x10, 0x70, 0x61, 0x69, 0x72, 0x5F, 0x61, 0x70, 0x70, 0x65, 0x6E, 0x64,
+    0x00, 0x30, 0x00, 0x00, 0x00, 0x10, 0x72, 0x65, 0x70, 0x6C, 0x61, 0x63,
+    0x65, 0x00, 0x31, 0x00, 0x00, 0x00, 0x10, 0x74, 0x6F, 0x5F, 0x6C, 0x69,
+    0x73, 0x74, 0x00, 0x32, 0x00, 0x00, 0x00, 0x00,
 };
 
 static const uint8_t ast_free[] = {
-    0x7A, 0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x72, 0x00, 0x28, 0x00, 0x00,
-    0x00, 0x10, 0x63, 0x64, 0x72, 0x00, 0x29, 0x00, 0x00, 0x00, 0x10, 0x65,
-    0x72, 0x72, 0x6F, 0x72, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x10, 0x63, 0x61,
-    0x64, 0x72, 0x00, 0x2B, 0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x64, 0x64,
-    0x72, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x10, 0x63, 0x64, 0x64, 0x72, 0x00,
-    0x2D, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x69, 0x73, 0x74, 0x5F, 0x74, 0x61,
-    0x69, 0x6C, 0x00, 0x2E, 0x00, 0x00, 0x00, 0x10, 0x73, 0x65, 0x78, 0x70,
-    0x72, 0x00, 0x2F, 0x00, 0x00, 0x00, 0x10, 0x63, 0x6F, 0x6E, 0x73, 0x00,
-    0x30, 0x00, 0x00, 0x00, 0x10, 0x63, 0x68, 0x61, 0x69, 0x6E, 0x00, 0x31,
-    0x00, 0x00, 0x00, 0x10, 0x70, 0x61, 0x69, 0x72, 0x00, 0x32, 0x00, 0x00,
-    0x00, 0x00,
+    0xCA, 0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x64, 0x64, 0x72, 0x00, 0x28,
+    0x00, 0x00, 0x00, 0x10, 0x63, 0x61, 0x64, 0x72, 0x00, 0x29, 0x00, 0x00,
+    0x00, 0x10, 0x63, 0x64, 0x64, 0x64, 0x72, 0x00, 0x2A, 0x00, 0x00, 0x00,
+    0x10, 0x63, 0x64, 0x64, 0x72, 0x00, 0x2B, 0x00, 0x00, 0x00, 0x10, 0x63,
+    0x68, 0x61, 0x69, 0x6E, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x10, 0x66, 0x69,
+    0x65, 0x6C, 0x64, 0x00, 0x2D, 0x00, 0x00, 0x00, 0x10, 0x6C, 0x69, 0x73,
+    0x74, 0x5F, 0x68, 0x65, 0x61, 0x64, 0x00, 0x2E, 0x00, 0x00, 0x00, 0x10,
+    0x6C, 0x69, 0x73, 0x74, 0x5F, 0x74, 0x61, 0x69, 0x6C, 0x00, 0x2F, 0x00,
+    0x00, 0x00, 0x10, 0x70, 0x61, 0x69, 0x72, 0x5F, 0x61, 0x70, 0x70, 0x65,
+    0x6E, 0x64, 0x00, 0x30, 0x00, 0x00, 0x00, 0x10, 0x72, 0x65, 0x70, 0x6C,
+    0x61, 0x63, 0x65, 0x00, 0x31, 0x00, 0x00, 0x00, 0x10, 0x74, 0x6F, 0x5F,
+    0x6C, 0x69, 0x73, 0x74, 0x00, 0x32, 0x00, 0x00, 0x00, 0x10, 0x63, 0x61,
+    0x72, 0x00, 0x33, 0x00, 0x00, 0x00, 0x10, 0x63, 0x64, 0x72, 0x00, 0x34,
+    0x00, 0x00, 0x00, 0x10, 0x65, 0x72, 0x72, 0x6F, 0x72, 0x00, 0x35, 0x00,
+    0x00, 0x00, 0x10, 0x73, 0x65, 0x78, 0x70, 0x72, 0x00, 0x36, 0x00, 0x00,
+    0x00, 0x10, 0x63, 0x6F, 0x6E, 0x73, 0x00, 0x37, 0x00, 0x00, 0x00, 0x10,
+    0x70, 0x61, 0x69, 0x72, 0x00, 0x38, 0x00, 0x00, 0x00, 0x00,
 };
 
 static const uint32_t ast_code[] = {
@@ -515,11 +532,11 @@ static const uint32_t ast_code[] = {
     0x00030097, 0x00010002,    /* 00A2  is L3 <- L1 is L2 */
     0x000D034B,                /* 00A4  jf L3, +13 */
     0x00020041,                /* 00A5  move L2 <- L0 */
-    0x00280342,                /* 00A6  gget L3 <- g40   (car) */
+    0x00330342,                /* 00A6  gget L3 <- g51   (car) */
     0x00040141,                /* 00A7  move L4 <- L1 */
     0x000301A0, 0x00010000,    /* 00A8  call base=L3 argc=1 nres=1 */
     0x000201A2, 0x00000001,    /* 00AA  msg base=L2 argc=1 msg#0 nres=1   (append) */
-    0x00290242,                /* 00AC  gget L2 <- g41   (cdr) */
+    0x00340242,                /* 00AC  gget L2 <- g52   (cdr) */
     0x00030141,                /* 00AD  move L3 <- L1 */
     0x000201A0, 0x00010000,    /* 00AE  call base=L2 argc=1 nres=1 */
     0x00010241,                /* 00B0  move L1 <- L2 */
@@ -528,7 +545,7 @@ static const uint32_t ast_code[] = {
     0x00030046,                /* 00B3  lconst L0 <- static#3   ("pair") */
     0x00010097, 0x80000000,    /* 00B4  is L1 <- P0 is L0 */
     0x0005014B,                /* 00B6  jf L1, +5 */
-    0x00280042,                /* 00B7  gget L0 <- g40   (car) */
+    0x00330042,                /* 00B7  gget L0 <- g51   (car) */
     0x00018041,                /* 00B8  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 00B9  call base=L0 argc=1 nres=1 */
     0x00000102,                /* 00BB  return L0 count=1 */
@@ -544,59 +561,59 @@ static const uint32_t ast_code[] = {
     0x0002014B,                /* 00C7  jf L1, +2 */
     0x00008041,                /* 00C8  move L0 <- P0 */
     0x00000102,                /* 00C9  return L0 count=1 */
-    0x002A0042,                /* 00CA  gget L0 <- g42   (error) */
+    0x00350042,                /* 00CA  gget L0 <- g53   (error) */
     0x00050146,                /* 00CB  lconst L1 <- static#5   ("name expected") */
     0x000001A0, 0x00010000,    /* 00CC  call base=L0 argc=1 nres=1 */
     0x00000102,                /* 00CE  return L0 count=1 */
-    0x002B0042,                /* 00CF  gget L0 <- g43   (cadr) */
+    0x00290042,                /* 00CF  gget L0 <- g41   (cadr) */
     0x00018041,                /* 00D0  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 00D1  call base=L0 argc=1 nres=1 */
     0x00000102,                /* 00D3  return L0 count=1 */
     0x00030146,                /* 00D4  lconst L1 <- static#3   ("pair") */
     0x00000097, 0x80000001,    /* 00D5  is L0 <- P0 is L1 */
     0x0007004B,                /* 00D7  jf L0, +7 */
-    0x00280142,                /* 00D8  gget L1 <- g40   (car) */
+    0x00330142,                /* 00D8  gget L1 <- g51   (car) */
     0x00028041,                /* 00D9  move L2 <- P0 */
     0x000101A0, 0x00010000,    /* 00DA  call base=L1 argc=1 nres=1 */
     0x00070245,                /* 00DC  lsym L2 <- sym#7   ("~") */
     0x0000008F, 0x00010002,    /* 00DD  eq L0 <- L1 == L2 */
     0x00000102,                /* 00DF  return L0 count=1 */
-    0x00280042,                /* 00E0  gget L0 <- g40   (car) */
+    0x00330042,                /* 00E0  gget L0 <- g51   (car) */
     0x00018041,                /* 00E1  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 00E2  call base=L0 argc=1 nres=1 */
     0x00000102,                /* 00E4  return L0 count=1 */
-    0x002B0042,                /* 00E5  gget L0 <- g43   (cadr) */
+    0x00290042,                /* 00E5  gget L0 <- g41   (cadr) */
     0x00018041,                /* 00E6  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 00E7  call base=L0 argc=1 nres=1 */
     0x00000102,                /* 00E9  return L0 count=1 */
-    0x002C0042,                /* 00EA  gget L0 <- g44   (caddr) */
+    0x00280042,                /* 00EA  gget L0 <- g40   (caddr) */
     0x00018041,                /* 00EB  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 00EC  call base=L0 argc=1 nres=1 */
     0x00000102,                /* 00EE  return L0 count=1 */
-    0x002B0042,                /* 00EF  gget L0 <- g43   (cadr) */
+    0x00290042,                /* 00EF  gget L0 <- g41   (cadr) */
     0x00018041,                /* 00F0  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 00F1  call base=L0 argc=1 nres=1 */
     0x00000102,                /* 00F3  return L0 count=1 */
-    0x002D0042,                /* 00F4  gget L0 <- g45   (cddr) */
+    0x002B0042,                /* 00F4  gget L0 <- g43   (cddr) */
     0x00018041,                /* 00F5  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 00F6  call base=L0 argc=1 nres=1 */
     0x00000102,                /* 00F8  return L0 count=1 */
     0x00030146,                /* 00F9  lconst L1 <- static#3   ("pair") */
     0x00000097, 0x80000001,    /* 00FA  is L0 <- P0 is L1 */
     0x0007004B,                /* 00FC  jf L0, +7 */
-    0x00280142,                /* 00FD  gget L1 <- g40   (car) */
+    0x00330142,                /* 00FD  gget L1 <- g51   (car) */
     0x00028041,                /* 00FE  move L2 <- P0 */
     0x000101A0, 0x00010000,    /* 00FF  call base=L1 argc=1 nres=1 */
     0x00080245,                /* 0101  lsym L2 <- sym#8   ("list") */
     0x0000008F, 0x00010002,    /* 0102  eq L0 <- L1 == L2 */
     0x00000102,                /* 0104  return L0 count=1 */
-    0x00290042,                /* 0105  gget L0 <- g41   (cdr) */
+    0x00340042,                /* 0105  gget L0 <- g52   (cdr) */
     0x00018041,                /* 0106  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 0107  call base=L0 argc=1 nres=1 */
     0x00000102,                /* 0109  return L0 count=1 */
-    0x00280042,                /* 010A  gget L0 <- g40   (car) */
-    0x002E0142,                /* 010B  gget L1 <- g46   (list_tail) */
-    0x002F0242,                /* 010C  gget L2 <- g47   (sexpr) */
+    0x00330042,                /* 010A  gget L0 <- g51   (car) */
+    0x002F0142,                /* 010B  gget L1 <- g47   (list_tail) */
+    0x00360242,                /* 010C  gget L2 <- g54   (sexpr) */
     0x00038041,                /* 010D  move L3 <- P0 */
     0x000201A0, 0x00010000,    /* 010E  call base=L2 argc=1 nres=1 */
     0x00260342,                /* 0110  gget L3 <- g38   (_FN_DEF_BODY) */
@@ -611,14 +628,14 @@ static const uint32_t ast_code[] = {
     0x00030146,                /* 011D  lconst L1 <- static#3   ("pair") */
     0x00000097, 0x80000001,    /* 011E  is L0 <- P0 is L1 */
     0x0007004B,                /* 0120  jf L0, +7 */
-    0x00280142,                /* 0121  gget L1 <- g40   (car) */
+    0x00330142,                /* 0121  gget L1 <- g51   (car) */
     0x00028041,                /* 0122  move L2 <- P0 */
     0x000101A0, 0x00010000,    /* 0123  call base=L1 argc=1 nres=1 */
     0x00090245,                /* 0125  lsym L2 <- sym#9   ("do") */
     0x0000008F, 0x00010002,    /* 0126  eq L0 <- L1 == L2 */
     0x0008004B,                /* 0128  jf L0, +8 */
     0x00050042,                /* 0129  gget L0 <- g5   (s_items) */
-    0x00290142,                /* 012A  gget L1 <- g41   (cdr) */
+    0x00340142,                /* 012A  gget L1 <- g52   (cdr) */
     0x00028041,                /* 012B  move L2 <- P0 */
     0x000101A0, 0x00010000,    /* 012C  call base=L1 argc=1 nres=1 */
     0x000001A0, 0x00010000,    /* 012E  call base=L0 argc=1 nres=1 */
@@ -645,9 +662,9 @@ static const uint32_t ast_code[] = {
     0x00030102,                /* 0149  return L3 count=1 */
     0x00008041,                /* 014A  move L0 <- P0 */
     0x00000102,                /* 014B  return L0 count=1 */
-    0x00300042,                /* 014C  gget L0 <- g48   (cons) */
+    0x00370042,                /* 014C  gget L0 <- g55   (cons) */
     0x000D0145,                /* 014D  lsym L1 <- sym#13   ("apply") */
-    0x00300242,                /* 014E  gget L2 <- g48   (cons) */
+    0x00370242,                /* 014E  gget L2 <- g55   (cons) */
     0x00038041,                /* 014F  move L3 <- P0 */
     0x00048141,                /* 0150  move L4 <- P1 */
     0x000202A0, 0x00010000,    /* 0151  call base=L2 argc=2 nres=1 */
@@ -663,22 +680,22 @@ static const uint32_t ast_code[] = {
     0x0002014B,                /* 015F  jf L1, +2 */
     0x00000003,                /* 0160  lnil L0 */
     0x00000102,                /* 0161  return L0 count=1 */
-    0x00290042,                /* 0162  gget L0 <- g41   (cdr) */
+    0x00340042,                /* 0162  gget L0 <- g52   (cdr) */
     0x00018041,                /* 0163  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 0164  call base=L0 argc=1 nres=1 */
     0x00020146,                /* 0166  lconst L1 <- static#2   ("nil") */
     0x00020097, 0x00000001,    /* 0167  is L2 <- L0 is L1 */
     0x0005024B,                /* 0169  jf L2, +5 */
-    0x00280042,                /* 016A  gget L0 <- g40   (car) */
+    0x00330042,                /* 016A  gget L0 <- g51   (car) */
     0x00018041,                /* 016B  move L1 <- P0 */
     0x000001A0, 0x00010000,    /* 016C  call base=L0 argc=1 nres=1 */
     0x00000102,                /* 016E  return L0 count=1 */
-    0x00300042,                /* 016F  gget L0 <- g48   (cons) */
+    0x00370042,                /* 016F  gget L0 <- g55   (cons) */
     0x00090145,                /* 0170  lsym L1 <- sym#9   ("do") */
     0x00028041,                /* 0171  move L2 <- P0 */
     0x000002A0, 0x00010000,    /* 0172  call base=L0 argc=2 nres=1 */
     0x00000102,                /* 0174  return L0 count=1 */
-    0x00300042,                /* 0175  gget L0 <- g48   (cons) */
+    0x00370042,                /* 0175  gget L0 <- g55   (cons) */
     0x00090145,                /* 0176  lsym L1 <- sym#9   ("do") */
     0x00028041,                /* 0177  move L2 <- P0 */
     0x000002A0, 0x00010000,    /* 0178  call base=L0 argc=2 nres=1 */
@@ -747,7 +764,7 @@ static const uint32_t ast_code[] = {
     0x0002034B,                /* 01C9  jf L3, +2 */
     0x00018041,                /* 01CA  move L1 <- P0 */
     0x00010102,                /* 01CB  return L1 count=1 */
-    0x00280142,                /* 01CC  gget L1 <- g40   (car) */
+    0x00330142,                /* 01CC  gget L1 <- g51   (car) */
     0x00028041,                /* 01CD  move L2 <- P0 */
     0x000101A0, 0x00010000,    /* 01CE  call base=L1 argc=1 nres=1 */
     0x00000141,                /* 01D0  move L0 <- L1 */
@@ -776,13 +793,13 @@ static const uint32_t ast_code[] = {
     0x0011024B,                /* 01EE  jf L2, +17 */
     0x00170145,                /* 01EF  lsym L1 <- sym#23   ("attr") */
     0x00200242,                /* 01F0  gget L2 <- g32   (_s_subst) */
-    0x002B0342,                /* 01F1  gget L3 <- g43   (cadr) */
+    0x00290342,                /* 01F1  gget L3 <- g41   (cadr) */
     0x00048041,                /* 01F2  move L4 <- P0 */
     0x000301A0, 0x00010000,    /* 01F3  call base=L3 argc=1 nres=1 */
     0x00048141,                /* 01F5  move L4 <- P1 */
     0x00058241,                /* 01F6  move L5 <- P2 */
     0x000203A0, 0x00010000,    /* 01F7  call base=L2 argc=3 nres=1 */
-    0x002C0342,                /* 01F9  gget L3 <- g44   (caddr) */
+    0x00280342,                /* 01F9  gget L3 <- g40   (caddr) */
     0x00048041,                /* 01FA  move L4 <- P0 */
     0x000301A0, 0x00010000,    /* 01FB  call base=L3 argc=1 nres=1 */
     0x00040384, 0x00010000,    /* 01FD  plist L4 <- L1, 3 items */
@@ -792,13 +809,13 @@ static const uint32_t ast_code[] = {
     0x0011024B,                /* 0203  jf L2, +17 */
     0x00120145,                /* 0204  lsym L1 <- sym#18   ("bind_msg") */
     0x00200242,                /* 0205  gget L2 <- g32   (_s_subst) */
-    0x002B0342,                /* 0206  gget L3 <- g43   (cadr) */
+    0x00290342,                /* 0206  gget L3 <- g41   (cadr) */
     0x00048041,                /* 0207  move L4 <- P0 */
     0x000301A0, 0x00010000,    /* 0208  call base=L3 argc=1 nres=1 */
     0x00048141,                /* 020A  move L4 <- P1 */
     0x00058241,                /* 020B  move L5 <- P2 */
     0x000203A0, 0x00010000,    /* 020C  call base=L2 argc=3 nres=1 */
-    0x002C0342,                /* 020E  gget L3 <- g44   (caddr) */
+    0x00280342,                /* 020E  gget L3 <- g40   (caddr) */
     0x00048041,                /* 020F  move L4 <- P0 */
     0x000301A0, 0x00010000,    /* 0210  call base=L3 argc=1 nres=1 */
     0x00040384, 0x00010000,    /* 0212  plist L4 <- L1, 3 items */
@@ -812,16 +829,16 @@ static const uint32_t ast_code[] = {
     0x00030046,                /* 021C  lconst L0 <- static#3   ("pair") */
     0x00010097, 0x80000000,    /* 021D  is L1 <- P0 is L0 */
     0x0016014B,                /* 021F  jf L1, +22 */
-    0x00300042,                /* 0220  gget L0 <- g48   (cons) */
+    0x00370042,                /* 0220  gget L0 <- g55   (cons) */
     0x00200142,                /* 0221  gget L1 <- g32   (_s_subst) */
-    0x00280242,                /* 0222  gget L2 <- g40   (car) */
+    0x00330242,                /* 0222  gget L2 <- g51   (car) */
     0x00038041,                /* 0223  move L3 <- P0 */
     0x000201A0, 0x00010000,    /* 0224  call base=L2 argc=1 nres=1 */
     0x00038141,                /* 0226  move L3 <- P1 */
     0x00048241,                /* 0227  move L4 <- P2 */
     0x000103A0, 0x00010000,    /* 0228  call base=L1 argc=3 nres=1 */
     0x00210242,                /* 022A  gget L2 <- g33   (_s_subst_tail) */
-    0x00290342,                /* 022B  gget L3 <- g41   (cdr) */
+    0x00340342,                /* 022B  gget L3 <- g52   (cdr) */
     0x00048041,                /* 022C  move L4 <- P0 */
     0x000301A0, 0x00010000,    /* 022D  call base=L3 argc=1 nres=1 */
     0x00048141,                /* 022F  move L4 <- P1 */
@@ -842,7 +859,7 @@ static const uint32_t ast_code[] = {
     0x000003A0, 0x00010000,    /* 0241  call base=L0 argc=3 nres=1 */
     0x00000102,                /* 0243  return L0 count=1 */
     0x00110742,                /* 0244  gget L7 <- g17   (s_fn_body) */
-    0x002F0842,                /* 0245  gget L8 <- g47   (sexpr) */
+    0x00360842,                /* 0245  gget L8 <- g54   (sexpr) */
     0x00098041,                /* 0246  move L9 <- P0 */
     0x000801A0, 0x00010000,    /* 0247  call base=L8 argc=1 nres=1 */
     0x000701A0, 0x00010000,    /* 0249  call base=L7 argc=1 nres=1 */
@@ -856,7 +873,7 @@ static const uint32_t ast_code[] = {
     0x00030241,                /* 0256  move L3 <- L2 */
     0x000900AE, 0x80010000,    /* 0257  iter L9 <- P1 */
     0x000400AF, 0x0009001E,    /* 0259  itnext L4 <- L9, done +30 */
-    0x00280A42,                /* 025B  gget L10 <- g40   (car) */
+    0x00330A42,                /* 025B  gget L10 <- g51   (car) */
     0x000B0441,                /* 025C  move L11 <- L4 */
     0x000A01A0, 0x00010000,    /* 025D  call base=L10 argc=1 nres=1 */
     0x00050A41,                /* 025F  move L5 <- L10 */
@@ -865,7 +882,7 @@ static const uint32_t ast_code[] = {
     0x00050098, 0x0004000A,    /* 0262  getidx L5 <- L4[L10] */
     0x0001054E,                /* 0264  jnerr L5, +1 */
     0x00050102,                /* 0265  return L5 count=1 */
-    0x00290A42,                /* 0266  gget L10 <- g41   (cdr) */
+    0x00340A42,                /* 0266  gget L10 <- g52   (cdr) */
     0x000B0441,                /* 0267  move L11 <- L4 */
     0x000A01A0, 0x00010000,    /* 0268  call base=L10 argc=1 nres=1 */
     0x00060A41,                /* 026A  move L6 <- L10 */
@@ -886,14 +903,14 @@ static const uint32_t ast_code[] = {
     0x000901A2, 0x00000001,    /* 027B  msg base=L9 argc=1 msg#0 nres=1   (append) */
     0xFFD6004F,                /* 027D  jmp -42 */
     0x001B0742,                /* 027E  gget L7 <- g27   (mk_do) */
-    0x00310842,                /* 027F  gget L8 <- g49   (chain) */
+    0x002C0842,                /* 027F  gget L8 <- g44   (chain) */
     0x00090141,                /* 0280  move L9 <- L1 */
     0x000801A0, 0x00010000,    /* 0281  call base=L8 argc=1 nres=1 */
     0x000701A0, 0x00010000,    /* 0283  call base=L7 argc=1 nres=1 */
     0x00070102,                /* 0285  return L7 count=1 */
     0x00230042,                /* 0286  gget L0 <- g35   (mk_expand_n) */
     0x00018041,                /* 0287  move L1 <- P0 */
-    0x00320242,                /* 0288  gget L2 <- g50   (pair) */
+    0x00380242,                /* 0288  gget L2 <- g56   (pair) */
     0x00038141,                /* 0289  move L3 <- P1 */
     0x00048241,                /* 028A  move L4 <- P2 */
     0x000202A0, 0x00010000,    /* 028B  call base=L2 argc=2 nres=1 */

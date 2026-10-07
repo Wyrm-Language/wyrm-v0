@@ -7,3 +7,10 @@ import ns::leaf
 
 println(pkg::compile(21))
 println(ns::leaf::NAME)
+
+# `wild` re-exports its child by wildcard: its exports include what it
+# imports, so both spellings reach parts' own BOLT.
+import wild
+import wild::*
+println(wild::BOLT)
+println(BOLT)

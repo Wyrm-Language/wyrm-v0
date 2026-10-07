@@ -1,0 +1,2 @@
+# A package that re-exports its child by wildcard (M1 rule 6, M2).
+import wild::parts::*

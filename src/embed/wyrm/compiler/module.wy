@@ -295,6 +295,52 @@ fn _declare_module_names(body, module: ModuleContext) -> nil | error:
     return nil
 
 # ---------------------------------------------------------------------------
+# what the imports offer (design/modules.md M2)
+
+# Read every imported module's exports before lowering, so each name is
+# placed at compile time: an `import m::*` offers m's exports (and this
+# module re-exports them, M1 rule 6), and `m::x` is checked against them.
+# A dependency that can't be loaded here - a host-registered module the
+# compiling machine doesn't have - is left unknown, and a name that might
+# come from it isn't refused.
+fn _read_dependency_exports(body, module: ModuleContext) -> nil | error:
+    for node in body:
+        kind := node_kind(node)
+        if (kind != 'import) and (kind != 'import_static):
+            continue
+        shape := _import_shape(node)
+        if shape is error:
+            return shape
+        path := _join_path(shape[0])
+        names := module_exports(path)
+        if names is error:
+            if shape[3]:
+                module.wildcard_unknown = true
+            continue
+        offered := {}
+        for name in names:
+            offered[name] = true
+        module.dep_exports[path] = offered
+        if not shape[3]:
+            continue
+        excluded := {}
+        p := shape[4]
+        while p is pair:
+            excluded[str(car(p))] = true
+            p = cdr(p)
+        for name in names:
+            if name in excluded:
+                continue
+            module.wildcard_names[name] = true
+            if (name in module.globals) or (name in module.imported) or (name in module.reexported):
+                continue
+            free := (module.image) ! add_free_global(name)
+            if free is error:
+                return free
+            module.reexported[name] = free
+    return nil
+
+# ---------------------------------------------------------------------------
 # the definition index (`foo::$ast` reads it - module.py's
 # _collect_definitions, over wyrm shapes)
 
@@ -587,6 +633,9 @@ fn _assemble(module: ModuleContext) -> dict | error:
     for name in module.imported:
         if not (name in exports):
             exports[name] = module.imported[name]
+    for name in module.reexported:
+        if not (name in exports):
+            exports[name] = module.reexported[name]
     uses := []
     for u in init.uses:
         uses ! append(u)
@@ -677,6 +726,9 @@ fn compile_module(program_node, module_name: str, source_file = nil, check: bool
     d := _declare_module_names(body, module)
     if d is error:
         return d
+    r := _read_dependency_exports(body, module)
+    if r is error:
+        return r
     c := _collect_definitions(body, module)
     if c is error:
         return c

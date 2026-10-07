@@ -19,6 +19,7 @@ Writes OUT_DIR/STAMP last. Exit 1 if any expected-to-compile source fails.
 """
 
 import os
+import shutil
 import subprocess
 import sys
 
@@ -47,13 +48,24 @@ def sources():
 
 def main():
     wyrm, out_dir = sys.argv[1], sys.argv[2]
+    # A compiled image bakes in what its wildcard imports offered when it
+    # was compiled (design/modules.md M2), and the .wyd cache is keyed on
+    # the source's own mtime only, so a cached importer can go stale when a
+    # dependency changes. A fresh build is well under a second: start clean.
+    shutil.rmtree(os.path.join(out_dir, ".cache"), ignore_errors=True)
     failures = 0
     built = 0
     for rel in sources():
         src = os.path.join(CORPUS, rel)
         dest = os.path.join(out_dir, os.path.dirname(rel))
         os.makedirs(dest, exist_ok=True)
-        cmd = [wyrm, "-I" + os.path.dirname(src), "-I" + CORPUS,
+        # Compiling reads each dependency's exports (design/modules.md M2),
+        # so the roots must find them: the source's own directory, the top
+        # directory it sits under in the corpus (a package's root, for
+        # packages/pkg/impl.wy), and the corpus itself.
+        top = os.path.join(CORPUS, rel.split(os.sep)[0]) if os.sep in rel else CORPUS
+        roots = list(dict.fromkeys([os.path.dirname(src), top, CORPUS]))
+        cmd = [wyrm] + ["-I" + r for r in roots] + [
                "--cache-dir", os.path.join(out_dir, ".cache"),
                "--build-bc", "-o", dest, "--emit", "wyd", src]
         p = subprocess.run(cmd, capture_output=True, text=True)

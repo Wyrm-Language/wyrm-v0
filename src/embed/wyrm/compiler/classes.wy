@@ -63,6 +63,7 @@ import wyrm::compiler::context::*
 import wyrm::compiler::analysis::*
 import wyrm::compiler::statements::*
 import wyrm::compiler::functions::*
+import wyrm::compiler::handlers::*
 
 # image.py's function-table flag bit 1 (doc/wyc-format.md 8.4). functions.wy
 # freezes the other three bits (coroutine/varargs/kwargs) and leaves this

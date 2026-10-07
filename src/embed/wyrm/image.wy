@@ -63,8 +63,8 @@
 # (`t`/`k`/`r`/`d` nil means "omit this key", matching wyc-format.md 8.5's
 # optional fields exactly.)
 
-import bjson::*
-import opcodes::*
+import wyrm::bjson::*
+import wyrm::opcodes::*
 
 SEC_HEADER := 1
 SEC_STATICS := 2

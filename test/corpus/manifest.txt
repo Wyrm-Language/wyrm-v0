@@ -29,6 +29,8 @@ packages/main.wy	packages/main.out	local-only	design/modules.md M1: a package's 
 shared/counter.wy	shared/counter.out	matches	
 shared/tools/gauge.wy	shared/tools/gauge.out	matches	
 shared/main.wy	shared/main.out	local-only	design/modules.md M2: wildcard, item and qualified imports all read the exporter's own binding, so they see `bump`'s later assignments; `gauge::LEVEL` after `import tools::gauge` is tools::gauge's own. wypoc agrees from its m1-packages branch on (it copied values before).
+names/undefined.wy	-	REFUSED	design/modules.md M2: a name no import offers is a compile error, even with a wildcard import in scope
+names/no_member.wy	-	REFUSED	design/modules.md M2: `std::io::printline` names nothing std::io exports
 samples/basics.wy	-	REFUSED	`with` has been removed from the language
 samples/classes.wy	-	REFUSED	a fragment: `canvas` comes from the test harness, not the file
 samples/control_flow.wy	-	REFUSED	a fragment: `condition` comes from the test harness

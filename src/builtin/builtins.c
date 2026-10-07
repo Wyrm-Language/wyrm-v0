@@ -10,6 +10,7 @@
 #include <wyrm/image.h>
 #include <wyrm/instance.h>
 #include <wyrm/iter.h>
+#include <wyrm/link.h>
 #include <wyrm/list.h>
 #include <wyrm/machine.h>
 #include <wyrm/message.h>
@@ -1238,7 +1239,7 @@ static wy_exec_state builtin_send_exec_(wy_context* context, wy_primitive c_data
  * Module assembly
  * ------------------------------------------------------------------------- */
 
-enum { WY_BUILTINS_LEAF_COUNT = 28, WY_BUILTINS_EXEC_COUNT = 2, WY_BUILTINS_CLASS_COUNT = 5,
+enum { WY_BUILTINS_LEAF_COUNT = 29, WY_BUILTINS_EXEC_COUNT = 2, WY_BUILTINS_CLASS_COUNT = 5,
     /* +1 for the bare `nil` slot, +1 for the bare `TreeBase` class (M5:
      * decorators fixture registers messages typed on it,
      * wyrm_builtins.py's TREE_BASE_CLASS). */
@@ -1505,6 +1506,68 @@ static wy_error builtin_error_message_(wy_context* context, wy_value* args, wy_u
 }
 
 /**
+ * `module_exports(path)`: the names module `path` exports, as a list of
+ * strings, loading it without running it - the compiler places every name
+ * before a module runs (project design/modules.md M2), so it reads each
+ * dependency's exports first. A namespace package exports nothing. An
+ * error value when the module can't be found or loaded here.
+ */
+static wy_error builtin_module_exports_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+{
+    WY_UNUSED(argc);
+    if (nres == 0) { return WY_ERR_NONE; }
+    if (args[0].type != WY_TYPE_TAG_STR) {
+        return write_error_value_(context, "module_exports: the path must be a string", &out[0]);
+    }
+    wy_module* module = WY_NULL;
+    wy_error err = wy_link_import(context, args[0].data.str, &module);
+    if (err == WY_ERR_NOMEM) { return err; }
+    if (err != WY_ERR_NONE) {
+        char text[256];
+        snprintf(text, sizeof(text), "module_exports: cannot load '%.*s' (error %d)",
+            (int) args[0].data.str->len, args[0].data.str->str, (int) err);
+        return write_error_value_(context, text, &out[0]);
+    }
+    wy_list* names = WY_NULL;
+    err = wy_list_new(context, module->exports.entry_count, &names);
+    if (err != WY_ERR_NONE) { return err; }
+    wy_value held = wy_value_object(WY_TYPE_TAG_LIST, (wy_object*) names);
+    err = wy_context_root_push_f(context, &held);
+    if (err != WY_ERR_NONE) { return err; }
+    for (wy_uword i = 0; err == WY_ERR_NONE && i < module->exports.capacity; i++) {
+        const wy_slot_dict_entry* entry = &module->exports.entry_table[i];
+        if (entry->symbol == WY_SYMBOL_INVALID) { continue; }
+        wy_string* name = WY_NULL;
+        err = wy_string_new(context, entry->symbol, wy_strlen_f(entry->symbol), &name);
+        if (err == WY_ERR_NONE) {
+            err = wy_list_push(context, names, wy_value_object(WY_TYPE_TAG_STR, (wy_object*) name));
+        }
+    }
+    wy_context_root_pop_f(context);
+    if (err != WY_ERR_NONE) { return err; }
+    /* Sorted: the exports table is hashed on symbol addresses, and the
+     * compiler numbers slots in the order it reads these, which must not
+     * depend on memory layout (the self-compile fixed point). Insertion
+     * sort - export tables are small. */
+    for (wy_uword i = 1; i < names->count; i++) {
+        wy_value key = names->items[i];
+        const wy_string* k = key.data.str;
+        wy_uword j = i;
+        while (j > 0) {
+            const wy_string* prev = names->items[j - 1].data.str;
+            wy_uword n = prev->len < k->len ? prev->len : k->len;
+            int c = wy_memcmp(prev->str, k->str, n);
+            if (c < 0 || (c == 0 && prev->len <= k->len)) { break; }
+            names->items[j] = names->items[j - 1];
+            j--;
+        }
+        names->items[j] = key;
+    }
+    out[0] = held;
+    return WY_ERR_NONE;
+}
+
+/**
  * `tree_box(x)`: wrap the sexpr `x` in a `TreeBase` instance (its one
  * `__tree` slot), the receiver a decorator message is dispatched on.
  */
@@ -1623,6 +1686,7 @@ static const builtin_leaf_entry_ leaf_builtins_[] = {
     { "tree_box",  1, 1,   builtin_tree_box_ },
     { "sexpr",     1, 1,   builtin_sexpr_ },
     { "bind_message", 3, 3, builtin_bind_message_ },
+    { "module_exports", 1, 1, builtin_module_exports_ },
     { "range",     2, 2,   builtin_range_ },
 };
 

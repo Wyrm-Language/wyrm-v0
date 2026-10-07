@@ -93,22 +93,21 @@ HOST_GLOBALS := ["__ARGS"]
 # The names resolution falls through to (spec 6.2 step 2) - see note 3 in
 # the header comment. `wypoc.completion.interpreter_names()` on the pypoc
 # checked out beside this repo, plus HOST_GLOBALS.
-BUILTIN_NAMES := ["$set_car", "$set_cdr", "OSError", "OutOfMemory",
-    "RuntimeError", "StopIteration", "TreeBase", "__STDERR", "__STDIN",
-    "__STDOUT", "__argv", "__close", "__dbus_connect_session",
-    "__dbus_connected", "__dbus_register_class", "__dbus_register_object",
-    "__dbus_request_name", "__dbus_run", "__dbus_stop", "__dup2",
-    "__dynamic__", "__environ", "__flush", "__lseek", "__name__",
+BUILTIN_NAMES := ["$set_car", "$set_cdr", "OSError", "OutOfMemory", "RuntimeError",
+    "StopIteration", "TreeBase", "__ARGS", "__STDERR", "__STDIN", "__STDOUT", "__argv",
+    "__close", "__dbus_connect_session", "__dbus_connected", "__dbus_register_class",
+    "__dbus_register_object", "__dbus_request_name", "__dbus_run", "__dbus_stop",
+    "__dup2", "__dynamic__", "__environ", "__flush", "__lseek", "__name__",
     "__nng_close", "__nng_dial", "__nng_listen", "__nng_open", "__nng_recv",
-    "__nng_send", "__nng_subscribe", "__open", "__read", "__sock_accept",
-    "__sock_bind", "__sock_close", "__sock_connect", "__sock_create",
-    "__sock_listen", "__sock_recv", "__sock_recvfrom", "__sock_send",
-    "__sock_sendto", "__term_isatty", "__term_raw_disable",
-    "__term_raw_enable", "__term_read_key", "__term_size", "__write",
-    "bind_message", "bool", "bytes", "car", "cdr", "cons", "copy", "end",
-    "error", "error_message", "exit", "float", "help", "int", "len", "macroexpand", "next", "nil", "nreverse",
-    "pair", "parse", "print", "println", "range", "resolve", "reverse",
-    "send", "sexpr", "str", "sym", "tree_box", "tuple", "__ARGS"]
+    "__nng_send", "__nng_subscribe", "__open", "__read", "__sock_accept", "__sock_bind",
+    "__sock_close", "__sock_connect", "__sock_create", "__sock_listen", "__sock_recv",
+    "__sock_recvfrom", "__sock_send", "__sock_sendto", "__term_isatty",
+    "__term_raw_disable", "__term_raw_enable", "__term_read_key", "__term_size",
+    "__write", "append", "bind_message", "bool", "bytes", "car", "cdr", "cons", "copy",
+    "end", "error", "error_message", "exit", "expand", "float", "help", "int", "len",
+    "macroexpand", "module_exports", "next", "nil", "nreverse", "pair", "parse", "print",
+    "println", "range", "remove", "resize", "resolve", "reverse", "send", "sexpr", "str",
+    "substr", "sym", "tree_box", "tuple"]
 
 # ---------------------------------------------------------------------------
 # pack_pairable (opcodes.py's, see note 2 in the header comment)
@@ -1133,6 +1132,17 @@ class ModuleContext:
     # `b::V` is spelled `a::b::V`, the spelling the import fills.
     slot imported: dict
     slot import_paths: dict
+    # What the module's imports offer, read before lowering (M2,
+    # module.wy's _read_dependency_exports). `wildcard_names`: every name an
+    # `import m::*` offers. `wildcard_unknown`: some wildcard dependency
+    # could not be read, so an unplaced name may still come from it.
+    # `dep_exports`: imported module path -> its export names (a dict),
+    # for checking `m::x`. `reexported`: an offered name -> the free slot
+    # that re-exports it (a module exports what it imports, M1 rule 6).
+    slot wildcard_names: dict
+    slot wildcard_unknown: bool
+    slot dep_exports: dict
+    slot reexported: dict
 
     fn init(module_name: str, source_file = nil):
         this.image = ModuleImage(module_name)
@@ -1158,6 +1168,10 @@ class ModuleContext:
         this.session_filled = []
         this.imported = {}
         this.import_paths = {}
+        this.wildcard_names = {}
+        this.wildcard_unknown = false
+        this.dep_exports = {}
+        this.reexported = {}
 
 # ---------------------------------------------------------------------------
 # ModuleContext's methods.
@@ -1301,6 +1315,42 @@ fn [ModuleContext] import_item(binding, parts: list, member) -> int | error:
         return index
     this.imported[str(binding)] = index
     return index
+
+
+# True when a bare `name` this module doesn't define may come from one of
+# its wildcard imports (M2): one of them offers it, or one couldn't be read.
+fn [ModuleContext] may_be_imported(name) -> bool:
+    if not this.has_wildcard_import:
+        return false
+    if this.wildcard_unknown:
+        return true
+    return str(name) in this.wildcard_names
+
+
+# Check a qualified name `parts` against the exports of the longest
+# imported module path it starts with (M2): `m::x` needs `m` to export `x`,
+# unless `m::x` is itself an imported module. Nil when it's fine, or when no
+# import read here covers it.
+fn [ModuleContext] check_member(parts: list):
+    i := len(parts) - 1
+    while i >= 1:
+        prefix := ""
+        j := 0
+        while j < i:
+            if j > 0:
+                prefix = prefix + "::"
+            prefix = prefix + str(parts[j])
+            j = j + 1
+        offered := (this.dep_exports[prefix] catch nil)
+        if not (offered is nil):
+            member := str(parts[i])
+            if member in offered:
+                return nil
+            if (prefix + "::" + member) in this.dep_exports:
+                return nil
+            return error("'" + prefix + "' has no member '" + member + "'")
+        i = i - 1
+    return nil
 
 
 # `parts` with its first name replaced by the module path an import bound it

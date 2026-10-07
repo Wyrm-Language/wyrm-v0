@@ -1,0 +1,4 @@
+# design/modules.md M2: every name is placed at compile time, wildcard in
+# scope or not. Nothing std::io offers is called `printline`.
+import std::io::*
+printline("never runs")
