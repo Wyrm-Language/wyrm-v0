@@ -36,7 +36,10 @@ touching `src/vm*.c`, `src/embed/wyrm/*.wy`, or the self-hosted compiler.
 **The amalgam hides bugs.** One shared namespace means: same-name top-level helpers in
 different modules silently shadow each other (last wins), and transitive names (a name
 reachable only through another module's wildcard import) always resolve. Real module trees
-break both. Wildcard imports are NOT re-exported on the C VM; import what you use.
+break both. Wildcard imports ARE re-exported now (design/modules.md M2: a module exports
+what it imports), but still import what you use: two wildcards that reach different
+bindings of one name (a duplicated private helper, or one module loaded twice under two
+spellings, as `opcodes` and `wyrm::opcodes` were) make that name ambiguous where it is read.
 Keep compiler-side helper names distinct from front-end ones (`_path_char`, `_join_path`,
 `_pool_kind` exist for this reason).
 
@@ -60,7 +63,8 @@ Symptom -> usual cause seen so far:
 | Symptom | Cause |
 |---|---|
 | `unreachable code reached`, `value is not callable` | function was stubbed, or a parse glue turned a statement into a call |
-| `unbound global 'x'` only on C VM | name relied on transitive wildcard import |
+| `undefined name 'x'` at compile time | nothing the module imports offers `x` (M2 places every name before running) - import the module that defines it |
+| `ambiguous name 'x'` fault | two wildcards reach two different bindings of `x`; import it explicitly, or drop a duplicate |
 | every string literal comes out with backslashes | `decode_str` shadowed in the amalgam |
 | header/section offsets wrong in output image | operator precedence in the parser (`a + b * c`) |
 | argument arrives as the receiver object | receiver temporaries not freed before message args |

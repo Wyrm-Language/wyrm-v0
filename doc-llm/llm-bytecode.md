@@ -312,6 +312,7 @@ same section payloads byte-for-byte (except `code` formatting in `.c`,
 | 8 | `code` | raw `u32[]`, **not** BSON |
 | 9 | `debug` | BSON document, optional; VM MUST ignore |
 | 10 | `exports` | BSON document, optional |
+| 11 | `free` | BSON document, optional: `"<spelling>": int32 global slot` for every name the module reads but doesn't define (§6.2) |
 
 ### 4.1 The BSON subset
 
@@ -418,6 +419,11 @@ global). Their initializers run in module init code like any other
 top-level effect.
 
 ### 4.8 `relocations`
+
+> **Not what the loader does.** The C VM never adopted this table; names from
+> outside a module are global slots listed in the `free` section (id 11) and
+> filled at import time, as §6.2 describes. Kept for the history of the
+> format.
 
 BSON array; entry *i* defines relocation index *i* — a late-bound reference
 to something outside the module (or dynamically registered inside it).
@@ -599,68 +605,72 @@ Given an image, the loader:
 
 ### 6.2 Name resolution
 
-The relocation table is exactly the set of names the source references —
-the compiler knows every one of them from the AST — and the bind table is
-that table's cache. Resolution is **batched at scope start**, never checked
-per instruction:
+Project `design/modules.md` M2 is the rule: every name is placed before a
+module runs, and an imported name *is* the exporter's binding (Lisp
+semantics), not a copy of its value.
 
-- **Module level.** The compiler hoists the import sequence to the top of
-  the init routine. Each `import`/`import_star` triggers the dependency to
-  load and run its own init ("build"). Immediately after the last import
-  the compiler emits `resolve`, which binds every entry in the header's
-  `u` set. Init code before the `resolve` point MUST NOT reference
-  external names except through the import ops themselves
-  (compiler-enforced).
-- **Function level.** Each function entry lists the relocation entries its
-  body uses (`u`, §4.6). At the function's **first call** the VM resolves
-  any of them still unbound, before the body runs. (Entries already bound
-  — by module init or an earlier function — cost nothing.)
+**Slots.** Every name a module reads is a global slot. Its own definitions
+are listed in `exports` (§4.9a). A name it reads but doesn't define is a
+*free* slot, listed in `free` (id 11) under the spelling that reaches it:
+`geometry::area` for a qualified read, `println` for a bare one. An item
+import (`import geometry::(area as a)`) is the free slot `geometry::area`
+itself, exported under the name it binds (`a`); a package re-exports what it
+imports. A wildcard import (`import m::*`) adds a free slot for every name `m`
+exports (§6.3), and exports it too.
 
-After its owning scope has started, every `rget`/`rset`/`msg`/`getmsg` is
-a straight table read with no bind check on the hot path.
+**Filling** (`src/link.c`), when each `import` finishes, in three layers -
+the module's explicit imports (1), its wildcards (2), the builtins (3); a
+stronger layer replaces a weaker one:
 
-Resolving one entry walks the path left-to-right; the first component
-resolves through, in order:
+- `wy_link_fill_from_import`: every free slot whose spelling starts with the
+  import's path. A member slot becomes an **alias** of the member's own global
+  in the defining module (`WY_LINK_ALIAS` in `fill_layer`, the target in
+  `module->aliases`); the module itself (`import a::b` binding `b`) is a value.
+- `wy_link_fill_from_wildcard`: every bare free slot the wildcard's module
+  exports, minus its `except` list, as an alias.
+- `wy_link_fill_from_builtins`: bare free slots the builtins module exports,
+  copied (builtins are never reassigned).
 
-1. this module's import/alias table,
-2. the builtin namespace,
-3. the wildcard namespaces registered by `import_star`, in registration
-   order — first match wins, except-lists filtering each;
+An alias always points at the defining module's own global: `scope_member`
+and `wy_link_binding` follow a re-exported name to the original. `gget`
+follows an alias in the branch it already takes for ambiguity, so the fast
+path is unchanged; `gset` on an alias faults ("cannot assign to imported
+name"), since only the defining module assigns its names.
 
-subsequent components via `::` scope lookup. A failure binds the entry to
-a NotFound error value rather than aborting anything: the error surfaces
-at each use through normal error flow (`rget` yields it; a store through
-it is a failed store, Appendix C). Entries resolve at most once —
-namespaces are assumed stable after a module's init has run.
+**Ambiguity.** Two layer-2 fills of one slot agree when they reach the same
+binding, or two bindings holding the same module (each re-exported `std`).
+Otherwise the slot holds an ambiguity error, raised when the slot is read,
+not when it is filled: an unused collision is legal (`wypoc/doc/addendum.md`).
 
-Only **purely dynamic references** — `getscope`/`setscope` on a runtime
-value — ever perform a lookup at execution time; anything with a name in
-the source goes through the table. Resolution never mutates code — the
-bind table is the only mutable linking state, so code stays in ROM.
+`getscope`/`setscope` on a runtime value (`x::y` where `x` is a value, not a
+module path) are the only lookups by name at execution time.
 
 ### 6.3 What the compiler may assume
 
-- **Names are never resolved statically across a module boundary.** Bindings
-  local to the module being compiled (its globals, functions, classes,
-  statics) compile to table indices; every reference to anything outside it
-  is emitted as a symbolic name reference — a relocation path — resolved at
-  bind time, even when the compiler could peek at the dependency. The
-  dependency's interface at run time is authoritative, not its interface at
-  compile time.
+- **The compiler reads every dependency's exports before lowering**
+  (`compiler/module.wy`'s `_read_dependency_exports`, through the
+  `module_exports(path)` builtin, which loads a module without running it).
+  Import cycles are illegal, so every dependency can be loaded first.
+- **Every name is placed at compile time.** A bare name is a local, a module
+  global, an item import, a builtin, or a name one of the wildcard imports
+  offers; anything else is a compile error ("undefined name"), wildcard in
+  scope or not. A qualified `m::x` must name an export of the longest
+  imported module path it starts with, or an imported submodule ("'m' has no
+  member 'x'"). After `import a::b`, `b::x` is spelled `a::b::x`.
+- **Assigning an imported name is a compile error.**
+- **Lenient where it can't know.** A dependency that can't be loaded while
+  compiling - a host-registered module the compiling machine doesn't have -
+  turns these checks off for the names that might come from it; the import
+  itself then fails, or not, at run time. A REPL session also defers: a name
+  an earlier input uses before a later one defines it is a forward reference
+  (the session module's own slot).
 - Name references are emitted **after decorator expansion**: decorators run
   at compile time (§7.2) and the expanded tree is what gets lowered, so
   decorator-generated code resolves exactly like handwritten code.
-- Global indices, function indices, class indices, static indices, symbol
-  indices, and relocation indices are all module-local and dense from 0.
-- The same external name reached from two places in the module SHOULD share
-  one relocation entry (wildcard entries are per-import-statement, since
-  each carries its own except-list).
-- Builtins (`println`, `len`, `next`, `send`, `pair`, `error`, type names
-  used by `is`, …) are reached by relocation with a single-component path —
-  resolution falls through the §6.2 order. An identifier that resolves to
-  nothing known at compile time is still a `CompileError` **unless** a
-  wildcard import is in scope, in which case it compiles to a
-  single-component relocation and resolves (or errors) at bind time.
+- Global indices, function indices, class indices, static indices and symbol
+  indices are all module-local and dense from 0. Free slots for a wildcard's
+  names are numbered in sorted-name order (`module_exports` sorts), so the
+  self-compile fixed point doesn't depend on memory layout.
 
 ---
 
