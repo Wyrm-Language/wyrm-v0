@@ -6,6 +6,13 @@
 
 #include <stdint.h>
 
+/* The `.wyc` format version: whole seconds from 2016-01-01T00:00:00Z to the
+ * moment the last change to the format was published. Any change to the
+ * container, a section's shape, a key or a value encoding sets a new one,
+ * here and in WYC_VERSION in src/embed/wyrm/image.wy. A loader accepts
+ * exactly this version (doc-llm/llm-bytecode.md section 4). */
+#define WY_IMAGE_VERSION 340739680u
+
 typedef struct wy_section_ref {
     const uint8_t *data;
     uint32_t len;

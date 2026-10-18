@@ -1,0 +1,147 @@
+# wy/wyrm/tools/test_cbor_driver.wy - regression driver for the encoder in
+# src/embed/wyrm/cbor.wy against the Worked examples of the wire encoding
+# (project design/wire_encoding.md), byte for byte. scripts/check_cbor.sh runs
+# it with the in-repo binary (wyrm::cbor is embedded) and fails on any
+# "FAIL" line or a missing final "ALL PASS".
+#
+#   ./buildDir/src/wyrm/wyrm wy/wyrm/tools/test_cbor_driver.wy
+#
+# The encoder never emits float32 (`FA`) or symbols/chars (tags 280/282): no
+# section holds one. The `'x` symbol key of the document's last example is a
+# string "x" here; the C reader (src/test/test_cbor.cpp) covers those items.
+
+import wyrm::cbor::*
+
+# A list, so the helpers below can bump it.
+failures := [0]
+
+fn expect(name: str, got, want: list):
+    if got is error:
+        println("FAIL: " + name + " errored")
+        failures[0] = failures[0] + 1
+        return
+    ok := len(got) == len(want)
+    i := 0
+    while ok and i < len(want):
+        if got[i] != want[i]:
+            ok = false
+        i = i + 1
+    if ok:
+        println("PASS: " + name)
+    else:
+        text := ""
+        j := 0
+        while j < len(got):
+            text = text + " " + str(got[j])
+            j = j + 1
+        println("FAIL: " + name + " got:" + text)
+        failures[0] = failures[0] + 1
+
+fn expect_error(name: str, got):
+    if got is error:
+        println("PASS: " + name)
+    else:
+        println("FAIL: " + name + " should have been an error")
+        failures[0] = failures[0] + 1
+
+fn cat(a: list, b: list) -> list:
+    out := []
+    for x in a:
+        out!append(x)
+    for x in b:
+        out!append(x)
+    return out
+
+fn repeat(item, n: int) -> list:
+    out := []
+    i := 0
+    while i < n:
+        out!append(item)
+        i = i + 1
+    return out
+
+fn repeat_str(ch: str, n: int) -> str:
+    out := ""
+    i := 0
+    while i < n:
+        out = out + ch
+        i = i + 1
+    return out
+
+# --- Worked examples, in the order of the table
+expect("0", encode(0), [0x00])
+expect("23", encode(23), [0x17])
+expect("24", encode(24), [0x18, 0x18])
+expect("500", encode(500), [0x19, 0x01, 0xF4])
+expect("-1", encode(-1), [0x20])
+expect("-500", encode(-500), [0x39, 0x01, 0xF3])
+expect("int64 min", encode(-(2 ** 62) * 2), [0x3B, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
+expect("1.5 as float64", encode(1.5), [0xFB, 0x3F, 0xF8, 0, 0, 0, 0, 0, 0])
+expect("true", encode(true), [0xF5])
+expect("false", encode(false), [0xF4])
+expect("nil", encode(nil), [0xF6])
+expect("hi", encode("hi"), [0x62, 0x68, 0x69])
+b12 := bytes(2)
+b12!pack_u8(0, 1)
+b12!pack_u8(1, 2)
+expect("bytes 01 02", encode(b12), [0x42, 0x01, 0x02])
+expect("[1, [2, 3]]", encode([1, [2, 3]]), [0x82, 0x01, 0x82, 0x02, 0x03])
+expect("{a: 1, x: -2}", encode({"a": 1, "x": -2}), [0xA2, 0x61, 0x61, 0x01, 0x61, 0x78, 0x21])
+
+# --- shortest argument at every boundary (Canonical rules, 1)
+expect("255", encode(255), [0x18, 0xFF])
+expect("256", encode(256), [0x19, 0x01, 0x00])
+expect("65535", encode(65535), [0x19, 0xFF, 0xFF])
+expect("65536", encode(65536), [0x1A, 0x00, 0x01, 0x00, 0x00])
+expect("2^32-1", encode(2 ** 32 - 1), [0x1A, 0xFF, 0xFF, 0xFF, 0xFF])
+expect("2^32", encode(2 ** 32), [0x1B, 0, 0, 0, 1, 0, 0, 0, 0])
+expect("int64 max", encode((2 ** 62 - 1) * 2 + 1), [0x1B, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
+expect("-24", encode(-24), [0x37])
+expect("-25", encode(-25), [0x38, 0x18])
+expect("-256", encode(-256), [0x38, 0xFF])
+expect("-257", encode(-257), [0x39, 0x01, 0x00])
+
+# --- lengths and counts use the shortest form too
+expect("23 chars", encode(repeat_str("a", 23)), cat([0x77], repeat(0x61, 23)))
+expect("24 chars", encode(repeat_str("a", 24)), cat([0x78, 0x18], repeat(0x61, 24)))
+expect("23 items", encode(repeat(0, 23)), cat([0x97], repeat(0x00, 23)))
+expect("24 items", encode(repeat(0, 24)), cat([0x98, 0x18], repeat(0x00, 24)))
+expect("256 items", encode(repeat(0, 256)), cat([0x99, 0x01, 0x00], repeat(0x00, 256)))
+big := bytes(24)
+expect("24 bytes", encode(big), cat([0x58, 0x18], repeat(0x00, 24)))
+expect("empty string", encode(""), [0x60])
+expect("empty list", encode([]), [0x80])
+expect("empty dict", encode({}), [0xA0])
+expect("empty bytes", encode(bytes(0)), [0x40])
+d24 := {}
+i := 0
+while i < 24:
+    d24[i] = i
+    i = i + 1
+enc24 := encode(d24)
+expect("24 pairs", [enc24[0], enc24[1]], [0xB8, 0x18])
+
+# --- text is UTF-8, counted in bytes
+expect("e acute", encode("é"), [0x62, 0xC3, 0xA9])
+
+# --- maps keep insertion order; keys may be ints, strings or bytes
+expect("insertion order", encode({"b": 1, "a": 2}), [0xA2, 0x61, 0x62, 0x01, 0x61, 0x61, 0x02])
+expect("int keys", encode({5: "x", 300: nil}), [0xA2, 0x05, 0x61, 0x78, 0x19, 0x01, 0x2C, 0xF6])
+expect("bytes key", encode({b12: 0}), [0xA1, 0x42, 0x01, 0x02, 0x00])
+expect("nested", encode({"a": [1, {"b": nil}]}), [0xA1, 0x61, 0x61, 0x82, 0x01, 0xA1, 0x61, 0x62, 0xF6])
+
+# --- helpers
+expect("head 0", head(MAJOR_UINT, 0), [0x00])
+expect("head text 5", head(MAJOR_TEXT, 5), [0x65])
+expect("head array 300", head(MAJOR_ARRAY, 300), [0x99, 0x01, 0x2C])
+expect("head map 2^32", head(MAJOR_MAP, 2 ** 32), [0xBB, 0, 0, 0, 1, 0, 0, 0, 0])
+if head_len(23) == 1 and head_len(24) == 2 and head_len(255) == 2 and head_len(256) == 3 and head_len(65535) == 3 and head_len(65536) == 5 and head_len(2 ** 32 - 1) == 5 and head_len(2 ** 32) == 9:
+    println("PASS: head_len")
+else:
+    println("FAIL: head_len")
+    failures[0] = failures[0] + 1
+
+if failures[0] == 0:
+    println("ALL PASS")
+else:
+    println("FAILURES: " + str(failures[0]))

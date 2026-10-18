@@ -6,7 +6,6 @@
 #include <vector>
 
 #include <wyrm.h>
-#include <wyrm/bson.h>
 #include <wyrm/gc.h>
 #include <wyrm/image_loader.h>
 #include <wyrm/opcode.h>
@@ -15,6 +14,7 @@
 #include <wyrm/session.h>
 #include <wyrm/string.h>
 
+#include <test_common/cbor_build.h>
 #include <test_common/test_context_fixture.h>
 #include <test_common/test_fiber_fixture.h>
 
@@ -25,60 +25,7 @@
 
 namespace {
 
-// A tiny BSON + container writer: just enough to hand-build delta images.
-using Bytes = std::vector<std::uint8_t>;
-
-void put_u32(Bytes& b, std::uint32_t v)
-{
-    for (int i = 0; i < 4; i++) { b.push_back((std::uint8_t) (v >> (8 * i))); }
-}
-
-Bytes element(std::uint8_t tag, const std::string& key, const Bytes& payload)
-{
-    Bytes e;
-    e.push_back(tag);
-    e.insert(e.end(), key.begin(), key.end());
-    e.push_back(0);
-    e.insert(e.end(), payload.begin(), payload.end());
-    return e;
-}
-
-Bytes bson_i32(const std::string& key, std::int32_t v)
-{
-    Bytes p;
-    put_u32(p, (std::uint32_t) v);
-    return element(WY_BSON_TAG_I32, key, p);
-}
-
-Bytes bson_str(const std::string& key, const std::string& text)
-{
-    Bytes p;
-    put_u32(p, (std::uint32_t) text.size() + 1);
-    p.insert(p.end(), text.begin(), text.end());
-    p.push_back(0);
-    return element(WY_BSON_TAG_STRING, key, p);
-}
-
-Bytes document(const std::vector<Bytes>& elements)
-{
-    Bytes body;
-    for (const Bytes& e : elements) { body.insert(body.end(), e.begin(), e.end()); }
-    Bytes d;
-    put_u32(d, (std::uint32_t) (body.size() + 5));
-    d.insert(d.end(), body.begin(), body.end());
-    d.push_back(0);
-    return d;
-}
-
-// An array is a document whose keys are "0", "1", ...
-Bytes array_of(const std::vector<Bytes>& items, std::uint8_t item_tag)
-{
-    std::vector<Bytes> elements;
-    for (std::size_t i = 0; i < items.size(); i++) { elements.push_back(element(item_tag, std::to_string(i), items[i])); }
-    return document(elements);
-}
-
-Bytes bson_doc(const std::string& key, const Bytes& d) { return element(WY_BSON_TAG_DOCUMENT, key, d); }
+using namespace wy_test_cbor;
 
 struct Delta
 {
@@ -98,73 +45,40 @@ struct Delta
 // Serialise `d` to a container. The returned buffer owns every section.
 Bytes build_delta(const Delta& d)
 {
-    std::vector<Bytes> header = {bson_str("n", "__repl__"), bson_i32("v", 1)};
-    if (d.delta_marker) { header.push_back(bson_i32("d", 1)); }
-    header.push_back(bson_i32("g", d.g));
-    header.push_back(bson_i32("l", 1));
-    header.push_back(bson_i32("i", d.init));
-    header.push_back(bson_i32("bc", d.bc)); header.push_back(bson_i32("bf", d.bf));
-    header.push_back(bson_i32("bs", d.bs)); header.push_back(bson_i32("by", d.by));
-    header.push_back(bson_i32("bk", d.bk)); header.push_back(bson_i32("bm", d.bm));
-    header.push_back(bson_i32("bg", d.bg));
+    std::vector<Pair> header = {kv("n", text("__repl__"))};
+    if (d.delta_marker) { header.push_back(kv("d", uval(1))); }
+    header.push_back(kv("g", uval(d.g)));
+    header.push_back(kv("l", uval(1)));
+    header.push_back(kv("i", uval(d.init)));
+    header.push_back(kv("bc", uval(d.bc))); header.push_back(kv("bf", uval(d.bf)));
+    header.push_back(kv("bs", uval(d.bs))); header.push_back(kv("by", uval(d.by)));
+    header.push_back(kv("bk", uval(d.bk))); header.push_back(kv("bm", uval(d.bm)));
+    header.push_back(kv("bg", uval(d.bg)));
 
     std::vector<Bytes> fn_docs;
     for (const auto& f : d.fns) {
-        fn_docs.push_back(document({bson_str("n", f.name), bson_i32("l", f.nlocals), bson_i32("c", f.code_offset),
-            bson_i32("f", 0), element(WY_BSON_TAG_ARRAY, "p", document(std::vector<Bytes>{}))}));
+        fn_docs.push_back(map({kv("n", text(f.name)), kv("l", uval(f.nlocals)), kv("c", uval(f.code_offset)),
+            kv("f", uval(0)), kv("p", array({}))}));
     }
-    std::vector<Bytes> exp;
-    for (const auto& e : d.exports) { exp.push_back(bson_i32(e.first, e.second)); }
+    std::vector<Pair> exp;
+    for (const auto& e : d.exports) { exp.push_back(kv(e.first, uval(e.second))); }
 
-    struct Sec { std::uint8_t id; Bytes data; };
-    std::vector<Sec> secs;
-    secs.push_back({WY_SEC_HEADER, document(header)});
+    std::vector<Section> secs;
+    secs.push_back({WY_SEC_HEADER, map(header)});
     if (!d.statics.empty()) {
         std::vector<Bytes> items;
-        for (const auto& t : d.statics) {
-            Bytes p;
-            put_u32(p, (std::uint32_t) t.size() + 1);
-            p.insert(p.end(), t.begin(), t.end());
-            p.push_back(0);
-            items.push_back(p);
-        }
-        secs.push_back({WY_SEC_STATICS, array_of(items, WY_BSON_TAG_STRING)});
+        for (const auto& t : d.statics) { items.push_back(text(t)); }
+        secs.push_back({WY_SEC_STATICS, array(items)});
     }
     if (!d.symbols.empty()) {
         std::vector<Bytes> items;
-        for (const auto& t : d.symbols) {
-            Bytes p;
-            put_u32(p, (std::uint32_t) t.size() + 1);
-            p.insert(p.end(), t.begin(), t.end());
-            p.push_back(0);
-            items.push_back(p);
-        }
-        secs.push_back({WY_SEC_SYMBOLS, array_of(items, WY_BSON_TAG_STRING)});
+        for (const auto& t : d.symbols) { items.push_back(text(t)); }
+        secs.push_back({WY_SEC_SYMBOLS, array(items)});
     }
-    if (!d.fns.empty()) { secs.push_back({WY_SEC_FUNCTIONS, array_of(fn_docs, WY_BSON_TAG_DOCUMENT)}); }
-    Bytes code;
-    for (wy_u32 w : d.code) { put_u32(code, w); }
-    secs.push_back({WY_SEC_CODE, code});
-    if (!d.exports.empty()) { secs.push_back({WY_SEC_EXPORTS, document(exp)}); }
-
-    Bytes out = {'W', 'Y', 'C', 0, 1, (std::uint8_t) secs.size(), 0, 0};
-    std::uint32_t offset = 8 + 12 * (std::uint32_t) secs.size();
-    std::vector<std::uint32_t> offsets;
-    for (const Sec& sec : secs) {
-        while (offset % 4 != 0) { offset++; }
-        offsets.push_back(offset);
-        offset += (std::uint32_t) sec.data.size();
-    }
-    for (std::size_t i = 0; i < secs.size(); i++) {
-        out.push_back(secs[i].id); out.push_back(0); out.push_back(0); out.push_back(0);
-        put_u32(out, offsets[i]);
-        put_u32(out, (std::uint32_t) secs[i].data.size());
-    }
-    for (std::size_t i = 0; i < secs.size(); i++) {
-        while (out.size() < offsets[i]) { out.push_back(0); }
-        out.insert(out.end(), secs[i].data.begin(), secs[i].data.end());
-    }
-    return out;
+    if (!d.fns.empty()) { secs.push_back({WY_SEC_FUNCTIONS, array(fn_docs)}); }
+    secs.push_back({WY_SEC_CODE, code_item(d.code)});
+    if (!d.exports.empty()) { secs.push_back({WY_SEC_EXPORTS, map(exp)}); }
+    return container(secs);
 }
 
 wy_error extend_with(wy_context* ctx, wy_module* session, const Bytes& bytes, wy_uword* init = nullptr)

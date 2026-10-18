@@ -7,7 +7,7 @@
 #include "std/pairs.c"
 #include "wyrm/_dsl.c"
 #include "wyrm/ast.c"
-#include "wyrm/bjson.c"
+#include "wyrm/cbor.c"
 #include "wyrm/decode.c"
 #include "wyrm/image.c"
 #include "wyrm/opcodes.c"

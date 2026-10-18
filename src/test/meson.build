@@ -2,7 +2,7 @@ test_cwyrm_sources = files(
     'main.cpp',
     'test_allocator.cpp',
     'test_atomics.cpp',
-    'test_bson.cpp',
+    'test_cbor.cpp',
     'test_builtins.cpp',
     'test_bytecode_golden.cpp',
     'test_class.cpp',

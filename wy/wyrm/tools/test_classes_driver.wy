@@ -2,7 +2,7 @@
 # wy/wyrm/compiler/classes.wy, run on this repo's C VM.
 #
 # Same amalgam constraint as test_functions_driver.wy (see its header):
-# the compiler modules + bjson + image are concatenated with their wyrm-side
+# the compiler modules + cbor + image are concatenated with their wyrm-side
 # `import` lines stripped (`import std::io` is KEPT - it resolves against
 # the C VM's native io module, exactly as test/bytecode/bytes_header's
 # cvm_header.wy does), compiled by pypoc's compiler_bc, then run on the
@@ -13,12 +13,12 @@
 # C VM and diffs stdout against the corpus .out files:
 #
 #   work=$(mktemp -d)
-#   cat wy/std/pairs.wy wy/wyrm/bjson.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
+#   cat wy/std/pairs.wy wy/wyrm/cbor.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
 #       wy/wyrm/compiler/analysis.wy wy/wyrm/compiler/context.wy \
 #       wy/wyrm/compiler/expressions.wy wy/wyrm/compiler/handlers.wy \
 #       wy/wyrm/compiler/statements.wy wy/wyrm/compiler/functions.wy \
 #       wy/wyrm/compiler/classes.wy wy/wyrm/tools/test_classes_driver.wy \
-#     | grep -vE '^import (wyrm|bjson|opcodes|image|std::pairs)' \
+#     | grep -vE '^import (wyrm|cbor|opcodes|image|std::pairs)' \
 #     > "$work/cls_check.wy"
 #   pypoc/.venv/bin/wyrm --build-bc "$work/cls_check.wy" -o "$work"
 #   ./buildDir/src/wyrm/wyrm "$work/cls_check.wyc"

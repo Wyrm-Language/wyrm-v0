@@ -644,7 +644,6 @@ fn _assemble(module: ModuleContext) -> dict | error:
         stubs ! append(s)
     img := {}
     img["name"] = image.module_name
-    img["version"] = 1
     img["globals"] = len(image.globals)
     img["init_l"] = init.high
     img["init_nlocals"] = init.high
@@ -1083,7 +1082,6 @@ fn _compile_snippet_body(session: SessionContext, program_node, expander) -> dic
 
     img := {}
     img["name"] = "__repl__"
-    img["version"] = 1
     img["globals"] = len(image.globals)
     img["init_l"] = init.high
     img["init_nlocals"] = init.high

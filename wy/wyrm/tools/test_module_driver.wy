@@ -2,7 +2,7 @@
 # wy/wyrm/compiler/module.wy (+ verify.wy), run on this repo's C VM.
 #
 # Same amalgam constraint as test_classes_driver.wy (see its header): the
-# compiler modules + bjson + image are concatenated with their wyrm-side
+# compiler modules + cbor + image are concatenated with their wyrm-side
 # `import` lines stripped, compiled by pypoc's compiler_bc, then run on the
 # C VM. The fixture MODULE TREES below are the literal, verbatim output of
 # wy/wyrm's own parser (regenerated after the M5-session expr_stmt/message
@@ -14,13 +14,13 @@
 # see the epic report).
 #
 #   work=$(mktemp -d)
-#   cat wy/std/pairs.wy wy/wyrm/bjson.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
+#   cat wy/std/pairs.wy wy/wyrm/cbor.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
 #       wy/wyrm/compiler/analysis.wy wy/wyrm/compiler/context.wy \
 #       wy/wyrm/compiler/expressions.wy wy/wyrm/compiler/handlers.wy \
 #       wy/wyrm/compiler/statements.wy wy/wyrm/compiler/functions.wy \
 #       wy/wyrm/compiler/classes.wy wy/wyrm/compiler/verify.wy \
 #       wy/wyrm/compiler/module.wy wy/wyrm/tools/test_module_driver.wy \
-#     | grep -vE '^import (wyrm|bjson|opcodes|image|std::pairs)' \
+#     | grep -vE '^import (wyrm|cbor|opcodes|image|std::pairs)' \
 #     > "$work/mod_check.wy"
 #   pypoc/.venv/bin/wyrm --build-bc "$work/mod_check.wy" -o "$work"
 #   ./buildDir/src/wyrm/wyrm "$work/mod_check.wyc"

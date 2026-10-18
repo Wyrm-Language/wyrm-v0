@@ -16,7 +16,8 @@ if check_wy_entry.found()
 endif
 
 # Epic 11 M3: the .wyd cache lifecycle - jit on a miss, cache hits, touch
-# invalidation, --cache-dir prefix mapping, and .wyc cache files ignored.
+# invalidation, --cache-dir prefix mapping, .wyc cache files ignored, and a cache
+# from another format version recompiled.
 check_wy_cache = find_program('../../scripts/check_wy_cache.sh', required: false)
 if check_wy_cache.found()
     test('wy-cache', check_wy_cache, args: [wyrm_exe.full_path(), meson.project_source_root()], suite: 'wyrm')
@@ -41,4 +42,11 @@ endif
 check_wy_repl = find_program('../../scripts/check_wy_repl.sh', required: false)
 if check_wy_repl.found()
     test('wy-repl', check_wy_repl, args: [wyrm_exe.full_path(), meson.project_source_root()], suite: 'wyrm', timeout: 300)
+endif
+
+# The wire-encoding encoder (src/embed/wyrm/cbor.wy) against the Worked
+# examples of project design/wire_encoding.md, byte for byte.
+check_cbor = find_program('../../scripts/check_cbor.sh', required: false)
+if check_cbor.found()
+    test('wy-cbor', check_cbor, args: [wyrm_exe.full_path(), meson.project_source_root()], suite: 'wyrm')
 endif

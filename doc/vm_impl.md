@@ -36,20 +36,20 @@ of it actually lives. Epic 1's own map (loader-only) follows below it.
 
 | File | Responsibility |
 |---|---|
-| `pypoc/` | Nested checkout (own git history, gitignored) of the Python proof-of-concept compiler and reference VM. Source of truth for the opcode set and the `.wyc` format. |
-| `pypoc/doc/wyc-format.md` | **Normative** format spec: container (§2), BSON subset (§4), instruction encoding (§5), opcode set (§6), load sequence (§7), section schemas (§8). |
+| `pypoc/` | Nested checkout (own git history, gitignored) of the Python proof-of-concept compiler and reference VM. Source of truth for the opcode set. Its `.wyc` writer still produces the pre-CBOR container, which this VM no longer loads; `doc-llm/llm-bytecode.md` §4 and §5.3 are the format here. |
+| `pypoc/doc/wyc-format.md` | Format spec for pypoc's own images: instruction encoding (§5), opcode set (§6), load sequence (§7) and section schemas (§8) still apply; the container (§2) and structured encoding (§4) are replaced by `doc-llm/llm-bytecode.md` §4.1 and §5.3 (CBOR, versioned preamble). |
 | `scripts/setup_pypoc.sh` | Creates/updates `pypoc/.venv`, installs `.[dev,lsp]`, runs pypoc's own test suite. Idempotent. |
 | `include/wyrm/opcode.h` | The 88-opcode v1 instruction set, encoding macros (`WYRM_OP`, `WYRM_F`, `WYRM_A0/A1/A2`, `WYRM_OP_WORDS`). Originally adopted from pypoc; maintained here now. Keep `opcode_names.h` and `src/embed/wyrm/opcodes.wy` in step with any change. |
 | `include/wyrm/opcode_names.h` | `wy_opcode_names[256]`, indexed by raw opcode byte, for the disassembler. Hand-maintained alongside `opcode.h`. |
 | `include/wyrm/image.h` | `wy_section_ref`, `WY_SEC_*` ids, `wy_module_image` (a container's sections, zero-copy). Originally adopted from pypoc; maintained here now. |
-| `include/wyrm/image_loader.h`, `src/image.c` | `wy_image_from_bytes`: parses the container (magic/version/directory/bounds/alignment) into a `wy_module_image`. Declared separately from `image.h`, which carries only the descriptors a generated `.c` image needs. |
-| `include/wyrm/bson.h`, `src/bson.c` | The pinned eight-type BSON reader (§4.2) every structured section is decoded through. `wy_bson_doc_reader` for documents, `wy_bson_array_reader` for arrays (ignores index keys). Any tag outside the eight, a bad bool byte, a binary subtype ≠ 0, or a truncated field is `WY_ERR_IMAGE`. |
+| `include/wyrm/image_loader.h`, `src/image.c` | `wy_image_from_bytes`: parses the container (preamble and version, then the section map: ascending ids, expected types, `code` a multiple of 4) into a `wy_module_image`, validating every item in it. Declared separately from `image.h`, which carries only the descriptors a generated `.c` image needs. |
+| `include/wyrm/cbor.h`, `src/cbor.c` | The strict reader for the wire encoding (a CBOR subset) that every structured section is decoded through: `wy_cbor_read`, an iterative `wy_cbor_skip` with a nesting limit, array and map cursors, `wy_cbor_map_find` and range-checked getters. Anything outside the subset (non-shortest arguments, indefinite or 64-bit lengths, float16, unknown tags, invalid UTF-8, a container as a map key) or truncated is `WY_ERR_IMAGE`. |
 | `include/wyrm/module.h`, `src/module.c` | `wy_module_load_image` / `wy_module_load_bytes`: decode every section into a `wy_module` (table below). Every table index is bounds-checked at load (§3). Executes nothing; fills no builtins — that's epic 2. |
 | `src/vm.c` | `wy_vm_exec_bytecode`: still a stub (`WY_ERR_INVAL` unconditionally) pending epic 2's interpreter loop against the real encoding. |
 | `src/wyrm/main.c` | The `wyrm` CLI: `wyrm [-I dir]... [-v] [--cache-dir DIR] [--sections] [--disasm] [-m mod::sub] [--check] [--build-bc [-o DIR] [--emit LIST] [--strip]] file.wy|.wyc|.wyd [args...]`. A `.wy` entry (and every `.wy` import) compiles in-process through the builtin module table's embedded compiler; `.wyc`/`.wyd` load directly. |
 | `src/context.c` (`wy_context_intern`) | The one entry point loader code uses to intern a name. Wraps the scaffold symtab (`src/machine.c`, 8 KB linear, 127-byte cap per symbol) so swapping in a real symtab (epic 2) is a one-function change. |
 | `test/corpus/` | Behavioral corpus: `.wy` sources + expected `.out`, `manifest.txt`. No bytecode is committed; the C++ tests build `.wyd` fixtures from it at build time (`scripts/build_fixtures.py`). |
-| `src/test/test_image.cpp`, additions to `test_bson.cpp` | Container/BSON rejection cases, mutating a freshly built `hello.wyd` byte-for-byte. |
+| `src/test/test_image.cpp`, `src/test/test_cbor.cpp` | Container rejection cases (magic, version, trailing bytes, section order and types) and the wire-encoding reader's worked-example and rejection tables. `test_common/cbor_build.h` builds images by hand. |
 | `src/test/test_module.cpp` | Exact-value assertions for `hello`/`classes`/`two_module/report`, the embedded `hello_1` image (emitted at build time), and a `loader` suite that loads every built fixture (`meson test -C buildDir --suite loader`). |
 
 ## The `wy_module` table (`include/wyrm/module.h`)

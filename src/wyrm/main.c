@@ -10,6 +10,7 @@
 #include <wyrm/error.h>
 #include <wyrm/fiber.h>
 #include <wyrm/image.h>
+#include <wyrm/image_loader.h>
 #include <wyrm/link.h>
 #include <wyrm/list.h>
 #include <wyrm/module.h>
@@ -625,6 +626,13 @@ int main(int argc, char** argv)
             if (cache_path != WY_NULL && wy_import_cache_valid(cache_path, source_mtime)) {
                 wy_uword cached_len = 0;
                 wy_u8* cached = wy_import_fs_read_file(context, cache_path, &cached_len);
+                // A cache file from another format version is a miss: it is
+                // recompiled below, not reported.
+                wy_module_image probe;
+                if (cached != WY_NULL && wy_image_from_bytes(cached, cached_len, &probe) != WY_ERR_NONE) {
+                    wy_context_gc_free(context, cached);
+                    cached = WY_NULL;
+                }
                 if (cached != WY_NULL) {
                     if (search_path.verbose) { fprintf(stderr, "wyrm: cache %s\n", cache_path); }
                     last_error = wy_module_load_bytes(context, cached, cached_len, true, &module);

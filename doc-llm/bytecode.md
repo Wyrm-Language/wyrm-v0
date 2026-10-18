@@ -51,7 +51,7 @@ Example (NOTE: Convert to Hex instead of decimal!):
 
 sections (add as needed):
 
-BSON encoded sections:
+CBOR encoded sections (the wire encoding, doc-llm/llm-bytecode.md section 4.1; a `.wyc` file opens with a version preamble, section 5.3):
 
   - header: defines module name, total module globals / slots
   - static variables: a list of different objects, str/integers/integer arrays (no symbols)
@@ -76,7 +76,7 @@ BYTE CODE:
 ### C File
 
 Each section is a C uint8 array. Each is named '{encoded module}_{section_name}'; contents
-are the simple binary contents of the BSON encoded. The purpose is to allow dropping into
+are the bytes of the CBOR item, as they appear in a `.wyc`. The purpose is to allow dropping into
 a code base with the runtime.
 
 

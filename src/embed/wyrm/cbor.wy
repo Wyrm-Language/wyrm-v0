@@ -1,0 +1,139 @@
+# cbor.wy - the Wyrm wire encoding
+#
+# Encoder for the CBOR subset of project/design/wire_encoding.md, used by
+# image.wy for the structured module sections. It follows the Canonical rules
+# there: shortest argument, definite lengths, floats always float64, map pairs
+# in insertion order. The C reader (src/cbor.c) is the strict decoder.
+#
+# Value -> item mapping:
+#   nil -> F6 | bool -> F4/F5 | int -> major 0 (>= 0) or 1 (< 0)
+#   float -> FB | str -> major 3 | bytes -> major 2
+#   list -> major 4 | dict -> major 5, pairs in insertion order
+#
+# Integers are exact over the int64 range; there is no int32 limit. A dict key
+# must be an int, a str or bytes. Symbols and chars (tags 280 and 282) are not
+# encoded: no section holds one yet, and the VM has no way to hand the encoder
+# a symbol it could tell from a str. A str is already valid UTF-8 by
+# construction, so the encoder does not re-check it; src/cbor.c does.
+#
+# `x is bytes` does not work on the C VM (see doc-llm/agent-notes.md), so
+# `_value` finds bytes by elimination, as the BSON writer did: nil, bool, int,
+# float, str, dict and list are tested first and whatever is left is bytes.
+#
+# A dict iterates in insertion order on this VM (src/wdict.c), which is what
+# makes the encoding deterministic.
+
+# Computed, not written as a literal: until a compiler that writes this format
+# builds it, the stage0 that compiles this file only holds int32 constants.
+U32_LIMIT := 2 ** 32
+
+MAJOR_UINT := 0
+MAJOR_NEGINT := 1
+MAJOR_BYTES := 2
+MAJOR_TEXT := 3
+MAJOR_ARRAY := 4
+MAJOR_MAP := 5
+
+# Number of bytes the header of an item with argument `n` takes.
+fn head_len(n: int) -> int:
+    if n < 24:
+        return 1
+    if n < 256:
+        return 2
+    if n < 65536:
+        return 3
+    if n < U32_LIMIT:
+        return 5
+    return 9
+
+# The header byte(s) for `major` and argument `n` in the shortest form.
+fn head(major: int, n: int) -> bytes:
+    out := bytes(0)
+    base := major * 32
+    if n < 24:
+        out!append(base + n)
+    elif n < 256:
+        out!append(base + 24)
+        out!append(n)
+    elif n < 65536:
+        out!append(base + 25)
+        out!append((n >> 8) & 255)
+        out!append(n & 255)
+    elif n < U32_LIMIT:
+        out!append(base + 26)
+        out!append((n >> 24) & 255)
+        out!append((n >> 16) & 255)
+        out!append((n >> 8) & 255)
+        out!append(n & 255)
+    else:
+        out!append(base + 27)
+        shift := 56
+        while shift >= 0:
+            out!append((n >> shift) & 255)
+            shift = shift - 8
+    return out
+
+# The canonical encoding of `value`, or an error for a value with none.
+fn encode(value) -> bytes | error:
+    return _value(value)
+
+fn _key(key) -> bytes | error:
+    if key is nil or key is bool or key is float or key is list or key is dict:
+        return error("cbor: a map key must be an int, a str or bytes")
+    return _value(key)
+
+fn _value(value) -> bytes | error:
+    if value is nil:
+        out := bytes(0)
+        out!append(246)
+        return out
+    if value is bool:
+        out := bytes(0)
+        if value:
+            out!append(245)
+        else:
+            out!append(244)
+        return out
+    if value is int:
+        if value >= 0:
+            return head(MAJOR_UINT, value)
+        return head(MAJOR_NEGINT, -1 - value)
+    if value is float:
+        raw := bytes(8)
+        raw!pack_f64(0, value)
+        out := bytes(0)
+        out!append(251)
+        i := 7
+        while i >= 0:
+            out!append(raw[i])
+            i = i - 1
+        return out
+    if value is str:
+        body := bytes(value)
+        out := head(MAJOR_TEXT, len(body))
+        out!append(body)
+        return out
+    if value is dict:
+        out := head(MAJOR_MAP, len(value))
+        for key in value:
+            k := _key(key)
+            if k is error:
+                return k
+            v := _value(value[key])
+            if v is error:
+                return v
+            out!append(k)
+            out!append(v)
+        return out
+    if value is list:
+        out := head(MAJOR_ARRAY, len(value))
+        for item in value:
+            v := _value(item)
+            if v is error:
+                return v
+            out!append(v)
+        return out
+    # Last resort: bytes (`is bytes` is not usable here).
+    out := head(MAJOR_BYTES, len(value))
+    out!append(value)
+    return out

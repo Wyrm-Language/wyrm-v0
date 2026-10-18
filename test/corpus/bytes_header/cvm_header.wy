@@ -1,59 +1,33 @@
-# C-VM counterpart to pypoc_header.wy (epic 7 M5 exit criterion). Same BSON
-# assembly, byte for byte, but the C VM's std::io exposes raw POSIX
-# natives directly (open/write/close on an int handle) rather than
-# pypoc's File class - the C VM doesn't load/compile .wy corelib sources
-# yet (no compiler in this repo until epics 9-11), so
-# std::io::write_bytes_file (pypoc_header.wy's helper) doesn't exist here.
+# Epic 7 M5 exit criterion: the `header` section of a module image built by
+# hand with `bytes` methods, as CBOR (project design/wire_encoding.md) since
+# the image format moved off BSON. The C VM's std::io exposes raw POSIX
+# natives directly (open/write/close on an int handle).
 import std::io
-
-TAG_STRING := 2
-TAG_INT32 := 16
 
 out := bytes(0)
 
-# "n": "hello"  (TAG_STRING key "n", int32 payload length, "hello\0")
-out!append(TAG_STRING)
+# map(3): {"n": "hello", "g": 2, "l": 3}, keys in the order the compiler
+# writes them. 0xA3 is the map header for three pairs.
+out!append(163)
+
+# "n": "hello"  (text(1) "n", text(5) "hello")
+out!append(97)
 out!append("n")
-out!append(0)
-n_len := bytes(4)
-n_len!pack_i32(0, 6)          # len("hello\0")
-out!append(n_len)
+out!append(101)
 out!append("hello")
-out!append(0)
 
-# "v": 1  (TAG_INT32)
-out!append(TAG_INT32)
-out!append("v")
-out!append(0)
-v_val := bytes(4)
-v_val!pack_i32(0, 1)
-out!append(v_val)
-
-# "g": 2
-out!append(TAG_INT32)
+# "g": 2  (the unsigned integer 2 is the single byte 0x02)
+out!append(97)
 out!append("g")
-out!append(0)
-g_val := bytes(4)
-g_val!pack_i32(0, 2)
-out!append(g_val)
+out!append(2)
 
 # "l": 3
-out!append(TAG_INT32)
+out!append(97)
 out!append("l")
-out!append(0)
-l_val := bytes(4)
-l_val!pack_i32(0, 3)
-out!append(l_val)
-
-# frame: int32(len(body) + 5) + body + 0x00. body is 34 bytes
-# (13 for "n" + 7 each for "v"/"g"/"l"), so the frame total is 39.
-frame := bytes(4)
-frame!pack_i32(0, 39)
-frame!append(out)
-frame!append(0)
+out!append(3)
 
 handle := std::io::open("bytes_header.bin", "wb")
 
-handle!write(frame)
+handle!write(out)
 
 handle!close()

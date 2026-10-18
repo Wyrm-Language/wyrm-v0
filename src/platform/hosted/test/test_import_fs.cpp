@@ -1,15 +1,19 @@
 #include <doctest/doctest.h>
 
-#include <fstream>
-#include <filesystem>
-#include <string>
+#include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include <unistd.h>
 
 #include <wyrm.h>
 #include <wyrm/platform/hosted/import_cache.h>
 #include <wyrm/platform/hosted/import_fs.h>
+#include <test_common/cbor_build.h>
 #include <test_common/test_fiber_fixture.h>
 
 /**
@@ -61,6 +65,19 @@ void write_file(const std::filesystem::path& path, const std::string& bytes)
 std::string read_out(const wy_u8* bytes, wy_uword len)
 {
     return std::string(reinterpret_cast<const char*>(bytes), len);
+}
+
+// A minimal valid image that carries `source` as its one static, so a test can
+// tell which compile produced it. `version` lets a test make a stale one.
+std::string image_for(const std::string& source, std::uint32_t version = WY_IMAGE_VERSION)
+{
+    using namespace wy_test_cbor;
+    Bytes b = container({
+        {WY_SEC_HEADER, map({kv("n", text("m")), kv("g", uval(0)), kv("l", uval(0))})},
+        {WY_SEC_STATICS, array({text(source)})},
+        {WY_SEC_CODE, code_item({})},
+    }, version);
+    return std::string(b.begin(), b.end());
 }
 
 } // namespace
@@ -386,10 +403,11 @@ TEST_SUITE("import_fs")
             wy_uword source_len, wy_u8** out_bytes, wy_uword* out_len, const char**) -> wy_error {
             compile_calls += 1;
             last_source.assign(reinterpret_cast<const char*>(source), source_len);
-            *out_len = source_len;
+            std::string image = image_for(last_source);
+            *out_len = image.size();
             *out_bytes = static_cast<wy_u8*>(wy_context_gc_alloc(context, *out_len));
             if (*out_bytes == nullptr) { return WY_ERR_NOMEM; }
-            std::memcpy(*out_bytes, source, *out_len);
+            std::memcpy(*out_bytes, image.data(), *out_len);
             return WY_ERR_NONE;
         };
 
@@ -414,7 +432,7 @@ TEST_SUITE("import_fs")
         const wy_module_image* image = WY_NULL;
         CHECK_EQ(wy_import_fs_hook(ctx, path.data(), path.size(), &bytes, &len, &image, &search), WY_ERR_NONE);
         REQUIRE_NE(bytes, WY_NULL);
-        CHECK_EQ(read_out(bytes, len), "the user source");
+        CHECK_EQ(read_out(bytes, len), image_for("the user source"));
         CHECK_EQ(compile_calls, 1);
         CHECK_EQ(last_source, "the user source");
         // The cache lives beside the source's own directory.
@@ -424,8 +442,33 @@ TEST_SUITE("import_fs")
         bytes = WY_NULL;
         CHECK_EQ(wy_import_fs_hook(ctx, path.data(), path.size(), &bytes, &len, &image, &search), WY_ERR_NONE);
         REQUIRE_NE(bytes, WY_NULL);
-        CHECK_EQ(read_out(bytes, len), "the user source");
+        CHECK_EQ(read_out(bytes, len), image_for("the user source"));
         CHECK_EQ(compile_calls, 1);
+
+        // A cache file written by another format version is a miss, not an
+        // error: the source is compiled again and the cache rewritten. A
+        // pre-CBOR file, which begins "WYC\0", is the same.
+        const auto cache_file = tmp.root / "user" / "__wycache__" / "mod.wyd";
+        const std::vector<std::string> stale_caches = {
+            image_for("older", WY_IMAGE_VERSION - 1),
+            image_for("newer", WY_IMAGE_VERSION + 1),
+            std::string("WYC\0\1\0\0\0", 8),
+            std::string("not an image at all"),
+        };
+        int expected_calls = 1;
+        for (const std::string& stale : stale_caches) {
+            write_file(cache_file, stale);
+            bytes = WY_NULL;
+            CHECK_EQ(wy_import_fs_hook(ctx, path.data(), path.size(), &bytes, &len, &image, &search), WY_ERR_NONE);
+            REQUIRE_NE(bytes, WY_NULL);
+            CHECK_EQ(read_out(bytes, len), image_for("the user source"));
+            expected_calls += 1;
+            CHECK_EQ(compile_calls, expected_calls);
+            std::ifstream rewritten(cache_file, std::ios::binary);
+            std::ostringstream ss;
+            ss << rewritten.rdbuf();
+            CHECK_EQ(ss.str(), image_for("the user source"));
+        }
 
         // A builtin-table module is never compiled from its source - that
         // path needs the compiler to compile itself. Even with the source
@@ -440,7 +483,7 @@ TEST_SUITE("import_fs")
             &barred, &barred_len, &barred_image, &search), WY_ERR_NONE);
         CHECK_EQ(barred, WY_NULL);
         CHECK_EQ(barred_image, &dummy_image);
-        CHECK_EQ(compile_calls, 1);
+        CHECK_EQ(compile_calls, expected_calls);
 
         // No compile hook: .wy sources are invisible (pre-M3 behavior) -
         // the resolution falls through to the sibling precompiled .wyc.

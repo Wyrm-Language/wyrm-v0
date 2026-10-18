@@ -1,7 +1,7 @@
 # wy/wyrm/tools/test_image_driver.wy - epic 9 M3 milestone-verification
 # driver for wy/wyrm/image.wy.
 #
-# NOT wired into any test harness (see wy/wyrm/tools/test_bjson_driver.wy's
+# NOT wired into any test harness (see wy/wyrm/tools/test_cbor_driver.wy's
 # header comment for why: this compiles under pypoc's compiler_bc and runs
 # on this repo's C VM `wyrm` binary, a different pipeline from the
 # tree-walker `test/wy/*` suite). Hand-builds the `hello` module image from
@@ -15,9 +15,9 @@
 # Run it by hand:
 #
 #   work=$(mktemp -d)
-#   cp wy/wyrm/bjson.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
+#   cp wy/wyrm/cbor.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
 #      wy/wyrm/tools/test_image_driver.wy "$work/"
-#   for f in bjson opcodes image test_image_driver; do
+#   for f in cbor opcodes image test_image_driver; do
 #     pypoc/.venv/bin/wyrm -Iwy -Iwy/wyrm --build-bc "$work/$f.wy"
 #   done
 #   ./buildDir/src/wyrm/wyrm -I"$work" "$work/test_image_driver.wyc"
@@ -35,7 +35,7 @@
 # wy source (checked: no such builtin in doc/stdlib.md, and nothing in
 # src/*.c wires CLI argv into a wy-visible global/builtin).
 
-import bjson::*
+import cbor::*
 import opcodes::*
 import image::*
 import std::io
@@ -49,7 +49,7 @@ import std::io
 OUT_PATH := "/tmp/hello_built.wyc"
 
 fn build_hello_image() -> dict:
-    img := make_image("hello", 1, 2, 3)
+    img := make_image("hello", 2, 3)
     img["statics"] = ["Hello ", "World"]
     img["functions"] = [make_function("greet", [make_param("name")], 2, 11, 0)]
     img["exports"] = {"greet": 0}

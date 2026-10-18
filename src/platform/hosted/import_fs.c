@@ -1,6 +1,7 @@
 #include <wyrm/platform/hosted/import_fs.h>
 #include <wyrm/platform/hosted/import_cache.h>
 
+#include <wyrm/image_loader.h>
 #include <wyrm/machine.h>
 #include <wyrm/sys/string.h>
 #include <wyrm/util.h>
@@ -131,6 +132,13 @@ static wy_error try_base_(wy_context* context, wy_import_fs_search_path* search,
         wy_uword cached_len = 0;
         if (cache_path != WY_NULL && wy_import_cache_valid(cache_path, source_mtime)) {
             *out_bytes = wy_import_fs_read_file(context, cache_path, &cached_len);
+            // A cache file from another format version is a miss, to be
+            // recompiled below, not an error.
+            wy_module_image probe;
+            if (*out_bytes != WY_NULL && wy_image_from_bytes(*out_bytes, cached_len, &probe) != WY_ERR_NONE) {
+                wy_context_gc_free(context, *out_bytes);
+                *out_bytes = WY_NULL;
+            }
             if (*out_bytes != WY_NULL) {
                 if (search->verbose) { fprintf(stderr, "wyrm: cache %s\n", cache_path); }
                 *out_len = cached_len;

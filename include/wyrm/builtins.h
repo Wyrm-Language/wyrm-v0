@@ -11,7 +11,7 @@ WY_BEGIN_DECLS
  * module" paragraph, epic 2/M5).
  *
  * Not loaded from a `.wyc` image: `state = WY_MODULE_BUILTIN`, `exports`
- * populated directly rather than by the BSON name-slot-dict loader. Exposes
+ * populated directly rather than by the name-slot-dict loader. Exposes
  * at least `println`, `print` (leaf natives) and `nil` (a plain value) as
  * global slots reachable through `module->exports`, for `wy_link.c`'s layer
  * 3 fill to read.

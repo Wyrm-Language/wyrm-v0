@@ -43,7 +43,7 @@ WYRM = wytest_env.LOCAL_WYRM
 SELF_SOURCES = [
     "std/pairs.wy",
     "std/ctype.wy",
-    "wyrm/bjson.wy",
+    "wyrm/cbor.wy",
     "wyrm/opcodes.wy",
     "wyrm/image.wy",
     "wyrm/tokenizer.wy",
@@ -90,7 +90,7 @@ def compile_tree(driver, roots, out_tree, src_root, cache_dir=None):
     `roots`, mirroring SELF_SOURCES from src_root into out_tree.
 
     `wyrm/` is a second root: the sources use package-relative imports
-    (`import bjson::*` in image.wy), which the C VM resolves as top-level
+    (`import cbor::*` in image.wy), which the C VM resolves as top-level
     names, so the sibling modules must be findable from inside the package.
     out_tree comes before the roots that supply the compiler itself:
     parser.wy's decorator expansion loads the modules it imports (tokenizer,

@@ -3,9 +3,10 @@
 # Wyrm port of pypoc/wypoc/compiler_bc/image.py's section-building and
 # `.wyc` serialization (ModuleImage.sections()/code_bytes()/to_wyc()) plus
 # M4's `to_wya()` (the ASCII listing, spec 5.1) and `to_c()` (the C-array
-# container, spec 5.2). Like wy/wyrm/bjson.wy (M1) and wy/wyrm/opcodes.wy
-# (M2), this file is compiled by pypoc's compiler_bc and run on this repo's
-# C VM (`wyrm`), never on pypoc's tree-walking interpreter - see
+# container, spec 5.2). The structured sections are encoded by
+# wy/wyrm/cbor.wy; the container is documented in doc-llm/llm-bytecode.md
+# section 4. Like wy/wyrm/cbor.wy and wy/wyrm/opcodes.wy, this file runs on
+# this repo's C VM (`wyrm`), never on pypoc's tree-walking interpreter - see
 # doc-llm/history/wypoc-vm-port/epic_9.md.
 #
 # `assemble_wya()` is deliberately not ported here: epic 10 compares listings
@@ -24,15 +25,14 @@
 # to reach for), with these keys:
 #
 #   "name"    : str            module name, "::"-separated       (header n)
-#   "version" : int            format version, always 1           (header v)
 #   "globals" : int            module global slot count            (header g)
 #   "init_l"  : int            init routine's L-frame size          (header l)
-#   "statics"       : list | nil   BSON array elements, or nil if none
-#   "slot_defaults" : dict | nil   {"<index str>": value}, or nil
+#   "statics"       : list | nil   array elements, or nil if none
+#   "slot_defaults" : dict | nil   {global slot index (int): value}, or nil
 #   "symbols"       : list | nil   list of str, or nil
 #   "functions"     : list | nil   list of function dicts (see below), or nil
-#   "classes"       : list | nil   list of ready-to-encode BSON dicts, or nil
-#   "messages"      : list | nil   list of ready-to-encode BSON dicts, or nil
+#   "classes"       : list | nil   list of ready-to-encode dicts, or nil
+#   "messages"      : list | nil   list of ready-to-encode dicts, or nil
 #   "exports"       : dict | nil   {name: global slot index}, or nil
 #   "free"          : dict | nil   {name: global slot index}, or nil
 #   "code"          : list         u32 words, ALWAYS present (never nil;
@@ -50,7 +50,7 @@
 # the optional sections; only the non-optional ones (e.g. "code") are ever
 # emitted as legitimately empty.
 #
-# `classes`/`messages` are intentionally left as "already-shaped BSON
+# `classes`/`messages` are intentionally left as "already-shaped
 # dicts/lists" rather than given full builder helpers - hello has neither,
 # and doc/wyc-format.md sections 8.6/8.7 fully specify their shape for
 # whoever (epic 10) needs to build real ones; over-investing here beyond
@@ -63,7 +63,7 @@
 # (`t`/`k`/`r`/`d` nil means "omit this key", matching wyc-format.md 8.5's
 # optional fields exactly.)
 
-import wyrm::bjson::*
+import wyrm::cbor::*
 import wyrm::opcodes::*
 
 SEC_HEADER := 1
@@ -78,16 +78,16 @@ SEC_CODE := 8
 SEC_EXPORTS := 10
 SEC_FREE := 11
 
-WYC_MAGIC_W := 87  # 'W'
-WYC_MAGIC_Y := 89  # 'Y'
-WYC_MAGIC_C := 67  # 'C'
-CONTAINER_VERSION := 1
+# The format version: whole seconds from 2016-01-01T00:00:00Z to the moment
+# the last change to the .wyc format was published. Every change to the
+# container, a section's shape, a key or a value encoding sets a new one, here
+# and as WY_IMAGE_VERSION in include/wyrm/image.h; a loader accepts only its own.
+WYC_VERSION := 340739680
 
 # All section ids this milestone's writer knows how to emit, in ascending
 # order. Building sections in this exact order also means the `sections()`
-# dict comes out already directory-sorted (bjson.wy's header comment notes
-# this repo's dict preserves insertion order), which `to_wyc()` relies on
-# instead of re-deriving a sort.
+# dict comes out already in id order (this repo's dict preserves insertion
+# order), which `to_wyc()` relies on instead of re-deriving a sort.
 ALL_SECTION_IDS := [SEC_HEADER, SEC_STATICS, SEC_SLOT_DEFAULTS, SEC_SYMBOLS,
                      SEC_FUNCTIONS, SEC_CLASSES, SEC_MESSAGES, SEC_CODE,
                      SEC_EXPORTS, SEC_FREE]
@@ -112,8 +112,8 @@ COMMENT_COLUMN := 54
 # --------------------------------------------------------------------------
 # constructors
 
-fn make_image(name: str, version: int, globals_count: int, init_l: int) -> dict:
-    return {"name": name, "version": version, "globals": globals_count, "init_l": init_l, "statics": nil, "slot_defaults": nil, "symbols": nil, "functions": nil, "classes": nil, "messages": nil, "exports": nil, "free": nil, "code": []}
+fn make_image(name: str, globals_count: int, init_l: int) -> dict:
+    return {"name": name, "globals": globals_count, "init_l": init_l, "statics": nil, "slot_defaults": nil, "symbols": nil, "functions": nil, "classes": nil, "messages": nil, "exports": nil, "free": nil, "code": []}
 
 fn make_param(name: str, default: int | nil = nil) -> dict:
     return {"name": name, "default": default}
@@ -137,7 +137,7 @@ fn make_function(name: str, params: list | nil = nil, nlocals: int = 0,
 # section document builders
 
 fn _header_doc(image: dict) -> dict:
-    doc := {"n": image["name"], "v": image["version"], "g": image["globals"], "l": image["init_l"]}
+    doc := {"n": image["name"], "g": image["globals"], "l": image["init_l"]}
     # A REPL session delta (doc-llm/history/repl/repl-plan.md): `d` marks it, `bc`..`bg` are the
     # module's counts before the delta (the loader refuses a mismatch), `i` is
     # the absolute index of the function that runs this input.
@@ -244,46 +244,48 @@ fn code_bytes(image: dict) -> bytes:
         out!append(word)
     return out
 
+# Each structured section is the CBOR item itself (a map or an array); `code`
+# is the raw words, which `to_wyc` wraps in a byte string.
 fn sections(image: dict) -> dict | error:
     out := {}
 
-    header_bytes := encode_document(_header_doc(image))
+    header_bytes := encode(_header_doc(image))
     if header_bytes is error:
         return header_bytes
     out[SEC_HEADER] = header_bytes
 
     if image["statics"] is not nil:
-        r := encode_array(image["statics"])
+        r := encode(image["statics"])
         if r is error:
             return r
         out[SEC_STATICS] = r
 
     if image["slot_defaults"] is not nil:
-        r := encode_document(image["slot_defaults"])
+        r := encode(image["slot_defaults"])
         if r is error:
             return r
         out[SEC_SLOT_DEFAULTS] = r
 
     if image["symbols"] is not nil:
-        r := encode_array(image["symbols"])
+        r := encode(image["symbols"])
         if r is error:
             return r
         out[SEC_SYMBOLS] = r
 
     if image["functions"] is not nil:
-        r := encode_array(_function_docs(image))
+        r := encode(_function_docs(image))
         if r is error:
             return r
         out[SEC_FUNCTIONS] = r
 
     if image["classes"] is not nil:
-        r := encode_array(_class_docs(image))
+        r := encode(_class_docs(image))
         if r is error:
             return r
         out[SEC_CLASSES] = r
 
     if image["messages"] is not nil:
-        r := encode_array(_message_docs(image))
+        r := encode(_message_docs(image))
         if r is error:
             return r
         out[SEC_MESSAGES] = r
@@ -292,80 +294,60 @@ fn sections(image: dict) -> dict | error:
     # section) - matches image.py's unconditional assignment.
     out[SEC_CODE] = code_bytes(image)
 
-    if image["exports"] is not nil:
-        r := encode_document(image["exports"])
+    # compile_module leaves these two keys out when the module has no
+    # exported or free names: no section then.
+    exports := (image["exports"] catch nil)
+    if exports is not nil:
+        r := encode(exports)
         if r is error:
             return r
         out[SEC_EXPORTS] = r
 
-    if image["free"] is not nil:
-        r := encode_document(image["free"])
+    free := (image["free"] catch nil)
+    if free is not nil:
+        r := encode(free)
         if r is error:
             return r
         out[SEC_FREE] = r
 
     return out
 
+# The file: the 11-byte preamble (array(2), text "WYCR", uint32 WYC_VERSION),
+# then one map from section id to section value, ids ascending.
 fn to_wyc(image: dict) -> bytes | error:
     secs := sections(image)
     if secs is error:
         return secs
 
-    # Directory order: ascending section id. `secs` was already built in
-    # ascending order (see ALL_SECTION_IDS above), but walk the canonical id
-    # list explicitly rather than trusting dict-iteration order to stay
-    # sorted, so this keeps working even if a future edit adds a section out
-    # of numeric order by mistake.
+    # Ascending section id. `secs` was already built in ascending order (see
+    # ALL_SECTION_IDS above), but walk the canonical id list explicitly rather
+    # than trusting dict-iteration order to stay sorted.
     ids := []
     for id in ALL_SECTION_IDS:
         present := secs[id] catch nil
         if present is not nil:
             ids!append(id)
 
-    count := 0
-    for id in ids:
-        count = count + 1
-
-    header := bytes(8)
-    header!pack_u8(0, WYC_MAGIC_W)
-    header!pack_u8(1, WYC_MAGIC_Y)
-    header!pack_u8(2, WYC_MAGIC_C)
-    header!pack_u8(3, 0)
-    header!pack_u8(4, CONTAINER_VERSION)
-    header!pack_u8(5, count)
-    header!pack_u8(6, 0)
-    header!pack_u8(7, 0)
-
-    directory_end := 8 + 12 * count
-    payloads := bytes(0)
-    directory := bytes(0)
-    for id in ids:
-        payload := secs[id]
-        plen := len(payload)
-        running := len(payloads)
-        offset := directory_end + running
-
-        entry := bytes(12)
-        entry!pack_u8(0, id)
-        entry!pack_u8(1, 0)
-        entry!pack_u8(2, 0)
-        entry!pack_u8(3, 0)
-        entry!pack_u32(4, offset)
-        entry!pack_u32(8, plen)
-        directory!append(entry)
-
-        payloads!append(payload)
-        total := len(payloads)
-        pad := (4 - (total % 4)) % 4
-        i := 0
-        while i < pad:
-            payloads!append(0)
-            i = i + 1
-
     result := bytes(0)
-    result!append(header)
-    result!append(directory)
-    result!append(payloads)
+    result!append(130)   # 82: array(2)
+    result!append(100)   # 64: text(4)
+    result!append(87)    # "W"
+    result!append(89)    # "Y"
+    result!append(67)    # "C"
+    result!append(82)    # "R"
+    result!append(26)    # 1A: uint, 4-byte argument
+    result!append((WYC_VERSION >> 24) & 255)
+    result!append((WYC_VERSION >> 16) & 255)
+    result!append((WYC_VERSION >> 8) & 255)
+    result!append(WYC_VERSION & 255)
+
+    result!append(head(MAJOR_MAP, len(ids)))
+    for id in ids:
+        result!append(head(MAJOR_UINT, id))
+        payload := secs[id]
+        if id == SEC_CODE:
+            result!append(head(MAJOR_BYTES, len(payload)))
+        result!append(payload)
     return result
 
 # --------------------------------------------------------------------------
@@ -406,15 +388,12 @@ fn _hex4(value: int) -> str:
 fn _hex8(value: int) -> str:
     return _hex_digits(value, 8)
 
-# A length-prefixed BSON element is the element bytes plus the document
-# frame: an int32 total length and a trailing NUL (bjson.wy's `_frame`).
-fn _element_len(key: str, value) -> int | error:
-    doc := {}
-    doc[key] = value
-    encoded := encode_document(doc)
+# The encoded size of one array element or map key or value.
+fn _item_len(value) -> int | error:
+    encoded := encode(value)
     if encoded is error:
         return encoded
-    return len(encoded) - 5
+    return len(encoded)
 
 # `_static_kind`/`_static_repr`/`_doc_value_repr`: how a pool value reads in
 # a listing comment (image.py's module-level helpers). `bytes` is the
@@ -503,36 +482,40 @@ fn _array_note(kind: str, i: int, item, image: dict) -> str | error:
         return _message_note(i, item)
     return ""
 
-# `{byte offset of each array element: note}` within its encoded BSON array.
+# `{byte offset of each array element: note}` within its encoded array.
 fn _array_annotations(items: list, kind: str, image: dict) -> dict | error:
     annotations := {}
-    offset := 4
+    offset := head_len(len(items))
     i := 0
     for item in items:
         note := _array_note(kind, i, item, image)
         if note is error:
             return note
         annotations[offset] = note
-        length := _element_len(str(i), item)
+        length := _item_len(item)
         if length is error:
             return length
         offset = offset + length
         i = i + 1
     return annotations
 
+# The same for a map: one note per pair, at the offset of its key.
 fn _document_annotations(document: dict) -> dict | error:
     annotations := {}
-    offset := 4
+    offset := head_len(len(document))
     for key in document:
         value := document[key]
         repr_s := _doc_value_repr(value)
         if repr_s is error:
             return repr_s
-        annotations[offset] = key + ": " + repr_s
-        length := _element_len(key, value)
-        if length is error:
-            return length
-        offset = offset + length
+        annotations[offset] = str(key) + ": " + repr_s
+        key_length := _item_len(key)
+        if key_length is error:
+            return key_length
+        value_length := _item_len(value)
+        if value_length is error:
+            return value_length
+        offset = offset + key_length + value_length
     return annotations
 
 fn _section_annotations(image: dict, name: str) -> dict | error:

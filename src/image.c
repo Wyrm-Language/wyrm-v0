@@ -1,28 +1,38 @@
+#include <wyrm/cbor.h>
 #include <wyrm/image_loader.h>
 
-#define WY_IMAGE_HEADER_SIZE 8u
-#define WY_IMAGE_DIRECTORY_ENTRY_SIZE 12u
-#define WY_IMAGE_VERSION 1u
+// The 11-byte preamble: array(2), text "WYCR", uint32 version. The first 7
+// bytes are fixed; the last four are the big-endian version.
+#define WY_IMAGE_PREAMBLE_SIZE 11u
+#define WY_IMAGE_MAGIC_SIZE 7u
 
-static wy_u32 read_u32_le_(const wy_u8* p)
+static const wy_u8 image_magic_[WY_IMAGE_MAGIC_SIZE] = { 0x82, 0x64, 'W', 'Y', 'C', 'R', 0x1A };
+
+/** Which CBOR type each section's value must be. */
+static bool section_kind_ok_(wy_u8 id, wy_cbor_kind kind)
 {
-    return (wy_u32) p[0] | ((wy_u32) p[1] << 8) | ((wy_u32) p[2] << 16) | ((wy_u32) p[3] << 24);
+    switch (id) {
+    case WY_SEC_STATICS:
+    case WY_SEC_SYMBOLS:
+    case WY_SEC_FUNCTIONS:
+    case WY_SEC_CLASSES:
+    case WY_SEC_MESSAGES:
+        return kind == WY_CBOR_ARRAY;
+    case WY_SEC_CODE:
+        return kind == WY_CBOR_BYTES;
+    default:
+        return kind == WY_CBOR_MAP;
+    }
 }
 
 wy_error wy_image_from_bytes(const wy_u8* data, wy_uword len, wy_module_image* out)
 {
     if (data == WY_NULL || out == WY_NULL) { return WY_ERR_INVAL; }
 
-    if (len < WY_IMAGE_HEADER_SIZE) { return WY_ERR_IMAGE; }
-    if (data[0] != 'W' || data[1] != 'Y' || data[2] != 'C' || data[3] != 0x00) { return WY_ERR_IMAGE; }
-    if (data[4] != WY_IMAGE_VERSION) { return WY_ERR_IMAGE; }
-
-    wy_u8 section_count = data[5];
-    // data[6..7] reserved, ignored.
-
-    wy_uword directory_size = (wy_uword) section_count * WY_IMAGE_DIRECTORY_ENTRY_SIZE;
-    if (len - WY_IMAGE_HEADER_SIZE < directory_size) { return WY_ERR_IMAGE; }
-    wy_uword directory_end = WY_IMAGE_HEADER_SIZE + directory_size;
+    if (len < WY_IMAGE_PREAMBLE_SIZE) { return WY_ERR_IMAGE; }
+    if (wy_memcmp(data, image_magic_, WY_IMAGE_MAGIC_SIZE) != 0) { return WY_ERR_IMAGE; }
+    wy_u32 version = ((wy_u32) data[7] << 24) | ((wy_u32) data[8] << 16) | ((wy_u32) data[9] << 8) | (wy_u32) data[10];
+    if (version != WY_IMAGE_VERSION) { return WY_ERR_IMAGE; }
 
     out->name = WY_NULL;
     for (wy_uword i = 0; i < WY_SEC_COUNT; i++) {
@@ -30,36 +40,46 @@ wy_error wy_image_from_bytes(const wy_u8* data, wy_uword len, wy_module_image* o
         out->sections[i].len = 0;
     }
 
-    wy_u8 previous_id = 0;
-    for (wy_u8 i = 0; i < section_count; i++) {
-        wy_uword entry_offset = WY_IMAGE_HEADER_SIZE + (wy_uword) i * WY_IMAGE_DIRECTORY_ENTRY_SIZE;
-        wy_u8 id = data[entry_offset];
-        // data[entry_offset + 1 .. 3] reserved, ignored.
-        wy_u32 payload_offset = read_u32_le_(&data[entry_offset + 4]);
-        wy_u32 payload_length = read_u32_le_(&data[entry_offset + 8]);
+    // The rest of the file is one map: section id -> section value.
+    wy_cbor_reader reader;
+    wy_cbor_reader_init(&reader, data + WY_IMAGE_PREAMBLE_SIZE, len - WY_IMAGE_PREAMBLE_SIZE);
+    wy_cbor_item item;
+    wy_error last_error = wy_cbor_read(&reader, &item);
+    if (last_error != WY_ERR_NONE || item.kind != WY_CBOR_MAP) { return WY_ERR_IMAGE; }
+    wy_u64 pairs = item.n;
 
-        // Recognised ids are 1..WY_SEC_COUNT-1; id 0 is reserved for a
-        // future CRC section and, like any other id this v1 loader does
-        // not know, must be rejected rather than silently skipped.
-        if (id < 1 || id >= WY_SEC_COUNT) { return WY_ERR_IMAGE; }
-        // Ascending, unique: catches both an unsorted directory and a
-        // duplicate id in one comparison.
+    wy_u8 previous_id = 0;
+    for (wy_u64 i = 0; i < pairs; i++) {
+        last_error = wy_cbor_read(&reader, &item);
+        if (last_error != WY_ERR_NONE || item.kind != WY_CBOR_UINT) { return WY_ERR_IMAGE; }
+        // Recognised ids are 1..WY_SEC_COUNT-1; any other id, including 0,
+        // is rejected rather than silently skipped.
+        if (item.n < 1 || item.n >= WY_SEC_COUNT) { return WY_ERR_IMAGE; }
+        wy_u8 id = (wy_u8) item.n;
+        // Ascending, unique: catches both an unsorted map and a duplicate id.
         if (id <= previous_id) { return WY_ERR_IMAGE; }
         previous_id = id;
 
-        // A payload may not start before the directory ends (it would
-        // overlap the header/directory it is described by) or run past the
-        // end of the file.
-        if ((wy_uword) payload_offset < directory_end) { return WY_ERR_IMAGE; }
-        if ((wy_uword) payload_offset > len) { return WY_ERR_IMAGE; }
-        if ((wy_uword) payload_length > len - (wy_uword) payload_offset) { return WY_ERR_IMAGE; }
-        if (payload_offset % 4 != 0) { return WY_ERR_IMAGE; }
-        if (id == WY_SEC_CODE && payload_length % 4 != 0) { return WY_ERR_IMAGE; }
+        // wy_cbor_next_span validates every item inside the value.
+        wy_cbor_span span;
+        last_error = wy_cbor_next_span(&reader, &span);
+        if (last_error != WY_ERR_NONE) { return WY_ERR_IMAGE; }
+        last_error = wy_cbor_span_item(span, &item);
+        if (last_error != WY_ERR_NONE || !section_kind_ok_(id, item.kind)) { return WY_ERR_IMAGE; }
 
-        out->sections[id].data = &data[payload_offset];
-        out->sections[id].len = payload_length;
+        if (id == WY_SEC_CODE) {
+            // The section is the words themselves, not the byte string around them.
+            if (item.n % 4 != 0) { return WY_ERR_IMAGE; }
+            span.data = item.data;
+            span.len = (wy_uword) item.n;
+        }
+        if (span.len > UINT32_MAX) { return WY_ERR_IMAGE; }
+        out->sections[id].data = span.data;
+        out->sections[id].len = (uint32_t) span.len;
     }
 
+    // Nothing follows the map.
+    if (!wy_cbor_reader_at_end(&reader)) { return WY_ERR_IMAGE; }
     if (out->sections[WY_SEC_HEADER].data == WY_NULL) { return WY_ERR_IMAGE; }
     if (out->sections[WY_SEC_CODE].data == WY_NULL) { return WY_ERR_IMAGE; }
 

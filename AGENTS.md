@@ -77,6 +77,8 @@ Tests check behavior, plus our own compiler's self-consistency:
   `src/embed/**.c`. After changing `src/embed/` sources, regenerate
   stage0 with `python3 scripts/regen_builtins.py` and commit.
 - `wy-tests`, `scripts/check_parser_truth.py`: run under the external wyrm.
+- `wy-cbor` (`scripts/check_cbor.sh`): the `.wyc` encoder (`src/embed/wyrm/cbor.wy`) against the
+  wire encoding's worked examples, byte for byte.
 
 - `examples` (`scripts/check_examples.sh`): the embedding examples in `examples/` run and
   compared with `examples/expected/`; the library they use is `libwyrmhost` (`include/wyrm/host.h`,
@@ -110,6 +112,15 @@ To test a script for syntax:
 ```sh
 ./buildDir/src/wyrm/wyrm --check script_path.wy
 ```
+
+## The `.wyc` Format Version
+
+Any change to the `.wyc` format (the container, a section's shape, a key, a value encoding) sets
+a new version: set `WY_IMAGE_VERSION` (`include/wyrm/image.h`) and `WYC_VERSION`
+(`src/embed/wyrm/image.wy`) to the publish time, whole seconds since 2016-01-01T00:00:00Z
+(`python3 -c "import datetime as d; print(int((d.datetime.now(d.UTC) - d.datetime(2016,1,1,tzinfo=d.UTC)).total_seconds()))"`).
+A loader accepts exactly its own version and never reads an old one. Such a change is a
+bootstrap; see [doc-llm/agent-notes.md](doc-llm/agent-notes.md).
 
 ## Debugging and Known Traps
 

@@ -90,8 +90,8 @@ src/platform/*                "hosted" = standard C11 malloc/free); platform/*
   `src/context.c`'s `context_triggered`).
 - **`wy_module`** (`include/wyrm/module.h`, `src/module.c`) — owns a bytecode
   buffer (`wy_u32[]`) and a globals array. `wy_module_load` deserializes a
-  module from a `"WYC\x02"`-tagged BSON-ish container (see `src/bson.c`,
-  `include/wyrm/bson.h`) — **it expects already-compiled bytecode, not
+  module from a versioned CBOR container (see `src/image.c`, `src/cbor.c`,
+  `include/wyrm/cbor.h`) — **it expects already-compiled bytecode, not
   `.wy` source text.** There is currently no C-side compiler; `main.c`
   passing a raw script file to `wy_module_load` will fail the magic-header
   check. The `.wy`-language self-hosted compiler under `src/embed/wyrm/` (tokenizer
@@ -238,7 +238,7 @@ external, already-built `wyrm` install per AGENTS.md's guidance).
 - Fixtures under `src/test/test_common/*.h` (allocator/context/fiber/machine/
   main-loop fixtures) are shared setup for doctest cases.
 - 161 test cases / 15132 assertions currently, all passing (`meson test -C
-  buildDir`), covering: allocators (static/cmem/hosted), atomics, bson,
+  buildDir`), covering: allocators (static/cmem/hosted), atomics, cbor,
   class/slot basics, context/module registration, fiber frame/continuation/
   tail-call mechanics, symbol interning, the heap object kinds
   (tuple/list/bytes/error/function/native), iterative GC (including a

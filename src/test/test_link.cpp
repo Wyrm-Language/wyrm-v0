@@ -581,10 +581,10 @@ TEST_SUITE("builtin_table") {
         REQUIRE_EQ(wy_string_strdup(ctx, "wyrm::compiler::expand", &expand_path), WY_ERR_NONE);
         CHECK_EQ(wy_link_import(ctx, expand_path, &expander), WY_ERR_NONE);
 
-        // Package-relative spellings (image.wy imports `bjson::*`) resolve too.
+        // Package-relative spellings (image.wy imports `cbor::*`) resolve too.
         wy_module* alias = nullptr;
         wy_string* alias_path;
-        REQUIRE_EQ(wy_string_strdup(ctx, "bjson", &alias_path), WY_ERR_NONE);
+        REQUIRE_EQ(wy_string_strdup(ctx, "cbor", &alias_path), WY_ERR_NONE);
         CHECK_EQ(wy_link_import(ctx, alias_path, &alias), WY_ERR_NONE);
         CHECK_NE(alias, module);
     }

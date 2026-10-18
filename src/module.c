@@ -3,7 +3,7 @@
 #include <wyrm/session.h>
 
 #include <wyrm/allocator.h>
-#include <wyrm/bson.h>
+#include <wyrm/cbor.h>
 #include <wyrm/context.h>
 #include <wyrm/function.h>
 #include <wyrm/gc_flags.h>
@@ -24,135 +24,155 @@ static bool host_is_little_endian_(void)
     return *(const wy_u8*) &probe == 1;
 }
 
-/** Count the elements of a BSON array without decoding them. */
-static wy_error bson_array_count_(const wy_u8* data, wy_uword len, wy_uword* out_count)
+/** The value under text key `key` of the map `doc`; WY_ERR_IMAGE if there is none. */
+static wy_error field_(wy_cbor_span doc, const char* key, wy_cbor_span* out)
 {
-    wy_bson_array_reader reader;
-    wy_error last_error = wy_bson_array_reader_start(&reader, data, len);
-    if (last_error != WY_ERR_NONE) { return last_error; }
+    wy_error last_error = wy_cbor_map_find(doc, key, out);
+    return last_error == WY_ERR_NONE ? WY_ERR_NONE : WY_ERR_IMAGE;
+}
 
-    wy_uword count = 0;
-    wy_u8 tag;
-    const wy_u8* buffer;
-    wy_uword length;
-    for (;;) {
-        last_error = wy_bson_array_reader_get(&reader, &tag, &buffer, &length);
-        if (last_error == WY_ERR_STOP_ITERATION) { break; }
-        if (last_error != WY_ERR_NONE) { return WY_ERR_IMAGE; }
-        count++;
-    }
-    *out_count = count;
+/** As field_ for an optional key: `*found` says whether it was there. */
+static wy_error opt_field_(wy_cbor_span doc, const char* key, wy_cbor_span* out, bool* found)
+{
+    wy_error last_error = wy_cbor_map_find(doc, key, out);
+    *found = last_error == WY_ERR_NONE;
+    if (last_error == WY_ERR_KEY) { return WY_ERR_NONE; }
+    return last_error == WY_ERR_NONE ? WY_ERR_NONE : WY_ERR_IMAGE;
+}
+
+/** A required unsigned field no larger than `max`. */
+static wy_error field_uint_(wy_cbor_span doc, const char* key, wy_u32 max, wy_u32* out)
+{
+    wy_cbor_span value;
+    wy_error last_error = field_(doc, key, &value);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    wy_u32 number;
+    last_error = wy_cbor_get_u32(value, &number);
+    if (last_error != WY_ERR_NONE || number > max) { return WY_ERR_IMAGE; }
+    *out = number;
     return WY_ERR_NONE;
 }
 
-static wy_error intern_bson_string_(wy_context* context, const wy_u8* buffer, wy_symbol* out)
+/** As field_uint_ for an optional field: `*found` says whether it was there. */
+static wy_error opt_field_uint_(wy_cbor_span doc, const char* key, wy_u32 max, wy_u32* out, bool* found)
+{
+    wy_cbor_span value;
+    wy_error last_error = opt_field_(doc, key, &value, found);
+    if (last_error != WY_ERR_NONE || !*found) { return last_error; }
+    wy_u32 number;
+    last_error = wy_cbor_get_u32(value, &number);
+    if (last_error != WY_ERR_NONE || number > max) { return WY_ERR_IMAGE; }
+    *out = number;
+    return WY_ERR_NONE;
+}
+
+/** A required array field; `reader` is left at its first element. */
+static wy_error field_array_(wy_cbor_span doc, const char* key, wy_cbor_reader* reader, wy_uword* out_count)
+{
+    wy_cbor_span value;
+    wy_error last_error = field_(doc, key, &value);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    return wy_cbor_open_array(value, reader, out_count);
+}
+
+static wy_error intern_text_(wy_context* context, wy_cbor_span span, wy_symbol* out)
 {
     const char* text;
     wy_uword len;
-    wy_bson_get_str(buffer, &text, &len);
+    if (wy_cbor_get_text(span, &text, &len) != WY_ERR_NONE) { return WY_ERR_IMAGE; }
     return wy_context_intern(context, text, len, out);
 }
 
-/**
- * A `statics[]`/`slot_defaults` value (wyc-format.md §8.2/§8.3): string,
- * int32, double, bool, null or binary. A document or array here is a
- * format error - those tags never appear as a static's own value.
- */
-static wy_error decode_static_value_(wy_context* context, wy_u8 tag, const wy_u8* buffer, wy_uword len, wy_value* out)
+/** A required text field, interned. */
+static wy_error field_symbol_(wy_context* context, wy_cbor_span doc, const char* key, wy_symbol* out)
 {
-    switch (tag) {
-    case WY_BSON_TAG_STRING: {
-        const char* text;
-        wy_uword slen;
-        wy_bson_get_str(buffer, &text, &slen);
+    wy_cbor_span value;
+    wy_error last_error = field_(doc, key, &value);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    return intern_text_(context, value, out);
+}
+
+/** Open an array section; a section that isn't there reads as an empty array. */
+static wy_error open_section_array_(wy_section_ref section, wy_cbor_reader* reader, wy_uword* out_count)
+{
+    if (section.data == WY_NULL) {
+        *out_count = 0;
+        return WY_ERR_NONE;
+    }
+    wy_cbor_span span = { section.data, section.len };
+    return wy_cbor_open_array(span, reader, out_count);
+}
+
+/**
+ * A `statics[]`/`slot_defaults` value (doc-llm/llm-bytecode.md §4.3): string,
+ * integer, float, bool, nil or byte string. Symbols, chars and containers
+ * never appear as a static's own value.
+ */
+static wy_error decode_static_value_(wy_context* context, wy_cbor_span span, wy_value* out)
+{
+    wy_cbor_item item;
+    wy_error last_error = wy_cbor_span_item(span, &item);
+    if (last_error != WY_ERR_NONE) { return WY_ERR_IMAGE; }
+
+    switch (item.kind) {
+    case WY_CBOR_TEXT:
+    case WY_CBOR_BYTES: {
         wy_string* str;
-        wy_error last_error = wy_string_new(context, text, slen, &str);
+        last_error = wy_string_new(context, (const char*) item.data, (wy_uword) item.n, &str);
         if (last_error != WY_ERR_NONE) { return last_error; }
+        // A byte string is a placeholder until wy_bytes exists (epic 7): a
+        // wy_string flagged as raw bytes rather than text (see WY_GC_FLAG_BINARY).
+        if (item.kind == WY_CBOR_BYTES) { str->object.flags |= WY_GC_FLAG_BINARY; }
         *out = (wy_value) { .type = WY_TYPE_TAG_STR, .data = { .str = str } };
         return WY_ERR_NONE;
     }
-    case WY_BSON_TAG_I32:
-        *out = wy_value_word((wy_word) wy_bson_get_i32(buffer));
-        return WY_ERR_NONE;
-    case WY_BSON_TAG_DOUBLE: {
-        double value;
-        wy_error last_error = wy_bson_get_double_f(buffer, len, &value);
-        if (last_error != WY_ERR_NONE) { return last_error; }
-        *out = wy_value_float((wy_float) value);
+    case WY_CBOR_UINT:
+    case WY_CBOR_NEGINT: {
+        wy_i64 value;
+        if (wy_cbor_get_i64(span, &value) != WY_ERR_NONE) { return WY_ERR_IMAGE; }
+        if (value < (wy_i64) (-WY_WORD_MAX - 1) || value > (wy_i64) WY_WORD_MAX) { return WY_ERR_IMAGE; }
+        *out = wy_value_word((wy_word) value);
         return WY_ERR_NONE;
     }
-    case WY_BSON_TAG_BOOL:
-        *out = wy_value_bool(wy_bson_get_bool(buffer));
+    case WY_CBOR_FLOAT32:
+    case WY_CBOR_FLOAT64:
+        *out = wy_value_float((wy_float) item.f);
         return WY_ERR_NONE;
-    case WY_BSON_TAG_NIL:
+    case WY_CBOR_TRUE:
+        *out = wy_value_bool(true);
+        return WY_ERR_NONE;
+    case WY_CBOR_FALSE:
+        *out = wy_value_bool(false);
+        return WY_ERR_NONE;
+    case WY_CBOR_NIL:
         *out = wy_value_nil();
         return WY_ERR_NONE;
-    case WY_BSON_TAG_BINARY: {
-        // Placeholder until wy_bytes exists (epic 7): a wy_string flagged
-        // as raw bytes rather than text (see WY_GC_FLAG_BINARY).
-        const wy_u8* data;
-        wy_u8 subtype;
-        wy_uword blen;
-        wy_error last_error = wy_bson_get_binary_f(buffer, len, &data, &subtype, &blen);
-        if (last_error != WY_ERR_NONE) { return WY_ERR_IMAGE; }
-        wy_string* str;
-        last_error = wy_string_new(context, (const char*) data, blen, &str);
-        if (last_error != WY_ERR_NONE) { return last_error; }
-        str->object.flags |= WY_GC_FLAG_BINARY;
-        *out = (wy_value) { .type = WY_TYPE_TAG_STR, .data = { .str = str } };
-        return WY_ERR_NONE;
-    }
     default:
         return WY_ERR_IMAGE;
     }
-}
-
-static wy_error parse_decimal_key_(const char* text, wy_uword* out)
-{
-    if (text == WY_NULL || text[0] == '\0') { return WY_ERR_IMAGE; }
-    wy_uword value = 0;
-    for (const char* p = text; *p != '\0'; p++) {
-        if (*p < '0' || *p > '9') { return WY_ERR_IMAGE; }
-        value = value * 10 + (wy_uword) (*p - '0');
-    }
-    *out = value;
-    return WY_ERR_NONE;
 }
 
 /* -------------------------------------------------------------------------
  * header (id 1)
  * ------------------------------------------------------------------------- */
 
+
 static wy_error module_load_section_header_(wy_context* context, wy_module* module, wy_section_ref section)
 {
     if (section.data == WY_NULL) { return WY_ERR_IMAGE; }  // required (wy_image_from_bytes already enforces this)
 
-    wy_bson_doc_reader doc;
-    wy_error last_error = wy_bson_doc_reader_start(&doc, section.data, section.len);
+    wy_cbor_span doc = { section.data, section.len };
+    wy_error last_error = field_symbol_(context, doc, "n", &module->name);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
-    wy_u8 tag;
-    const wy_u8* buffer;
-    wy_uword len;
-
-    last_error = wy_bson_doc_reader_find(&doc, "n", &tag, &buffer, &len);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_STRING) { return WY_ERR_IMAGE; }
-    last_error = intern_bson_string_(context, buffer, &module->name);
+    // The format version lives in the file's preamble, not the header.
+    wy_u32 nglobals;
+    last_error = field_uint_(doc, "g", 0x7FFFFFFFu, &nglobals);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
-    last_error = wy_bson_doc_reader_find(&doc, "v", &tag, &buffer, &len);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-    if (wy_bson_get_i32(buffer) != 1) { return WY_ERR_IMAGE; }
-
-    last_error = wy_bson_doc_reader_find(&doc, "g", &tag, &buffer, &len);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-    wy_i32 nglobals = wy_bson_get_i32(buffer);
-    if (nglobals < 0) { return WY_ERR_IMAGE; }
-
-    last_error = wy_bson_doc_reader_find(&doc, "l", &tag, &buffer, &len);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-    wy_i32 init_nlocals = wy_bson_get_i32(buffer);
-    if (init_nlocals < 0 || init_nlocals > 0xFFFF) { return WY_ERR_IMAGE; }
+    wy_u32 init_nlocals;
+    last_error = field_uint_(doc, "l", 0xFFFFu, &init_nlocals);
+    if (last_error != WY_ERR_NONE) { return last_error; }
     module->init_nlocals = (wy_u16) init_nlocals;
 
     // `u` (referenced-name set) is a writer artifact from before binding was
@@ -186,25 +206,26 @@ static wy_error module_load_section_slot_defaults_(wy_context* context, wy_modul
 {
     if (section.data == WY_NULL) { return WY_ERR_NONE; }
 
-    wy_bson_doc_reader doc;
-    wy_error last_error = wy_bson_doc_reader_start(&doc, section.data, section.len);
+    wy_cbor_span span = { section.data, section.len };
+    wy_cbor_reader reader;
+    wy_uword count;
+    wy_error last_error = wy_cbor_open_map(span, &reader, &count);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
-    wy_u8 tag;
-    const char* key;
-    const wy_u8* buffer;
-    wy_uword len;
-    for (;;) {
-        last_error = wy_bson_doc_reader_get(&doc, &tag, &key, &buffer, &len);
-        if (last_error == WY_ERR_STOP_ITERATION) { break; }
-        if (last_error != WY_ERR_NONE) { return WY_ERR_IMAGE; }
+    for (wy_uword i = 0; i < count; i++) {
+        // Keys are module-global slot indices, unsigned integers.
+        wy_cbor_span key;
+        last_error = wy_cbor_next_span(&reader, &key);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+        wy_u32 slot;
+        if (wy_cbor_get_u32(key, &slot) != WY_ERR_NONE) { return WY_ERR_IMAGE; }
+        if ((wy_uword) slot >= module->global_count) { return WY_ERR_IMAGE; }
 
-        wy_uword slot;
-        if (parse_decimal_key_(key, &slot) != WY_ERR_NONE) { return WY_ERR_IMAGE; }
-        if (slot >= module->global_count) { return WY_ERR_IMAGE; }
-
+        wy_cbor_span item;
+        last_error = wy_cbor_next_span(&reader, &item);
+        if (last_error != WY_ERR_NONE) { return last_error; }
         wy_value value;
-        last_error = decode_static_value_(context, tag, buffer, len, &value);
+        last_error = decode_static_value_(context, item, &value);
         if (last_error != WY_ERR_NONE) { return last_error; }
         module->globals[slot] = value;
     }
@@ -217,24 +238,19 @@ static wy_error module_load_section_slot_defaults_(wy_context* context, wy_modul
 
 static wy_error module_load_section_symbols_(wy_context* context, wy_module* module, wy_section_ref section)
 {
-    if (section.data == WY_NULL) { return WY_ERR_NONE; }
-
-    wy_error last_error = bson_array_count_(section.data, section.len, &module->symbol_count);
+    wy_cbor_reader reader;
+    wy_error last_error = open_section_array_(section, &reader, &module->symbol_count);
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (module->symbol_count == 0) { return WY_ERR_NONE; }
 
     module->symbols = wy_context_gc_alloc(context, sizeof(wy_symbol) * module->symbol_count);
     if (module->symbols == WY_NULL) { return WY_ERR_NOMEM; }
 
-    wy_bson_array_reader reader;
-    wy_bson_array_reader_start(&reader, section.data, section.len);
     for (wy_uword i = 0; i < module->symbol_count; i++) {
-        wy_u8 tag;
-        const wy_u8* buffer;
-        wy_uword len;
-        last_error = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
-        if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_STRING) { return WY_ERR_IMAGE; }
-        last_error = intern_bson_string_(context, buffer, &module->symbols[i]);
+        wy_cbor_span item;
+        last_error = wy_cbor_next_span(&reader, &item);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+        last_error = intern_text_(context, item, &module->symbols[i]);
         if (last_error != WY_ERR_NONE) { return last_error; }
     }
     return WY_ERR_NONE;
@@ -246,24 +262,19 @@ static wy_error module_load_section_symbols_(wy_context* context, wy_module* mod
 
 static wy_error module_load_section_statics_(wy_context* context, wy_module* module, wy_section_ref section)
 {
-    if (section.data == WY_NULL) { return WY_ERR_NONE; }
-
-    wy_error last_error = bson_array_count_(section.data, section.len, &module->static_count);
+    wy_cbor_reader reader;
+    wy_error last_error = open_section_array_(section, &reader, &module->static_count);
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (module->static_count == 0) { return WY_ERR_NONE; }
 
     module->statics = wy_context_gc_alloc(context, sizeof(wy_value) * module->static_count);
     if (module->statics == WY_NULL) { return WY_ERR_NOMEM; }
 
-    wy_bson_array_reader reader;
-    wy_bson_array_reader_start(&reader, section.data, section.len);
     for (wy_uword i = 0; i < module->static_count; i++) {
-        wy_u8 tag;
-        const wy_u8* buffer;
-        wy_uword len;
-        last_error = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
-        if (last_error != WY_ERR_NONE) { return WY_ERR_IMAGE; }
-        last_error = decode_static_value_(context, tag, buffer, len, &module->statics[i]);
+        wy_cbor_span item;
+        last_error = wy_cbor_next_span(&reader, &item);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+        last_error = decode_static_value_(context, item, &module->statics[i]);
         if (last_error != WY_ERR_NONE) { return last_error; }
     }
     return WY_ERR_NONE;
@@ -273,93 +284,56 @@ static wy_error module_load_section_statics_(wy_context* context, wy_module* mod
  * functions (id 5)
  * ------------------------------------------------------------------------- */
 
-static wy_error decode_param_(wy_context* context, wy_module* module, const wy_u8* buffer, wy_uword len, wy_param* out)
+static wy_error decode_param_(wy_context* context, wy_module* module, wy_cbor_span doc, wy_param* out)
 {
-    wy_bson_doc_reader doc;
-    wy_error last_error = wy_bson_doc_reader_start(&doc, buffer, len);
-    if (last_error != WY_ERR_NONE) { return last_error; }
-
-    wy_u8 tag;
-    const wy_u8* field;
-    wy_uword flen;
-
-    last_error = wy_bson_doc_reader_find(&doc, "n", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_STRING) { return WY_ERR_IMAGE; }
-    last_error = intern_bson_string_(context, field, &out->name);
+    wy_error last_error = field_symbol_(context, doc, "n", &out->name);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
     out->default_static = -1;
-    last_error = wy_bson_doc_reader_find(&doc, "d", &tag, &field, &flen);
-    if (last_error == WY_ERR_NONE) {
-        if (tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-        wy_i32 idx = wy_bson_get_i32(field);
-        if (idx < 0 || (wy_uword) idx >= module->static_count) { return WY_ERR_IMAGE; }
-        out->default_static = idx;
-    } else if (last_error != WY_ERR_KEY) {
-        return WY_ERR_IMAGE;
+    wy_u32 idx;
+    bool found;
+    last_error = opt_field_uint_(doc, "d", 0x7FFFFFFFu, &idx, &found);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    if (found) {
+        if ((wy_uword) idx >= module->static_count) { return WY_ERR_IMAGE; }
+        out->default_static = (wy_i32) idx;
     }
     return WY_ERR_NONE;
 }
 
-static wy_error decode_function_(wy_context* context, wy_module* module, const wy_u8* buffer, wy_uword len, wy_function_proto* out)
+static wy_error decode_function_(wy_context* context, wy_module* module, wy_cbor_span doc, wy_function_proto* out)
 {
-    wy_bson_doc_reader doc;
-    wy_error last_error = wy_bson_doc_reader_start(&doc, buffer, len);
+    wy_error last_error = field_symbol_(context, doc, "n", &out->name);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
-    wy_u8 tag;
-    const wy_u8* field;
-    wy_uword flen;
-
-    last_error = wy_bson_doc_reader_find(&doc, "n", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_STRING) { return WY_ERR_IMAGE; }
-    last_error = intern_bson_string_(context, field, &out->name);
+    wy_u32 number;
+    last_error = field_uint_(doc, "l", 0xFFFFu, &number);
     if (last_error != WY_ERR_NONE) { return last_error; }
+    out->nlocals = (wy_u16) number;
 
-    last_error = wy_bson_doc_reader_find(&doc, "l", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-    wy_i32 nlocals = wy_bson_get_i32(field);
-    if (nlocals < 0 || nlocals > 0xFFFF) { return WY_ERR_IMAGE; }
-    out->nlocals = (wy_u16) nlocals;
+    last_error = field_uint_(doc, "c", 0x7FFFFFFFu, &number);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    if ((wy_uword) number >= module->code_len) { return WY_ERR_IMAGE; }
+    out->code_offset = number;
 
-    last_error = wy_bson_doc_reader_find(&doc, "c", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-    wy_i32 code_offset = wy_bson_get_i32(field);
-    if (code_offset < 0 || (wy_uword) code_offset >= module->code_len) { return WY_ERR_IMAGE; }
-    out->code_offset = (wy_u32) code_offset;
+    last_error = field_uint_(doc, "f", 0xFFu, &number);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    out->flags = (wy_u8) number;
 
-    last_error = wy_bson_doc_reader_find(&doc, "f", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-    wy_i32 flags = wy_bson_get_i32(field);
-    if (flags < 0 || flags > 0xFF) { return WY_ERR_IMAGE; }
-    out->flags = (wy_u8) flags;
-
+    bool found;
     out->ncaptures = 0;
-    last_error = wy_bson_doc_reader_find(&doc, "k", &tag, &field, &flen);
-    if (last_error == WY_ERR_NONE) {
-        if (tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-        wy_i32 ncaptures = wy_bson_get_i32(field);
-        if (ncaptures < 0 || ncaptures > 0xFFFF) { return WY_ERR_IMAGE; }
-        out->ncaptures = (wy_u16) ncaptures;
-    } else if (last_error != WY_ERR_KEY) {
-        return WY_ERR_IMAGE;
-    }
+    last_error = opt_field_uint_(doc, "k", 0xFFFFu, &number, &found);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    if (found) { out->ncaptures = (wy_u16) number; }
 
     out->nresults = 1;
-    last_error = wy_bson_doc_reader_find(&doc, "r", &tag, &field, &flen);
-    if (last_error == WY_ERR_NONE) {
-        if (tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-        wy_i32 nresults = wy_bson_get_i32(field);
-        if (nresults < 0 || nresults > 0xFF) { return WY_ERR_IMAGE; }
-        out->nresults = (wy_u8) nresults;
-    } else if (last_error != WY_ERR_KEY) {
-        return WY_ERR_IMAGE;
-    }
+    last_error = opt_field_uint_(doc, "r", 0xFFu, &number, &found);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    if (found) { out->nresults = (wy_u8) number; }
 
-    last_error = wy_bson_doc_reader_find(&doc, "p", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_ARRAY) { return WY_ERR_IMAGE; }
+    wy_cbor_reader reader;
     wy_uword nparams;
-    last_error = bson_array_count_(field, flen, &nparams);
+    last_error = field_array_(doc, "p", &reader, &nparams);
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (nparams > 0xFFFF) { return WY_ERR_IMAGE; }
     out->nparams = (wy_u16) nparams;
@@ -367,47 +341,40 @@ static wy_error decode_function_(wy_context* context, wy_module* module, const w
     if (nparams > 0) {
         out->params = wy_context_gc_alloc(context, sizeof(wy_param) * nparams);
         if (out->params == WY_NULL) { return WY_ERR_NOMEM; }
-        wy_bson_array_reader preader;
-        wy_bson_array_reader_start(&preader, field, flen);
         for (wy_uword i = 0; i < nparams; i++) {
-            wy_u8 ptag;
-            const wy_u8* pbuf;
-            wy_uword plen;
-            last_error = wy_bson_array_reader_get(&preader, &ptag, &pbuf, &plen);
-            if (last_error != WY_ERR_NONE || ptag != WY_BSON_TAG_DOCUMENT) { return WY_ERR_IMAGE; }
-            last_error = decode_param_(context, module, pbuf, plen, &out->params[i]);
+            wy_cbor_span item;
+            last_error = wy_cbor_next_span(&reader, &item);
+            if (last_error != WY_ERR_NONE) { return last_error; }
+            last_error = decode_param_(context, module, item, &out->params[i]);
             if (last_error != WY_ERR_NONE) { return last_error; }
         }
     }
 
     out->ndispatch = 0;
     out->dispatch_slots = WY_NULL;
-    last_error = wy_bson_doc_reader_find(&doc, "t", &tag, &field, &flen);
-    if (last_error == WY_ERR_NONE) {
-        if (tag != WY_BSON_TAG_ARRAY) { return WY_ERR_IMAGE; }
+    wy_cbor_span dispatch;
+    last_error = opt_field_(doc, "t", &dispatch, &found);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    if (found) {
+        wy_cbor_reader treader;
         wy_uword ndispatch;
-        last_error = bson_array_count_(field, flen, &ndispatch);
+        last_error = wy_cbor_open_array(dispatch, &treader, &ndispatch);
         if (last_error != WY_ERR_NONE) { return last_error; }
         if (ndispatch > 0xFFFF) { return WY_ERR_IMAGE; }
         out->ndispatch = (wy_u16) ndispatch;
         if (ndispatch > 0) {
             out->dispatch_slots = wy_context_gc_alloc(context, sizeof(wy_u16) * ndispatch);
             if (out->dispatch_slots == WY_NULL) { return WY_ERR_NOMEM; }
-            wy_bson_array_reader treader;
-            wy_bson_array_reader_start(&treader, field, flen);
             for (wy_uword i = 0; i < ndispatch; i++) {
-                wy_u8 ttag;
-                const wy_u8* tbuf;
-                wy_uword tlen;
-                last_error = wy_bson_array_reader_get(&treader, &ttag, &tbuf, &tlen);
-                if (last_error != WY_ERR_NONE || ttag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-                wy_i32 slot = wy_bson_get_i32(tbuf);
-                if (slot < 0 || (wy_uword) slot >= module->global_count) { return WY_ERR_IMAGE; }
+                wy_cbor_span item;
+                last_error = wy_cbor_next_span(&treader, &item);
+                if (last_error != WY_ERR_NONE) { return last_error; }
+                wy_u32 slot;
+                if (wy_cbor_get_u32(item, &slot) != WY_ERR_NONE) { return WY_ERR_IMAGE; }
+                if ((wy_uword) slot >= module->global_count) { return WY_ERR_IMAGE; }
                 out->dispatch_slots[i] = (wy_u16) slot;
             }
         }
-    } else if (last_error != WY_ERR_KEY) {
-        return WY_ERR_IMAGE;
     }
 
     return WY_ERR_NONE;
@@ -415,24 +382,22 @@ static wy_error decode_function_(wy_context* context, wy_module* module, const w
 
 static wy_error module_load_section_functions_(wy_context* context, wy_module* module, wy_section_ref section)
 {
-    if (section.data == WY_NULL) { return WY_ERR_NONE; }
-
-    wy_error last_error = bson_array_count_(section.data, section.len, &module->function_count);
+    wy_cbor_reader reader;
+    wy_error last_error = open_section_array_(section, &reader, &module->function_count);
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (module->function_count == 0) { return WY_ERR_NONE; }
 
     module->functions = wy_context_gc_alloc(context, sizeof(wy_function_proto) * module->function_count);
     if (module->functions == WY_NULL) { return WY_ERR_NOMEM; }
+    // Zeroed, so that finalizing a module whose load failed part way frees only
+    // what the entries decoded so far allocated.
+    wy_memset(module->functions, 0, sizeof(wy_function_proto) * module->function_count);
 
-    wy_bson_array_reader reader;
-    wy_bson_array_reader_start(&reader, section.data, section.len);
     for (wy_uword i = 0; i < module->function_count; i++) {
-        wy_u8 tag;
-        const wy_u8* buffer;
-        wy_uword len;
-        last_error = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
-        if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_DOCUMENT) { return WY_ERR_IMAGE; }
-        last_error = decode_function_(context, module, buffer, len, &module->functions[i]);
+        wy_cbor_span item;
+        last_error = wy_cbor_next_span(&reader, &item);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+        last_error = decode_function_(context, module, item, &module->functions[i]);
         if (last_error != WY_ERR_NONE) { return last_error; }
     }
     return WY_ERR_NONE;
@@ -442,99 +407,61 @@ static wy_error module_load_section_functions_(wy_context* context, wy_module* m
  * classes (id 6)
  * ------------------------------------------------------------------------- */
 
-static wy_error decode_slot_proto_(wy_context* context, wy_module* module, const wy_u8* buffer, wy_uword len, wy_slot_proto* out)
+/** An optional index field that must be below `limit`; `*out` keeps its value if absent. */
+static wy_error opt_field_index_(wy_cbor_span doc, const char* key, wy_uword limit, wy_i32* out)
 {
-    wy_bson_doc_reader doc;
-    wy_error last_error = wy_bson_doc_reader_start(&doc, buffer, len);
+    wy_u32 idx;
+    bool found;
+    wy_error last_error = opt_field_uint_(doc, key, 0x7FFFFFFFu, &idx, &found);
     if (last_error != WY_ERR_NONE) { return last_error; }
-
-    wy_u8 tag;
-    const wy_u8* field;
-    wy_uword flen;
-
-    last_error = wy_bson_doc_reader_find(&doc, "n", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_STRING) { return WY_ERR_IMAGE; }
-    last_error = intern_bson_string_(context, field, &out->name);
-    if (last_error != WY_ERR_NONE) { return last_error; }
-
-    out->default_static = -1;
-    last_error = wy_bson_doc_reader_find(&doc, "d", &tag, &field, &flen);
-    if (last_error == WY_ERR_NONE) {
-        if (tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-        wy_i32 idx = wy_bson_get_i32(field);
-        if (idx < 0 || (wy_uword) idx >= module->static_count) { return WY_ERR_IMAGE; }
-        out->default_static = idx;
-    } else if (last_error != WY_ERR_KEY) {
-        return WY_ERR_IMAGE;
-    }
-
-    out->getter_fn = -1;
-    last_error = wy_bson_doc_reader_find(&doc, "g", &tag, &field, &flen);
-    if (last_error == WY_ERR_NONE) {
-        if (tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-        wy_i32 idx = wy_bson_get_i32(field);
-        if (idx < 0 || (wy_uword) idx >= module->function_count) { return WY_ERR_IMAGE; }
-        out->getter_fn = idx;
-    } else if (last_error != WY_ERR_KEY) {
-        return WY_ERR_IMAGE;
-    }
-
-    out->setter_fn = -1;
-    last_error = wy_bson_doc_reader_find(&doc, "s", &tag, &field, &flen);
-    if (last_error == WY_ERR_NONE) {
-        if (tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-        wy_i32 idx = wy_bson_get_i32(field);
-        if (idx < 0 || (wy_uword) idx >= module->function_count) { return WY_ERR_IMAGE; }
-        out->setter_fn = idx;
-    } else if (last_error != WY_ERR_KEY) {
-        return WY_ERR_IMAGE;
-    }
-
+    if (!found) { return WY_ERR_NONE; }
+    if ((wy_uword) idx >= limit) { return WY_ERR_IMAGE; }
+    *out = (wy_i32) idx;
     return WY_ERR_NONE;
 }
 
-static wy_error decode_class_(wy_context* context, wy_module* module, const wy_u8* buffer, wy_uword len, wy_class_proto* out)
+/** A required index field that must be below `limit`. */
+static wy_error field_index_(wy_cbor_span doc, const char* key, wy_uword limit, wy_u32* out)
 {
-    wy_bson_doc_reader doc;
-    wy_error last_error = wy_bson_doc_reader_start(&doc, buffer, len);
+    wy_error last_error = field_uint_(doc, key, 0x7FFFFFFFu, out);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+    return (wy_uword) *out >= limit ? WY_ERR_IMAGE : WY_ERR_NONE;
+}
+
+static wy_error decode_slot_proto_(wy_context* context, wy_module* module, wy_cbor_span doc, wy_slot_proto* out)
+{
+    wy_error last_error = field_symbol_(context, doc, "n", &out->name);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
-    wy_u8 tag;
-    const wy_u8* field;
-    wy_uword flen;
+    out->default_static = -1;
+    last_error = opt_field_index_(doc, "d", module->static_count, &out->default_static);
+    if (last_error != WY_ERR_NONE) { return last_error; }
 
-    last_error = wy_bson_doc_reader_find(&doc, "n", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_STRING) { return WY_ERR_IMAGE; }
-    last_error = intern_bson_string_(context, field, &out->name);
+    out->getter_fn = -1;
+    last_error = opt_field_index_(doc, "g", module->function_count, &out->getter_fn);
+    if (last_error != WY_ERR_NONE) { return last_error; }
+
+    out->setter_fn = -1;
+    return opt_field_index_(doc, "s", module->function_count, &out->setter_fn);
+}
+
+static wy_error decode_class_(wy_context* context, wy_module* module, wy_cbor_span doc, wy_class_proto* out)
+{
+    wy_error last_error = field_symbol_(context, doc, "n", &out->name);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
     out->super_slot = -1;
-    last_error = wy_bson_doc_reader_find(&doc, "s", &tag, &field, &flen);
-    if (last_error == WY_ERR_NONE) {
-        if (tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-        wy_i32 slot = wy_bson_get_i32(field);
-        if (slot < 0 || (wy_uword) slot >= module->global_count) { return WY_ERR_IMAGE; }
-        out->super_slot = slot;
-    } else if (last_error != WY_ERR_KEY) {
-        return WY_ERR_IMAGE;
-    }
+    last_error = opt_field_index_(doc, "s", module->global_count, &out->super_slot);
+    if (last_error != WY_ERR_NONE) { return last_error; }
 
     out->init_fn = -1;
-    last_error = wy_bson_doc_reader_find(&doc, "i", &tag, &field, &flen);
-    if (last_error == WY_ERR_NONE) {
-        if (tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-        wy_i32 idx = wy_bson_get_i32(field);
-        if (idx < 0 || (wy_uword) idx >= module->function_count) { return WY_ERR_IMAGE; }
-        out->init_fn = idx;
-    } else if (last_error != WY_ERR_KEY) {
-        return WY_ERR_IMAGE;
-    }
+    last_error = opt_field_index_(doc, "i", module->function_count, &out->init_fn);
+    if (last_error != WY_ERR_NONE) { return last_error; }
 
     // sl - always present, may be empty
-    last_error = wy_bson_doc_reader_find(&doc, "sl", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_ARRAY) { return WY_ERR_IMAGE; }
+    wy_cbor_reader reader;
     wy_uword nslots;
-    last_error = bson_array_count_(field, flen, &nslots);
+    last_error = field_array_(doc, "sl", &reader, &nslots);
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (nslots > 0xFFFF) { return WY_ERR_IMAGE; }
     out->nslots = (wy_u16) nslots;
@@ -542,67 +469,40 @@ static wy_error decode_class_(wy_context* context, wy_module* module, const wy_u
     if (nslots > 0) {
         out->slots = wy_context_gc_alloc(context, sizeof(wy_slot_proto) * nslots);
         if (out->slots == WY_NULL) { return WY_ERR_NOMEM; }
-        wy_bson_array_reader reader;
-        wy_bson_array_reader_start(&reader, field, flen);
         for (wy_uword i = 0; i < nslots; i++) {
-            wy_u8 stag;
-            const wy_u8* sbuf;
-            wy_uword slen;
-            last_error = wy_bson_array_reader_get(&reader, &stag, &sbuf, &slen);
-            if (last_error != WY_ERR_NONE || stag != WY_BSON_TAG_DOCUMENT) { return WY_ERR_IMAGE; }
-            last_error = decode_slot_proto_(context, module, sbuf, slen, &out->slots[i]);
+            wy_cbor_span item;
+            last_error = wy_cbor_next_span(&reader, &item);
+            if (last_error != WY_ERR_NONE) { return last_error; }
+            last_error = decode_slot_proto_(context, module, item, &out->slots[i]);
             if (last_error != WY_ERR_NONE) { return last_error; }
         }
     }
 
     // m - always present, may be empty, <= WY_CLASS_MAX_MESSAGES (§8.6)
-    last_error = wy_bson_doc_reader_find(&doc, "m", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_ARRAY) { return WY_ERR_IMAGE; }
     wy_uword nmsgs;
-    last_error = bson_array_count_(field, flen, &nmsgs);
+    last_error = field_array_(doc, "m", &reader, &nmsgs);
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (nmsgs > WY_CLASS_MAX_MESSAGES) { return WY_ERR_IMAGE; }
     out->nmsgs = (wy_u16) nmsgs;
-    if (nmsgs > 0) {
-        wy_bson_array_reader reader;
-        wy_bson_array_reader_start(&reader, field, flen);
-        for (wy_uword i = 0; i < nmsgs; i++) {
-            wy_u8 mtag;
-            const wy_u8* mbuf;
-            wy_uword mlen;
-            last_error = wy_bson_array_reader_get(&reader, &mtag, &mbuf, &mlen);
-            if (last_error != WY_ERR_NONE || mtag != WY_BSON_TAG_DOCUMENT) { return WY_ERR_IMAGE; }
+    for (wy_uword i = 0; i < nmsgs; i++) {
+        wy_cbor_span item;
+        last_error = wy_cbor_next_span(&reader, &item);
+        if (last_error != WY_ERR_NONE) { return last_error; }
 
-            wy_bson_doc_reader mdoc;
-            last_error = wy_bson_doc_reader_start(&mdoc, mbuf, mlen);
-            if (last_error != WY_ERR_NONE) { return last_error; }
+        wy_u32 symidx;
+        last_error = field_index_(item, "y", module->symbol_count, &symidx);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+        wy_u32 fnidx;
+        last_error = field_index_(item, "f", module->function_count, &fnidx);
+        if (last_error != WY_ERR_NONE) { return last_error; }
 
-            wy_u8 ytag;
-            const wy_u8* ybuf;
-            wy_uword ylen;
-            last_error = wy_bson_doc_reader_find(&mdoc, "y", &ytag, &ybuf, &ylen);
-            if (last_error != WY_ERR_NONE || ytag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-            wy_i32 symidx = wy_bson_get_i32(ybuf);
-            if (symidx < 0 || (wy_uword) symidx >= module->symbol_count) { return WY_ERR_IMAGE; }
-
-            wy_u8 ftag;
-            const wy_u8* fbuf;
-            wy_uword flen2;
-            last_error = wy_bson_doc_reader_find(&mdoc, "f", &ftag, &fbuf, &flen2);
-            if (last_error != WY_ERR_NONE || ftag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-            wy_i32 fnidx = wy_bson_get_i32(fbuf);
-            if (fnidx < 0 || (wy_uword) fnidx >= module->function_count) { return WY_ERR_IMAGE; }
-
-            out->msgs[i].name = module->symbols[symidx];
-            out->msgs[i].fn = (wy_u16) fnidx;
-        }
+        out->msgs[i].name = module->symbols[symidx];
+        out->msgs[i].fn = (wy_u16) fnidx;
     }
 
     // st - always present, may be empty
-    last_error = wy_bson_doc_reader_find(&doc, "st", &tag, &field, &flen);
-    if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_ARRAY) { return WY_ERR_IMAGE; }
     wy_uword nstatics;
-    last_error = bson_array_count_(field, flen, &nstatics);
+    last_error = field_array_(doc, "st", &reader, &nstatics);
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (nstatics > 0xFFFF) { return WY_ERR_IMAGE; }
     out->nstatics = (wy_u16) nstatics;
@@ -610,34 +510,16 @@ static wy_error decode_class_(wy_context* context, wy_module* module, const wy_u
     if (nstatics > 0) {
         out->statics = wy_context_gc_alloc(context, sizeof(wy_class_static_proto) * nstatics);
         if (out->statics == WY_NULL) { return WY_ERR_NOMEM; }
-        wy_bson_array_reader reader;
-        wy_bson_array_reader_start(&reader, field, flen);
         for (wy_uword i = 0; i < nstatics; i++) {
-            wy_u8 sttag;
-            const wy_u8* stbuf;
-            wy_uword stlen;
-            last_error = wy_bson_array_reader_get(&reader, &sttag, &stbuf, &stlen);
-            if (last_error != WY_ERR_NONE || sttag != WY_BSON_TAG_DOCUMENT) { return WY_ERR_IMAGE; }
-
-            wy_bson_doc_reader stdoc;
-            last_error = wy_bson_doc_reader_start(&stdoc, stbuf, stlen);
+            wy_cbor_span item;
+            last_error = wy_cbor_next_span(&reader, &item);
             if (last_error != WY_ERR_NONE) { return last_error; }
 
-            wy_u8 ntag;
-            const wy_u8* nbuf;
-            wy_uword nlen;
-            last_error = wy_bson_doc_reader_find(&stdoc, "n", &ntag, &nbuf, &nlen);
-            if (last_error != WY_ERR_NONE || ntag != WY_BSON_TAG_STRING) { return WY_ERR_IMAGE; }
-            last_error = intern_bson_string_(context, nbuf, &out->statics[i].name);
+            last_error = field_symbol_(context, item, "n", &out->statics[i].name);
             if (last_error != WY_ERR_NONE) { return last_error; }
-
-            wy_u8 gtag;
-            const wy_u8* gbuf;
-            wy_uword glen;
-            last_error = wy_bson_doc_reader_find(&stdoc, "g", &gtag, &gbuf, &glen);
-            if (last_error != WY_ERR_NONE || gtag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-            wy_i32 gidx = wy_bson_get_i32(gbuf);
-            if (gidx < 0 || (wy_uword) gidx >= module->global_count) { return WY_ERR_IMAGE; }
+            wy_u32 gidx;
+            last_error = field_index_(item, "g", module->global_count, &gidx);
+            if (last_error != WY_ERR_NONE) { return last_error; }
             out->statics[i].global = (wy_u16) gidx;
         }
     }
@@ -647,24 +529,22 @@ static wy_error decode_class_(wy_context* context, wy_module* module, const wy_u
 
 static wy_error module_load_section_classes_(wy_context* context, wy_module* module, wy_section_ref section)
 {
-    if (section.data == WY_NULL) { return WY_ERR_NONE; }
-
-    wy_error last_error = bson_array_count_(section.data, section.len, &module->class_count);
+    wy_cbor_reader reader;
+    wy_error last_error = open_section_array_(section, &reader, &module->class_count);
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (module->class_count == 0) { return WY_ERR_NONE; }
 
     module->class_protos = wy_context_gc_alloc(context, sizeof(wy_class_proto) * module->class_count);
     if (module->class_protos == WY_NULL) { return WY_ERR_NOMEM; }
+    // Zeroed, so that finalizing a module whose load failed part way frees only
+    // what the entries decoded so far allocated.
+    wy_memset(module->class_protos, 0, sizeof(wy_class_proto) * module->class_count);
 
-    wy_bson_array_reader reader;
-    wy_bson_array_reader_start(&reader, section.data, section.len);
     for (wy_uword i = 0; i < module->class_count; i++) {
-        wy_u8 tag;
-        const wy_u8* buffer;
-        wy_uword len;
-        last_error = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
-        if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_DOCUMENT) { return WY_ERR_IMAGE; }
-        last_error = decode_class_(context, module, buffer, len, &module->class_protos[i]);
+        wy_cbor_span item;
+        last_error = wy_cbor_next_span(&reader, &item);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+        last_error = decode_class_(context, module, item, &module->class_protos[i]);
         if (last_error != WY_ERR_NONE) { return last_error; }
     }
     return WY_ERR_NONE;
@@ -675,24 +555,15 @@ static wy_error module_load_section_classes_(wy_context* context, wy_module* mod
  * ------------------------------------------------------------------------- */
 
 /** One `messages[]` entry (wyc-format.md §8.7): a message identity as a path of symbol indices. */
-static wy_error decode_message_(wy_context* context, wy_module* module, const wy_u8* buffer, wy_uword len, wy_message_ref* out)
+static wy_error decode_message_(wy_context* context, wy_module* module, wy_cbor_span doc, wy_message_ref* out)
 {
     out->path_len = 0;
     out->path = WY_NULL;
     out->bound = WY_NULL;
 
-    wy_bson_doc_reader mdoc;
-    wy_error last_error = wy_bson_doc_reader_start(&mdoc, buffer, len);
-    if (last_error != WY_ERR_NONE) { return last_error; }
-
-    wy_u8 ptag;
-    const wy_u8* pbuf;
-    wy_uword plen;
-    last_error = wy_bson_doc_reader_find(&mdoc, "p", &ptag, &pbuf, &plen);
-    if (last_error != WY_ERR_NONE || ptag != WY_BSON_TAG_ARRAY) { return WY_ERR_IMAGE; }
-
+    wy_cbor_reader preader;
     wy_uword path_len;
-    last_error = bson_array_count_(pbuf, plen, &path_len);
+    wy_error last_error = field_array_(doc, "p", &preader, &path_len);
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (path_len == 0 || path_len > 0xFFFF) { return WY_ERR_IMAGE; }
 
@@ -700,16 +571,13 @@ static wy_error decode_message_(wy_context* context, wy_module* module, const wy
     if (out->path == WY_NULL) { return WY_ERR_NOMEM; }
     out->path_len = (wy_u16) path_len;
 
-    wy_bson_array_reader preader;
-    wy_bson_array_reader_start(&preader, pbuf, plen);
     for (wy_uword j = 0; j < path_len; j++) {
-        wy_u8 sytag;
-        const wy_u8* sybuf;
-        wy_uword sylen;
-        last_error = wy_bson_array_reader_get(&preader, &sytag, &sybuf, &sylen);
-        if (last_error != WY_ERR_NONE || sytag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-        wy_i32 symidx = wy_bson_get_i32(sybuf);
-        if (symidx < 0 || (wy_uword) symidx >= module->symbol_count) { return WY_ERR_IMAGE; }
+        wy_cbor_span item;
+        last_error = wy_cbor_next_span(&preader, &item);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+        wy_u32 symidx;
+        if (wy_cbor_get_u32(item, &symidx) != WY_ERR_NONE) { return WY_ERR_IMAGE; }
+        if ((wy_uword) symidx >= module->symbol_count) { return WY_ERR_IMAGE; }
         out->path[j] = (wy_u16) symidx;
     }
     return WY_ERR_NONE;
@@ -717,77 +585,60 @@ static wy_error decode_message_(wy_context* context, wy_module* module, const wy
 
 static wy_error module_load_section_messages_(wy_context* context, wy_module* module, wy_section_ref section)
 {
-    if (section.data == WY_NULL) { return WY_ERR_NONE; }
-
-    wy_error last_error = bson_array_count_(section.data, section.len, &module->message_count);
+    wy_cbor_reader reader;
+    wy_error last_error = open_section_array_(section, &reader, &module->message_count);
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (module->message_count == 0) { return WY_ERR_NONE; }
 
     module->messages = wy_context_gc_alloc(context, sizeof(wy_message_ref) * module->message_count);
     if (module->messages == WY_NULL) { return WY_ERR_NOMEM; }
+    // Zeroed, so that finalizing a module whose load failed part way frees only
+    // what the entries decoded so far allocated.
+    wy_memset(module->messages, 0, sizeof(wy_message_ref) * module->message_count);
 
-    wy_bson_array_reader reader;
-    wy_bson_array_reader_start(&reader, section.data, section.len);
     for (wy_uword i = 0; i < module->message_count; i++) {
-        wy_u8 tag;
-        const wy_u8* buffer;
-        wy_uword len;
-        last_error = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
-        if (last_error != WY_ERR_NONE || tag != WY_BSON_TAG_DOCUMENT) { return WY_ERR_IMAGE; }
-
-        last_error = decode_message_(context, module, buffer, len, &module->messages[i]);
+        wy_cbor_span item;
+        last_error = wy_cbor_next_span(&reader, &item);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+        last_error = decode_message_(context, module, item, &module->messages[i]);
         if (last_error != WY_ERR_NONE) { return last_error; }
     }
     return WY_ERR_NONE;
 }
 
 /* -------------------------------------------------------------------------
- * exports / free (ids 10, 11): "<name>": int32 global slot index
+ * exports / free (ids 10, 11): "<name>": global slot index
  * ------------------------------------------------------------------------- */
 
 static wy_error module_load_name_slot_dict_(wy_context* context, wy_module* module, wy_section_ref section, wy_slot_dict* out)
 {
     if (section.data == WY_NULL) { return WY_ERR_NONE; }
 
-    wy_uword count = 0;
-    {
-        wy_bson_doc_reader doc;
-        wy_error last_error = wy_bson_doc_reader_start(&doc, section.data, section.len);
-        if (last_error != WY_ERR_NONE) { return last_error; }
-        wy_u8 tag;
-        const char* key;
-        const wy_u8* buffer;
-        wy_uword len;
-        for (;;) {
-            last_error = wy_bson_doc_reader_get(&doc, &tag, &key, &buffer, &len);
-            if (last_error == WY_ERR_STOP_ITERATION) { break; }
-            if (last_error != WY_ERR_NONE) { return WY_ERR_IMAGE; }
-            count++;
-        }
-    }
+    wy_cbor_span span = { section.data, section.len };
+    wy_cbor_reader reader;
+    wy_uword count;
+    wy_error last_error = wy_cbor_open_map(span, &reader, &count);
+    if (last_error != WY_ERR_NONE) { return last_error; }
     if (count == 0) { return WY_ERR_NONE; }
 
     wy_allocator* allocator = wy_context_get_machine(context)->allocator;
-    wy_error last_error = wy_slot_dict_expand_f(out, allocator, count * 2);
+    last_error = wy_slot_dict_expand_f(out, allocator, count * 2);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
-    wy_bson_doc_reader doc;
-    last_error = wy_bson_doc_reader_start(&doc, section.data, section.len);
-    if (last_error != WY_ERR_NONE) { return last_error; }
-    wy_u8 tag;
-    const char* key;
-    const wy_u8* buffer;
-    wy_uword len;
-    for (;;) {
-        last_error = wy_bson_doc_reader_get(&doc, &tag, &key, &buffer, &len);
-        if (last_error == WY_ERR_STOP_ITERATION) { break; }
-        if (last_error != WY_ERR_NONE) { return WY_ERR_IMAGE; }
-        if (tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-        wy_i32 slot = wy_bson_get_i32(buffer);
-        if (slot < 0 || (wy_uword) slot >= module->global_count) { return WY_ERR_IMAGE; }
+    for (wy_uword i = 0; i < count; i++) {
+        wy_cbor_span key;
+        last_error = wy_cbor_next_span(&reader, &key);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+        wy_cbor_span value;
+        last_error = wy_cbor_next_span(&reader, &value);
+        if (last_error != WY_ERR_NONE) { return last_error; }
+
+        wy_u32 slot;
+        if (wy_cbor_get_u32(value, &slot) != WY_ERR_NONE) { return WY_ERR_IMAGE; }
+        if ((wy_uword) slot >= module->global_count) { return WY_ERR_IMAGE; }
 
         wy_symbol sym;
-        last_error = wy_context_intern(context, key, wy_strlen_f(key), &sym);
+        last_error = intern_text_(context, key, &sym);
         if (last_error != WY_ERR_NONE) { return last_error; }
 
         last_error = wy_slot_dict_add_entry(out, sym, (wy_uword) slot);
@@ -831,6 +682,16 @@ wy_error wy_module_load_image(wy_context* context, const wy_module_image* image,
     wy_section_ref code_section = image->sections[WY_SEC_CODE];
     module->code = (const wy_u32*) code_section.data;
     module->code_len = code_section.len / 4;
+    if (code_section.len > 0 && ((wy_uintptr) code_section.data % sizeof(wy_u32)) != 0) {
+        // A .wyc file puts the code wherever the structured sections before it
+        // end. The VM reads it as u32 words, so copy it to an aligned buffer
+        // that the module owns.
+        wy_allocator* allocator = wy_context_get_machine(context)->allocator;
+        module->owned_code = (wy_u32*) wy_allocator_alloc(allocator, code_section.len);
+        if (module->owned_code == WY_NULL) { return WY_ERR_NOMEM; }
+        wy_memcpy(module->owned_code, code_section.data, code_section.len);
+        module->code = module->owned_code;
+    }
 
     last_error = module_load_section_slot_defaults_(context, module, image->sections[WY_SEC_SLOT_DEFAULTS]);
     if (last_error != WY_ERR_NONE) { return last_error; }
@@ -962,6 +823,7 @@ static void finalize(wy_context* context, wy_object* self_s)
     if (self->owns_image) {
         wy_context_gc_free(context, (void*) self->image);
     }
+    if (self->owned_code != WY_NULL) { wy_allocator_free(allocator, self->owned_code); }
 
     if (self->session != WY_NULL) {
         /* The code reservation and the bookkeeping struct (session.c). */
@@ -1102,24 +964,19 @@ typedef struct session_delta_
     wy_uword new_code, new_functions, new_statics, new_symbols, new_classes, new_messages;
 } session_delta_;
 
-static wy_error delta_header_i32_(wy_bson_doc_reader* doc, const char* key, wy_uword* out)
+static wy_error delta_header_uint_(wy_cbor_span doc, const char* key, wy_uword* out)
 {
-    wy_u8 tag;
-    const wy_u8* buffer;
-    wy_uword len;
-    wy_error err = wy_bson_doc_reader_find(doc, key, &tag, &buffer, &len);
-    if (err != WY_ERR_NONE || tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-    wy_i32 value = wy_bson_get_i32(buffer);
-    if (value < 0) { return WY_ERR_IMAGE; }
+    wy_u32 value;
+    wy_error err = field_uint_(doc, key, 0x7FFFFFFFu, &value);
+    if (err != WY_ERR_NONE) { return WY_ERR_IMAGE; }
     *out = (wy_uword) value;
     return WY_ERR_NONE;
 }
 
 static wy_error delta_section_count_(wy_section_ref section, wy_uword* out)
 {
-    *out = 0;
-    if (section.data == WY_NULL) { return WY_ERR_NONE; }
-    return bson_array_count_(section.data, section.len, out);
+    wy_cbor_reader reader;
+    return open_section_array_(section, &reader, out);
 }
 
 /* Read and validate the header and section sizes; touches nothing. */
@@ -1127,22 +984,20 @@ static wy_error delta_read_(const wy_module* module, const wy_module_image* imag
 {
     wy_section_ref header = image->sections[WY_SEC_HEADER];
     if (header.data == WY_NULL) { return WY_ERR_IMAGE; }
-    wy_bson_doc_reader doc;
-    wy_error err = wy_bson_doc_reader_start(&doc, header.data, header.len);
-    if (err != WY_ERR_NONE) { return err; }
+    wy_cbor_span doc = { header.data, header.len };
+    wy_error err = WY_ERR_NONE;
 
-    wy_uword marker = 0, version = 0;
-    if (delta_header_i32_(&doc, "v", &version) != WY_ERR_NONE || version != 1) { return WY_ERR_IMAGE; }
-    if (delta_header_i32_(&doc, "d", &marker) != WY_ERR_NONE || marker != 1) { return WY_ERR_IMAGE; }
-    if ((err = delta_header_i32_(&doc, "bc", &d->base_code)) != WY_ERR_NONE) { return err; }
-    if ((err = delta_header_i32_(&doc, "bf", &d->base_functions)) != WY_ERR_NONE) { return err; }
-    if ((err = delta_header_i32_(&doc, "bs", &d->base_statics)) != WY_ERR_NONE) { return err; }
-    if ((err = delta_header_i32_(&doc, "by", &d->base_symbols)) != WY_ERR_NONE) { return err; }
-    if ((err = delta_header_i32_(&doc, "bk", &d->base_classes)) != WY_ERR_NONE) { return err; }
-    if ((err = delta_header_i32_(&doc, "bm", &d->base_messages)) != WY_ERR_NONE) { return err; }
-    if ((err = delta_header_i32_(&doc, "bg", &d->base_globals)) != WY_ERR_NONE) { return err; }
-    if ((err = delta_header_i32_(&doc, "g", &d->globals_after)) != WY_ERR_NONE) { return err; }
-    if ((err = delta_header_i32_(&doc, "i", &d->init_function)) != WY_ERR_NONE) { return err; }
+    wy_uword marker = 0;
+    if (delta_header_uint_(doc, "d", &marker) != WY_ERR_NONE || marker != 1) { return WY_ERR_IMAGE; }
+    if ((err = delta_header_uint_(doc, "bc", &d->base_code)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_uint_(doc, "bf", &d->base_functions)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_uint_(doc, "bs", &d->base_statics)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_uint_(doc, "by", &d->base_symbols)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_uint_(doc, "bk", &d->base_classes)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_uint_(doc, "bm", &d->base_messages)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_uint_(doc, "bg", &d->base_globals)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_uint_(doc, "g", &d->globals_after)) != WY_ERR_NONE) { return err; }
+    if ((err = delta_header_uint_(doc, "i", &d->init_function)) != WY_ERR_NONE) { return err; }
 
     /* The desync guard: the delta was compiled against exactly this module. */
     if (d->base_code != module->code_len || d->base_functions != module->function_count
@@ -1216,21 +1071,19 @@ wy_error wy_module_extend(wy_context* context, wy_module* module, const wy_modul
     for (int which = 0; which < 2; which++) {
         wy_section_ref section = image->sections[which == 0 ? WY_SEC_EXPORTS : WY_SEC_FREE];
         if (section.data == WY_NULL) { continue; }
-        wy_bson_doc_reader doc;
-        if ((err = wy_bson_doc_reader_start(&doc, section.data, section.len)) != WY_ERR_NONE) { return err; }
-        for (;;) {
-            wy_u8 tag;
-            const char* key;
-            const wy_u8* buffer;
-            wy_uword len;
-            err = wy_bson_doc_reader_get(&doc, &tag, &key, &buffer, &len);
-            if (err == WY_ERR_STOP_ITERATION) { break; }
-            if (err != WY_ERR_NONE || tag != WY_BSON_TAG_I32) { return WY_ERR_IMAGE; }
-            wy_i32 slot = wy_bson_get_i32(buffer);
-            if (slot < 0 || (wy_uword) slot >= d.globals_after) { return WY_ERR_IMAGE; }
+        wy_cbor_span span = { section.data, section.len };
+        wy_cbor_reader reader;
+        wy_uword count;
+        if ((err = wy_cbor_open_map(span, &reader, &count)) != WY_ERR_NONE) { return err; }
+        for (wy_uword i = 0; i < count; i++) {
+            wy_cbor_span key, value;
+            if ((err = wy_cbor_next_span(&reader, &key)) != WY_ERR_NONE) { return err; }
+            if ((err = wy_cbor_next_span(&reader, &value)) != WY_ERR_NONE) { return err; }
+            wy_u32 slot;
+            if (wy_cbor_get_u32(value, &slot) != WY_ERR_NONE || (wy_uword) slot >= d.globals_after) { return WY_ERR_IMAGE; }
             if (which == 1) {
                 wy_symbol sym;
-                if ((err = wy_context_intern(context, key, wy_strlen_f(key), &sym)) != WY_ERR_NONE) { return err; }
+                if ((err = intern_text_(context, key, &sym)) != WY_ERR_NONE) { return err; }
                 if (wy_slot_dict_get(&module->free_names, sym) != WY_SLOT_INVALID) { return WY_ERR_IMAGE; }
             }
         }
@@ -1257,86 +1110,63 @@ wy_error wy_module_extend(wy_context* context, wy_module* module, const wy_modul
 
     err = module_load_section_slot_defaults_(context, module, image->sections[WY_SEC_SLOT_DEFAULTS]);
 
-    wy_section_ref sec = image->sections[WY_SEC_SYMBOLS];
-    if (err == WY_ERR_NONE && sec.data != WY_NULL && d.new_symbols > 0) {
-        wy_bson_array_reader reader;
-        wy_bson_array_reader_start(&reader, sec.data, sec.len);
+    wy_cbor_reader reader;
+    wy_uword count;
+    wy_cbor_span item;
+
+    if (err == WY_ERR_NONE && d.new_symbols > 0) {
+        err = open_section_array_(image->sections[WY_SEC_SYMBOLS], &reader, &count);
         for (wy_uword i = 0; i < d.new_symbols && err == WY_ERR_NONE; i++) {
-            wy_u8 tag;
-            const wy_u8* buffer;
-            wy_uword len;
-            err = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
-            if (err != WY_ERR_NONE || tag != WY_BSON_TAG_STRING) { err = WY_ERR_IMAGE; break; }
-            err = intern_bson_string_(context, buffer, &module->symbols[module->symbol_count]);
+            err = wy_cbor_next_span(&reader, &item);
+            if (err == WY_ERR_NONE) { err = intern_text_(context, item, &module->symbols[module->symbol_count]); }
             if (err == WY_ERR_NONE) { module->symbol_count++; }
         }
     }
 
-    sec = image->sections[WY_SEC_STATICS];
-    if (err == WY_ERR_NONE && sec.data != WY_NULL && d.new_statics > 0) {
-        wy_bson_array_reader reader;
-        wy_bson_array_reader_start(&reader, sec.data, sec.len);
+    if (err == WY_ERR_NONE && d.new_statics > 0) {
+        err = open_section_array_(image->sections[WY_SEC_STATICS], &reader, &count);
         for (wy_uword i = 0; i < d.new_statics && err == WY_ERR_NONE; i++) {
-            wy_u8 tag;
-            const wy_u8* buffer;
-            wy_uword len;
-            err = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
-            if (err != WY_ERR_NONE) { err = WY_ERR_IMAGE; break; }
-            err = decode_static_value_(context, tag, buffer, len, &module->statics[module->static_count]);
+            err = wy_cbor_next_span(&reader, &item);
+            if (err == WY_ERR_NONE) { err = decode_static_value_(context, item, &module->statics[module->static_count]); }
             if (err == WY_ERR_NONE) { module->static_count++; }
         }
     }
 
-    sec = image->sections[WY_SEC_FUNCTIONS];
-    if (err == WY_ERR_NONE && sec.data != WY_NULL && d.new_functions > 0) {
-        wy_bson_array_reader reader;
-        wy_bson_array_reader_start(&reader, sec.data, sec.len);
+    if (err == WY_ERR_NONE && d.new_functions > 0) {
+        err = open_section_array_(image->sections[WY_SEC_FUNCTIONS], &reader, &count);
         for (wy_uword i = 0; i < d.new_functions && err == WY_ERR_NONE; i++) {
-            wy_u8 tag;
-            const wy_u8* buffer;
-            wy_uword len;
-            err = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
-            if (err != WY_ERR_NONE || tag != WY_BSON_TAG_DOCUMENT) { err = WY_ERR_IMAGE; break; }
+            err = wy_cbor_next_span(&reader, &item);
+            if (err != WY_ERR_NONE) { break; }
             wy_function_proto* slot = &module->functions[module->function_count];
             wy_memset(slot, 0, sizeof(*slot));
             module->session_fill_functions_ = module->function_count + 1;  /* the entry may own partial allocations */
-            err = decode_function_(context, module, buffer, len, slot);
+            err = decode_function_(context, module, item, slot);
             if (err == WY_ERR_NONE) { module->function_count++; }
         }
     }
 
-    sec = image->sections[WY_SEC_CLASSES];
-    if (err == WY_ERR_NONE && sec.data != WY_NULL && d.new_classes > 0) {
-        wy_bson_array_reader reader;
-        wy_bson_array_reader_start(&reader, sec.data, sec.len);
+    if (err == WY_ERR_NONE && d.new_classes > 0) {
+        err = open_section_array_(image->sections[WY_SEC_CLASSES], &reader, &count);
         for (wy_uword i = 0; i < d.new_classes && err == WY_ERR_NONE; i++) {
-            wy_u8 tag;
-            const wy_u8* buffer;
-            wy_uword len;
-            err = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
-            if (err != WY_ERR_NONE || tag != WY_BSON_TAG_DOCUMENT) { err = WY_ERR_IMAGE; break; }
+            err = wy_cbor_next_span(&reader, &item);
+            if (err != WY_ERR_NONE) { break; }
             wy_class_proto* slot = &module->class_protos[module->class_count];
             wy_memset(slot, 0, sizeof(*slot));
             module->classes[module->class_count] = WY_NULL;
             module->session_fill_classes_ = module->class_count + 1;
-            err = decode_class_(context, module, buffer, len, slot);
+            err = decode_class_(context, module, item, slot);
             if (err == WY_ERR_NONE) { module->class_count++; }
         }
     }
 
-    sec = image->sections[WY_SEC_MESSAGES];
-    if (err == WY_ERR_NONE && sec.data != WY_NULL && d.new_messages > 0) {
-        wy_bson_array_reader reader;
-        wy_bson_array_reader_start(&reader, sec.data, sec.len);
+    if (err == WY_ERR_NONE && d.new_messages > 0) {
+        err = open_section_array_(image->sections[WY_SEC_MESSAGES], &reader, &count);
         for (wy_uword i = 0; i < d.new_messages && err == WY_ERR_NONE; i++) {
-            wy_u8 tag;
-            const wy_u8* buffer;
-            wy_uword len;
-            err = wy_bson_array_reader_get(&reader, &tag, &buffer, &len);
-            if (err != WY_ERR_NONE || tag != WY_BSON_TAG_DOCUMENT) { err = WY_ERR_IMAGE; break; }
+            err = wy_cbor_next_span(&reader, &item);
+            if (err != WY_ERR_NONE) { break; }
             wy_message_ref* slot = &module->messages[module->message_count];
             module->session_fill_messages_ = module->message_count + 1;
-            err = decode_message_(context, module, buffer, len, slot);
+            err = decode_message_(context, module, item, slot);
             if (err == WY_ERR_NONE) { module->message_count++; }
         }
     }
@@ -1351,18 +1181,17 @@ wy_error wy_module_extend(wy_context* context, wy_module* module, const wy_modul
     for (int which = 0; which < 2; which++) {
         wy_section_ref section = image->sections[which == 0 ? WY_SEC_EXPORTS : WY_SEC_FREE];
         if (section.data == WY_NULL) { continue; }
-        wy_bson_doc_reader doc;
-        (void) wy_bson_doc_reader_start(&doc, section.data, section.len);
-        for (;;) {
-            wy_u8 tag;
-            const char* key;
-            const wy_u8* buffer;
-            wy_uword len;
-            if (wy_bson_doc_reader_get(&doc, &tag, &key, &buffer, &len) != WY_ERR_NONE) { break; }
+        wy_cbor_span span = { section.data, section.len };
+        if (wy_cbor_open_map(span, &reader, &count) != WY_ERR_NONE) { continue; }
+        for (wy_uword i = 0; i < count; i++) {
+            wy_cbor_span key, value;
+            if (wy_cbor_next_span(&reader, &key) != WY_ERR_NONE) { break; }
+            if (wy_cbor_next_span(&reader, &value) != WY_ERR_NONE) { break; }
+            wy_u32 slot = 0;
+            (void) wy_cbor_get_u32(value, &slot);
             wy_symbol sym;
-            (void) wy_context_intern(context, key, wy_strlen_f(key), &sym);
-            (void) wy_slot_dict_set(which == 0 ? &module->exports : &module->free_names, sym,
-                (wy_uword) wy_bson_get_i32(buffer));
+            (void) intern_text_(context, key, &sym);
+            (void) wy_slot_dict_set(which == 0 ? &module->exports : &module->free_names, sym, (wy_uword) slot);
         }
     }
 

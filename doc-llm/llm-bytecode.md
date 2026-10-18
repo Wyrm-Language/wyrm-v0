@@ -30,8 +30,10 @@ targets are MCUs and desktop GUI apps from one image format:
   batches into a bind table — at module init and at each function's first
   call (§6.2) — so no code is ever rewritten and the hot path never checks
   a binding.
-- Structured sections are a pinned BSON subset: one ~200-line reader on the
-  C side, no schema negotiation.
+- Structured sections are the wire encoding, a pinned CBOR subset (§4.1):
+  one small strict reader on the C side (`src/cbor.c`), no schema
+  negotiation. A `.wyc` file opens with a fixed preamble that carries a
+  format version, and a loader accepts only its own version.
 
 Deviations from the bytecode.md brainstorm are listed in
 [Appendix B](#appendix-b-deviations-from-bytecodemd) — review those first if
@@ -302,50 +304,61 @@ same section payloads byte-for-byte (except `code` formatting in `.c`,
 
 | ID | Name | Payload |
 |---|---|---|
-| 1 | `header` | BSON document |
-| 2 | `statics` | BSON array |
-| 3 | `slot_defaults` | BSON document |
-| 4 | `symbols` | BSON array |
-| 5 | `functions` | BSON array |
-| 6 | `classes` | BSON array |
-| 7 | `relocations` | BSON array |
-| 8 | `code` | raw `u32[]`, **not** BSON |
-| 9 | `debug` | BSON document, optional; VM MUST ignore |
-| 10 | `exports` | BSON document, optional |
-| 11 | `free` | BSON document, optional: `"<spelling>": int32 global slot` for every name the module reads but doesn't define (§6.2) |
+| 1 | `header` | map |
+| 2 | `statics` | array |
+| 3 | `slot_defaults` | map from global slot index (uint) to constant |
+| 4 | `symbols` | array |
+| 5 | `functions` | array |
+| 6 | `classes` | array |
+| 7 | `relocations` | array |
+| 8 | `code` | raw `u32[]` words, **not** structured: a byte string in `.wyc`, a `uint32_t[]` in `.c` |
+| 9 | `debug` | map, optional; VM MUST ignore |
+| 10 | `exports` | map, optional |
+| 11 | `free` | map, optional: `"<spelling>": global slot (uint)` for every name the module reads but doesn't define (§6.2) |
 
-### 4.1 The BSON subset
+### 4.1 The wire encoding (CBOR subset)
 
-Standard BSON framing (int32 total length, elements, trailing 0x00), with
-exactly these element types permitted:
+Structured sections are items of the Wyrm wire encoding, a subset of CBOR
+(RFC 8949) specified in the project's `design/wire_encoding.md`: any stock
+CBOR decoder reads them. The writer follows its canonical rules (shortest
+argument, definite lengths, map pairs in insertion order, floats always
+`FB`); the C reader (`include/wyrm/cbor.h`, `src/cbor.c`) is strict and
+rejects with `WY_ERR_IMAGE` everything outside the subset, and walks
+containers without recursing, with a nesting limit of `WY_CBOR_MAX_DEPTH`
+(32). The writer is `src/embed/wyrm/cbor.wy`.
 
-| Tag | Type | Used for |
+The BSON element types the old format used map as follows. No BSON binary
+subtype was ever used, so no distinction is lost.
+
+| BSON | CBOR | Used for |
 |---|---|---|
-| `0x01` | double | float constants |
-| `0x02` | string | names, string constants |
-| `0x03` | document | nested records |
-| `0x04` | array | lists (keys `"0"`, `"1"`, …) |
-| `0x05` | binary (subtype 0) | byte/packed-int data |
-| `0x08` | bool | flags, bool constants |
-| `0x0A` | null | nil constants |
-| `0x10` | int32 | all indices and counts |
+| double (`0x01`) | float64 (`FB`) | float constants |
+| string (`0x02`) | text string (major 3) | names, string constants |
+| document (`0x03`) | map (major 5) | nested records; keys are text, except `slot_defaults` (uint) |
+| array (`0x04`) | array (major 4) | lists (no `"0"`, `"1"` keys) |
+| binary, subtype 0 (`0x05`) | byte string (major 2) | byte constants |
+| bool (`0x08`) | `F4` / `F5` | flags, bool constants |
+| null (`0x0A`) | `F6` | nil constants |
+| int32 (`0x10`) | uint (major 0) / negint (major 1) | all indices and counts, int constants |
 
-A loader encountering any other element type MUST reject the module. Keys
-are kept to 1–2 characters in the schemas below to keep images small and
-the C reader trivial. The compiler ships its own ~100-line encoder
-(`bsonlite.py`) — no external dependency.
+Integers are written at their real value, so there is no int32 limit; the
+loader range-checks each field into its target type (a count that must fit a
+`u16` is rejected above 65535, and so on). A symbol or a char, wherever a
+static or default would carry one, would be tag 280 (text) or 282 (uint); no
+section holds one today and the loader rejects them in a constant position.
+Floats are always `FB`; the reader also accepts `FA` and widens it.
 
-Convention: an *optional* key is simply absent when not applicable; there
-are no `-1` sentinels.
+Keys are kept to 1-2 characters in the schemas below to keep images small
+and the C reader trivial. Convention: an *optional* key is simply absent when
+not applicable; there are no `-1` sentinels.
 
 ### 4.2 `header`
 
 ```
 { n: str        module name (fully qualified, "::"-separated)
-  v: int32      format version, = 1
-  g: int32      module global slot count
-  l: int32      L-frame size of the init routine (locals + temps high-water)
-  u: [int32]    module-level referenced-name set: reloc idxs used by module
+  g: uint       module global slot count
+  l: uint       L-frame size of the init routine (locals + temps high-water)
+  u: [uint]     module-level referenced-name set: reloc idxs used by module
                 init code, bound by its `resolve` instruction (§6.2) }
 ```
 
@@ -355,40 +368,39 @@ way it calls anything else (§6.1 step 6).
 
 ### 4.3 `statics`
 
-BSON array of constant values — string, int32, double, bool, null, or
-binary. No symbols (those live in `symbols`). Referenced by index from
+Array of constant values — text string, integer, float64, bool, nil, or
+byte string. No symbols (those live in `symbols`). Referenced by index from
 `lconst`, slot/param defaults, and class slot defaults. The compiler
 deduplicates identical constants.
 
 ### 4.4 `slot_defaults`
 
-BSON document mapping module-global index (as decimal string key, BSON
-style) to a constant default value. Globals absent from this map start as
+Map from module-global index (a uint key) to a constant default value. Globals absent from this map start as
 **Unset**. Non-constant initializers are not represented here — they compile
 into the module init code.
 
 ### 4.5 `symbols`
 
-BSON array of strings: every name the module needs to look up or intern at
+Array of text strings: every name the module needs to look up or intern at
 runtime (relocation path components, `getattr`/`setattr` names, `lsym`
 literals). Deduplicated; order defines the index space.
 
 ### 4.6 `functions`
 
-BSON array; entry *i* defines function index *i*.
+Array; entry *i* defines function index *i*.
 
 ```
 { n: str        name ("!" suffix convention marks messages, e.g. "greet!")
   p: [ { n: str          parameter name
-         d: int32        static idx of default   (optional)
+         d: uint        static idx of default   (optional)
        } ... ]
-  l: int32      L-frame size (locals + temps high-water)
-  c: int32      code offset in u32 words
-  f: int32      flags: bit0 coroutine, bit1 message, bit2 *args, bit3 **kwargs
-  t: [int32]    dispatch types as reloc idxs     (messages only)
-  k: int32      capture count (P-frame tail size) (optional, default 0)
-  r: int32      max results the body returns      (optional, default 1)
-  u: [int32]    referenced-name set: reloc idxs this body uses, resolved by
+  l: uint      L-frame size (locals + temps high-water)
+  c: uint      code offset in u32 words
+  f: uint      flags: bit0 coroutine, bit1 message, bit2 *args, bit3 **kwargs
+  t: [uint]    dispatch types as reloc idxs     (messages only)
+  k: uint      capture count (P-frame tail size) (optional, default 0)
+  r: uint      max results the body returns      (optional, default 1)
+  u: [uint]    referenced-name set: reloc idxs this body uses, resolved by
                 the VM at the function's first call (§6.2)  (optional) }
 ```
 
@@ -397,19 +409,19 @@ non-constant default is a `CompileError` (see Appendix C).
 
 ### 4.7 `classes`
 
-BSON array; entry *i* defines class index *i* (the operand of `class`).
+Array; entry *i* defines class index *i* (the operand of `class`).
 
 ```
 { n: str        class name
-  s: int32      reloc idx of superclass          (optional; absent = object)
+  s: uint      reloc idx of superclass          (optional; absent = object)
   sl: [ { n: str        slot name
-          d: int32      static idx of constant default   (optional)
-          g: int32      getter fn idx (virtual slot)      (optional)
-          s: int32      setter fn idx (virtual slot)      (optional)
+          d: uint      static idx of constant default   (optional)
+          g: uint      getter fn idx (virtual slot)      (optional)
+          s: uint      setter fn idx (virtual slot)      (optional)
         } ... ]
-  i: int32      init fn idx                       (optional)
-  m: [ { y: int32 symbol idx, f: int32 fn idx } ... ]   message map, ≤16
-  st: [ { n: str name, g: int32 global idx } ... ]      class statics →
+  i: uint      init fn idx                       (optional)
+  m: [ { y: uint symbol idx, f: uint fn idx } ... ]   message map, ≤16
+  st: [ { n: str name, g: uint global idx } ... ]      class statics →
                                                         module-global slots }
 ```
 
@@ -425,15 +437,15 @@ top-level effect.
 > filled at import time, as §6.2 describes. Kept for the history of the
 > format.
 
-BSON array; entry *i* defines relocation index *i* — a late-bound reference
+Array; entry *i* defines relocation index *i* — a late-bound reference
 to something outside the module (or dynamically registered inside it).
 
 ```
-{ t: int32      0 module | 1 class | 2 message | 3 function | 4 variable
+{ t: uint      0 module | 1 class | 2 message | 3 function | 4 variable
                 | 5 wildcard namespace
-  p: [int32]    qualified path as symbol idxs;
+  p: [uint]    qualified path as symbol idxs;
                 mod::a::b → [sym("mod"), sym("a"), sym("b")]
-  x: [int32]    except-list as symbol idxs (t = 5 only, optional):
+  x: [uint]    except-list as symbol idxs (t = 5 only, optional):
                 the names excluded by `import ...::* except (...)` }
 ```
 
@@ -444,7 +456,11 @@ before `reg_msg` populates them.
 
 ### 4.9 `code`
 
-Raw array of `u32` words, § 2 encoding, 4-byte aligned in every container.
+Raw array of `u32` words, § 2 encoding, little-endian. In `.c` it is a
+`uuint_t[]`. In `.wyc` it is a byte string (CBOR major 2) whose length is a
+multiple of 4; the bytes sit wherever the sections before them end, so a
+loader that finds them misaligned in memory copies them to an aligned
+`wy_allocator` buffer that the module owns, and otherwise uses them in place.
 Word offset 0 is the module init entry point. Function bodies follow,
 located by the `c` field of their `functions` entries. No padding between
 functions is required; `noop` is available if an implementation wants
@@ -453,7 +469,7 @@ alignment.
 ### 4.9a `exports` (optional)
 
 ```
-{ "<name>": int32 global slot, ... }
+{ "<name>": uint global slot, ... }
 ```
 
 Every module global by name. A `::` lookup into this module resolves through
@@ -465,7 +481,7 @@ the module has globals.
 
 ```
 { f: str        source file name
-  ln: { "<code word offset>": int32 line, ... }   line table
+  ln: { <code word offset (uint)>: uint line, ... }   line table
   lv: [ ... ]   reserved for local-name maps }
 ```
 
@@ -514,8 +530,8 @@ Formatting rules for the *emitter* (not needed to parse):
 
 - Lines fit 120 columns; the `;` comment column is 60 characters wide when
   present.
-- BSON sections emit 16 bytes per line; the comment describes every entry
-  that begins on that line, `; `-joined when more than one does.
+- Structured sections emit 16 bytes per line; the comment describes every
+  entry that begins on that line, `; `-joined when more than one does.
 - The `code` section emits **one instruction per line** (4 or 8 bytes,
   little-endian byte order); the comment is the disassembly, using the
   mnemonics of §3 and `L#`/`P#` register names, with source line numbers
@@ -528,8 +544,12 @@ load-time I/O. Emission rules:
 
 - Module name is encoded by replacing `::` with `__`; the result must be a
   valid C identifier (else `CompileError`).
-- Every BSON section becomes
-  `static const uint8_t {enc}_{section}[] = { ... };`
+- Every structured section becomes
+  `static const uint8_t {enc}_{section}[] = { ... };`: the section's CBOR item,
+  byte for byte as it appears in a `.wyc`. The `.c` container has no preamble
+  and no version; the generated builtin table carries a
+  `_Static_assert(WY_IMAGE_VERSION == <version>u, ...)` so an embed built for
+  another version fails to compile.
 - The code section becomes `static const uint32_t {enc}_code[] = { ... };`
   — `uint32_t`, not bytes, so alignment and host byte order are correct by
   construction (Appendix B, D5). One instruction per source line with the
@@ -564,21 +584,48 @@ output to).
 
 ### 5.3 `.wyc` — binary
 
+A file is a CBOR sequence (RFC 8742) of two items: a fixed preamble, then one
+map. Nothing follows the map.
+
 ```
-offset  size  field
-0       4     magic: 57 59 43 00            ("WYC\0")
-4       1     container version = 1
-5       1     section count
-6       2     reserved = 0
-8       12·n  directory entries, ascending section id:
-              { u8 id; u8 reserved; u16 reserved; u32 offset; u32 length }
-...           section payloads, each 4-byte aligned, in directory order
+82                  array(2)
+64 57 59 43 52      text "WYCR"
+1A vv vv vv vv      uint, 4-byte big-endian argument: the format version
+A<n> ...            map: section id (uint) -> section value, ids ascending,
+                    no duplicates
 ```
 
-Offsets are from file start. Canonical byte order is little-endian
-throughout (a big-endian MCU target byte-swaps code at load, or uses the
-`.c` container which is host-order by construction). No checksum in v1; a
-directory entry id `0` is reserved for a future CRC section.
+The preamble is the same 11 bytes in every file of a version. A loader
+compares the first 7 bytes, reads the version, and rejects (`WY_ERR_IMAGE`)
+any version other than its own: it never reads an old or unknown format.
+It doesn't parse the preamble as general CBOR.
+
+The map's keys are the section ids of §4; `header` (1) and `code` (8) are
+required, and an unknown id is rejected. A structured section is written
+directly as the map value, so a section reference is the byte span of that
+value inside the file and is read in place. `code` is a byte string of
+little-endian `u32` words (§4.9). The loader validates the whole file once:
+every item must be in the wire subset, each section must have its expected
+type, and the byte string of `code` must be a multiple of 4 long.
+
+**The version.** The format version is a `u32`: whole seconds from
+2016-01-01T00:00:00Z to the moment a change to this format is published.
+Any change to the format (the container, a section's shape, a key, a value
+encoding) sets a new version, in `WY_IMAGE_VERSION` (`include/wyrm/image.h`)
+and `WYC_VERSION` (`src/embed/wyrm/image.wy`) together. Every version from
+2^16 seconds up to 2^32 - 1 (the year 2152) needs the 4-byte argument, so the
+preamble is always 11 bytes. The current version is 340739680 (`0x144F4660`,
+2026-10-18 17:54:40Z).
+
+Canonical byte order for the code words is little-endian (a big-endian MCU
+target byte-swaps code at load, or uses the `.c` container which is
+host-order by construction). There is no checksum.
+
+**Caches.** A `.wyd` in `__wycache__` (or under `--cache-dir`) that fails the
+preamble or version check, or is otherwise not a valid image, is a cache
+miss: the source is recompiled and the cache rewritten. A `.wyc`/`.wyd` named
+on the command line, or found by an import as a precompiled module, that
+fails the check is an error.
 
 ---
 
@@ -799,7 +846,7 @@ runtime except `wypoc.ast_nodes`.
 |---|---|
 | `errors.py` | `CompileError`, `err()` |
 | `opcodes.py` | **single source of truth**: the §3 table as data (name, value, form, operand kinds); encode/decode helpers; the compact/wide fallback rule; disassembly for listings; and `c_header()`, which generates `include/wyrm/opcode.h` (see `tools/generate_opcode_header.py`) |
-| `bsonlite.py` | the §4.1 BSON subset, encode + decode (decode is for tests and the disassembler) |
+| (encoder) | pypoc's `compiler_bc` still writes the container this document had before the CBOR move; those images no longer load (§5.3) |
 | `image.py` | `ModuleImage` (section payloads) + the three serializers `to_wya() / to_c() / to_wyc()`, and `assemble_wya()` (§5.1 rules) |
 | `handlers.py` | dispatch registries keyed by AST class (statement / expression / toplevel), and the refusal wording — a construct not implemented *yet* reads differently from one the language has removed |
 | `analysis.py` | the static questions asked before lowering: what a scope declares, a nested body's free names, what is assigned anywhere below — which is what capture lists and capture cells are built from |
@@ -861,8 +908,8 @@ Deliberately simple and deterministic:
   documentation — this is the point of the ASCII container).
 - Round-trip: `assemble_wya(to_wya(img)) == to_wyc(img)` byte-identical,
   and `.c` payloads byte-identical to `.wyc` sections.
-- `bsonlite` decode cross-checked against a known-good BSON implementation
-  in the test suite only.
+- The §4.1 encoding cross-checked against a stock CBOR decoder in the test
+  suite only.
 - Generated `.c` compiled under `-Wall -Werror` in CI (same as
   `test_compiler_c.py`).
 
@@ -1099,7 +1146,7 @@ little-endian bytes of `a1<<16 | a2`.
   brainstormed.
 - **D6 — `pass` compiles to nothing**; `noop` (0x00) is kept for patching.
   A dedicated `PASS` opcode bought nothing.
-- **D7 — no `-1` sentinels in BSON schemas** — optional keys are absent.
+- **D7 — no `-1` sentinels in the section schemas** — optional keys are absent.
   Slightly smaller images, simpler C reader (missing key = default).
 - **D8 — `return_cps` is specified but reserved** (Appendix C) rather than
   half-specified.

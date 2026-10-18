@@ -30,6 +30,18 @@ touching `src/vm*.c`, `src/embed/wyrm/*.wy`, or the self-hosted compiler.
   tree's embedded-table emit == committed stage0 (`scripts/run_selfcompile.py`;
   `SELFCOMPILE_KEEP=<dir>` keeps the trees). After a compiler change, regenerate stage0
   with `scripts/regen_builtins.py`.
+- **Changing the `.wyc` format is a bootstrap.** The binary's embedded stage0 writes images
+  and its loader reads them, so writer and loader cannot switch in one step. Land the new
+  writer (`image.wy`, `cbor.wy`) first with the old loader still in the binary, build, and
+  regenerate the embedded images with the old binary: `regen_builtins.py` cannot run as is,
+  because gen1 then writes the new format (its `embed_build.wyd`, and the `.wyd` that
+  decorator expansion hands the host) and the old loader rejects it. Run `embed_build` from
+  a `--build-bc` of its source against the gen1 tree (stage0 writes that one in the old
+  format), and for expansion point a scratch copy of `compiler/expansion.wy` at a copy of
+  the old `image.wy`'s `to_wyc`. Then land the new loader with those regenerated `.c`
+  files, rebuild, run `regen_builtins.py` again (the output can differ in the free names of
+  modules that import the changed module, until this second pass) and again with
+  `--check`. Set `WY_IMAGE_VERSION` and `WYC_VERSION` to the publish time.
 - The notes below about the amalgam describe historical gen0 bugs; the failure modes are
   still a useful checklist when a gen1 image misbehaves.
 
@@ -48,6 +60,10 @@ Keep compiler-side helper names distinct from front-end ones (`_path_char`, `_jo
 1. **Bisect by swapping images.** Copy a gen1 tree, replace ONE `.wyc` with the pypoc- or
    gen0-built equivalent, rerun the failing command. Then swap all. If only the all-swap
    passes, suspect module linking; if one swap fixes it, that module is miscompiled.
+   Since the move to the versioned CBOR container (`doc-llm/llm-bytecode.md` §5.3), pypoc's
+   `compiler_bc` output is the old BSON container and **no longer loads** (`WY_ERR_IMAGE`),
+   so there is nothing pypoc-built to swap in. Swap between two gen1/gen2 trees, or against a
+   tree built by a binary from before the change (same version only).
 2. **Diff opcodes, not bytes.** `wyrm --disasm a.wyc | awk '{print $2}'` vs the same for the
    pypoc build of the same source; `diff` shows the first miscompiled construct. Operand
    columns differ legitimately (slot numbering); opcode sequences should match.

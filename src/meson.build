@@ -13,9 +13,9 @@ libm_dep = cc_compiler.find_library('m', required: false)
 cwyrm_lib_inc = include_directories('.', '../include')
 
 cwyrm_sources = files(
-    'bson.c',
     'bound_msg.c',
     'bytes.c',
+    'cbor.c',
     'context.c',
     'coroutine.c',
     'dispatch.c',

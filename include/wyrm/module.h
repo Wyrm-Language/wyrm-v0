@@ -144,7 +144,8 @@ struct wy_module
     wy_uword image_len;
     bool owns_image;        /**< whether finalize frees `image` */
 
-    const wy_u32* code;     /**< points into `image`; never copied */
+    const wy_u32* code;     /**< points into `image`, or at `owned_code` when `image` doesn't hold it aligned */
+    wy_u32* owned_code;     /**< aligned copy of the code, allocated by load_image and freed by finalize; else NULL */
     wy_uword code_len;      /**< word count */
     wy_u16 init_nlocals;    /**< L-frame size for code word offset 0 */
 

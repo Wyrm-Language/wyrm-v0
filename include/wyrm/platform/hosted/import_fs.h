@@ -84,12 +84,16 @@ void wy_import_fs_search_path_finalize_f(wy_allocator* allocator, wy_import_fs_s
  *      the .wyd cache (epic 11 M3): a valid `<dir>/__wycache__/<name>.wyd`
  *      (or `--cache-dir` prefix) is served as bytes; a miss calls the
  *      search path's `compile` hook (if set) and stores the result
- *      best-effort. Any cache I/O failure is silently skipped.
+ *      best-effort. Any cache I/O failure is silently skipped. A cache
+ *      file that is not an image of this build's format version
+ *      (wy_image_from_bytes fails) is a miss too: it is recompiled.
  *   2. `<root>/<path-with-slashes>.wyd` - a precompiled port-built image.
- *   3. `<root>/<path-with-slashes>.wyc` - a precompiled pypoc image.
+ *   3. `<root>/<path-with-slashes>.wyc` - a precompiled image under pypoc's
+ *      extension. It must be of this build's format version; pypoc's own
+ *      writer still produces the old container, which fails to load.
  *
- * .wyd comes before .wyc so a stale pypoc artifact never shadows a fresh
- * port build in a mixed tree. After the last root, the search path's
+ * .wyd comes before .wyc so a stale artifact never shadows a fresh port
+ * build in a mixed tree. After the last root, the search path's
  * builtin table is scanned (epic 11): a hit is answered through `out_image`
  * as a static image, leaving `out_bytes` untouched. Failing that, a path
  * that is a directory on some root, or that has table rows filed under it

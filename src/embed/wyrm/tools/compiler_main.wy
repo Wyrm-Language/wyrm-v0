@@ -27,7 +27,7 @@
 # fact, not a crash. Output directories must already exist.
 
 import std::io
-import wyrm::bjson::*
+import wyrm::cbor::*
 import wyrm::opcodes::*
 import wyrm::image::*
 import wyrm::parser::*

@@ -13,9 +13,9 @@
 # Run it by hand:
 #
 #   work=$(mktemp -d)
-#   cp wy/wyrm/bjson.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
+#   cp wy/wyrm/cbor.wy wy/wyrm/opcodes.wy wy/wyrm/image.wy \
 #      wy/wyrm/tools/test_image_m4_driver.wy "$work/"
-#   for f in bjson opcodes image test_image_m4_driver; do
+#   for f in cbor opcodes image test_image_m4_driver; do
 #     pypoc/.venv/bin/wyrm -Iwy -Iwy/wyrm --build-bc "$work/$f.wy"
 #   done
 #   ./buildDir/src/wyrm/wyrm -I"$work" "$work/test_image_m4_driver.wyc"
@@ -27,7 +27,7 @@
 # Output paths are hardcoded: no wy-visible argv builtin exists (see the M3
 # driver's header comment).
 
-import bjson::*
+import cbor::*
 import opcodes::*
 import image::*
 import std::io
@@ -36,7 +36,7 @@ WYA_PATH := "/tmp/hello_built.wy_a"
 C_PATH := "/tmp/hello_built.c"
 
 fn build_hello_image() -> dict:
-    img := make_image("hello", 1, 2, 3)
+    img := make_image("hello", 2, 3)
     img["statics"] = ["Hello ", "World"]
     img["functions"] = [make_function("greet", [make_param("name")], 2, 11, 0)]
     img["exports"] = {"greet": 0}
