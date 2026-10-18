@@ -12,6 +12,7 @@
 #include <wyrm/vm.h>
 #include <test_common/test_context_fixture.h>
 #include <test_common/test_fiber_fixture.h>
+#include <test_common/test_call.h>
 
 namespace {
 
@@ -51,7 +52,7 @@ wy_error run_fn0(wy_context* ctx, wy_module* module, wy_value* out, wy_uword nre
     REQUIRE_EQ(wy_context_module_register(ctx, module, &module_id), WY_ERR_NONE);
     wy_function* fn = WY_NULL;
     REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn), WY_ERR_NONE);
-    return wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, nres);
+    return test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, nres);
 }
 
 } // namespace
@@ -172,6 +173,8 @@ TEST_SUITE("dispatch super") {
         // GP_mark: G1 <- 1; return.
         // P_mark:  G2 <- 1; super(); return.
         // C_mark:  G3 <- 1; super(); return.
+        // Each hop's value comes back through L0: GP_mark answers 7, P_mark
+        // and C_mark answer their super's value plus one.
         const wy_u32 code[] = {
             /* 0 main */
             enc1(WY_OP_GGET, 0, 0),
@@ -180,16 +183,21 @@ TEST_SUITE("dispatch super") {
             /* 4 GP_mark */
             enc1(WY_OP_I8, 1, 0),
             enc1(WY_OP_GSET, 0, 1),
+            enc1(WY_OP_I8, 7, 0),
             enc1(WY_OP_RETURN, 0, 0),
-            /* 7 P_mark */
+            /* 8 P_mark */
             enc1(WY_OP_I8, 1, 0),
             enc1(WY_OP_GSET, 0, 2),
-            enc2a(WY_OP_SUPER, 0, 0), enc2b(0, 0),
+            enc1(WY_OP_SUPER, 0, 0),
+            enc1(WY_OP_I8, 1, 1),
+            enc2a(WY_OP_ADD, 0, 0), enc2b(0, 1),
             enc1(WY_OP_RETURN, 0, 0),
-            /* 12 C_mark */
+            /* 15 C_mark */
             enc1(WY_OP_I8, 1, 0),
             enc1(WY_OP_GSET, 0, 3),
-            enc2a(WY_OP_SUPER, 0, 0), enc2b(0, 0),
+            enc1(WY_OP_SUPER, 0, 0),
+            enc1(WY_OP_I8, 1, 1),
+            enc2a(WY_OP_ADD, 0, 0), enc2b(0, 1),
             enc1(WY_OP_RETURN, 0, 0),
         };
 
@@ -203,8 +211,8 @@ TEST_SUITE("dispatch super") {
         std::vector<wy_function_proto> protos = {
             proto_msg("main", 0, 1, 0),
             proto_msg("GP.mark!", 4, 1, 1),
-            proto_msg("P.mark!", 7, 1, 1),
-            proto_msg("C.mark!", 12, 1, 1),
+            proto_msg("P.mark!", 8, 2, 1),
+            proto_msg("C.mark!", 15, 2, 1),
         };
         module->function_count = protos.size();
         module->functions = (wy_function_proto*) wy_context_gc_alloc(context, sizeof(wy_function_proto) * protos.size());
@@ -251,7 +259,8 @@ TEST_SUITE("dispatch super") {
         module->globals[0] = wy_value_object(WY_TYPE_TAG_INSTANCE, (wy_object*) c_inst);
 
         wy_value out[1];
-        REQUIRE_EQ(run_fn0(context, module, out, 0), WY_ERR_NONE);
+        REQUIRE_EQ(run_fn0(context, module, out, 1), WY_ERR_NONE);
+        CHECK_EQ(out[0].data.word, 9);  // 7 from GP, +1 in P, +1 in C: each super and the msg delivered through L0
         CHECK_EQ(module->globals[0].type, WY_TYPE_TAG_INSTANCE);  // untouched receiver slot
         CHECK_EQ(module->globals[1].data.word, 1);  // GP_mark ran (hop 2, via P's super)
         CHECK_EQ(module->globals[2].data.word, 1);  // P_mark ran (hop 1, via C's super)

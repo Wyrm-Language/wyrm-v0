@@ -12,7 +12,7 @@ touching `src/vm*.c`, `src/embed/wyrm/*.wy`, or the self-hosted compiler.
 | This repo's C VM (`buildDir/src/wyrm/wyrm`) | Compiles and runs `.wy` in-process (epic 11: builtin module table + `__wycache__` .wyd cache); runs `.wyc`/`.wyd` directly. Self-sufficient - no Python. |
 | Ported compiler (`src/embed/wyrm/compiler/*.wy`) | Runs on the C VM, compiled by pypoc (gen0) or by itself (gen1+). |
 
-- Always use `pypoc/.venv/bin/wyrm`, never `~/tools/bin/wyrm` (stale checkout).
+- The external reference wyrm is `$WYRM`, else the `wyrm` on `PATH` (`scripts/wytest_env.py`); no nested pypoc checkout is consulted any more.
 - Bar for the compiler port is *functional*, not byte-identical with pypoc.
 - The spec is silent on some semantics (e.g. `==` on pairs/lists/dicts). "Structural" is
   inherited from pypoc, not written down. Check `doc/language-spec.md` before asserting.
@@ -42,6 +42,30 @@ touching `src/vm*.c`, `src/embed/wyrm/*.wy`, or the self-hosted compiler.
   files, rebuild, run `regen_builtins.py` again (the output can differ in the free names of
   modules that import the changed module, until this second pass) and again with
   `--check`. Set `WY_IMAGE_VERSION` and `WYC_VERSION` to the publish time.
+- **Changing the calling convention is a bootstrap too** (project H, one result per call;
+  the accumulator L0). stage0 is bytecode in the old convention and is also the compiler that has to
+  emit the new one. What worked, in order: (1) land the compiler change that is compatible with the
+  old VM (`return a, b` builds a tuple, every call asks for one result) and regenerate; (2) make the
+  natives and host API take one `out` and delete the result count from the VM, keeping the
+  old opcodes (they now ignore `nres` and deliver one value); (3) add the new opcodes at new numbers
+  beside the old ones, in the VM only; (4) change the compiler to emit them and run
+  `regen_builtins.py`: the old stage0 compiles the new compiler, and the *new* compiler (gen1) is
+  what writes the new stage0, so no helper images were needed; (5) the fixed point took five more
+  passes, not one: `compiler_main`/`compile_source` carry the free names of the modules they import,
+  and a name that left a module (`_fmt_return`) leaves one more generation at a time. Repeat
+  `regen_builtins.py`, rebuild, `--check` until the check is clean; (6) only then delete the old
+  opcodes and rerun `regen_builtins.py` (no change expected); (7) bump the `.wyc` version through a
+  temporary loader that accepts both versions, one regen pass, then restore the strict loader.
+  Frames of old and new convention can call each other throughout: the result goes wherever the
+  *caller's* instruction said (`ret_dst`).
+- **Stale `__wycache__/*.wyd`** (untracked) from before a bytecode change make the tools that run
+  from source fail with "unknown or unimplemented opcode" until the cache is deleted or the image
+  version changes. After an opcode change, `find . -name __wycache__ -prune -exec rm -rf {} +`.
+- **L0 is the accumulator.** Every call, `call_va`, `msg`, `msg_va`, `super`, `yield` and
+  `yield_from` writes its value to L0 of the calling frame; the compiler starts locals and temps at
+  L1 and copies the value out at once (`_take_accumulator`). Hand-written bytecode (the C++ tests)
+  must not keep a value in L0 across such an instruction, and `return L0` of a frame that never
+  wrote L0 returns Unset (an error value: it replaces a constructed instance).
 - The notes below about the amalgam describe historical gen0 bugs; the failure modes are
   still a useful checklist when a gen1 image misbehaves.
 
@@ -121,6 +145,8 @@ Symptom -> usual cause seen so far:
 - `int(str)` reads an integer literal like pypoc's `int(x, 0)`: `0x`/`0o`/`0b`, `_` separators,
   no implicit octal (`010` is an error). Out of `wy_word` range is an error, not a clamp.
 - Indexing a pair list walks the cdr chain (`$[a, b][1]` is `b`), for reads and `p[i] = v`.
+- `yield from` whose delegate *returns* used to crash (`delegate_dst` was set on the delegate
+  instead of the outer coroutine); fixed with project H, covered by `delegate_return.wy`.
 - `f(x, *rest)` in `call_va` is a known, unfixed gap. (`range` is now a native iterator; the old
   coroutine-prelude gap where `for i in range(...)` never iterated is gone.)
 

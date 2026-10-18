@@ -98,7 +98,7 @@ wy_error wy_host_compile_source_bytes_(wy_context* compile_ctx,
     wy_value result = wy_value_nil();
     if (wy_context_root_push_f(compile_ctx, &result) != WY_ERR_NONE) { return WY_ERR_NOMEM; }
 
-    err = wy_vm_call_sync(compile_ctx, *fn_slot, args, 3, &result, 1);
+    err = wy_vm_call_sync(compile_ctx, *fn_slot, args, 3, &result);
     if (err != WY_ERR_NONE) {
         wy_value fault = compile_ctx->current_fiber->fault;
         *msg = (wy_value_is_error(fault) && fault.data.gc_object != WY_NULL &&
@@ -256,7 +256,7 @@ static bool export_fn_(wy_host* host, const char* name, wy_value* out)
 /* Call a compiler entry point; a fault inside it is an internal error. */
 static wy_error call_(wy_host* host, wy_value fn, const wy_value* args, wy_uword argc, wy_value* out)
 {
-    wy_error err = wy_vm_call_sync(host->context, fn, args, argc, out, 1);
+    wy_error err = wy_vm_call_sync(host->context, fn, args, argc, out);
     if (err != WY_ERR_NONE) {
         set_error_(host, "internal error in the session compiler: %s", fault_text_(host->context));
         host->context->current_fiber->fault = wy_value_nil();
@@ -665,8 +665,8 @@ wy_error wy_host_format(wy_host* host, wy_value value, char* buf, size_t cap, si
     void* saved_ud = host->context->io.ud;
     host->context->io.write = capture_write_;
     host->context->io.ud = &c;
-    wy_value ignored[1] = { wy_value_nil() };
-    wy_error err = wy_builtin_println_body_f(host->context, &value, 1, ignored, 0);
+    wy_value ignored = wy_value_nil();
+    wy_error err = wy_builtin_println_body_f(host->context, &value, 1, &ignored);
     host->context->io.write = saved;
     host->context->io.ud = saved_ud;
     if (err != WY_ERR_NONE) { return err; }

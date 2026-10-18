@@ -156,7 +156,7 @@ static bool binding_kwarg_str_consumed_f(const wy_symbol* consumed, wy_uword n, 
 static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn,
     wy_uword this_count, const wy_value* this_values,
     const wy_value* args, wy_uword argc,
-    wy_dict* kwargs, wy_value* ret_dst, wy_uword nres, wy_ret_kind ret_kind,
+    wy_dict* kwargs, wy_value* ret_dst, wy_ret_kind ret_kind,
     char* fault_msg, wy_uword fault_msg_size)
 {
     const wy_function_proto* proto = fn->proto;
@@ -194,7 +194,6 @@ static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn,
         new_frame->kind = WY_FRAME_BYTECODE;
         new_frame->ret_kind = (wy_u8) ret_kind;
         new_frame->ret_dst = ret_dst;
-        new_frame->ret_nres = (wy_u16) nres;
         new_frame->p = p;
         new_frame->l = l;
         new_frame->p_count = (wy_u16) p_count;
@@ -332,7 +331,6 @@ static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn,
     new_frame->kind = WY_FRAME_BYTECODE;
     new_frame->ret_kind = (wy_u8) ret_kind;
     new_frame->ret_dst = ret_dst;
-    new_frame->ret_nres = (wy_u16) nres;
     new_frame->p = p;
     new_frame->l = l;
     new_frame->p_count = (wy_u16) p_count;
@@ -389,7 +387,7 @@ static const char* push_fault_text_f(wy_error err, const char* fault_msg)
  *   or whatever else push_bytecode_call_bind_f returns.
  */
 static wy_error construct_on_call_f(wy_context* ctx, wy_class* cls, const wy_value* args, wy_uword argc,
-    wy_dict* kwargs, wy_value* ret_dst, wy_uword nres, bool* out_pushed, wy_value* out_value,
+    wy_dict* kwargs, wy_value* ret_dst, bool* out_pushed, wy_value* out_value,
     char* fault_msg, wy_uword fault_msg_size)
 {
     wy_instance* inst = WY_NULL;
@@ -415,7 +413,7 @@ static wy_error construct_on_call_f(wy_context* ctx, wy_class* cls, const wy_val
      * compiler_bc/functions.py's `this_count` - a method's `params` never
      * include an implicit `self`). */
     err = push_bytecode_call_bind_f(ctx, (wy_function*) init.data.gc_object, 1, &inst_v,
-        args, argc, kwargs, ret_dst, nres, WY_RET_CONSTRUCT, fault_msg, fault_msg_size);
+        args, argc, kwargs, ret_dst, WY_RET_CONSTRUCT, fault_msg, fault_msg_size);
     if (err != WY_ERR_NONE) { return err; }
 
     ctx->current_fiber->current_frame->aux = inst_v;
@@ -530,7 +528,7 @@ static wy_error dispatch_builtins_fallback_f(wy_context* ctx, wy_message* msg, c
  * body. `n > 1` faults explicitly rather than silently misbehaving.
  */
 static wy_error dispatch_native_body_f(wy_context* ctx, wy_native* native, const wy_value* receivers, wy_uword n,
-    wy_value* args, wy_uword argc, wy_value* out, wy_uword nres, char* fault_msg, wy_uword fault_msg_size)
+    wy_value* args, wy_uword argc, wy_value* out, char* fault_msg, wy_uword fault_msg_size)
 {
     if (n != 1) {
         snprintf(fault_msg, fault_msg_size, "msg: native message dispatch supports exactly one receiver");
@@ -551,7 +549,7 @@ static wy_error dispatch_native_body_f(wy_context* ctx, wy_native* native, const
     for (wy_uword i = 0; i < n; i++) { merged[i] = receivers[i]; }
     for (wy_uword i = 0; i < argc; i++) { merged[n + i] = args[i]; }
 
-    wy_error err = wy_vm_call_leaf_f(ctx, native, merged, n + argc, out, nres);
+    wy_error err = wy_vm_call_leaf_f(ctx, native, merged, n + argc, out);
     if (err != WY_ERR_NONE) {
         native_fail_msg_f(fault_msg, fault_msg_size, native, err);
         return err;
@@ -690,7 +688,7 @@ static wy_error construct_coroutine_f(wy_context* ctx, wy_function* fn, const wy
 
     wy_fiber* caller_fiber = ctx->current_fiber;
     ctx->current_fiber = co_fiber;
-    err = push_bytecode_call_bind_f(ctx, fn, 0, WY_NULL, args, argc, kwargs, WY_NULL, 0, WY_RET_COROUTINE,
+    err = push_bytecode_call_bind_f(ctx, fn, 0, WY_NULL, args, argc, kwargs, WY_NULL, WY_RET_COROUTINE,
         fault_msg, fault_msg_size);
     if (err == WY_ERR_NONE) {
         co_fiber->current_frame->aux = wy_value_object(WY_TYPE_TAG_COROUTINE, (wy_object*) co);
@@ -727,12 +725,10 @@ static wy_exec_state exec_native_call_resume_f(wy_context* ctx, wy_primitive c_d
     WY_UNUSED(c_data);
     wy_fiber* fb = ctx->current_fiber;
     wy_value* dst = fb->pending_native_dst;
-    wy_uword nres = fb->pending_native_nres;
     wy_uword base_count = fb->pending_native_base_count;
     fb->pending_native_dst = WY_NULL;
-    fb->pending_native_nres = 0;
 
-    wy_error err = wy_vm_native_await_complete_f(ctx, base_count, dst, nres);
+    wy_error err = wy_vm_native_await_complete_f(ctx, base_count, dst);
     if (err != WY_ERR_NONE) {
         fb->fault = fault_value_f(ctx, "native call bridge failed");
         return WY_EXEC_FAULT;
@@ -803,10 +799,10 @@ reload:;
             goto do_fault;
 
         case WY_OP_RETURN:
-            /* The window stays in this frame's own L while defers drain. */
+            /* `return src`: the register stays in this frame while defers
+             * drain, then its value goes to the caller's accumulator. */
             fr->ip = next_ip;
-            fr->ret_base = a0;
-            fr->ret_count = f;
+            fr->ret_src = a0;
             fr->phase = WY_PHASE_RETURNING;
             goto do_return;
 
@@ -960,7 +956,7 @@ reload:;
             init_fn.proto = &dep->init_proto;
             char fault_msg[WY_VM_CALL_FAULT_MSG];
             err = push_bytecode_call_bind_f(ctx, &init_fn, 0, WY_NULL, WY_NULL, 0,
-                WY_NULL, dst, star ? 0 : 1, star ? WY_RET_IMPORT_STAR : WY_RET_IMPORT,
+                WY_NULL, dst, star ? WY_RET_IMPORT_STAR : WY_RET_IMPORT,
                 fault_msg, sizeof(fault_msg));
             if (err != WY_ERR_NONE) {
                 dep->state = WY_MODULE_FAILED;
@@ -1196,7 +1192,7 @@ reload:;
             fr->ip = next_ip;
             char fault_msg[WY_VM_CALL_FAULT_MSG];
             wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) slot->getter.data.gc_object,
-                1, &obj, WY_NULL, 0, WY_NULL, wy_vm_reg_f(fr, a0), 1, WY_RET_WINDOW,
+                1, &obj, WY_NULL, 0, WY_NULL, wy_vm_reg_f(fr, a0), WY_RET_WINDOW,
                 fault_msg, sizeof(fault_msg));
             if (err != WY_ERR_NONE) {
                 fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
@@ -1245,7 +1241,7 @@ reload:;
             fr->ip = next_ip;
             char fault_msg[WY_VM_CALL_FAULT_MSG];
             wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) slot->setter.data.gc_object,
-                1, &obj, &src, 1, WY_NULL, WY_NULL, 0, WY_RET_DISCARD,
+                1, &obj, &src, 1, WY_NULL, WY_NULL, WY_RET_DISCARD,
                 fault_msg, sizeof(fault_msg));
             if (err != WY_ERR_NONE) {
                 fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
@@ -1409,15 +1405,21 @@ reload:;
             wy_uword base = a0, count = f;
             wy_value src = *wy_vm_reg_f(fr, a1);
             bool match = false;
+            bool counted = false;  /* `actual` is the source's length, when it has one */
+            wy_uword actual = 0;
 
             if (src.type == WY_TYPE_TAG_LIST) {
                 wy_list* list = (wy_list*) src.data.gc_object;
+                counted = true;
+                actual = list->count;
                 if (list->count == count) {
                     for (wy_uword i = 0; i < count; i++) L[base + i] = list->items[i];
                     match = true;
                 }
             } else if (src.type == WY_TYPE_TAG_TUPLE) {
                 wy_tuple* tup = (wy_tuple*) src.data.gc_object;
+                counted = true;
+                actual = tup->count;
                 if (tup->count == count) {
                     for (wy_uword i = 0; i < count; i++) L[base + i] = tup->items[i];
                     match = true;
@@ -1428,6 +1430,8 @@ reload:;
                 for (; offset < s->len; n++) {
                     offset += wy_utf8_decode_f(s->str, s->len, offset, &(wy_u32){0});
                 }
+                counted = true;
+                actual = n;
                 if (n == count) {
                     offset = 0;
                     match = true;
@@ -1442,12 +1446,12 @@ reload:;
                     }
                 }
             } else if (src.type == WY_TYPE_TAG_PAIR) {
-                wy_uword actual = 0;
                 wy_value curr = src;
                 while (curr.type == WY_TYPE_TAG_PAIR) {
                     actual++;
                     curr = ((wy_pair*)curr.data.gc_object)->cdr;
                 }
+                counted = (curr.type == WY_TYPE_TAG_NIL);
                 if (curr.type == WY_TYPE_TAG_NIL && actual == count) {
                     curr = src;
                     for (wy_uword i = 0; i < count; i++) {
@@ -1459,6 +1463,8 @@ reload:;
                 }
             } else if (src.type == WY_TYPE_TAG_TABLE) {
                 wy_dict* dict = (wy_dict*) src.data.gc_object;
+                counted = true;
+                actual = dict->count;
                 if (dict->count == count) {
                     for (wy_uword i = 0; i < count; i++) L[base + i] = dict->dense[i].key;
                     match = true;
@@ -1466,8 +1472,19 @@ reload:;
             }
 
             if (!match) {
-                wy_value err_val = fault_value_f(ctx, "unpack mismatch");
-                for (wy_uword i = 0; i < count; i++) L[base + i] = err_val;
+                /* A length or type mismatch is a fault at the unpacking
+                 * site (design runtime.md D12). */
+                char msg[WY_VM_CALL_FAULT_MSG];
+                if (counted) {
+                    snprintf(msg, sizeof(msg), "unpack: expected %lu value(s), got %lu",
+                        (unsigned long) count, (unsigned long) actual);
+                } else {
+                    snprintf(msg, sizeof(msg), "unpack: cannot unpack this value into %lu target(s)",
+                        (unsigned long) count);
+                }
+                fr->ip = next_ip;
+                fault_v = fault_value_f(ctx, msg);
+                goto do_fault;
             }
 
             ip = next_ip;
@@ -1534,8 +1551,10 @@ reload:;
             break;
         }
 
-        case WY_OP_CALL: {
-            wy_uword base = a0, argc = f, nres = a1;
+        case WY_OP_CALL: case WY_OP_CALL_WIDE: {
+            wy_uword base = a0;
+            wy_uword argc = (op == WY_OP_CALL_WIDE) ? a1 : f;
+            wy_value* dst = &L[0];  /* the accumulator */
             wy_value callee = L[base];
 
             if (callee.type == WY_TYPE_TAG_CLASS) {
@@ -1548,8 +1567,7 @@ reload:;
                             err == WY_ERR_ARITY ? "wrong argument count" : "error() takes a string");
                         goto do_fault;
                     }
-                    *wy_vm_reg_f(fr, base) = result;
-                    for (wy_uword i = 1; i < nres; i++) { *wy_vm_reg_f(fr, base + i) = wy_value_nil(); }
+                    *dst = result;
                     ip = next_ip;
                     break;
                 }
@@ -1559,14 +1577,13 @@ reload:;
                 wy_value instance_v = wy_value_nil();
                 char fault_msg[WY_VM_CALL_FAULT_MSG];
                 err = construct_on_call_f(ctx, (wy_class*) callee.data.gc_object, &L[base + 1], argc,
-                    WY_NULL, &L[base], nres, &pushed, &instance_v, fault_msg, sizeof(fault_msg));
+                    WY_NULL, dst, &pushed, &instance_v, fault_msg, sizeof(fault_msg));
                 if (err != WY_ERR_NONE) {
                     fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
                     goto do_fault;
                 }
                 if (!pushed) {
-                    *wy_vm_reg_f(fr, base) = instance_v;
-                    for (wy_uword i = 1; i < nres; i++) { *wy_vm_reg_f(fr, base + i) = wy_value_nil(); }
+                    *dst = instance_v;
                     ip = next_ip;
                     break;
                 }
@@ -1585,15 +1602,14 @@ reload:;
                         fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
                         goto do_fault;
                     }
-                    *wy_vm_reg_f(fr, base) = co_v;
-                    for (wy_uword i = 1; i < nres; i++) { *wy_vm_reg_f(fr, base + i) = wy_value_nil(); }
+                    *dst = co_v;
                     ip = next_ip;
                     break;
                 }
                 fr->ip = next_ip;
                 char fault_msg[WY_VM_CALL_FAULT_MSG];
                 wy_error err = push_bytecode_call_bind_f(ctx, fn,
-                    0, WY_NULL, &L[base + 1], argc, WY_NULL, &L[base], nres, WY_RET_WINDOW,
+                    0, WY_NULL, &L[base + 1], argc, WY_NULL, dst, WY_RET_WINDOW,
                     fault_msg, sizeof(fault_msg));
                 if (err != WY_ERR_NONE) {
                     fault_v = fault_value_f(ctx,
@@ -1616,12 +1632,11 @@ reload:;
                         goto do_fault;
                     }
                     fr->ip = next_ip;
-                    fb->pending_native_dst = &L[base];
-                    fb->pending_native_nres = (wy_u16) nres;
+                    fb->pending_native_dst = dst;
                     fb->pending_native_base_count = wy_fiber_value_count_f(fb);
                     wy_error err = wy_vm_call_exec_push_f(ctx,
                         wy_exec_fn_create(exec_native_call_resume_f, wy_primitive_null()),
-                        native, &L[base + 1], argc, nres);
+                        native, &L[base + 1], argc);
                     if (err != WY_ERR_NONE) {
                         char fail_msg[128];
                         native_fail_msg_f(fail_msg, sizeof fail_msg, native, err);
@@ -1630,7 +1645,7 @@ reload:;
                     }
                     return WY_EXEC_CONTINUE;
                 }
-                wy_error err = wy_vm_call_leaf_f(ctx, native, &L[base + 1], argc, &L[base], nres);
+                wy_error err = wy_vm_call_leaf_f(ctx, native, &L[base + 1], argc, dst);
                 if (err != WY_ERR_NONE) {
                     fr->ip = next_ip;
                     char fail_msg[128];
@@ -1638,11 +1653,6 @@ reload:;
                     fault_v = fault_value_f(ctx, fail_msg);
                     goto do_fault;
                 }
-                /* Backfill nil past whatever the leaf actually wrote, same
-                 * as a bytecode return would (leaf natives write directly,
-                 * they don't know nres vs. count the way RETURN's operand
-                 * does - callers below (println/print) always fill every
-                 * reserved slot themselves). */
                 ip = next_ip;
                 break;
             }
@@ -1658,7 +1668,7 @@ reload:;
                 fr->ip = next_ip;
                 char fault_msg[WY_VM_CALL_FAULT_MSG];
                 wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) bm->body.data.gc_object,
-                    tcount, receivers, &L[base + 1], argc, WY_NULL, &L[base], nres, WY_RET_WINDOW,
+                    tcount, receivers, &L[base + 1], argc, WY_NULL, dst, WY_RET_WINDOW,
                     fault_msg, sizeof(fault_msg));
                 if (err != WY_ERR_NONE) {
                     fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
@@ -1678,8 +1688,9 @@ reload:;
         case WY_OP_CALL_VA: {
             /* `f(*a, **k)`: the callee sits at the window base, with the
              * positional tuple and the keyword dict the compiler joined for
-             * us above it (§6.3). Results land back at the base. */
-            wy_uword base = a0, nres = a1;
+             * us above it (§6.3). The result lands at the base. */
+            wy_uword base = a0;
+            wy_value* dst = &L[0];
             wy_value callee = L[base];
             wy_value posv = L[base + 1];
             wy_value kwv = L[base + 2];
@@ -1701,8 +1712,7 @@ reload:;
                             err == WY_ERR_ARITY ? "wrong argument count" : "error() takes a string");
                         goto do_fault;
                     }
-                    *wy_vm_reg_f(fr, base) = result;
-                    for (wy_uword i = 1; i < nres; i++) { *wy_vm_reg_f(fr, base + i) = wy_value_nil(); }
+                    *dst = result;
                     ip = next_ip;
                     break;
                 }
@@ -1719,15 +1729,14 @@ reload:;
                 wy_value instance_v = wy_value_nil();
                 char fault_msg[WY_VM_CALL_FAULT_MSG];
                 err = construct_on_call_f(ctx, (wy_class*) callee.data.gc_object, args, argc,
-                    (kwargs != WY_NULL && kwargs->count > 0) ? kwargs : WY_NULL, &L[base], nres,
+                    (kwargs != WY_NULL && kwargs->count > 0) ? kwargs : WY_NULL, dst,
                     &pushed, &instance_v, fault_msg, sizeof(fault_msg));
                 if (err != WY_ERR_NONE) {
                     fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg));
                     goto do_fault;
                 }
                 if (!pushed) {
-                    *wy_vm_reg_f(fr, base) = instance_v;
-                    for (wy_uword i = 1; i < nres; i++) { *wy_vm_reg_f(fr, base + i) = wy_value_nil(); }
+                    *dst = instance_v;
                     ip = next_ip;
                     break;
                 }
@@ -1760,7 +1769,7 @@ reload:;
                 wy_error berr = push_bytecode_call_bind_f(ctx, (wy_function*) bm->body.data.gc_object,
                     tcount, receivers, bargs, bargc,
                     (bkw != WY_NULL && bkw->count > 0) ? bkw : WY_NULL,
-                    &L[base], nres, WY_RET_WINDOW, bfault_msg, sizeof(bfault_msg));
+                    dst, WY_RET_WINDOW, bfault_msg, sizeof(bfault_msg));
                 if (berr != WY_ERR_NONE) {
                     fault_v = fault_value_f(ctx, push_fault_text_f(berr, bfault_msg));
                     goto do_fault;
@@ -1798,7 +1807,7 @@ reload:;
                     fault_v = fault_value_f(ctx, "call_va: native keyword calls are not supported");
                     goto do_fault;
                 }
-                wy_error err = wy_vm_call_leaf_f(ctx, native, args, argc, &L[base], nres);
+                wy_error err = wy_vm_call_leaf_f(ctx, native, args, argc, dst);
                 if (err != WY_ERR_NONE) {
                     fr->ip = next_ip;
                     char fail_msg[128];
@@ -1815,7 +1824,7 @@ reload:;
             wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) callee.data.gc_object,
                 0, WY_NULL, args, argc,
                 (kwargs != WY_NULL && kwargs->count > 0) ? kwargs : WY_NULL,
-                &L[base], nres, WY_RET_WINDOW, fault_msg, sizeof(fault_msg));
+                dst, WY_RET_WINDOW, fault_msg, sizeof(fault_msg));
             if (err != WY_ERR_NONE) {
                 fault_v = fault_value_f(ctx,
                     push_fault_text_f(err, fault_msg));
@@ -1825,7 +1834,8 @@ reload:;
         }
 
         case WY_OP_MSG: {
-            wy_uword base = a0, argc = f, message_idx = a1, nres = a2;
+            wy_uword base = a0, argc = f, message_idx = a1;
+            wy_value* dst = &L[0];
             wy_value recv = *wy_vm_reg_f(fr, base);
 
             wy_message* msg = WY_NULL;
@@ -1860,7 +1870,7 @@ reload:;
                 fr->ip = next_ip;
                 char fault_msg2[WY_VM_CALL_FAULT_MSG];
                 wy_error err = dispatch_native_body_f(ctx, (wy_native*) body.data.gc_object,
-                    receivers, n, &L[base + 1], argc, &L[base], nres, fault_msg2, sizeof(fault_msg2));
+                    receivers, n, &L[base + 1], argc, dst, fault_msg2, sizeof(fault_msg2));
                 if (err != WY_ERR_NONE) {
                     fault_v = fault_value_f(ctx, fault_msg2);
                     goto do_fault;
@@ -1872,7 +1882,7 @@ reload:;
             fr->ip = next_ip;
             char fault_msg2[WY_VM_CALL_FAULT_MSG];
             wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) body.data.gc_object,
-                dispatch_this_count_f(body, n), receivers, &L[base + 1], argc, WY_NULL, &L[base], nres,
+                dispatch_this_count_f(body, n), receivers, &L[base + 1], argc, WY_NULL, dst,
                 WY_RET_WINDOW, fault_msg2, sizeof(fault_msg2));
             if (err != WY_ERR_NONE) {
                 fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg2));
@@ -1885,7 +1895,8 @@ reload:;
         }
 
         case WY_OP_MSG_VA: {
-            wy_uword base = a0, message_idx = a1, nres = a2;
+            wy_uword base = a0, message_idx = a1;
+            wy_value* dst = &L[0];
             wy_value recv = L[base];
             wy_value posv = L[base + 1];
             wy_value kwv = L[base + 2];
@@ -1941,7 +1952,7 @@ reload:;
                 fr->ip = next_ip;
                 char fault_msg2[WY_VM_CALL_FAULT_MSG];
                 wy_error err = dispatch_native_body_f(ctx, (wy_native*) body.data.gc_object,
-                    receivers, n, args, argc, &L[base], nres, fault_msg2, sizeof(fault_msg2));
+                    receivers, n, args, argc, dst, fault_msg2, sizeof(fault_msg2));
                 if (err != WY_ERR_NONE) {
                     fault_v = fault_value_f(ctx, fault_msg2);
                     goto do_fault;
@@ -1955,7 +1966,7 @@ reload:;
             wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) body.data.gc_object,
                 dispatch_this_count_f(body, n), receivers, args, argc,
                 (kwargs != WY_NULL && kwargs->count > 0) ? kwargs : WY_NULL,
-                &L[base], nres, WY_RET_WINDOW, fault_msg2, sizeof(fault_msg2));
+                dst, WY_RET_WINDOW, fault_msg2, sizeof(fault_msg2));
             if (err != WY_ERR_NONE) {
                 fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg2));
                 goto do_fault;
@@ -2009,8 +2020,10 @@ reload:;
             break;
         }
 
-        case WY_OP_SUPER: {
-            wy_uword base = a0, argc = f, nres = a1;
+        case WY_OP_SUPER: case WY_OP_SUPER_WIDE: {
+            wy_uword base = a0;
+            wy_uword argc = (op == WY_OP_SUPER_WIDE) ? a1 : f;
+            wy_value* dst = &L[0];
             wy_uword t = (fr->proto != WY_NULL) ? fr->proto->ndispatch : 0;
             if (fr->dispatch_msg == WY_NULL || t == 0) {
                 fr->ip = next_ip;
@@ -2039,7 +2052,7 @@ reload:;
             fr->ip = next_ip;
             char fault_msg2[WY_VM_CALL_FAULT_MSG];
             wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) ov->body.data.gc_object,
-                push_t, fr->p, &L[base], argc, WY_NULL, &L[base], nres, WY_RET_WINDOW,
+                push_t, fr->p, &L[base], argc, WY_NULL, dst, WY_RET_WINDOW,
                 fault_msg2, sizeof(fault_msg2));
             if (err != WY_ERR_NONE) {
                 fault_v = fault_value_f(ctx, push_fault_text_f(err, fault_msg2));
@@ -2112,45 +2125,29 @@ reload:;
         }
 
         case WY_OP_YIELD: {
-            /* a0 = base, f = count (wyc-format.md §6). Suspend this
-             * coroutine, handing count values from L[base..) to whoever is
-             * waiting - always co->resumer directly, even mid-delegation
-             * (design_c_vm.md §3: yield_from repoints a delegate's own
-             * `resumer` at the top-level caller so this needs no chain
-             * walk). On resume, next/send writes the sent value into
-             * L[base] itself before switching back here. */
+            /* `yield src`: a0 = src. Suspend this coroutine, handing its one
+             * value to whoever is waiting - always co->resumer directly, even
+             * mid-delegation (design_c_vm.md §3: yield_from repoints a
+             * delegate's own `resumer` at the top-level caller so this needs
+             * no chain walk). On resume, next/send writes the sent value into
+             * L0, the accumulator, before switching back here. */
             wy_coroutine* co = fb->coroutine;
             if (co == WY_NULL) {
                 fr->ip = next_ip;
                 fault_v = fault_value_f(ctx, "yield: not running inside a coroutine");
                 goto do_fault;
             }
-            wy_uword base = a0, count = f;
-            wy_value v;
-            if (count == 0) {
-                v = wy_value_nil();
-            } else if (count == 1) {
-                v = *wy_vm_reg_f(fr, base);
-            } else {
-                wy_tuple* tup = WY_NULL;
-                wy_error err = wy_tuple_new(ctx, &L[base], count, &tup);
-                if (err != WY_ERR_NONE) {
-                    fr->ip = next_ip;
-                    fault_v = fault_value_f(ctx, "yield: tuple construction failed");
-                    goto do_fault;
-                }
-                v = wy_value_object(WY_TYPE_TAG_TUPLE, (wy_object*) tup);
-            }
+            wy_value v = *wy_vm_reg_f(fr, a0);
             fr->ip = next_ip;
-            co->yield_base = (wy_u16) base;
             co->state = WY_CO_SUSPENDED;
-            wy_fiber_set_result_f(co->resumer, 0, v);
+            wy_fiber_set_result_f(co->resumer, v);
             ctx->current_fiber = co->resumer;
             return WY_EXEC_SWITCH;
         }
 
         case WY_OP_YIELD_FROM: {
-            /* a0 = dst, a1 = sub coroutine register (wyc-format.md §6). */
+            /* a1 = sub coroutine register; the delegate's return value goes
+             * to L0, the accumulator. */
             wy_coroutine* co = fb->coroutine;
             if (co == WY_NULL) {
                 fr->ip = next_ip;
@@ -2171,7 +2168,7 @@ reload:;
             }
             fr->ip = next_ip;
             sub->outer = co;
-            sub->delegate_dst = wy_vm_reg_f(fr, a0);
+            co->delegate_dst = &L[0];
             sub->resumer = co->resumer;
             co->delegate = sub;
             sub->state = WY_CO_RUNNING;
@@ -2195,13 +2192,12 @@ reload:;
      * the frame depth.
      */
 do_return: {
-    const wy_value* src = wy_vm_reg_f(fr, fr->ret_base);
-    wy_value result0 = (fr->ret_count > 0) ? src[0] : wy_value_nil();
+    wy_value result0 = *wy_vm_reg_f(fr, fr->ret_src);
     wy_value closure;
     if (defer_pop_runnable_f(fr, false, result0, &closure)) {
         char fault_msg[WY_VM_CALL_FAULT_MSG];
         wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) closure.data.gc_object,
-            0, WY_NULL, WY_NULL, 0, WY_NULL, WY_NULL, 0, WY_RET_DISCARD, fault_msg, sizeof(fault_msg));
+            0, WY_NULL, WY_NULL, 0, WY_NULL, WY_NULL, WY_RET_DISCARD, fault_msg, sizeof(fault_msg));
         if (err != WY_ERR_NONE) {
             /* A defer that cannot even start fails the frame; the rest of
              * its defers still run, as on-error ones. */
@@ -2213,7 +2209,7 @@ do_return: {
 
     switch ((wy_ret_kind) fr->ret_kind) {
     case WY_RET_WINDOW:
-        wy_vm_backfill_f(fr->ret_dst, fr->ret_nres, src, fr->ret_count);
+        *fr->ret_dst = result0;
         break;
     case WY_RET_DISCARD:
         break;
@@ -2242,7 +2238,7 @@ do_return: {
         /* design_c_vm.md §7: an error result[0] replaces the instance,
          * anything else (including no results at all) keeps it. */
         wy_value out = wy_value_is_error(result0) ? result0 : fr->aux;
-        wy_vm_backfill_f(fr->ret_dst, fr->ret_nres, &out, 1);
+        *fr->ret_dst = out;
         break;
     }
     case WY_RET_COROUTINE: {
@@ -2263,11 +2259,12 @@ do_return: {
             *outer->delegate_dst = result0;
             outer->delegate = WY_NULL;
             co->outer = WY_NULL;
+            outer->fiber->pending = wy_exec_fn_create(wy_vm_run, wy_primitive_null());
             ctx->current_fiber = outer->fiber;
             return WY_EXEC_SWITCH;
         }
         wy_value stop_it = stop_iteration_value_f(ctx);
-        wy_fiber_set_result_f(co->resumer, 0, stop_it);
+        wy_fiber_set_result_f(co->resumer, stop_it);
         ctx->current_fiber = co->resumer;
         return WY_EXEC_SWITCH;
     }
@@ -2302,7 +2299,7 @@ do_unwind: {
     while (defer_pop_runnable_f(fr, true, wy_value_nil(), &closure)) {
         char fault_msg[WY_VM_CALL_FAULT_MSG];
         wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) closure.data.gc_object,
-            0, WY_NULL, WY_NULL, 0, WY_NULL, WY_NULL, 0, WY_RET_DISCARD, fault_msg, sizeof(fault_msg));
+            0, WY_NULL, WY_NULL, 0, WY_NULL, WY_NULL, WY_RET_DISCARD, fault_msg, sizeof(fault_msg));
         if (err == WY_ERR_NONE) { goto reload; }
         /* No room (the fault may itself be a stack overflow): this defer
          * is lost, the original fault stands, and outer frames - which
@@ -2325,14 +2322,18 @@ do_unwind: {
  * leaf natives; exec natives from bytecode fault), but declared per
  * design_c_vm.md §1.3 for epic 3+ to wire up.
  */
-wy_error wy_vm_call_sync(wy_context* ctx, wy_value callee, const wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+wy_error wy_vm_call_sync(wy_context* ctx, wy_value callee, const wy_value* args, wy_uword argc, wy_value* out)
 {
     if (ctx == WY_NULL || ctx->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
     if (callee.type != WY_TYPE_TAG_FUNCTION) { return WY_ERR_BAD_TYPE; }
 
+    /* A caller that wants no value (module init) passes no slot. */
+    wy_value discarded = wy_value_nil();
+    if (out == WY_NULL) { out = &discarded; }
+
     char fault_msg[WY_VM_CALL_FAULT_MSG];
     wy_error err = push_bytecode_call_bind_f(ctx, (wy_function*) callee.data.gc_object, 0, WY_NULL, args, argc, WY_NULL,
-        out, nres, WY_RET_WINDOW, fault_msg, sizeof(fault_msg));
+        out, WY_RET_WINDOW, fault_msg, sizeof(fault_msg));
     if (err == WY_ERR_ARITY) {
         /* The parameters wouldn't bind (a missing required argument, a too
          * many/twisted call...): report it the way the dispatch loop does,
@@ -2358,9 +2359,9 @@ wy_error wy_vm_call_sync(wy_context* ctx, wy_value callee, const wy_value* args,
 }
 
 wy_error wy_vm_call_continue(wy_context* ctx, wy_exec_fn continuation, wy_value callee,
-    const wy_value* args, wy_uword argc, wy_uword nres)
+    const wy_value* args, wy_uword argc)
 {
-    WY_UNUSED(ctx); WY_UNUSED(continuation); WY_UNUSED(callee); WY_UNUSED(args); WY_UNUSED(argc); WY_UNUSED(nres);
+    WY_UNUSED(ctx); WY_UNUSED(continuation); WY_UNUSED(callee); WY_UNUSED(args); WY_UNUSED(argc);
     return WY_ERR_NOSUPPORT;  /* epic 3+: natives calling back into the VM */
 }
 

@@ -336,7 +336,7 @@ static wy_error expand_run_(wy_context* parent, wy_value tree, wy_bytes* scope_i
 
     args[0] = tree_in;
     args[1] = scope_value;
-    err = wy_vm_call_sync(ctx, *fn_slot, args, 2, &result, 1);
+    err = wy_vm_call_sync(ctx, *fn_slot, args, 2, &result);
     if (err != WY_ERR_NONE) {
         /* A decorator faulted instead of answering: name it (D5). The
          * expander records the decorator it is applying in `_STATE[0]`. */
@@ -376,27 +376,25 @@ done:
  * std::expand
  * ------------------------------------------------------------------------- */
 
-static wy_error expand_leaf_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error expand_leaf_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
-    if (nres == 0) { return WY_ERR_NONE; }
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
     if (args[1].type != WY_TYPE_TAG_BYTES || args[2].type != WY_TYPE_TAG_STR) { return WY_ERR_BAD_TYPE; }
 
     char msg[WY_EXPAND_MSG];
     msg[0] = '\0';
     if (context->expansion) {
-        return make_error_value_(context, "expansion is not re-entrant", &out[0]);
+        return make_error_value_(context, "expansion is not re-entrant", out);
     }
     wy_value tree = wy_value_nil();
     wy_error err = expand_run_(context, args[0], (wy_bytes*) args[1].data.gc_object,
         args[2].data.str, &tree, msg, sizeof(msg));
     if (err == WY_ERR_NONE) {
-        out[0] = tree;
+        *out = tree;
         return WY_ERR_NONE;
     }
     if (err == WY_ERR_NOMEM && msg[0] == '\0') { return WY_ERR_NOMEM; }
-    return make_error_value_(context, msg, &out[0]);
+    return make_error_value_(context, msg, out);
 }
 
 wy_error wy_expand_module_new(wy_context* context, wy_module** out)

@@ -11,7 +11,7 @@
  * container, a section's shape, a key or a value encoding sets a new one,
  * here and in WYC_VERSION in src/embed/wyrm/image.wy. A loader accepts
  * exactly this version (doc-llm/llm-bytecode.md section 4). */
-#define WY_IMAGE_VERSION 340739680u
+#define WY_IMAGE_VERSION 340758572u
 
 typedef struct wy_section_ref {
     const uint8_t *data;

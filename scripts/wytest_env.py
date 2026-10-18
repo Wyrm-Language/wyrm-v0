@@ -5,8 +5,7 @@ checked against; it is deliberately not the build tree under test. Selection,
 in order:
 
   1. $WYRM          - exported path to the interpreter
-  2. pypoc          - pypoc/.venv/bin/wyrm, when that checkout is present
-  3. `wyrm` on $PATH
+  2. `wyrm` on $PATH
 
 $WYRM_FLAGS overrides the interpreter's leading arguments (shell-split, `~`
 expanded), e.g.  WYRM=/bin/wyrm WYRM_FLAGS="-I~/wy" scripts/run_wy_tests.py
@@ -29,7 +28,6 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EMBED_ROOT = os.path.join(REPO_ROOT, "src", "embed")
 WY_ROOT = os.path.join(REPO_ROOT, "wy")
 SOURCE_ROOTS = [EMBED_ROOT, WY_ROOT]
-PYPOC_WYRM = os.path.join(REPO_ROOT, "pypoc", ".venv", "bin", "wyrm")
 BUILD_DIR = os.environ.get("WYRM_BUILD_DIR") or os.path.join(REPO_ROOT, "buildDir")
 LOCAL_WYRM = os.path.join(BUILD_DIR, "src", "wyrm", "wyrm")
 
@@ -46,10 +44,7 @@ def reference_wyrm():
     when no interpreter is available."""
     exe = os.environ.get("WYRM")
     if not exe:
-        if os.path.isfile(PYPOC_WYRM):
-            exe = PYPOC_WYRM
-        else:
-            exe = shutil.which("wyrm")
+        exe = shutil.which("wyrm")
     if not exe:
         return None
     exe = os.path.expanduser(exe)
@@ -82,6 +77,6 @@ def require_reference(tool):
     """reference_wyrm() or print a skip notice and return None."""
     ref = reference_wyrm()
     if ref is None:
-        print(f"{tool}: no external wyrm (set WYRM, or install pypoc or a wyrm "
+        print(f"{tool}: no external wyrm (set WYRM, or put a wyrm "
               "on PATH) - skipped", flush=True)
     return ref

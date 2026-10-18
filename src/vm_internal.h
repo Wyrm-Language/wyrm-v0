@@ -21,17 +21,6 @@ WY_INLINE wy_value* wy_vm_reg8_f(wy_frame* fr, wy_u8 r)
     return (r & 0x80u) ? &fr->p[r & 0x7fu] : &fr->l[r];
 }
 
-/**
- * Copy up to `nres` of `src[0..count)` into `dst[0..nres)`, nil-filling any
- * of `dst` beyond `count` (design_c_vm.md §1.2's backfill rule).
- */
-WY_INLINE void wy_vm_backfill_f(wy_value* dst, wy_uword nres, const wy_value* src, wy_uword count)
-{
-    wy_uword n = count < nres ? count : nres;
-    for (wy_uword i = 0; i < n; i++) { dst[i] = src[i]; }
-    for (wy_uword i = n; i < nres; i++) { dst[i] = wy_value_nil(); }
-}
-
 /* src/vm_ops.c - arithmetic/comparison/is/unary semantics (wyc-format.md §6.3) */
 wy_error wy_vm_binop_f(wy_context* ctx, wy_u8 op, wy_value lhs, wy_value rhs, wy_value* out);
 wy_error wy_vm_is_f(wy_context* ctx, wy_value value, wy_value type_operand, wy_value* out);

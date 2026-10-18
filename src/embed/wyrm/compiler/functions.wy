@@ -521,9 +521,9 @@ fn compile_callable(module, name: str, params, body, pos, flags: int = 0, enclos
     # throughout expressions.wy/statements.wy) compiles fine. A real gap in
     # the retiring compiler, not this port's to fix; noted in the epic
     # report. `add_function`'s own parameter order (context.wy) is name,
-    # params, nlocals, code_offset, flags, dispatch, ncaptures, nresults,
+    # params, nlocals, code_offset, flags, dispatch, ncaptures,
     # uses - positional through `ncaptures` covers everything this call
-    # needs, leaving `nresults`/`uses` at their defaults.
+    # needs, leaving `uses` at its default.
     index := (module.image) ! add_function(name, entries, 0, 0, f, dispatch_list, len(captures))
     if index is error:
         return index
@@ -538,7 +538,6 @@ fn compile_callable(module, name: str, params, body, pos, flags: int = 0, enclos
         # stub assertion - key on that distinction.
         (module.image.unlowered) ! append([name, reason, frame.tolerant])
     entry["nlocals"] = frame.high
-    entry["nresults"] = frame.max_results
     entry["uses"] = _copy_list(frame.uses)
     module ! add_pending(index, frame)
     return [index, captures]

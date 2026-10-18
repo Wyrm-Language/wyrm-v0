@@ -39,10 +39,11 @@ LONG := "long"
 OPS := [
     {"name": "noop", "value": 0x00, "form": "core", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "noop", "operands": {}, "wide_fmt": "", "wide_operands": {}},
     {"name": "trap", "value": 0x01, "form": "core", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "trap {code}", "operands": {"code": ["f", "imm"]}, "wide_fmt": "", "wide_operands": {}},
-    {"name": "return", "value": 0x02, "form": "core", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "", "operands": {"base": ["a0", "reg"], "count": ["f", "count"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "lnil", "value": 0x03, "form": "core", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "lnil {dst}", "operands": {"dst": ["a0", "reg"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "lbool", "value": 0x04, "form": "core", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "lbool {dst} <- {flag}", "operands": {"dst": ["a0", "reg"], "flag": ["f", "flag"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "lunset", "value": 0x05, "form": "core", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "lunset {dst}", "operands": {"dst": ["a0", "reg"]}, "wide_fmt": "", "wide_operands": {}},
+    {"name": "return", "value": 0x08, "form": "core", "shape": "", "wide_name": "", "wide_value": 0x00, "fmt": "return {src}", "operands": {"src": ["a0", "reg"]}, "wide_fmt": "", "wide_operands": {}},
+    {"name": "yield", "value": 0x09, "form": "core", "shape": "", "wide_name": "", "wide_value": 0x00, "fmt": "yield {src}", "operands": {"src": ["a0", "reg"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "i8", "value": 0x40, "form": "pairable", "shape": "imm", "wide_name": "i32", "wide_value": 0xC0, "fmt": "i8 {dst} <- {imm}", "operands": {"dst": ["a0", "reg"], "imm": ["f", "i8"]}, "wide_fmt": "i32 {dst} <- {imm}", "wide_operands": {"dst": ["a0", "reg"], "imm": ["w1", "i32"]}},
     {"name": "move", "value": 0x41, "form": "pairable", "shape": "reg", "wide_name": "move", "wide_value": 0xC1, "fmt": "move {dst} <- {src}", "operands": {"dst": ["a0", "reg"], "src": ["f", "reg8"]}, "wide_fmt": "", "wide_operands": {"dst": ["a0", "reg"], "src": ["a1", "reg"]}},
     {"name": "gget", "value": 0x42, "form": "pairable", "shape": "inv", "wide_name": "gget", "wide_value": 0xC2, "fmt": "gget {dst} <- {glob}", "operands": {"glob": ["a0", "global"], "dst": ["f", "reg8"]}, "wide_fmt": "", "wide_operands": {"glob": ["a0", "global"], "dst": ["a1", "reg"]}},
@@ -58,6 +59,8 @@ OPS := [
     {"name": "jerr", "value": 0x4D, "form": "pairable", "shape": "jcond", "wide_name": "jerr", "wide_value": 0xCD, "fmt": "jerr {cond}, {rel}", "operands": {"cond": ["f", "reg8"], "rel": ["a0", "rel"]}, "wide_fmt": "", "wide_operands": {"cond": ["a0", "reg"], "rel": ["w1", "rel"]}},
     {"name": "jnerr", "value": 0x4E, "form": "pairable", "shape": "jcond", "wide_name": "jnerr", "wide_value": 0xCE, "fmt": "jnerr {cond}, {rel}", "operands": {"cond": ["f", "reg8"], "rel": ["a0", "rel"]}, "wide_fmt": "", "wide_operands": {"cond": ["a0", "reg"], "rel": ["w1", "rel"]}},
     {"name": "jmp", "value": 0x4F, "form": "pairable", "shape": "jmp", "wide_name": "jmp", "wide_value": 0xCF, "fmt": "jmp {rel}", "operands": {"rel": ["a0", "rel"]}, "wide_fmt": "", "wide_operands": {"rel": ["w1", "rel"]}},
+    {"name": "call", "value": 0x51, "form": "pairable", "shape": "count", "wide_name": "call", "wide_value": 0xD1, "fmt": "call base={base} argc={argc}", "operands": {"base": ["a0", "reg"], "argc": ["f", "count"]}, "wide_fmt": "", "wide_operands": {"base": ["a0", "reg"], "argc": ["a1", "count"]}},
+    {"name": "super", "value": 0x52, "form": "pairable", "shape": "count", "wide_name": "super", "wide_value": 0xD2, "fmt": "super base={base} argc={argc}", "operands": {"base": ["a0", "reg"], "argc": ["f", "count"]}, "wide_fmt": "", "wide_operands": {"base": ["a0", "reg"], "argc": ["a1", "count"]}},
     {"name": "f32", "value": 0x80, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "f32 {dst} <- {imm}", "operands": {"dst": ["a0", "reg"], "imm": ["w1", "f32"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "tuple", "value": 0x81, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "tuple {dst} <- {base}, {count} items", "operands": {"dst": ["a0", "reg"], "base": ["a1", "reg"], "count": ["f", "count"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "list", "value": 0x82, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "list {dst} <- {base}, {count} items", "operands": {"dst": ["a0", "reg"], "base": ["a1", "reg"], "count": ["f", "count"]}, "wide_fmt": "", "wide_operands": {}},
@@ -88,14 +91,8 @@ OPS := [
     {"name": "setattr", "value": 0x9B, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "setattr {obj}.{sym} <- {src}", "operands": {"obj": ["a0", "reg"], "sym": ["a1", "symbol"], "src": ["a2", "reg"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "getslot", "value": 0x9C, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "getslot {dst} <- {obj}#{slot}", "operands": {"dst": ["a0", "reg"], "obj": ["a1", "reg"], "slot": ["a2", "slot"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "setslot", "value": 0x9D, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "setslot {obj}#{slot} <- {src}", "operands": {"obj": ["a0", "reg"], "slot": ["a1", "slot"], "src": ["a2", "reg"]}, "wide_fmt": "", "wide_operands": {}},
-    {"name": "call", "value": 0xA0, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "call base={base} argc={argc} nres={nres}", "operands": {"base": ["a0", "reg"], "argc": ["f", "count"], "nres": ["a1", "count"]}, "wide_fmt": "", "wide_operands": {}},
-    {"name": "call_va", "value": 0xA1, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "call_va base={base} nres={nres}", "operands": {"base": ["a0", "reg"], "nres": ["a1", "count"]}, "wide_fmt": "", "wide_operands": {}},
-    {"name": "msg", "value": 0xA2, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "msg base={base} argc={argc} {message} nres={nres}", "operands": {"base": ["a0", "reg"], "argc": ["f", "count"], "message": ["a1", "message"], "nres": ["a2", "count"]}, "wide_fmt": "", "wide_operands": {}},
-    {"name": "msg_va", "value": 0xA3, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "msg_va base={base} {message} nres={nres}", "operands": {"base": ["a0", "reg"], "message": ["a1", "message"], "nres": ["a2", "count"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "getmsg", "value": 0xA4, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "getmsg {dst} <- {recv} ! {message}", "operands": {"dst": ["a0", "reg"], "recv": ["a1", "reg"], "message": ["a2", "message"]}, "wide_fmt": "", "wide_operands": {}},
-    {"name": "super", "value": 0xA5, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "super base={base} argc={argc} nres={nres}", "operands": {"base": ["a0", "reg"], "argc": ["f", "count"], "nres": ["a1", "count"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "return_cps", "value": 0xA6, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "return_cps base={base} argc={argc} cont={cont}", "operands": {"base": ["a0", "reg"], "argc": ["f", "count"], "cont": ["a1", "reg"]}, "wide_fmt": "", "wide_operands": {}},
-    {"name": "yield", "value": 0xA7, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "yield base={base} count={count}", "operands": {"base": ["a0", "reg"], "count": ["f", "count"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "closure", "value": 0xA8, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "closure {dst} <- {fn}, {ncaps} caps", "operands": {"dst": ["a0", "reg"], "fn": ["a1", "function"], "caps": ["a2", "reg"], "ncaps": ["f", "count"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "class", "value": 0xA9, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "class {dst} <- {cls}", "operands": {"dst": ["a0", "reg"], "cls": ["a1", "class"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "new_instance", "value": 0xAA, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "new_instance {dst} <- {cls}", "operands": {"dst": ["a0", "reg"], "cls": ["a1", "reg"]}, "wide_fmt": "", "wide_operands": {}},
@@ -104,12 +101,15 @@ OPS := [
     {"name": "defer_reg", "value": 0xAD, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "defer_reg {closure} mode={mode}", "operands": {"closure": ["a0", "reg"], "mode": ["f", "imm"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "iter", "value": 0xAE, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "iter {dst} <- {src}", "operands": {"dst": ["a0", "reg"], "src": ["a1", "reg"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "itnext", "value": 0xAF, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "itnext {dst} <- {iter}, done {rel}", "operands": {"dst": ["a0", "reg"], "iter": ["a1", "reg"], "rel": ["a2", "rel"]}, "wide_fmt": "", "wide_operands": {}},
-    {"name": "yield_from", "value": 0xB0, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "yield_from {dst} <- {sub}", "operands": {"dst": ["a0", "reg"], "sub": ["a1", "reg"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "unpack", "value": 0xB1, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "unpack {dst}.. <- {src}, {count} items", "operands": {"dst": ["a0", "reg"], "src": ["a1", "reg"], "count": ["f", "count"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "cmp3", "value": 0xB2, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "cmp3 {dst} <- {lhs} <=> {rhs}", "operands": {"dst": ["a0", "reg"], "lhs": ["a1", "reg"], "rhs": ["a2", "reg"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "getscope", "value": 0xB3, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "getscope {dst} <- {obj}::{sym}", "operands": {"dst": ["a0", "reg"], "obj": ["a1", "reg"], "sym": ["a2", "symbol"]}, "wide_fmt": "", "wide_operands": {}},
     {"name": "setscope", "value": 0xB4, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "setscope {obj}::{sym} <- {src}", "operands": {"obj": ["a0", "reg"], "sym": ["a1", "symbol"], "src": ["a2", "reg"]}, "wide_fmt": "", "wide_operands": {}},
-    {"name": "import_star", "value": 0xB5, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "import_star {path} except {base}, {count} names", "operands": {"path": ["a0", "static"], "base": ["a1", "base"], "count": ["f", "count"]}, "wide_fmt": "", "wide_operands": {}}
+    {"name": "import_star", "value": 0xB5, "form": "long", "shape": "", "wide_name": "", "wide_value": 0, "fmt": "import_star {path} except {base}, {count} names", "operands": {"path": ["a0", "static"], "base": ["a1", "base"], "count": ["f", "count"]}, "wide_fmt": "", "wide_operands": {}},
+    {"name": "call_va", "value": 0xB6, "form": "long", "shape": "", "wide_name": "", "wide_value": 0x00, "fmt": "call_va base={base}", "operands": {"base": ["a0", "reg"]}, "wide_fmt": "", "wide_operands": {}},
+    {"name": "msg", "value": 0xB7, "form": "long", "shape": "", "wide_name": "", "wide_value": 0x00, "fmt": "msg base={base} argc={argc} {message}", "operands": {"base": ["a0", "reg"], "argc": ["f", "count"], "message": ["a1", "message"]}, "wide_fmt": "", "wide_operands": {}},
+    {"name": "msg_va", "value": 0xB8, "form": "long", "shape": "", "wide_name": "", "wide_value": 0x00, "fmt": "msg_va base={base} {message}", "operands": {"base": ["a0", "reg"], "message": ["a1", "message"]}, "wide_fmt": "", "wide_operands": {}},
+    {"name": "yield_from", "value": 0xB9, "form": "long", "shape": "", "wide_name": "", "wide_value": 0x00, "fmt": "yield_from <- {sub}", "operands": {"sub": ["a1", "reg"]}, "wide_fmt": "", "wide_operands": {}}
 ]
 
 # BY_NAME/BY_VALUE index OPS by mnemonic (str) and by opcode value
@@ -396,14 +396,6 @@ fn _render_fmt(fmt: str, values: dict) -> str | error:
             i = j + 1
     return out
 
-# The appendix spells a zero-value return without a base register, since
-# the base is meaningless when nothing is returned (opcodes.py's
-# _render_return).
-fn _fmt_return(fields: dict) -> str:
-    if fields["f"] == 0:
-        return "return count=0"
-    return "return " + _decode_operand(fields["a0"], "reg") + " count=" + str(fields["f"])
-
 # Render the instruction at words[offset].  Returns a record dict:
 #   { "offset": int, "text": str, "nwords": int, "is_wide": bool,
 #     "entry": dict, "fields": dict, "operands": dict }
@@ -426,18 +418,14 @@ fn disassemble_one(words: list, offset: int = 0) -> dict | error:
         fmt = entry["wide_fmt"]
     else:
         fmt = entry["fmt"]
-    var text: str
-    if entry["name"] == "return":
-        text = _fmt_return(fields)
-    else:
-        values := {}
-        for label in operands:
-            e := operands[label]
-            values[label] = _decode_operand(fields[e[0]], e[1])
-        rendered := _render_fmt(fmt, values)
-        if rendered is error:
-            return rendered
-        text = rendered
+    values := {}
+    for label in operands:
+        e := operands[label]
+        values[label] = _decode_operand(fields[e[0]], e[1])
+    rendered := _render_fmt(fmt, values)
+    if rendered is error:
+        return rendered
+    text := rendered
     return {"offset": offset, "text": text, "nwords": packed["nwords"], "is_wide": is_wide, "entry": entry, "fields": fields, "operands": operands}
 
 # Render a whole code array as disassembly records, word offsets shifted by

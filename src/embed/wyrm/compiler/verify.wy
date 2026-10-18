@@ -174,7 +174,10 @@ fn _verify_region(image: dict, region: dict) -> nil | error:
                 e7 := _check_index(region, inst_offset, entry, label, raw, image["classes"])
                 if e7 is error:
                     return e7
-        windows := _windows(entry, fields)
+        reserved := _check_reserved(region, inst_offset, entry, is_wide, fields)
+        if reserved is error:
+            return reserved
+        windows := _windows(entry, fields, is_wide)
         for window in windows:
             e8 := _check_window(region, inst_offset, entry, window[0], window[1])
             if e8 is error:
@@ -259,17 +262,14 @@ fn _fail(region: dict, offset: int, message: str) -> error:
 # register windows
 
 # Operand labels this instruction does not actually read: an empty window
-# has a base register the VM never touches - `return count=0` and
-# `dict dst, base, 0` are both meaningful with any base at all, and the
-# compiler naturally leaves it pointing one past the last live slot.
-# Checking it would reject correct code, so it is skipped here for the same
-# reason the disassembler leaves it out of `return count=0`.
+# has a base register the VM never touches - `dict dst, base, 0` is
+# meaningful with any base at all, and the compiler naturally leaves it
+# pointing one past the last live slot. Checking it would reject correct
+# code, so it is skipped here.
 fn _unread_operands(entry: dict, fields: dict) -> list:
     if fields["f"] != 0:
         return []
     name := entry["name"]
-    if (name == "return") or (name == "yield"):
-        return ["base"]
     if (name == "tuple") or (name == "list") or (name == "plist") or (name == "dict"):
         return ["base"]
     if name == "closure":
@@ -278,32 +278,44 @@ fn _unread_operands(entry: dict, fields: dict) -> list:
         return ["dst"]
     return []
 
+# Fields a one-result instruction leaves unused (design runtime.md D12 /
+# plans/H D4). They are reserved and must be 0: a later format may give them
+# a meaning, and an image that already sets them would change behaviour.
+# Each entry is [compact slots, wide slots].
+RESERVED := {"return": [["f"], []], "yield": [["f"], []], "call": [[], ["a2"]], "super": [[], ["a2"]], "call_va": [["f", "a1", "a2"], []], "msg": [["a2"], []], "msg_va": [["f", "a2"], []], "yield_from": [["f", "a0", "a2"], []]}
+
+fn _check_reserved(region: dict, offset: int, entry: dict, is_wide: bool, fields: dict) -> nil | error:
+    layout := (RESERVED[entry["name"]] catch nil)
+    if layout is nil:
+        return nil
+    which := layout[0]
+    if is_wide:
+        which = layout[1]
+    for field in which:
+        if fields[field] != 0:
+            return _fail(region, offset, str(entry["name"]) + " sets reserved field " + str(field) + " to " + str(fields[field]) + "; it must be 0")
+    return nil
+
 # The `(base, count)` runs of frame slots an instruction touches.
-fn _windows(entry: dict, fields: dict) -> list:
+fn _windows(entry: dict, fields: dict, is_wide: bool) -> list:
     name := entry["name"]
     a0 := fields["a0"]
     a1 := fields["a1"]
-    a2 := fields["a2"]
     f := fields["f"]
-    if name == "return":
-        if f != 0:
-            return [[a0, f]]
-        return []
-    if name == "call":
-        # callee plus arguments going in, results coming back
-        return [[a0, f + 1], [a0, _max1(a1)]]
-    if name == "super":
+    if (name == "call") or (name == "super"):
+        argc := f
+        if is_wide:
+            argc = a1
+        if name == "call":
+            # callee plus arguments going in
+            return [[a0, argc + 1]]
         # no callee slot: the dispatch is already in progress, so the
         # window is the arguments alone (spec 3.3)
-        return [[a0, _max1(f)], [a0, _max1(a1)]]
-    if name == "call_va":
-        return [[a0, 3], [a0, _max1(a1)]]
+        return [[a0, _max1(argc)]]
+    if (name == "call_va") or (name == "msg_va"):
+        return [[a0, 3]]
     if name == "msg":
-        return [[a0, f + 1], [a0, _max1(a2)]]
-    if name == "msg_va":
-        return [[a0, 3], [a0, _max1(a2)]]
-    if name == "yield":
-        return [[a0, _max1(f)]]
+        return [[a0, f + 1]]
     if (name == "tuple") or (name == "list") or (name == "plist"):
         return [[a1, f]]
     if name == "dict":
@@ -312,7 +324,7 @@ fn _windows(entry: dict, fields: dict) -> list:
         return [[a0, f]]
     if name == "closure":
         if f != 0:
-            return [[a2, f]]
+            return [[fields["a2"], f]]
         return []
     return []
 

@@ -26,6 +26,7 @@
 #include <vector>
 
 #include <test_common/test_fiber_fixture.h>
+#include <test_common/test_call.h>
 
 namespace {
 
@@ -159,7 +160,7 @@ TEST_SUITE("builtins")
             wy_value_object(WY_TYPE_TAG_STR, (wy_object*) hi),
         };
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_leaf_f(context, println, args, 6, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(context, println, args, 6, out), WY_ERR_NONE);
         CHECK_EQ(g_output, "-3 9 3.4 true nil hi\n");
     }
 
@@ -175,12 +176,12 @@ TEST_SUITE("builtins")
 
         wy_value args[1] = { wy_value_float(3.4) };
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_leaf_f(context, println, args, 1, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(context, println, args, 1, out), WY_ERR_NONE);
         CHECK_EQ(g_output, "3.4\n");
 
         g_output.clear();
         args[0] = wy_value_float(1.0);
-        REQUIRE_EQ(wy_vm_call_leaf_f(context, println, args, 1, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(context, println, args, 1, out), WY_ERR_NONE);
         CHECK_EQ(g_output, "1.0\n");
     }
 
@@ -196,7 +197,7 @@ TEST_SUITE("builtins")
 
         wy_value args[1] = { wy_value_word(2) };
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_leaf_f(context, println, args, 1, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(context, println, args, 1, out), WY_ERR_NONE);
         CHECK_EQ(g_output, "2\n");
     }
 
@@ -221,7 +222,7 @@ TEST_SUITE("builtins")
             wy_value_object(WY_TYPE_TAG_STR, (wy_object*) newline),
         };
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_leaf_f(context, print, args, 3, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(context, print, args, 3, out), WY_ERR_NONE);
         // test/bytecode/hello_3.out, byte for byte:
         CHECK_EQ(g_output, "Magic Number:  3 \n");
     }
@@ -237,7 +238,7 @@ TEST_SUITE("builtins")
         wy_native* print = find_native(module, context, "print");
 
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_leaf_f(context, print, WY_NULL, 0, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(context, print, WY_NULL, 0, out), WY_ERR_NONE);
         CHECK_EQ(g_output, "");
     }
 
@@ -252,7 +253,7 @@ TEST_SUITE("builtins")
 
         wy_value args[1] = { wy_value_word(42) };
         wy_value out[1];
-        CHECK_EQ(wy_vm_call_leaf_f(context, println, args, 1, out, 1), WY_ERR_NONE);
+        CHECK_EQ(wy_vm_call_leaf_f(context, println, args, 1, out), WY_ERR_NONE);
     }
 }
 
@@ -272,7 +273,7 @@ TEST_SUITE("builtins") {
         const char* expected[] = {"-3", "9", "3.4", "true", "nil", "hello"};
         for (unsigned i = 0; i < 6; i++) {
             wy_value out;
-            REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &values[i], 1, &out, 1), WY_ERR_NONE);
+            REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &values[i], 1, &out), WY_ERR_NONE);
             REQUIRE_EQ(out.type, WY_TYPE_TAG_STR);
             CHECK_EQ(std::string(out.data.str->str, out.data.str->len), expected[i]);
             if (i == 5) { CHECK_EQ(out.data.str, original); }
@@ -307,16 +308,16 @@ TEST_SUITE("builtins") {
         const char* expected = "(1 (2 3) a \"q\\\"b\\\\s\\n\\x01\" () 1500.0 1e20)";
 
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, println, &list, 1, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, println, &list, 1, out), WY_ERR_NONE);
         CHECK_EQ(g_output, std::string(expected) + "\n");
 
         g_output.clear();
         wy_value improper = cons(wy_value_word(1), cons(wy_value_word(2), wy_value_word(3)));
         wy_value args[2] = {list, improper};
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &args[0], 1, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &args[0], 1, out), WY_ERR_NONE);
         REQUIRE_EQ(out[0].type, WY_TYPE_TAG_STR);
         CHECK_EQ(std::string(out[0].data.str->str, out[0].data.str->len), expected);
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &args[1], 1, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &args[1], 1, out), WY_ERR_NONE);
         CHECK_EQ(std::string(out[0].data.str->str, out[0].data.str->len), "(1 2 . 3)");
         CHECK(g_output.empty());
     }
@@ -333,7 +334,7 @@ TEST_SUITE("builtins") {
         for (unsigned i = 0; i < 8; i++) {
             wy_value in = wy_value_float(values[i]);
             wy_value out;
-            REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &in, 1, &out, 1), WY_ERR_NONE);
+            REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str, &in, 1, &out), WY_ERR_NONE);
             CHECK_EQ(std::string(out.data.str->str, out.data.str->len), expected[i]);
         }
     }
@@ -349,7 +350,7 @@ TEST_SUITE("builtins") {
 
         auto check_len = [&](wy_value v, wy_word expected) {
             wy_value out;
-            REQUIRE_EQ(wy_vm_call_leaf_f(ctx, len_native, &v, 1, &out, 1), WY_ERR_NONE);
+            REQUIRE_EQ(wy_vm_call_leaf_f(ctx, len_native, &v, 1, &out), WY_ERR_NONE);
             REQUIRE_EQ(out.type, WY_TYPE_TAG_WORD);
             CHECK_EQ(out.data.word, expected);
         };
@@ -409,12 +410,12 @@ TEST_SUITE("builtins") {
         // Non-collections and improper lists are faults, like Python's TypeError.
         wy_value not_a_collection = wy_value_word(5);
         wy_value out;
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, len_native, &not_a_collection, 1, &out, 1), WY_ERR_BAD_TYPE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, len_native, &not_a_collection, 1, &out), WY_ERR_BAD_TYPE);
 
         wy_pair* improper = wy_pair_cons_f(ctx, wy_value_word(1), wy_value_word(2));
         REQUIRE_NE(improper, WY_NULL);
         wy_value improper_v = wy_value_object(WY_TYPE_TAG_PAIR, (wy_object*) improper);
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, len_native, &improper_v, 1, &out, 1), WY_ERR_BAD_TYPE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, len_native, &improper_v, 1, &out), WY_ERR_BAD_TYPE);
     }
 
     TEST_CASE("range(begin, end) is a bare-name native iterator needing no import") {
@@ -435,21 +436,21 @@ TEST_SUITE("builtins") {
             enc1(WY_OP_LCONST, 0, 0),                    // L0 <- range fn (static 0)
             enc1(WY_OP_I8, 0, 1),                         // L1 <- 0 (begin)
             enc1(WY_OP_I8, 3, 2),                         // L2 <- 3 (end)
-            enc2a(WY_OP_CALL, 2, 0), enc2b(1, 0),         // L0 <- range(L1, L2), argc=2 nres=1
-            enc1(WY_OP_LCONST, 10, 1),                    // L10 <- next native (static 1)
-            enc1(WY_OP_MOVE, 0, 11),                      // L11 <- L0 (the range iterator)
-            enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),        // L10 <- next(L11)
-            enc1(WY_OP_MOVE, 10, 3),                      // L3 <- result 1
-            enc1(WY_OP_LCONST, 10, 1), enc1(WY_OP_MOVE, 0, 11),
-            enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),
-            enc1(WY_OP_MOVE, 10, 4),                      // L4 <- result 2
-            enc1(WY_OP_LCONST, 10, 1), enc1(WY_OP_MOVE, 0, 11),
-            enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),
-            enc1(WY_OP_MOVE, 10, 5),                      // L5 <- result 3
-            enc1(WY_OP_LCONST, 10, 1), enc1(WY_OP_MOVE, 0, 11),
-            enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),
-            enc1(WY_OP_MOVE, 10, 6),                      // L6 <- StopIteration
-            enc1(WY_OP_RETURN, 4, 3),                     // return L3..L6
+            enc1(WY_OP_CALL, 2, 0),                       // L0 <- range(L1, L2), argc=2
+            enc1(WY_OP_MOVE, 0, 7),                       // L7 <- the range iterator (the next call clobbers L0)
+            enc1(WY_OP_LCONST, 10, 1), enc1(WY_OP_MOVE, 7, 11),
+            enc1(WY_OP_CALL, 1, 10),                      // L0 <- next(L11)
+            enc1(WY_OP_MOVE, 0, 3),                       // L3 <- result 1
+            enc1(WY_OP_LCONST, 10, 1), enc1(WY_OP_MOVE, 7, 11),
+            enc1(WY_OP_CALL, 1, 10),
+            enc1(WY_OP_MOVE, 0, 4),                       // L4 <- result 2
+            enc1(WY_OP_LCONST, 10, 1), enc1(WY_OP_MOVE, 7, 11),
+            enc1(WY_OP_CALL, 1, 10),
+            enc1(WY_OP_MOVE, 0, 5),                       // L5 <- result 3
+            enc1(WY_OP_LCONST, 10, 1), enc1(WY_OP_MOVE, 7, 11),
+            enc1(WY_OP_CALL, 1, 10),
+            enc1(WY_OP_MOVE, 0, 6),                       // L6 <- StopIteration
+            enc2a(WY_OP_TUPLE, 4, 3), enc2b(3, 0), enc1(WY_OP_RETURN, 0, 3),                     // return L3..L6
         };
         wy_value statics[] = {range_fn, next_native};
         std::vector<wy_function_proto> protos = {proto_at(0, 12, 0)};
@@ -460,7 +461,7 @@ TEST_SUITE("builtins") {
         REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
 
         wy_value out[4];
-        wy_error err = wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+        wy_error err = test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
             WY_NULL, 0, out, 4);
         REQUIRE_EQ(err, WY_ERR_NONE);
 
@@ -522,7 +523,7 @@ TEST_SUITE("builtins") {
         wy_function* fn0 = WY_NULL;
         REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
 
-        wy_error err = wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+        wy_error err = test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
             WY_NULL, 0, WY_NULL, 0);
         REQUIRE_EQ(err, WY_ERR_NONE);
 
@@ -553,8 +554,8 @@ TEST_SUITE("builtins") {
             enc1(WY_OP_GGET, 0, 0),              // L0 <- G0 (str receiver)
             enc1(WY_OP_I8, 1, 1),                // L1 <- 1 (start)
             enc1(WY_OP_I8, 3, 2),                // L2 <- 3 (count)
-            enc2a(WY_OP_MSG, 2, 0), enc2b(0, 1), // L0 <- L0!substr(L1, L2), msg 0, nres=1
-            enc1(WY_OP_RETURN, 1, 0),            // return L0 (f=count, a0=base)
+            enc2a(WY_OP_MSG, 2, 0), enc2b(0, 0), // L0 <- L0!substr(L1, L2), msg 0
+            enc1(WY_OP_RETURN, 0, 0),            // return L0 (f=count, a0=base)
         };
 
         wy_module* module = make_code_module(ctx, code, std::size(code), { proto_at(0, 3, 0) }, 1);
@@ -577,7 +578,62 @@ TEST_SUITE("builtins") {
         REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
 
         wy_value out[1];
-        wy_error err = wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+        wy_error err = test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+            WY_NULL, 0, out, 1);
+        REQUIRE_EQ(err, WY_ERR_NONE);
+        REQUIRE_EQ(out[0].type, WY_TYPE_TAG_STR);
+        wy_string* sub = out[0].data.str;
+        CHECK_EQ(std::string(sub->str, sub->len), "\xC3\xA9ll");
+    }
+
+    TEST_CASE("msg_va delivers the native overload's value to L0") {
+        // Same real-opcode path as the bytes!pack_u32 case above: `module`
+        // never reg_msg's "substr", so the WY_OP_MSG resolution must fall back
+        // onto ctx->builtins's message_table and land on the PTYPE(STR)
+        // overload install_native_messages_ registers. Uses codepoint offsets,
+        // not bytes: "h\xC3\xA9llo" ! substr(1, 3) is "\xC3\xA9ll", so a
+        // byte-indexed implementation would fail this.
+        static const char hello_utf8[] = "h\xC3\xA9llo";
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(ctx, &builtins), WY_ERR_NONE);
+        ctx->builtins = builtins;
+
+        wy_string* s = WY_NULL;
+        REQUIRE_EQ(wy_string_new(ctx, hello_utf8, sizeof(hello_utf8) - 1, &s), WY_ERR_NONE);
+
+        const wy_u32 code[] = {
+            enc1(WY_OP_GGET, 0, 0),              // L0 <- G0 (str receiver)
+            enc1(WY_OP_I8, 1, 3),                // L3 <- 1 (start)
+            enc1(WY_OP_I8, 3, 4),                // L4 <- 3 (count)
+            enc2a(WY_OP_TUPLE, 2, 1), enc2b(3, 0),                                   // L1 <- (1, 3)
+            enc2a(WY_OP_NEW_PRIMITIVE, (wy_u8) WY_TYPE_TAG_TABLE, 2), enc2b(0, 0),   // L2 <- {}
+            enc2a(WY_OP_MSG_VA, 0, 0), enc2b(0, 0),  // L0 <- L0!substr(*L1, **L2), msg 0
+            enc1(WY_OP_RETURN, 0, 0),            // return L0
+        };
+
+        wy_module* module = make_code_module(ctx, code, std::size(code), { proto_at(0, 5, 0) }, 1);
+        module->globals[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) s);
+
+        wy_symbol substr_sym = WY_NULL;
+        REQUIRE_EQ(wy_context_intern(ctx, "substr", std::strlen("substr"), &substr_sym), WY_ERR_NONE);
+        module->symbols = (wy_symbol*) wy_context_gc_alloc(ctx, sizeof(wy_symbol));
+        module->symbols[0] = substr_sym;
+        module->symbol_count = 1;
+        module->messages = (wy_message_ref*) wy_context_gc_alloc(ctx, sizeof(wy_message_ref));
+        module->messages[0].path_len = 1;
+        module->messages[0].path = (wy_u16*) wy_context_gc_alloc(ctx, sizeof(wy_u16));
+        module->messages[0].path[0] = 0;
+        module->messages[0].bound = WY_NULL;
+        module->message_count = 1;
+
+        REQUIRE_EQ(wy_context_module_register(ctx, module, nullptr), WY_ERR_NONE);
+        wy_function* fn0 = WY_NULL;
+        REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
+
+        wy_value out[1];
+        wy_error err = test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
             WY_NULL, 0, out, 1);
         REQUIRE_EQ(err, WY_ERR_NONE);
         REQUIRE_EQ(out[0].type, WY_TYPE_TAG_STR);
@@ -598,19 +654,19 @@ TEST_SUITE("builtins") {
         REQUIRE_EQ(wy_error_obj_new(ctx, WY_NULL, what, wy_value_nil(), &err), WY_ERR_NONE);
         wy_value err_v = wy_value_object(WY_TYPE_TAG_ERROR, (wy_object*) err);
         wy_value out;
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, error_message, &err_v, 1, &out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, error_message, &err_v, 1, &out), WY_ERR_NONE);
         REQUIRE_EQ(out.type, WY_TYPE_TAG_STR);
         CHECK_EQ(std::string(out.data.str->str, out.data.str->len), "boom");
 
         // Non-error arguments answer nil.
         wy_value not_err = wy_value_word(7);
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, error_message, &not_err, 1, &out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, error_message, &not_err, 1, &out), WY_ERR_NONE);
         CHECK_EQ(out.type, WY_TYPE_TAG_NIL);
 
         // str(error) renders the same message (compiler_main's REFUSED text relies on it).
         wy_native* str_native = find_native(builtins, ctx, "str");
         wy_value str_out[1];
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str_native, &err_v, 1, str_out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str_native, &err_v, 1, str_out), WY_ERR_NONE);
         REQUIRE_EQ(str_out[0].type, WY_TYPE_TAG_STR);
         CHECK_EQ(std::string(str_out[0].data.str->str, str_out[0].data.str->len), "boom");
     }
@@ -627,7 +683,7 @@ TEST_SUITE("builtins") {
         // bytes(4): four zero bytes.
         wy_value args_n[1] = { wy_value_word(4) };
         wy_value out_n[1];
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, bytes_ctor, args_n, 1, out_n, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, bytes_ctor, args_n, 1, out_n), WY_ERR_NONE);
         REQUIRE_EQ(out_n[0].type, WY_TYPE_TAG_BYTES);
         wy_bytes* n_bytes = (wy_bytes*) out_n[0].data.gc_object;
         CHECK_EQ(n_bytes->len, 4u);
@@ -638,7 +694,7 @@ TEST_SUITE("builtins") {
         REQUIRE_EQ(wy_string_new(ctx, "hi", 2, &hi), WY_ERR_NONE);
         wy_value args_s[1] = { wy_value_object(WY_TYPE_TAG_STR, (wy_object*) hi) };
         wy_value out_s[1];
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, bytes_ctor, args_s, 1, out_s, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, bytes_ctor, args_s, 1, out_s), WY_ERR_NONE);
         wy_bytes* s_bytes = (wy_bytes*) out_s[0].data.gc_object;
         REQUIRE_EQ(s_bytes->len, 2u);
         CHECK_EQ(s_bytes->data[0], 'h');
@@ -660,7 +716,7 @@ TEST_SUITE("builtins") {
         // str(bytes) renders "N bytes" (builtin_str_'s BYTES case).
         wy_native* str_native = find_native(builtins, ctx, "str");
         wy_value str_out[1];
-        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str_native, out_n, 1, str_out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(wy_vm_call_leaf_f(ctx, str_native, out_n, 1, str_out), WY_ERR_NONE);
         REQUIRE_EQ(str_out[0].type, WY_TYPE_TAG_STR);
         wy_string* rendered = str_out[0].data.str;
         CHECK_EQ(std::string(rendered->str, rendered->len), "4 bytes");

@@ -53,7 +53,6 @@ typedef struct wy_function_proto
     wy_u16 ncaptures;
     wy_u16 ndispatch;
     wy_u8 flags;
-    wy_u8 nresults;
     wy_param* params;         /**< nparams entries */
     wy_u16* dispatch_slots;   /**< ndispatch entries: global slot indices */
 } wy_function_proto;

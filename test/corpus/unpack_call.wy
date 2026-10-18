@@ -1,0 +1,36 @@
+# Unpacking assignment reads one value: a call returns one tuple, and the
+# targets take it apart. Plain wypoc cannot unpack a single value yet, so this
+# fixture is local-only.
+fn divmod(a, b):
+    return a / b, a % b
+
+q, r := divmod(17, 5)
+println(q)
+println(r)
+
+var x, y = divmod(9, 2)
+println(x)
+println(y)
+
+var a = 0
+var b = 0
+a, b = divmod(8, 3)
+println(a + b)
+
+fn swap(p, q):
+    return q, p
+
+m, n := swap(1, 2)
+println(m)
+println(n)
+
+# The right-hand side is evaluated once, then unpacked.
+var calls = 0
+fn pair():
+    calls = calls + 1
+    return (calls, calls * 10)
+
+c, d := pair()
+println(c)
+println(d)
+println(calls)

@@ -41,7 +41,6 @@ fn base_image(code: list) -> dict:
     fn_entry["flags"] = 0
     fn_entry["dispatch"] = [0]
     fn_entry["ncaptures"] = 0
-    fn_entry["nresults"] = 1
     fn_entry["uses"] = []
     img := {}
     img["name"] = "t"
@@ -95,7 +94,7 @@ expect_fail("function index out of range refused",
     base_image(pack('closure, f=0, a0=L(1), a1=7, a2=0)), "index 7")
 
 # -- uses check: a msg read with no referenced-name set entry --
-msg_image := base_image(pack('msg, f=0, a0=L(0), a1=0, a2=1))
+msg_image := base_image(pack('msg, f=0, a0=L(0), a1=0))
 msg_image["messages"] = [{"p": [0], "_path": "ping"}]
 msg_image["statics"] = ["x"]
 expect_fail("unlisted message read refused", msg_image, "without listing it")
@@ -110,5 +109,27 @@ expect_ok("listed message read accepted", msg_image)
 truncated := base_image([])
 truncated["code"] = []
 expect_ok("empty body accepted", truncated)
+
+# -- reserved fields: unused fields of the one-result opcodes must be 0 --
+fn refused_for_reserved(what: str, words: list):
+    r := verify(base_image(words))
+    if (r is error) and ("reserved field" in str(r)):
+        println("PASS " + what)
+    else:
+        println("FAIL " + what + " got " + str(r))
+        exit(1)
+
+expect_ok("clean return accepted", base_image(pack('return, a0=L(1))))
+refused_for_reserved("return with f set", pack('return, f=1, a0=L(1)))
+refused_for_reserved("yield with f set", pack('yield, f=2, a0=L(1)))
+refused_for_reserved("call_va with a1 set", pack('call_va, a0=L(0), a1=1))
+reserved_msg := base_image(pack('msg, a0=L(0), a1=0, a2=1))
+reserved_msg["messages"] = [{"p": [0], "_path": "ping"}]
+r_msg := verify(reserved_msg)
+check("msg with a2 set", (r_msg is error) and ("reserved field" in str(r_msg)), true)
+refused_for_reserved("yield_from with a0 set", pack('yield_from, a0=L(1), a1=L(0)))
+wide_call := pack(0xD1, a0=L(0), a1=0, a2=3)
+refused_for_reserved("wide call with a2 set", wide_call)
+expect_ok("wide call with a2 clear accepted", base_image(pack(0xD1, a0=L(0), a1=1)))
 
 println("test_compiler_verify: all checks passed")

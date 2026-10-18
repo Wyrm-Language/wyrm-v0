@@ -5,7 +5,7 @@
 
 static const uint8_t _dsl_header[] = {
     0xA3, 0x61, 0x6E, 0x64, 0x5F, 0x64, 0x73, 0x6C, 0x61, 0x67, 0x18, 0x64,
-    0x61, 0x6C, 0x03,
+    0x61, 0x6C, 0x04,
 };
 
 static const uint8_t _dsl_statics[] = {
@@ -111,145 +111,145 @@ static const uint8_t _dsl_symbols[] = {
 static const uint8_t _dsl_functions[] = {
     0x98, 0x27, 0xA5, 0x61, 0x6E, 0x69, 0x5F, 0x72, 0x65, 0x71, 0x5F, 0x6E,
     0x61, 0x6D, 0x65, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x67, 0x6C, 0x69,
-    0x74, 0x65, 0x72, 0x61, 0x6C, 0x61, 0x6C, 0x02, 0x61, 0x63, 0x18, 0x8E,
+    0x74, 0x65, 0x72, 0x61, 0x6C, 0x61, 0x6C, 0x03, 0x61, 0x63, 0x18, 0x8F,
     0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x70, 0x5F, 0x64, 0x65, 0x63, 0x6F,
     0x64, 0x65, 0x5F, 0x61, 0x70, 0x70, 0x6C, 0x79, 0x5F, 0x69, 0x66, 0x61,
     0x70, 0x82, 0xA1, 0x61, 0x6E, 0x65, 0x66, 0x69, 0x72, 0x73, 0x74, 0xA1,
-    0x61, 0x6E, 0x64, 0x72, 0x65, 0x73, 0x74, 0x61, 0x6C, 0x0D, 0x61, 0x63,
+    0x61, 0x6E, 0x64, 0x72, 0x65, 0x73, 0x74, 0x61, 0x6C, 0x0E, 0x61, 0x63,
     0x18, 0x99, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x71, 0x5F, 0x64, 0x65,
     0x63, 0x6F, 0x64, 0x65, 0x5F, 0x72, 0x75, 0x6C, 0x65, 0x5F, 0x63, 0x61,
     0x6C, 0x6C, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64, 0x6E, 0x61, 0x6D,
-    0x65, 0x61, 0x6C, 0x05, 0x61, 0x63, 0x18, 0xD4, 0x61, 0x66, 0x00, 0xA5,
+    0x65, 0x61, 0x6C, 0x06, 0x61, 0x63, 0x18, 0xD4, 0x61, 0x66, 0x00, 0xA5,
     0x61, 0x6E, 0x6B, 0x24, 0x74, 0x6F, 0x6B, 0x65, 0x6E, 0x5F, 0x6B, 0x69,
     0x6E, 0x64, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64, 0x6B, 0x69, 0x6E,
-    0x64, 0x61, 0x6C, 0x02, 0x61, 0x63, 0x18, 0xDE, 0x61, 0x66, 0x00, 0xA5,
+    0x64, 0x61, 0x6C, 0x03, 0x61, 0x63, 0x18, 0xDE, 0x61, 0x66, 0x00, 0xA5,
     0x61, 0x6E, 0x72, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65, 0x5F, 0x74,
     0x6F, 0x6B, 0x65, 0x6E, 0x5F, 0x6B, 0x69, 0x6E, 0x64, 0x61, 0x70, 0x81,
-    0xA1, 0x61, 0x6E, 0x64, 0x6B, 0x69, 0x6E, 0x64, 0x61, 0x6C, 0x14, 0x61,
+    0xA1, 0x61, 0x6E, 0x64, 0x6B, 0x69, 0x6E, 0x64, 0x61, 0x6C, 0x15, 0x61,
     0x63, 0x18, 0xDF, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6B, 0x24, 0x5F,
     0x74, 0x65, 0x78, 0x74, 0x5F, 0x74, 0x6D, 0x70, 0x6C, 0x61, 0x70, 0x81,
-    0xA1, 0x61, 0x6E, 0x64, 0x6B, 0x69, 0x6E, 0x64, 0x61, 0x6C, 0x03, 0x61,
+    0xA1, 0x61, 0x6E, 0x64, 0x6B, 0x69, 0x6E, 0x64, 0x61, 0x6C, 0x04, 0x61,
     0x63, 0x19, 0x01, 0x24, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6C, 0x5F,
     0x64, 0x65, 0x63, 0x6F, 0x64, 0x65, 0x5F, 0x74, 0x65, 0x78, 0x74, 0x61,
     0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64, 0x6E, 0x6F, 0x64, 0x65, 0x61, 0x6C,
-    0x18, 0x18, 0x61, 0x63, 0x19, 0x01, 0x25, 0x61, 0x66, 0x00, 0xA5, 0x61,
+    0x18, 0x19, 0x61, 0x63, 0x19, 0x01, 0x25, 0x61, 0x66, 0x00, 0xA5, 0x61,
     0x6E, 0x6D, 0x24, 0x73, 0x6F, 0x66, 0x74, 0x5F, 0x6B, 0x65, 0x79, 0x77,
     0x6F, 0x72, 0x64, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64, 0x74, 0x65,
-    0x78, 0x74, 0x61, 0x6C, 0x03, 0x61, 0x63, 0x19, 0x01, 0x96, 0x61, 0x66,
+    0x78, 0x74, 0x61, 0x6C, 0x04, 0x61, 0x63, 0x19, 0x01, 0x96, 0x61, 0x66,
     0x00, 0xA5, 0x61, 0x6E, 0x74, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65,
     0x5F, 0x73, 0x6F, 0x66, 0x74, 0x5F, 0x6B, 0x65, 0x79, 0x77, 0x6F, 0x72,
     0x64, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64, 0x74, 0x65, 0x78, 0x74,
-    0x61, 0x6C, 0x18, 0x19, 0x61, 0x63, 0x19, 0x01, 0x97, 0x61, 0x66, 0x00,
+    0x61, 0x6C, 0x18, 0x1A, 0x61, 0x63, 0x19, 0x01, 0x97, 0x61, 0x66, 0x00,
     0xA5, 0x61, 0x6E, 0x6D, 0x24, 0x5F, 0x65, 0x78, 0x70, 0x65, 0x63, 0x74,
     0x5F, 0x74, 0x6D, 0x70, 0x6C, 0x61, 0x70, 0x82, 0xA1, 0x61, 0x6E, 0x6B,
     0x65, 0x78, 0x70, 0x65, 0x63, 0x74, 0x5F, 0x74, 0x65, 0x78, 0x74, 0xA1,
     0x61, 0x6E, 0x6A, 0x6D, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x65, 0x78, 0x70,
-    0x72, 0x61, 0x6C, 0x04, 0x61, 0x63, 0x19, 0x01, 0xFF, 0x61, 0x66, 0x00,
+    0x72, 0x61, 0x6C, 0x05, 0x61, 0x63, 0x19, 0x01, 0xFF, 0x61, 0x66, 0x00,
     0xA5, 0x61, 0x6E, 0x6E, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65, 0x5F,
     0x65, 0x78, 0x70, 0x65, 0x63, 0x74, 0x61, 0x70, 0x82, 0xA1, 0x61, 0x6E,
     0x68, 0x61, 0x72, 0x67, 0x5F, 0x74, 0x65, 0x78, 0x74, 0xA1, 0x61, 0x6E,
     0x6A, 0x61, 0x72, 0x67, 0x5F, 0x73, 0x75, 0x62, 0x73, 0x65, 0x71, 0x61,
-    0x6C, 0x13, 0x61, 0x63, 0x19, 0x02, 0x0C, 0x61, 0x66, 0x00, 0xA5, 0x61,
+    0x6C, 0x14, 0x61, 0x63, 0x19, 0x02, 0x0C, 0x61, 0x66, 0x00, 0xA5, 0x61,
     0x6E, 0x66, 0x24, 0x5F, 0x6D, 0x61, 0x6E, 0x79, 0x61, 0x70, 0x81, 0xA1,
     0x61, 0x6E, 0x6A, 0x6D, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x65, 0x78, 0x70,
-    0x72, 0x61, 0x6C, 0x05, 0x61, 0x63, 0x19, 0x02, 0x5C, 0x61, 0x66, 0x00,
+    0x72, 0x61, 0x6C, 0x06, 0x61, 0x63, 0x19, 0x02, 0x5C, 0x61, 0x66, 0x00,
     0xA5, 0x61, 0x6E, 0x6C, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65, 0x5F,
     0x6D, 0x61, 0x6E, 0x79, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x63, 0x61,
-    0x72, 0x67, 0x61, 0x6C, 0x18, 0x1E, 0x61, 0x63, 0x19, 0x02, 0x5D, 0x61,
+    0x72, 0x67, 0x61, 0x6C, 0x18, 0x1F, 0x61, 0x63, 0x19, 0x02, 0x5D, 0x61,
     0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6A, 0x24, 0x5F, 0x6D, 0x61, 0x6E, 0x79,
     0x66, 0x6C, 0x61, 0x74, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x6A, 0x6D,
-    0x61, 0x74, 0x63, 0x68, 0x5F, 0x65, 0x78, 0x70, 0x72, 0x61, 0x6C, 0x06,
+    0x61, 0x74, 0x63, 0x68, 0x5F, 0x65, 0x78, 0x70, 0x72, 0x61, 0x6C, 0x07,
     0x61, 0x63, 0x19, 0x02, 0xF6, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x70,
     0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65, 0x5F, 0x6D, 0x61, 0x6E, 0x79,
     0x66, 0x6C, 0x61, 0x74, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x63, 0x61,
-    0x72, 0x67, 0x61, 0x6C, 0x18, 0x24, 0x61, 0x63, 0x19, 0x02, 0xF7, 0x61,
+    0x72, 0x67, 0x61, 0x6C, 0x18, 0x25, 0x61, 0x63, 0x19, 0x02, 0xF7, 0x61,
     0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6A, 0x5F, 0x74, 0x6D, 0x70, 0x6C, 0x5F,
     0x62, 0x6F, 0x6F, 0x6C, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x6A, 0x6D,
-    0x61, 0x74, 0x63, 0x68, 0x5F, 0x65, 0x78, 0x70, 0x72, 0x61, 0x6C, 0x04,
+    0x61, 0x74, 0x63, 0x68, 0x5F, 0x65, 0x78, 0x70, 0x72, 0x61, 0x6C, 0x05,
     0x61, 0x63, 0x19, 0x03, 0xC3, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6C,
     0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65, 0x5F, 0x62, 0x6F, 0x6F, 0x6C,
     0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x63, 0x61, 0x72, 0x67, 0x61, 0x6C,
-    0x18, 0x18, 0x61, 0x63, 0x19, 0x03, 0xC4, 0x61, 0x66, 0x00, 0xA5, 0x61,
+    0x18, 0x19, 0x61, 0x63, 0x19, 0x03, 0xC4, 0x61, 0x66, 0x00, 0xA5, 0x61,
     0x6E, 0x6C, 0x24, 0x5F, 0x74, 0x6D, 0x70, 0x6C, 0x5F, 0x76, 0x61, 0x6C,
     0x75, 0x65, 0x61, 0x70, 0x82, 0xA1, 0x61, 0x6E, 0x64, 0x72, 0x65, 0x70,
     0x6C, 0xA1, 0x61, 0x6E, 0x6A, 0x6D, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x65,
-    0x78, 0x70, 0x72, 0x61, 0x6C, 0x05, 0x61, 0x63, 0x19, 0x04, 0x2D, 0x61,
+    0x78, 0x70, 0x72, 0x61, 0x6C, 0x06, 0x61, 0x63, 0x19, 0x04, 0x2D, 0x61,
     0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6D, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64,
     0x65, 0x5F, 0x76, 0x61, 0x6C, 0x75, 0x65, 0x61, 0x70, 0x82, 0xA1, 0x61,
     0x6E, 0x64, 0x72, 0x65, 0x70, 0x6C, 0xA1, 0x61, 0x6E, 0x63, 0x61, 0x72,
-    0x67, 0x61, 0x6C, 0x18, 0x18, 0x61, 0x63, 0x19, 0x04, 0x3B, 0x61, 0x66,
+    0x67, 0x61, 0x6C, 0x18, 0x19, 0x61, 0x63, 0x19, 0x04, 0x3B, 0x61, 0x66,
     0x00, 0xA5, 0x61, 0x6E, 0x6B, 0x24, 0x5F, 0x74, 0x6D, 0x70, 0x6C, 0x5F,
     0x70, 0x75, 0x73, 0x68, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64, 0x72,
-    0x65, 0x70, 0x6C, 0x61, 0x6C, 0x01, 0x61, 0x63, 0x19, 0x04, 0xA2, 0x61,
+    0x65, 0x70, 0x6C, 0x61, 0x6C, 0x02, 0x61, 0x63, 0x19, 0x04, 0xA2, 0x61,
     0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6C, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64,
     0x65, 0x5F, 0x70, 0x75, 0x73, 0x68, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E,
-    0x64, 0x72, 0x65, 0x70, 0x6C, 0x61, 0x6C, 0x0C, 0x61, 0x63, 0x19, 0x04,
+    0x64, 0x72, 0x65, 0x70, 0x6C, 0x61, 0x6C, 0x0D, 0x61, 0x63, 0x19, 0x04,
     0xA4, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6B, 0x24, 0x5F, 0x74, 0x6D,
     0x70, 0x6C, 0x5F, 0x63, 0x6F, 0x6E, 0x73, 0x61, 0x70, 0x82, 0xA1, 0x61,
     0x6E, 0x66, 0x61, 0x5F, 0x65, 0x78, 0x70, 0x72, 0xA1, 0x61, 0x6E, 0x66,
-    0x62, 0x5F, 0x65, 0x78, 0x70, 0x72, 0x61, 0x6C, 0x06, 0x61, 0x63, 0x19,
+    0x62, 0x5F, 0x65, 0x78, 0x70, 0x72, 0x61, 0x6C, 0x07, 0x61, 0x63, 0x19,
     0x04, 0xCC, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6C, 0x5F, 0x64, 0x65,
     0x63, 0x6F, 0x64, 0x65, 0x5F, 0x63, 0x6F, 0x6E, 0x73, 0x61, 0x70, 0x81,
-    0xA1, 0x61, 0x6E, 0x64, 0x61, 0x72, 0x67, 0x73, 0x61, 0x6C, 0x18, 0x1E,
+    0xA1, 0x61, 0x6E, 0x64, 0x61, 0x72, 0x67, 0x73, 0x61, 0x6C, 0x18, 0x1F,
     0x61, 0x63, 0x19, 0x04, 0xED, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x69,
     0x5F, 0x74, 0x6D, 0x70, 0x6C, 0x5F, 0x6F, 0x70, 0x74, 0x61, 0x70, 0x81,
     0xA1, 0x61, 0x6E, 0x6A, 0x6D, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x65, 0x78,
-    0x70, 0x72, 0x61, 0x6C, 0x04, 0x61, 0x63, 0x19, 0x05, 0x90, 0x61, 0x66,
+    0x70, 0x72, 0x61, 0x6C, 0x05, 0x61, 0x63, 0x19, 0x05, 0x90, 0x61, 0x66,
     0x00, 0xA5, 0x61, 0x6E, 0x6B, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65,
     0x5F, 0x6F, 0x70, 0x74, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x63, 0x61,
-    0x72, 0x67, 0x61, 0x6C, 0x17, 0x61, 0x63, 0x19, 0x05, 0x91, 0x61, 0x66,
-    0x00, 0xA5, 0x61, 0x6E, 0x6C, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65,
-    0x5F, 0x63, 0x61, 0x6C, 0x6C, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64,
-    0x6E, 0x6F, 0x64, 0x65, 0x61, 0x6C, 0x09, 0x61, 0x63, 0x19, 0x05, 0xEA,
-    0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6A, 0x24, 0x5F, 0x62, 0x69, 0x6E,
-    0x6F, 0x70, 0x5F, 0x6F, 0x72, 0x61, 0x70, 0x82, 0xA1, 0x61, 0x6E, 0x6A,
-    0x66, 0x69, 0x72, 0x73, 0x74, 0x5F, 0x65, 0x78, 0x70, 0x72, 0xA1, 0x61,
-    0x6E, 0x6B, 0x73, 0x65, 0x63, 0x6F, 0x6E, 0x64, 0x5F, 0x65, 0x78, 0x70,
-    0x72, 0x61, 0x6C, 0x04, 0x61, 0x63, 0x19, 0x06, 0x7D, 0x61, 0x66, 0x00,
-    0xA5, 0x61, 0x6E, 0x6D, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65, 0x5F,
-    0x62, 0x69, 0x6E, 0x6F, 0x70, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64,
-    0x6E, 0x6F, 0x64, 0x65, 0x61, 0x6C, 0x18, 0x19, 0x61, 0x63, 0x19, 0x06,
-    0x7E, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6C, 0x5F, 0x64, 0x65, 0x63,
-    0x6F, 0x64, 0x65, 0x5F, 0x74, 0x65, 0x72, 0x6D, 0x61, 0x70, 0x81, 0xA1,
-    0x61, 0x6E, 0x64, 0x6E, 0x6F, 0x64, 0x65, 0x61, 0x6C, 0x04, 0x61, 0x63,
-    0x19, 0x07, 0x07, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x68, 0x5F, 0x69,
-    0x73, 0x5F, 0x64, 0x72, 0x6F, 0x70, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E,
-    0x64, 0x6E, 0x6F, 0x64, 0x65, 0x61, 0x6C, 0x03, 0x61, 0x63, 0x19, 0x07,
-    0x54, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x75, 0x5F, 0x62, 0x75, 0x69,
+    0x72, 0x67, 0x61, 0x6C, 0x18, 0x18, 0x61, 0x63, 0x19, 0x05, 0x91, 0x61,
+    0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6C, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64,
+    0x65, 0x5F, 0x63, 0x61, 0x6C, 0x6C, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E,
+    0x64, 0x6E, 0x6F, 0x64, 0x65, 0x61, 0x6C, 0x0A, 0x61, 0x63, 0x19, 0x05,
+    0xEA, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6A, 0x24, 0x5F, 0x62, 0x69,
+    0x6E, 0x6F, 0x70, 0x5F, 0x6F, 0x72, 0x61, 0x70, 0x82, 0xA1, 0x61, 0x6E,
+    0x6A, 0x66, 0x69, 0x72, 0x73, 0x74, 0x5F, 0x65, 0x78, 0x70, 0x72, 0xA1,
+    0x61, 0x6E, 0x6B, 0x73, 0x65, 0x63, 0x6F, 0x6E, 0x64, 0x5F, 0x65, 0x78,
+    0x70, 0x72, 0x61, 0x6C, 0x05, 0x61, 0x63, 0x19, 0x06, 0x7D, 0x61, 0x66,
+    0x00, 0xA5, 0x61, 0x6E, 0x6D, 0x5F, 0x64, 0x65, 0x63, 0x6F, 0x64, 0x65,
+    0x5F, 0x62, 0x69, 0x6E, 0x6F, 0x70, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E,
+    0x64, 0x6E, 0x6F, 0x64, 0x65, 0x61, 0x6C, 0x18, 0x1A, 0x61, 0x63, 0x19,
+    0x06, 0x7E, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6C, 0x5F, 0x64, 0x65,
+    0x63, 0x6F, 0x64, 0x65, 0x5F, 0x74, 0x65, 0x72, 0x6D, 0x61, 0x70, 0x81,
+    0xA1, 0x61, 0x6E, 0x64, 0x6E, 0x6F, 0x64, 0x65, 0x61, 0x6C, 0x05, 0x61,
+    0x63, 0x19, 0x07, 0x07, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x68, 0x5F,
+    0x69, 0x73, 0x5F, 0x64, 0x72, 0x6F, 0x70, 0x61, 0x70, 0x81, 0xA1, 0x61,
+    0x6E, 0x64, 0x6E, 0x6F, 0x64, 0x65, 0x61, 0x6C, 0x04, 0x61, 0x63, 0x19,
+    0x07, 0x54, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x75, 0x5F, 0x62, 0x75,
+    0x69, 0x6C, 0x64, 0x5F, 0x73, 0x65, 0x71, 0x75, 0x65, 0x6E, 0x63, 0x65,
+    0x5F, 0x73, 0x74, 0x65, 0x70, 0x73, 0x61, 0x70, 0x82, 0xA1, 0x61, 0x6E,
+    0x69, 0x72, 0x65, 0x6D, 0x61, 0x69, 0x6E, 0x69, 0x6E, 0x67, 0xA1, 0x61,
+    0x6E, 0x6F, 0x6E, 0x5F, 0x63, 0x61, 0x70, 0x74, 0x75, 0x72, 0x65, 0x5F,
+    0x63, 0x6F, 0x75, 0x6E, 0x74, 0x61, 0x6C, 0x11, 0x61, 0x63, 0x19, 0x07,
+    0x60, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x74, 0x5F, 0x62, 0x75, 0x69,
     0x6C, 0x64, 0x5F, 0x73, 0x65, 0x71, 0x75, 0x65, 0x6E, 0x63, 0x65, 0x5F,
-    0x73, 0x74, 0x65, 0x70, 0x73, 0x61, 0x70, 0x82, 0xA1, 0x61, 0x6E, 0x69,
-    0x72, 0x65, 0x6D, 0x61, 0x69, 0x6E, 0x69, 0x6E, 0x67, 0xA1, 0x61, 0x6E,
-    0x6F, 0x6E, 0x5F, 0x63, 0x61, 0x70, 0x74, 0x75, 0x72, 0x65, 0x5F, 0x63,
-    0x6F, 0x75, 0x6E, 0x74, 0x61, 0x6C, 0x10, 0x61, 0x63, 0x19, 0x07, 0x60,
-    0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x74, 0x5F, 0x62, 0x75, 0x69, 0x6C,
-    0x64, 0x5F, 0x73, 0x65, 0x71, 0x75, 0x65, 0x6E, 0x63, 0x65, 0x5F, 0x65,
-    0x78, 0x70, 0x72, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x68, 0x65, 0x6C,
-    0x65, 0x6D, 0x65, 0x6E, 0x74, 0x73, 0x61, 0x6C, 0x06, 0x61, 0x63, 0x19,
-    0x07, 0xE7, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x72, 0x5F, 0x73, 0x65,
-    0x71, 0x75, 0x65, 0x6E, 0x63, 0x65, 0x5F, 0x65, 0x6C, 0x65, 0x6D, 0x65,
-    0x6E, 0x74, 0x73, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64, 0x6E, 0x6F,
-    0x64, 0x65, 0x61, 0x6C, 0x02, 0x61, 0x63, 0x19, 0x07, 0xFF, 0x61, 0x66,
-    0x00, 0xA5, 0x61, 0x6E, 0x6E, 0x24, 0x5F, 0x61, 0x63, 0x63, 0x65, 0x70,
-    0x74, 0x5F, 0x63, 0x61, 0x63, 0x68, 0x65, 0x61, 0x70, 0x82, 0xA1, 0x61,
-    0x6E, 0x68, 0x5F, 0x73, 0x69, 0x74, 0x65, 0x5F, 0x69, 0x64, 0xA1, 0x61,
-    0x6E, 0x68, 0x73, 0x65, 0x71, 0x5F, 0x65, 0x78, 0x70, 0x72, 0x61, 0x6C,
-    0x05, 0x61, 0x63, 0x19, 0x08, 0x0D, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E,
-    0x74, 0x5F, 0x6E, 0x65, 0x78, 0x74, 0x5F, 0x61, 0x63, 0x63, 0x65, 0x70,
-    0x74, 0x5F, 0x73, 0x69, 0x74, 0x65, 0x5F, 0x69, 0x64, 0x61, 0x70, 0x80,
-    0x61, 0x6C, 0x03, 0x61, 0x63, 0x19, 0x08, 0x0E, 0x61, 0x66, 0x00, 0xA6,
-    0x61, 0x6E, 0x67, 0x61, 0x63, 0x63, 0x65, 0x70, 0x74, 0x21, 0x61, 0x70,
-    0x80, 0x61, 0x6C, 0x18, 0x27, 0x61, 0x63, 0x19, 0x08, 0x15, 0x61, 0x66,
-    0x02, 0x61, 0x74, 0x81, 0x18, 0x62, 0xA5, 0x61, 0x6E, 0x68, 0x24, 0x5F,
-    0x65, 0x78, 0x70, 0x65, 0x63, 0x74, 0x61, 0x70, 0x82, 0xA1, 0x61, 0x6E,
-    0x6A, 0x6D, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x65, 0x78, 0x70, 0x72, 0xA1,
-    0x61, 0x6E, 0x64, 0x64, 0x65, 0x73, 0x63, 0x61, 0x6C, 0x04, 0x61, 0x63,
-    0x19, 0x08, 0xD1, 0x61, 0x66, 0x00, 0xA6, 0x61, 0x6E, 0x67, 0x65, 0x78,
-    0x70, 0x65, 0x63, 0x74, 0x21, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64,
-    0x64, 0x65, 0x73, 0x63, 0x61, 0x6C, 0x17, 0x61, 0x63, 0x19, 0x08, 0xDD,
-    0x61, 0x66, 0x02, 0x61, 0x74, 0x81, 0x18, 0x62, 0xA5, 0x61, 0x6E, 0x68,
-    0x69, 0x73, 0x5F, 0x6D, 0x61, 0x74, 0x63, 0x68, 0x61, 0x70, 0x81, 0xA1,
-    0x61, 0x6E, 0x66, 0x72, 0x65, 0x73, 0x75, 0x6C, 0x74, 0x61, 0x6C, 0x03,
-    0x61, 0x63, 0x19, 0x09, 0x3D, 0x61, 0x66, 0x00,
+    0x65, 0x78, 0x70, 0x72, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x68, 0x65,
+    0x6C, 0x65, 0x6D, 0x65, 0x6E, 0x74, 0x73, 0x61, 0x6C, 0x07, 0x61, 0x63,
+    0x19, 0x07, 0xE9, 0x61, 0x66, 0x00, 0xA5, 0x61, 0x6E, 0x72, 0x5F, 0x73,
+    0x65, 0x71, 0x75, 0x65, 0x6E, 0x63, 0x65, 0x5F, 0x65, 0x6C, 0x65, 0x6D,
+    0x65, 0x6E, 0x74, 0x73, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E, 0x64, 0x6E,
+    0x6F, 0x64, 0x65, 0x61, 0x6C, 0x03, 0x61, 0x63, 0x19, 0x08, 0x01, 0x61,
+    0x66, 0x00, 0xA5, 0x61, 0x6E, 0x6E, 0x24, 0x5F, 0x61, 0x63, 0x63, 0x65,
+    0x70, 0x74, 0x5F, 0x63, 0x61, 0x63, 0x68, 0x65, 0x61, 0x70, 0x82, 0xA1,
+    0x61, 0x6E, 0x68, 0x5F, 0x73, 0x69, 0x74, 0x65, 0x5F, 0x69, 0x64, 0xA1,
+    0x61, 0x6E, 0x68, 0x73, 0x65, 0x71, 0x5F, 0x65, 0x78, 0x70, 0x72, 0x61,
+    0x6C, 0x06, 0x61, 0x63, 0x19, 0x08, 0x0F, 0x61, 0x66, 0x00, 0xA5, 0x61,
+    0x6E, 0x74, 0x5F, 0x6E, 0x65, 0x78, 0x74, 0x5F, 0x61, 0x63, 0x63, 0x65,
+    0x70, 0x74, 0x5F, 0x73, 0x69, 0x74, 0x65, 0x5F, 0x69, 0x64, 0x61, 0x70,
+    0x80, 0x61, 0x6C, 0x04, 0x61, 0x63, 0x19, 0x08, 0x10, 0x61, 0x66, 0x00,
+    0xA6, 0x61, 0x6E, 0x67, 0x61, 0x63, 0x63, 0x65, 0x70, 0x74, 0x21, 0x61,
+    0x70, 0x80, 0x61, 0x6C, 0x18, 0x28, 0x61, 0x63, 0x19, 0x08, 0x17, 0x61,
+    0x66, 0x02, 0x61, 0x74, 0x81, 0x18, 0x62, 0xA5, 0x61, 0x6E, 0x68, 0x24,
+    0x5F, 0x65, 0x78, 0x70, 0x65, 0x63, 0x74, 0x61, 0x70, 0x82, 0xA1, 0x61,
+    0x6E, 0x6A, 0x6D, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x65, 0x78, 0x70, 0x72,
+    0xA1, 0x61, 0x6E, 0x64, 0x64, 0x65, 0x73, 0x63, 0x61, 0x6C, 0x05, 0x61,
+    0x63, 0x19, 0x08, 0xD3, 0x61, 0x66, 0x00, 0xA6, 0x61, 0x6E, 0x67, 0x65,
+    0x78, 0x70, 0x65, 0x63, 0x74, 0x21, 0x61, 0x70, 0x81, 0xA1, 0x61, 0x6E,
+    0x64, 0x64, 0x65, 0x73, 0x63, 0x61, 0x6C, 0x18, 0x18, 0x61, 0x63, 0x19,
+    0x08, 0xDF, 0x61, 0x66, 0x02, 0x61, 0x74, 0x81, 0x18, 0x62, 0xA5, 0x61,
+    0x6E, 0x68, 0x69, 0x73, 0x5F, 0x6D, 0x61, 0x74, 0x63, 0x68, 0x61, 0x70,
+    0x81, 0xA1, 0x61, 0x6E, 0x66, 0x72, 0x65, 0x73, 0x75, 0x6C, 0x74, 0x61,
+    0x6C, 0x04, 0x61, 0x63, 0x19, 0x09, 0x3F, 0x61, 0x66, 0x00,
 };
 
 static const uint8_t _dsl_classes[] = {
@@ -428,1789 +428,1926 @@ static const uint8_t _dsl_free[] = {
 };
 
 static const uint32_t _dsl_code[] = {
-    0x00000047,                /* 0000  import L0 <- static#0   ("wyrm::") */
-    0x00000043,                /* 0001  gset g0 <- L0   (wyrm) */
-    0x00010047,                /* 0002  import L0 <- static#1   ("wyrm::ast") */
-    0x000100B5, 0x00000000,    /* 0003  import_star static#1 except 0, 0 names   ("wyrm::ast") */
-    0x00020047,                /* 0005  import L0 <- static#2   ("std::") */
-    0x00010043,                /* 0006  gset g1 <- L0   (std) */
-    0x00030047,                /* 0007  import L0 <- static#3   ("std::pairs") */
-    0x00020043,                /* 0008  gset g2 <- L0   (pairs) */
-    0x00000145,                /* 0009  lsym L1 <- sym#0   ("sym") */
-    0x00010245,                /* 000A  lsym L2 <- sym#1   ("NO_MATCH") */
-    0x00000284, 0x00010000,    /* 000B  plist L0 <- L1, 2 items */
-    0x002B0043,                /* 000D  gset g43 <- L0   (NO_MATCH_EXPR) */
-    0x000000A8, 0x00000000,    /* 000E  closure L0 <- fn#0, 0 caps */
-    0x00060043,                /* 0010  gset g6 <- L0   (_req_name) */
-    0x000000A8, 0x00010000,    /* 0011  closure L0 <- fn#1, 0 caps */
-    0x00070043,                /* 0013  gset g7 <- L0   (_decode_apply_if) */
-    0x000000A8, 0x00020000,    /* 0014  closure L0 <- fn#2, 0 caps */
-    0x00080043,                /* 0016  gset g8 <- L0   (_decode_rule_call) */
-    0x000000A8, 0x00030000,    /* 0017  closure L0 <- fn#3, 0 caps */
-    0x00090043,                /* 0019  gset g9 <- L0   ($token_kind) */
-    0x000000A8, 0x00040000,    /* 001A  closure L0 <- fn#4, 0 caps */
-    0x000A0043,                /* 001C  gset g10 <- L0   (_decode_token_kind) */
-    0x000000A8, 0x00050000,    /* 001D  closure L0 <- fn#5, 0 caps */
-    0x000B0043,                /* 001F  gset g11 <- L0   ($_text_tmpl) */
-    0x000000A8, 0x00060000,    /* 0020  closure L0 <- fn#6, 0 caps */
-    0x000C0043,                /* 0022  gset g12 <- L0   (_decode_text) */
-    0x000000A8, 0x00070000,    /* 0023  closure L0 <- fn#7, 0 caps */
-    0x000D0043,                /* 0025  gset g13 <- L0   ($soft_keyword) */
-    0x000000A8, 0x00080000,    /* 0026  closure L0 <- fn#8, 0 caps */
-    0x000E0043,                /* 0028  gset g14 <- L0   (_decode_soft_keyword) */
-    0x000000A8, 0x00090000,    /* 0029  closure L0 <- fn#9, 0 caps */
-    0x000F0043,                /* 002B  gset g15 <- L0   ($_expect_tmpl) */
-    0x000000A8, 0x000A0000,    /* 002C  closure L0 <- fn#10, 0 caps */
-    0x00100043,                /* 002E  gset g16 <- L0   (_decode_expect) */
-    0x000000A8, 0x000B0000,    /* 002F  closure L0 <- fn#11, 0 caps */
-    0x00110043,                /* 0031  gset g17 <- L0   ($_many) */
-    0x000000A8, 0x000C0000,    /* 0032  closure L0 <- fn#12, 0 caps */
-    0x00120043,                /* 0034  gset g18 <- L0   (_decode_many) */
-    0x000000A8, 0x000D0000,    /* 0035  closure L0 <- fn#13, 0 caps */
-    0x00130043,                /* 0037  gset g19 <- L0   ($_manyflat) */
-    0x000000A8, 0x000E0000,    /* 0038  closure L0 <- fn#14, 0 caps */
-    0x00140043,                /* 003A  gset g20 <- L0   (_decode_manyflat) */
-    0x000000A8, 0x000F0000,    /* 003B  closure L0 <- fn#15, 0 caps */
-    0x00150043,                /* 003D  gset g21 <- L0   (_tmpl_bool) */
-    0x000000A8, 0x00100000,    /* 003E  closure L0 <- fn#16, 0 caps */
-    0x00160043,                /* 0040  gset g22 <- L0   (_decode_bool) */
-    0x000000A8, 0x00110000,    /* 0041  closure L0 <- fn#17, 0 caps */
-    0x00170043,                /* 0043  gset g23 <- L0   ($_tmpl_value) */
-    0x000000A8, 0x00120000,    /* 0044  closure L0 <- fn#18, 0 caps */
-    0x00180043,                /* 0046  gset g24 <- L0   (_decode_value) */
-    0x000000A8, 0x00130000,    /* 0047  closure L0 <- fn#19, 0 caps */
-    0x00190043,                /* 0049  gset g25 <- L0   ($_tmpl_push) */
-    0x000000A8, 0x00140000,    /* 004A  closure L0 <- fn#20, 0 caps */
-    0x001A0043,                /* 004C  gset g26 <- L0   (_decode_push) */
-    0x000000A8, 0x00150000,    /* 004D  closure L0 <- fn#21, 0 caps */
-    0x001B0043,                /* 004F  gset g27 <- L0   ($_tmpl_cons) */
-    0x000000A8, 0x00160000,    /* 0050  closure L0 <- fn#22, 0 caps */
-    0x001C0043,                /* 0052  gset g28 <- L0   (_decode_cons) */
-    0x000000A8, 0x00170000,    /* 0053  closure L0 <- fn#23, 0 caps */
-    0x001D0043,                /* 0055  gset g29 <- L0   (_tmpl_opt) */
-    0x000000A8, 0x00180000,    /* 0056  closure L0 <- fn#24, 0 caps */
-    0x001E0043,                /* 0058  gset g30 <- L0   (_decode_opt) */
-    0x000000A8, 0x00190000,    /* 0059  closure L0 <- fn#25, 0 caps */
-    0x001F0043,                /* 005B  gset g31 <- L0   (_decode_call) */
-    0x000000A8, 0x001A0000,    /* 005C  closure L0 <- fn#26, 0 caps */
-    0x00200043,                /* 005E  gset g32 <- L0   ($_binop_or) */
-    0x000000A8, 0x001B0000,    /* 005F  closure L0 <- fn#27, 0 caps */
-    0x00210043,                /* 0061  gset g33 <- L0   (_decode_binop) */
-    0x000000A8, 0x001C0000,    /* 0062  closure L0 <- fn#28, 0 caps */
-    0x00220043,                /* 0064  gset g34 <- L0   (_decode_term) */
-    0x000000A8, 0x001D0000,    /* 0065  closure L0 <- fn#29, 0 caps */
-    0x00230043,                /* 0067  gset g35 <- L0   (_is_drop) */
-    0x000000A8, 0x001E0000,    /* 0068  closure L0 <- fn#30, 0 caps */
-    0x00240043,                /* 006A  gset g36 <- L0   (_build_sequence_steps) */
-    0x000000A8, 0x001F0000,    /* 006B  closure L0 <- fn#31, 0 caps */
-    0x00250043,                /* 006D  gset g37 <- L0   (_build_sequence_expr) */
-    0x000000A8, 0x00200000,    /* 006E  closure L0 <- fn#32, 0 caps */
-    0x00260043,                /* 0070  gset g38 <- L0   (_sequence_elements) */
-    0x000000A8, 0x00210000,    /* 0071  closure L0 <- fn#33, 0 caps */
-    0x00270043,                /* 0073  gset g39 <- L0   ($_accept_cache) */
-    0x000000A8, 0x00220000,    /* 0074  closure L0 <- fn#34, 0 caps */
-    0x00280043,                /* 0076  gset g40 <- L0   (_next_accept_site_id) */
-    0x00010040,                /* 0077  i8 L1 <- 0 */
-    0x00610143,                /* 0078  gset g97 <- L1   (_next_accept_site_id::id) */
-    0x000000A8, 0x00230000,    /* 0079  closure L0 <- fn#35, 0 caps */
-    0x00620142,                /* 007B  gget L1 <- g98   (TreeBase) */
-    0x00020181, 0x00010000,    /* 007C  tuple L2 <- L1, 1 items */
-    0x000300AC, 0x00000002,    /* 007E  reg_msg msg#3 <- L0, types L2   (accept) */
-    0x000000A8, 0x00240000,    /* 0080  closure L0 <- fn#36, 0 caps */
-    0x00290043,                /* 0082  gset g41 <- L0   ($_expect) */
-    0x000000A8, 0x00250000,    /* 0083  closure L0 <- fn#37, 0 caps */
-    0x00620142,                /* 0085  gget L1 <- g98   (TreeBase) */
-    0x00020181, 0x00010000,    /* 0086  tuple L2 <- L1, 1 items */
-    0x000400AC, 0x00000002,    /* 0088  reg_msg msg#4 <- L0, types L2   (expect) */
-    0x000000A8, 0x00260000,    /* 008A  closure L0 <- fn#38, 0 caps */
-    0x002A0043,                /* 008C  gset g42 <- L0   (is_match) */
-    0x00000002,                /* 008D  return count=0 */
-    0x00040046,                /* 008E  lconst L0 <- static#4   ("sym") */
-    0x00010097, 0x80000000,    /* 008F  is L1 <- P0 is L0 */
-    0x0002014B,                /* 0091  jf L1, +2 */
-    0x00008041,                /* 0092  move L0 <- P0 */
-    0x00000102,                /* 0093  return L0 count=1 */
-    0x005B0042,                /* 0094  gget L0 <- g91   (error) */
-    0x00050146,                /* 0095  lconst L1 <- static#5   ("name expected") */
-    0x000001A0, 0x00010000,    /* 0096  call base=L0 argc=1 nres=1 */
-    0x00000102,                /* 0098  return L0 count=1 */
-    0x00380342,                /* 0099  gget L3 <- g56   (mk_call) */
-    0x00048041,                /* 009A  move L4 <- P0 */
-    0x00020545,                /* 009B  lsym L5 <- sym#2   ("_vt") */
-    0x00060184, 0x00050000,    /* 009C  plist L6 <- L5, 1 items */
-    0x00050641,                /* 009E  move L5 <- L6 */
-    0x000302A0, 0x00010000,    /* 009F  call base=L3 argc=2 nres=1 */
-    0x00000184, 0x00030000,    /* 00A1  plist L0 <- L3, 1 items */
-    0x00370342,                /* 00A3  gget L3 <- g55   (mk_binop) */
-    0x00020445,                /* 00A4  lsym L4 <- sym#2   ("_vt") */
-    0x00030545,                /* 00A5  lsym L5 <- sym#3   ("!=") */
-    0x002B0642,                /* 00A6  gget L6 <- g43   (NO_MATCH_EXPR) */
-    0x000303A0, 0x00010000,    /* 00A7  call base=L3 argc=3 nres=1 */
-    0x00010341,                /* 00A9  move L1 <- L3 */
-    0x003F0342,                /* 00AA  gget L3 <- g63   (mk_is_type) */
-    0x00020445,                /* 00AB  lsym L4 <- sym#2   ("_vt") */
-    0x00040545,                /* 00AC  lsym L5 <- sym#4   ("error") */
-    0x000302A0, 0x00010000,    /* 00AD  call base=L3 argc=2 nres=1 */
-    0x00020341,                /* 00AF  move L2 <- L3 */
-    0x003A0342,                /* 00B0  gget L3 <- g58   (mk_do) */
-    0x00450442,                /* 00B1  gget L4 <- g69   (n_define) */
-    0x00020545,                /* 00B2  lsym L5 <- sym#2   ("_vt") */
-    0x002D0642,                /* 00B3  gget L6 <- g45   (N_AUTO_TYPE) */
-    0x00250742,                /* 00B4  gget L7 <- g37   (_build_sequence_expr) */
-    0x00088141,                /* 00B5  move L8 <- P1 */
-    0x000701A0, 0x00010000,    /* 00B6  call base=L7 argc=1 nres=1 */
-    0x000403A0, 0x00010000,    /* 00B8  call base=L4 argc=3 nres=1 */
-    0x003D0542,                /* 00BA  gget L5 <- g61   (mk_if) */
-    0x00060241,                /* 00BB  move L6 <- L2 */
-    0x00020745,                /* 00BC  lsym L7 <- sym#2   ("_vt") */
-    0x00080184, 0x00070000,    /* 00BD  plist L8 <- L7, 1 items */
-    0x00070841,                /* 00BF  move L7 <- L8 */
-    0x003D0842,                /* 00C0  gget L8 <- g61   (mk_if) */
-    0x00090141,                /* 00C1  move L9 <- L1 */
-    0x000A0041,                /* 00C2  move L10 <- L0 */
-    0x002B0B42,                /* 00C3  gget L11 <- g43   (NO_MATCH_EXPR) */
-    0x000C0184, 0x000B0000,    /* 00C4  plist L12 <- L11, 1 items */
-    0x000B0C41,                /* 00C6  move L11 <- L12 */
-    0x000803A0, 0x00010000,    /* 00C7  call base=L8 argc=3 nres=1 */
-    0x00090184, 0x00080000,    /* 00C9  plist L9 <- L8, 1 items */
-    0x00080941,                /* 00CB  move L8 <- L9 */
-    0x000503A0, 0x00010000,    /* 00CC  call base=L5 argc=3 nres=1 */
-    0x00060284, 0x00040000,    /* 00CE  plist L6 <- L4, 2 items */
-    0x00040641,                /* 00D0  move L4 <- L6 */
-    0x000301A0, 0x00010000,    /* 00D1  call base=L3 argc=1 nres=1 */
-    0x00030102,                /* 00D3  return L3 count=1 */
-    0x00050045,                /* 00D4  lsym L0 <- sym#5   ("apply") */
-    0x00060145,                /* 00D5  lsym L1 <- sym#6   ("bind_msg") */
-    0x00070245,                /* 00D6  lsym L2 <- sym#7   ("this") */
-    0x00038041,                /* 00D7  move L3 <- P0 */
-    0x00040384, 0x00010000,    /* 00D8  plist L4 <- L1, 3 items */
-    0x00010441,                /* 00DA  move L1 <- L4 */
-    0x00020284, 0x00000000,    /* 00DB  plist L2 <- L0, 2 items */
-    0x00020102,                /* 00DD  return L2 count=1 */
+    0x00000147,                /* 0000  import L1 <- static#0   ("wyrm::") */
+    0x00000143,                /* 0001  gset g0 <- L1   (wyrm) */
+    0x00010147,                /* 0002  import L1 <- static#1   ("wyrm::ast") */
+    0x000100B5, 0x00010000,    /* 0003  import_star static#1 except 1, 0 names   ("wyrm::ast") */
+    0x00020147,                /* 0005  import L1 <- static#2   ("std::") */
+    0x00010143,                /* 0006  gset g1 <- L1   (std) */
+    0x00030147,                /* 0007  import L1 <- static#3   ("std::pairs") */
+    0x00020143,                /* 0008  gset g2 <- L1   (pairs) */
+    0x00000245,                /* 0009  lsym L2 <- sym#0   ("sym") */
+    0x00010345,                /* 000A  lsym L3 <- sym#1   ("NO_MATCH") */
+    0x00010284, 0x00020000,    /* 000B  plist L1 <- L2, 2 items */
+    0x002B0143,                /* 000D  gset g43 <- L1   (NO_MATCH_EXPR) */
+    0x000100A8, 0x00000000,    /* 000E  closure L1 <- fn#0, 0 caps */
+    0x00060143,                /* 0010  gset g6 <- L1   (_req_name) */
+    0x000100A8, 0x00010000,    /* 0011  closure L1 <- fn#1, 0 caps */
+    0x00070143,                /* 0013  gset g7 <- L1   (_decode_apply_if) */
+    0x000100A8, 0x00020000,    /* 0014  closure L1 <- fn#2, 0 caps */
+    0x00080143,                /* 0016  gset g8 <- L1   (_decode_rule_call) */
+    0x000100A8, 0x00030000,    /* 0017  closure L1 <- fn#3, 0 caps */
+    0x00090143,                /* 0019  gset g9 <- L1   ($token_kind) */
+    0x000100A8, 0x00040000,    /* 001A  closure L1 <- fn#4, 0 caps */
+    0x000A0143,                /* 001C  gset g10 <- L1   (_decode_token_kind) */
+    0x000100A8, 0x00050000,    /* 001D  closure L1 <- fn#5, 0 caps */
+    0x000B0143,                /* 001F  gset g11 <- L1   ($_text_tmpl) */
+    0x000100A8, 0x00060000,    /* 0020  closure L1 <- fn#6, 0 caps */
+    0x000C0143,                /* 0022  gset g12 <- L1   (_decode_text) */
+    0x000100A8, 0x00070000,    /* 0023  closure L1 <- fn#7, 0 caps */
+    0x000D0143,                /* 0025  gset g13 <- L1   ($soft_keyword) */
+    0x000100A8, 0x00080000,    /* 0026  closure L1 <- fn#8, 0 caps */
+    0x000E0143,                /* 0028  gset g14 <- L1   (_decode_soft_keyword) */
+    0x000100A8, 0x00090000,    /* 0029  closure L1 <- fn#9, 0 caps */
+    0x000F0143,                /* 002B  gset g15 <- L1   ($_expect_tmpl) */
+    0x000100A8, 0x000A0000,    /* 002C  closure L1 <- fn#10, 0 caps */
+    0x00100143,                /* 002E  gset g16 <- L1   (_decode_expect) */
+    0x000100A8, 0x000B0000,    /* 002F  closure L1 <- fn#11, 0 caps */
+    0x00110143,                /* 0031  gset g17 <- L1   ($_many) */
+    0x000100A8, 0x000C0000,    /* 0032  closure L1 <- fn#12, 0 caps */
+    0x00120143,                /* 0034  gset g18 <- L1   (_decode_many) */
+    0x000100A8, 0x000D0000,    /* 0035  closure L1 <- fn#13, 0 caps */
+    0x00130143,                /* 0037  gset g19 <- L1   ($_manyflat) */
+    0x000100A8, 0x000E0000,    /* 0038  closure L1 <- fn#14, 0 caps */
+    0x00140143,                /* 003A  gset g20 <- L1   (_decode_manyflat) */
+    0x000100A8, 0x000F0000,    /* 003B  closure L1 <- fn#15, 0 caps */
+    0x00150143,                /* 003D  gset g21 <- L1   (_tmpl_bool) */
+    0x000100A8, 0x00100000,    /* 003E  closure L1 <- fn#16, 0 caps */
+    0x00160143,                /* 0040  gset g22 <- L1   (_decode_bool) */
+    0x000100A8, 0x00110000,    /* 0041  closure L1 <- fn#17, 0 caps */
+    0x00170143,                /* 0043  gset g23 <- L1   ($_tmpl_value) */
+    0x000100A8, 0x00120000,    /* 0044  closure L1 <- fn#18, 0 caps */
+    0x00180143,                /* 0046  gset g24 <- L1   (_decode_value) */
+    0x000100A8, 0x00130000,    /* 0047  closure L1 <- fn#19, 0 caps */
+    0x00190143,                /* 0049  gset g25 <- L1   ($_tmpl_push) */
+    0x000100A8, 0x00140000,    /* 004A  closure L1 <- fn#20, 0 caps */
+    0x001A0143,                /* 004C  gset g26 <- L1   (_decode_push) */
+    0x000100A8, 0x00150000,    /* 004D  closure L1 <- fn#21, 0 caps */
+    0x001B0143,                /* 004F  gset g27 <- L1   ($_tmpl_cons) */
+    0x000100A8, 0x00160000,    /* 0050  closure L1 <- fn#22, 0 caps */
+    0x001C0143,                /* 0052  gset g28 <- L1   (_decode_cons) */
+    0x000100A8, 0x00170000,    /* 0053  closure L1 <- fn#23, 0 caps */
+    0x001D0143,                /* 0055  gset g29 <- L1   (_tmpl_opt) */
+    0x000100A8, 0x00180000,    /* 0056  closure L1 <- fn#24, 0 caps */
+    0x001E0143,                /* 0058  gset g30 <- L1   (_decode_opt) */
+    0x000100A8, 0x00190000,    /* 0059  closure L1 <- fn#25, 0 caps */
+    0x001F0143,                /* 005B  gset g31 <- L1   (_decode_call) */
+    0x000100A8, 0x001A0000,    /* 005C  closure L1 <- fn#26, 0 caps */
+    0x00200143,                /* 005E  gset g32 <- L1   ($_binop_or) */
+    0x000100A8, 0x001B0000,    /* 005F  closure L1 <- fn#27, 0 caps */
+    0x00210143,                /* 0061  gset g33 <- L1   (_decode_binop) */
+    0x000100A8, 0x001C0000,    /* 0062  closure L1 <- fn#28, 0 caps */
+    0x00220143,                /* 0064  gset g34 <- L1   (_decode_term) */
+    0x000100A8, 0x001D0000,    /* 0065  closure L1 <- fn#29, 0 caps */
+    0x00230143,                /* 0067  gset g35 <- L1   (_is_drop) */
+    0x000100A8, 0x001E0000,    /* 0068  closure L1 <- fn#30, 0 caps */
+    0x00240143,                /* 006A  gset g36 <- L1   (_build_sequence_steps) */
+    0x000100A8, 0x001F0000,    /* 006B  closure L1 <- fn#31, 0 caps */
+    0x00250143,                /* 006D  gset g37 <- L1   (_build_sequence_expr) */
+    0x000100A8, 0x00200000,    /* 006E  closure L1 <- fn#32, 0 caps */
+    0x00260143,                /* 0070  gset g38 <- L1   (_sequence_elements) */
+    0x000100A8, 0x00210000,    /* 0071  closure L1 <- fn#33, 0 caps */
+    0x00270143,                /* 0073  gset g39 <- L1   ($_accept_cache) */
+    0x000100A8, 0x00220000,    /* 0074  closure L1 <- fn#34, 0 caps */
+    0x00280143,                /* 0076  gset g40 <- L1   (_next_accept_site_id) */
+    0x00020040,                /* 0077  i8 L2 <- 0 */
+    0x00610243,                /* 0078  gset g97 <- L2   (_next_accept_site_id::id) */
+    0x000100A8, 0x00230000,    /* 0079  closure L1 <- fn#35, 0 caps */
+    0x00620242,                /* 007B  gget L2 <- g98   (TreeBase) */
+    0x00030181, 0x00020000,    /* 007C  tuple L3 <- L2, 1 items */
+    0x000300AC, 0x00010003,    /* 007E  reg_msg msg#3 <- L1, types L3   (accept) */
+    0x000100A8, 0x00240000,    /* 0080  closure L1 <- fn#36, 0 caps */
+    0x00290143,                /* 0082  gset g41 <- L1   ($_expect) */
+    0x000100A8, 0x00250000,    /* 0083  closure L1 <- fn#37, 0 caps */
+    0x00620242,                /* 0085  gget L2 <- g98   (TreeBase) */
+    0x00030181, 0x00020000,    /* 0086  tuple L3 <- L2, 1 items */
+    0x000400AC, 0x00010003,    /* 0088  reg_msg msg#4 <- L1, types L3   (expect) */
+    0x000100A8, 0x00260000,    /* 008A  closure L1 <- fn#38, 0 caps */
+    0x002A0143,                /* 008C  gset g42 <- L1   (is_match) */
+    0x00000003,                /* 008D  lnil L0 */
+    0x00000008,                /* 008E  return L0 */
+    0x00040146,                /* 008F  lconst L1 <- static#4   ("sym") */
+    0x00020097, 0x80000001,    /* 0090  is L2 <- P0 is L1 */
+    0x0001024B,                /* 0092  jf L2, +1 */
+    0x80000008,                /* 0093  return P0 */
+    0x005B0142,                /* 0094  gget L1 <- g91   (error) */
+    0x00050246,                /* 0095  lconst L2 <- static#5   ("name expected") */
+    0x00010151,                /* 0096  call base=L1 argc=1 */
+    0x00010041,                /* 0097  move L1 <- L0 */
+    0x00010008,                /* 0098  return L1 */
+    0x00380442,                /* 0099  gget L4 <- g56   (mk_call) */
+    0x00058041,                /* 009A  move L5 <- P0 */
+    0x00020645,                /* 009B  lsym L6 <- sym#2   ("_vt") */
+    0x00070184, 0x00060000,    /* 009C  plist L7 <- L6, 1 items */
+    0x00060741,                /* 009E  move L6 <- L7 */
+    0x00040251,                /* 009F  call base=L4 argc=2 */
+    0x00040041,                /* 00A0  move L4 <- L0 */
+    0x00010184, 0x00040000,    /* 00A1  plist L1 <- L4, 1 items */
+    0x00370442,                /* 00A3  gget L4 <- g55   (mk_binop) */
+    0x00020545,                /* 00A4  lsym L5 <- sym#2   ("_vt") */
+    0x00030645,                /* 00A5  lsym L6 <- sym#3   ("!=") */
+    0x002B0742,                /* 00A6  gget L7 <- g43   (NO_MATCH_EXPR) */
+    0x00040351,                /* 00A7  call base=L4 argc=3 */
+    0x00040041,                /* 00A8  move L4 <- L0 */
+    0x00020441,                /* 00A9  move L2 <- L4 */
+    0x003F0442,                /* 00AA  gget L4 <- g63   (mk_is_type) */
+    0x00020545,                /* 00AB  lsym L5 <- sym#2   ("_vt") */
+    0x00040645,                /* 00AC  lsym L6 <- sym#4   ("error") */
+    0x00040251,                /* 00AD  call base=L4 argc=2 */
+    0x00040041,                /* 00AE  move L4 <- L0 */
+    0x00030441,                /* 00AF  move L3 <- L4 */
+    0x003A0442,                /* 00B0  gget L4 <- g58   (mk_do) */
+    0x00450542,                /* 00B1  gget L5 <- g69   (n_define) */
+    0x00020645,                /* 00B2  lsym L6 <- sym#2   ("_vt") */
+    0x002D0742,                /* 00B3  gget L7 <- g45   (N_AUTO_TYPE) */
+    0x00250842,                /* 00B4  gget L8 <- g37   (_build_sequence_expr) */
+    0x00098141,                /* 00B5  move L9 <- P1 */
+    0x00080151,                /* 00B6  call base=L8 argc=1 */
+    0x00080041,                /* 00B7  move L8 <- L0 */
+    0x00050351,                /* 00B8  call base=L5 argc=3 */
+    0x00050041,                /* 00B9  move L5 <- L0 */
+    0x003D0642,                /* 00BA  gget L6 <- g61   (mk_if) */
+    0x00070341,                /* 00BB  move L7 <- L3 */
+    0x00020845,                /* 00BC  lsym L8 <- sym#2   ("_vt") */
+    0x00090184, 0x00080000,    /* 00BD  plist L9 <- L8, 1 items */
+    0x00080941,                /* 00BF  move L8 <- L9 */
+    0x003D0942,                /* 00C0  gget L9 <- g61   (mk_if) */
+    0x000A0241,                /* 00C1  move L10 <- L2 */
+    0x000B0141,                /* 00C2  move L11 <- L1 */
+    0x002B0C42,                /* 00C3  gget L12 <- g43   (NO_MATCH_EXPR) */
+    0x000D0184, 0x000C0000,    /* 00C4  plist L13 <- L12, 1 items */
+    0x000C0D41,                /* 00C6  move L12 <- L13 */
+    0x00090351,                /* 00C7  call base=L9 argc=3 */
+    0x00090041,                /* 00C8  move L9 <- L0 */
+    0x000A0184, 0x00090000,    /* 00C9  plist L10 <- L9, 1 items */
+    0x00090A41,                /* 00CB  move L9 <- L10 */
+    0x00060351,                /* 00CC  call base=L6 argc=3 */
+    0x00060041,                /* 00CD  move L6 <- L0 */
+    0x00070284, 0x00050000,    /* 00CE  plist L7 <- L5, 2 items */
+    0x00050741,                /* 00D0  move L5 <- L7 */
+    0x00040151,                /* 00D1  call base=L4 argc=1 */
+    0x00040041,                /* 00D2  move L4 <- L0 */
+    0x00040008,                /* 00D3  return L4 */
+    0x00050145,                /* 00D4  lsym L1 <- sym#5   ("apply") */
+    0x00060245,                /* 00D5  lsym L2 <- sym#6   ("bind_msg") */
+    0x00070345,                /* 00D6  lsym L3 <- sym#7   ("this") */
+    0x00048041,                /* 00D7  move L4 <- P0 */
+    0x00050384, 0x00020000,    /* 00D8  plist L5 <- L2, 3 items */
+    0x00020541,                /* 00DA  move L2 <- L5 */
+    0x00030284, 0x00010000,    /* 00DB  plist L3 <- L1, 2 items */
+    0x00030008,                /* 00DD  return L3 */
     0x00000001,                /* 00DE  trap 0 */
-    0x003B0042,                /* 00DF  gget L0 <- g59   (mk_expand) */
-    0x00090245,                /* 00E0  lsym L2 <- sym#9   ("fn_def") */
-    0x000A0345,                /* 00E1  lsym L3 <- sym#10   ("$token_kind") */
-    0x00040003,                /* 00E2  lnil L4 */
-    0x000B0745,                /* 00E3  lsym L7 <- sym#11   ("param") */
-    0x000C0845,                /* 00E4  lsym L8 <- sym#12   ("kind") */
-    0x000D0A45,                /* 00E5  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 00E6  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 00E7  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 00E9  lnil L10 */
-    0x00060484, 0x00070000,    /* 00EA  plist L6 <- L7, 4 items */
-    0x00050184, 0x00060000,    /* 00EC  plist L5 <- L6, 1 items */
-    0x000D0745,                /* 00EE  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 00EF  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 00F0  plist L6 <- L7, 2 items */
-    0x000F0845,                /* 00F2  lsym L8 <- sym#15   ("cond") */
-    0x00100B45,                /* 00F3  lsym L11 <- sym#16   ("==") */
-    0x00110D45,                /* 00F4  lsym L13 <- sym#17   ("attr") */
-    0x00050F45,                /* 00F5  lsym L15 <- sym#5   ("apply") */
-    0x00061145,                /* 00F6  lsym L17 <- sym#6   ("bind_msg") */
-    0x00071245,                /* 00F7  lsym L18 <- sym#7   ("this") */
-    0x00081345,                /* 00F8  lsym L19 <- sym#8   ("peek") */
-    0x00100384, 0x00110000,    /* 00F9  plist L16 <- L17, 3 items */
-    0x00121245,                /* 00FB  lsym L18 <- sym#18   ("int") */
-    0x00130040,                /* 00FC  i8 L19 <- 0 */
-    0x00110284, 0x00120000,    /* 00FD  plist L17 <- L18, 2 items */
-    0x000E0384, 0x000F0000,    /* 00FF  plist L14 <- L15, 3 items */
-    0x000C0F45,                /* 0101  lsym L15 <- sym#12   ("kind") */
-    0x000C0384, 0x000D0000,    /* 0102  plist L12 <- L13, 3 items */
-    0x000C0D45,                /* 0104  lsym L13 <- sym#12   ("kind") */
-    0x000A0384, 0x000B0000,    /* 0105  plist L10 <- L11, 3 items */
-    0x00050C45,                /* 0107  lsym L12 <- sym#5   ("apply") */
-    0x00060E45,                /* 0108  lsym L14 <- sym#6   ("bind_msg") */
-    0x00070F45,                /* 0109  lsym L15 <- sym#7   ("this") */
-    0x00131045,                /* 010A  lsym L16 <- sym#19   ("advance") */
-    0x000D0384, 0x000E0000,    /* 010B  plist L13 <- L14, 3 items */
-    0x000B0284, 0x000C0000,    /* 010D  plist L11 <- L12, 2 items */
-    0x00090284, 0x000A0000,    /* 010F  plist L9 <- L10, 2 items */
-    0x00140B45,                /* 0111  lsym L11 <- sym#20   ("else") */
-    0x00000D45,                /* 0112  lsym L13 <- sym#0   ("sym") */
-    0x00010E45,                /* 0113  lsym L14 <- sym#1   ("NO_MATCH") */
-    0x000C0284, 0x000D0000,    /* 0114  plist L12 <- L13, 2 items */
-    0x000A0284, 0x000B0000,    /* 0116  plist L10 <- L11, 2 items */
-    0x00070384, 0x00080000,    /* 0118  plist L7 <- L8, 3 items */
-    0x00010684, 0x00020000,    /* 011A  plist L1 <- L2, 6 items */
-    0x000C0245,                /* 011C  lsym L2 <- sym#12   ("kind") */
-    0x00420342,                /* 011D  gget L3 <- g66   (mk_sym) */
-    0x00048041,                /* 011E  move L4 <- P0 */
-    0x000301A0, 0x00010000,    /* 011F  call base=L3 argc=1 nres=1 */
-    0x000003A0, 0x00010000,    /* 0121  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 0123  return L0 count=1 */
+    0x003B0142,                /* 00DF  gget L1 <- g59   (mk_expand) */
+    0x00090345,                /* 00E0  lsym L3 <- sym#9   ("fn_def") */
+    0x000A0445,                /* 00E1  lsym L4 <- sym#10   ("$token_kind") */
+    0x00050003,                /* 00E2  lnil L5 */
+    0x000B0845,                /* 00E3  lsym L8 <- sym#11   ("param") */
+    0x000C0945,                /* 00E4  lsym L9 <- sym#12   ("kind") */
+    0x000D0B45,                /* 00E5  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 00E6  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 00E7  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 00E9  lnil L11 */
+    0x00070484, 0x00080000,    /* 00EA  plist L7 <- L8, 4 items */
+    0x00060184, 0x00070000,    /* 00EC  plist L6 <- L7, 1 items */
+    0x000D0845,                /* 00EE  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 00EF  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 00F0  plist L7 <- L8, 2 items */
+    0x000F0945,                /* 00F2  lsym L9 <- sym#15   ("cond") */
+    0x00100C45,                /* 00F3  lsym L12 <- sym#16   ("==") */
+    0x00110E45,                /* 00F4  lsym L14 <- sym#17   ("attr") */
+    0x00051045,                /* 00F5  lsym L16 <- sym#5   ("apply") */
+    0x00061245,                /* 00F6  lsym L18 <- sym#6   ("bind_msg") */
+    0x00071345,                /* 00F7  lsym L19 <- sym#7   ("this") */
+    0x00081445,                /* 00F8  lsym L20 <- sym#8   ("peek") */
+    0x00110384, 0x00120000,    /* 00F9  plist L17 <- L18, 3 items */
+    0x00121345,                /* 00FB  lsym L19 <- sym#18   ("int") */
+    0x00140040,                /* 00FC  i8 L20 <- 0 */
+    0x00120284, 0x00130000,    /* 00FD  plist L18 <- L19, 2 items */
+    0x000F0384, 0x00100000,    /* 00FF  plist L15 <- L16, 3 items */
+    0x000C1045,                /* 0101  lsym L16 <- sym#12   ("kind") */
+    0x000D0384, 0x000E0000,    /* 0102  plist L13 <- L14, 3 items */
+    0x000C0E45,                /* 0104  lsym L14 <- sym#12   ("kind") */
+    0x000B0384, 0x000C0000,    /* 0105  plist L11 <- L12, 3 items */
+    0x00050D45,                /* 0107  lsym L13 <- sym#5   ("apply") */
+    0x00060F45,                /* 0108  lsym L15 <- sym#6   ("bind_msg") */
+    0x00071045,                /* 0109  lsym L16 <- sym#7   ("this") */
+    0x00131145,                /* 010A  lsym L17 <- sym#19   ("advance") */
+    0x000E0384, 0x000F0000,    /* 010B  plist L14 <- L15, 3 items */
+    0x000C0284, 0x000D0000,    /* 010D  plist L12 <- L13, 2 items */
+    0x000A0284, 0x000B0000,    /* 010F  plist L10 <- L11, 2 items */
+    0x00140C45,                /* 0111  lsym L12 <- sym#20   ("else") */
+    0x00000E45,                /* 0112  lsym L14 <- sym#0   ("sym") */
+    0x00010F45,                /* 0113  lsym L15 <- sym#1   ("NO_MATCH") */
+    0x000D0284, 0x000E0000,    /* 0114  plist L13 <- L14, 2 items */
+    0x000B0284, 0x000C0000,    /* 0116  plist L11 <- L12, 2 items */
+    0x00080384, 0x00090000,    /* 0118  plist L8 <- L9, 3 items */
+    0x00020684, 0x00030000,    /* 011A  plist L2 <- L3, 6 items */
+    0x000C0345,                /* 011C  lsym L3 <- sym#12   ("kind") */
+    0x00420442,                /* 011D  gget L4 <- g66   (mk_sym) */
+    0x00058041,                /* 011E  move L5 <- P0 */
+    0x00040151,                /* 011F  call base=L4 argc=1 */
+    0x00040041,                /* 0120  move L4 <- L0 */
+    0x00010351,                /* 0121  call base=L1 argc=3 */
+    0x00010041,                /* 0122  move L1 <- L0 */
+    0x00010008,                /* 0123  return L1 */
     0x00000001,                /* 0124  trap 0 */
-    0x005C0042,                /* 0125  gget L0 <- g92   (car) */
-    0x00018041,                /* 0126  move L1 <- P0 */
-    0x000001A0, 0x00010000,    /* 0127  call base=L0 argc=1 nres=1 */
-    0x00000145,                /* 0129  lsym L1 <- sym#0   ("sym") */
-    0x00020090, 0x00000001,    /* 012A  ne L2 <- L0 != L1 */
-    0x0005024B,                /* 012C  jf L2, +5 */
-    0x005B0042,                /* 012D  gget L0 <- g91   (error) */
-    0x00060146,                /* 012E  lconst L1 <- static#6   ("text(): argument must be a token kind symbol, e.g. text('TOK_LITERAL_INT)") */
-    0x000001A0, 0x00010000,    /* 012F  call base=L0 argc=1 nres=1 */
-    0x00000102,                /* 0131  return L0 count=1 */
-    0x003B0042,                /* 0132  gget L0 <- g59   (mk_expand) */
-    0x00090245,                /* 0133  lsym L2 <- sym#9   ("fn_def") */
-    0x00150345,                /* 0134  lsym L3 <- sym#21   ("$_text_tmpl") */
-    0x00040003,                /* 0135  lnil L4 */
-    0x000B0745,                /* 0136  lsym L7 <- sym#11   ("param") */
-    0x000C0845,                /* 0137  lsym L8 <- sym#12   ("kind") */
-    0x000D0A45,                /* 0138  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 0139  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 013A  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 013C  lnil L10 */
-    0x00060484, 0x00070000,    /* 013D  plist L6 <- L7, 4 items */
-    0x00050184, 0x00060000,    /* 013F  plist L5 <- L6, 1 items */
-    0x000D0745,                /* 0141  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 0142  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 0143  plist L6 <- L7, 2 items */
-    0x00160845,                /* 0145  lsym L8 <- sym#22   ("do") */
-    0x00170A45,                /* 0146  lsym L10 <- sym#23   ("define") */
-    0x00180B45,                /* 0147  lsym L11 <- sym#24   ("tok") */
-    0x000D0D45,                /* 0148  lsym L13 <- sym#13   ("type") */
-    0x000E0E45,                /* 0149  lsym L14 <- sym#14   ("auto") */
-    0x000C0284, 0x000D0000,    /* 014A  plist L12 <- L13, 2 items */
-    0x00050E45,                /* 014C  lsym L14 <- sym#5   ("apply") */
-    0x00061045,                /* 014D  lsym L16 <- sym#6   ("bind_msg") */
-    0x00071145,                /* 014E  lsym L17 <- sym#7   ("this") */
-    0x00081245,                /* 014F  lsym L18 <- sym#8   ("peek") */
-    0x000F0384, 0x00100000,    /* 0150  plist L15 <- L16, 3 items */
-    0x00121145,                /* 0152  lsym L17 <- sym#18   ("int") */
-    0x00120040,                /* 0153  i8 L18 <- 0 */
-    0x00100284, 0x00110000,    /* 0154  plist L16 <- L17, 2 items */
-    0x000D0384, 0x000E0000,    /* 0156  plist L13 <- L14, 3 items */
-    0x00090484, 0x000A0000,    /* 0158  plist L9 <- L10, 4 items */
-    0x000F0B45,                /* 015A  lsym L11 <- sym#15   ("cond") */
-    0x00100E45,                /* 015B  lsym L14 <- sym#16   ("==") */
-    0x00111045,                /* 015C  lsym L16 <- sym#17   ("attr") */
-    0x00181145,                /* 015D  lsym L17 <- sym#24   ("tok") */
-    0x000C1245,                /* 015E  lsym L18 <- sym#12   ("kind") */
-    0x000F0384, 0x00100000,    /* 015F  plist L15 <- L16, 3 items */
-    0x000C1045,                /* 0161  lsym L16 <- sym#12   ("kind") */
-    0x000D0384, 0x000E0000,    /* 0162  plist L13 <- L14, 3 items */
-    0x00160F45,                /* 0164  lsym L15 <- sym#22   ("do") */
-    0x00051145,                /* 0165  lsym L17 <- sym#5   ("apply") */
-    0x00061345,                /* 0166  lsym L19 <- sym#6   ("bind_msg") */
-    0x00071445,                /* 0167  lsym L20 <- sym#7   ("this") */
-    0x00131545,                /* 0168  lsym L21 <- sym#19   ("advance") */
-    0x00120384, 0x00130000,    /* 0169  plist L18 <- L19, 3 items */
-    0x00100284, 0x00110000,    /* 016B  plist L16 <- L17, 2 items */
-    0x00051245,                /* 016D  lsym L18 <- sym#5   ("apply") */
-    0x00061445,                /* 016E  lsym L20 <- sym#6   ("bind_msg") */
-    0x00181545,                /* 016F  lsym L21 <- sym#24   ("tok") */
-    0x00191645,                /* 0170  lsym L22 <- sym#25   ("get_text") */
-    0x00130384, 0x00140000,    /* 0171  plist L19 <- L20, 3 items */
-    0x00111545,                /* 0173  lsym L21 <- sym#17   ("attr") */
-    0x00071645,                /* 0174  lsym L22 <- sym#7   ("this") */
-    0x001A1745,                /* 0175  lsym L23 <- sym#26   ("buffer") */
-    0x00140384, 0x00150000,    /* 0176  plist L20 <- L21, 3 items */
-    0x00110384, 0x00120000,    /* 0178  plist L17 <- L18, 3 items */
-    0x000E0384, 0x000F0000,    /* 017A  plist L14 <- L15, 3 items */
-    0x000C0284, 0x000D0000,    /* 017C  plist L12 <- L13, 2 items */
-    0x00140E45,                /* 017E  lsym L14 <- sym#20   ("else") */
-    0x00001045,                /* 017F  lsym L16 <- sym#0   ("sym") */
-    0x00011145,                /* 0180  lsym L17 <- sym#1   ("NO_MATCH") */
-    0x000F0284, 0x00100000,    /* 0181  plist L15 <- L16, 2 items */
-    0x000D0284, 0x000E0000,    /* 0183  plist L13 <- L14, 2 items */
-    0x000A0384, 0x000B0000,    /* 0185  plist L10 <- L11, 3 items */
-    0x00070384, 0x00080000,    /* 0187  plist L7 <- L8, 3 items */
-    0x00010684, 0x00020000,    /* 0189  plist L1 <- L2, 6 items */
-    0x000C0245,                /* 018B  lsym L2 <- sym#12   ("kind") */
-    0x00420342,                /* 018C  gget L3 <- g66   (mk_sym) */
-    0x00040442,                /* 018D  gget L4 <- g4   (std::pairs::cadr) */
-    0x00058041,                /* 018E  move L5 <- P0 */
-    0x000401A0, 0x00010000,    /* 018F  call base=L4 argc=1 nres=1 */
-    0x000301A0, 0x00010000,    /* 0191  call base=L3 argc=1 nres=1 */
-    0x000003A0, 0x00010000,    /* 0193  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 0195  return L0 count=1 */
+    0x005C0142,                /* 0125  gget L1 <- g92   (car) */
+    0x00028041,                /* 0126  move L2 <- P0 */
+    0x00010151,                /* 0127  call base=L1 argc=1 */
+    0x00010041,                /* 0128  move L1 <- L0 */
+    0x00000245,                /* 0129  lsym L2 <- sym#0   ("sym") */
+    0x00030090, 0x00010002,    /* 012A  ne L3 <- L1 != L2 */
+    0x0005034B,                /* 012C  jf L3, +5 */
+    0x005B0142,                /* 012D  gget L1 <- g91   (error) */
+    0x00060246,                /* 012E  lconst L2 <- static#6   ("text(): argument must be a token kind symbol, e.g. text('TOK_LITERAL_INT)") */
+    0x00010151,                /* 012F  call base=L1 argc=1 */
+    0x00010041,                /* 0130  move L1 <- L0 */
+    0x00010008,                /* 0131  return L1 */
+    0x003B0142,                /* 0132  gget L1 <- g59   (mk_expand) */
+    0x00090345,                /* 0133  lsym L3 <- sym#9   ("fn_def") */
+    0x00150445,                /* 0134  lsym L4 <- sym#21   ("$_text_tmpl") */
+    0x00050003,                /* 0135  lnil L5 */
+    0x000B0845,                /* 0136  lsym L8 <- sym#11   ("param") */
+    0x000C0945,                /* 0137  lsym L9 <- sym#12   ("kind") */
+    0x000D0B45,                /* 0138  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 0139  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 013A  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 013C  lnil L11 */
+    0x00070484, 0x00080000,    /* 013D  plist L7 <- L8, 4 items */
+    0x00060184, 0x00070000,    /* 013F  plist L6 <- L7, 1 items */
+    0x000D0845,                /* 0141  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 0142  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 0143  plist L7 <- L8, 2 items */
+    0x00160945,                /* 0145  lsym L9 <- sym#22   ("do") */
+    0x00170B45,                /* 0146  lsym L11 <- sym#23   ("define") */
+    0x00180C45,                /* 0147  lsym L12 <- sym#24   ("tok") */
+    0x000D0E45,                /* 0148  lsym L14 <- sym#13   ("type") */
+    0x000E0F45,                /* 0149  lsym L15 <- sym#14   ("auto") */
+    0x000D0284, 0x000E0000,    /* 014A  plist L13 <- L14, 2 items */
+    0x00050F45,                /* 014C  lsym L15 <- sym#5   ("apply") */
+    0x00061145,                /* 014D  lsym L17 <- sym#6   ("bind_msg") */
+    0x00071245,                /* 014E  lsym L18 <- sym#7   ("this") */
+    0x00081345,                /* 014F  lsym L19 <- sym#8   ("peek") */
+    0x00100384, 0x00110000,    /* 0150  plist L16 <- L17, 3 items */
+    0x00121245,                /* 0152  lsym L18 <- sym#18   ("int") */
+    0x00130040,                /* 0153  i8 L19 <- 0 */
+    0x00110284, 0x00120000,    /* 0154  plist L17 <- L18, 2 items */
+    0x000E0384, 0x000F0000,    /* 0156  plist L14 <- L15, 3 items */
+    0x000A0484, 0x000B0000,    /* 0158  plist L10 <- L11, 4 items */
+    0x000F0C45,                /* 015A  lsym L12 <- sym#15   ("cond") */
+    0x00100F45,                /* 015B  lsym L15 <- sym#16   ("==") */
+    0x00111145,                /* 015C  lsym L17 <- sym#17   ("attr") */
+    0x00181245,                /* 015D  lsym L18 <- sym#24   ("tok") */
+    0x000C1345,                /* 015E  lsym L19 <- sym#12   ("kind") */
+    0x00100384, 0x00110000,    /* 015F  plist L16 <- L17, 3 items */
+    0x000C1145,                /* 0161  lsym L17 <- sym#12   ("kind") */
+    0x000E0384, 0x000F0000,    /* 0162  plist L14 <- L15, 3 items */
+    0x00161045,                /* 0164  lsym L16 <- sym#22   ("do") */
+    0x00051245,                /* 0165  lsym L18 <- sym#5   ("apply") */
+    0x00061445,                /* 0166  lsym L20 <- sym#6   ("bind_msg") */
+    0x00071545,                /* 0167  lsym L21 <- sym#7   ("this") */
+    0x00131645,                /* 0168  lsym L22 <- sym#19   ("advance") */
+    0x00130384, 0x00140000,    /* 0169  plist L19 <- L20, 3 items */
+    0x00110284, 0x00120000,    /* 016B  plist L17 <- L18, 2 items */
+    0x00051345,                /* 016D  lsym L19 <- sym#5   ("apply") */
+    0x00061545,                /* 016E  lsym L21 <- sym#6   ("bind_msg") */
+    0x00181645,                /* 016F  lsym L22 <- sym#24   ("tok") */
+    0x00191745,                /* 0170  lsym L23 <- sym#25   ("get_text") */
+    0x00140384, 0x00150000,    /* 0171  plist L20 <- L21, 3 items */
+    0x00111645,                /* 0173  lsym L22 <- sym#17   ("attr") */
+    0x00071745,                /* 0174  lsym L23 <- sym#7   ("this") */
+    0x001A1845,                /* 0175  lsym L24 <- sym#26   ("buffer") */
+    0x00150384, 0x00160000,    /* 0176  plist L21 <- L22, 3 items */
+    0x00120384, 0x00130000,    /* 0178  plist L18 <- L19, 3 items */
+    0x000F0384, 0x00100000,    /* 017A  plist L15 <- L16, 3 items */
+    0x000D0284, 0x000E0000,    /* 017C  plist L13 <- L14, 2 items */
+    0x00140F45,                /* 017E  lsym L15 <- sym#20   ("else") */
+    0x00001145,                /* 017F  lsym L17 <- sym#0   ("sym") */
+    0x00011245,                /* 0180  lsym L18 <- sym#1   ("NO_MATCH") */
+    0x00100284, 0x00110000,    /* 0181  plist L16 <- L17, 2 items */
+    0x000E0284, 0x000F0000,    /* 0183  plist L14 <- L15, 2 items */
+    0x000B0384, 0x000C0000,    /* 0185  plist L11 <- L12, 3 items */
+    0x00080384, 0x00090000,    /* 0187  plist L8 <- L9, 3 items */
+    0x00020684, 0x00030000,    /* 0189  plist L2 <- L3, 6 items */
+    0x000C0345,                /* 018B  lsym L3 <- sym#12   ("kind") */
+    0x00420442,                /* 018C  gget L4 <- g66   (mk_sym) */
+    0x00040542,                /* 018D  gget L5 <- g4   (std::pairs::cadr) */
+    0x00068041,                /* 018E  move L6 <- P0 */
+    0x00050151,                /* 018F  call base=L5 argc=1 */
+    0x00050041,                /* 0190  move L5 <- L0 */
+    0x00040151,                /* 0191  call base=L4 argc=1 */
+    0x00040041,                /* 0192  move L4 <- L0 */
+    0x00010351,                /* 0193  call base=L1 argc=3 */
+    0x00010041,                /* 0194  move L1 <- L0 */
+    0x00010008,                /* 0195  return L1 */
     0x00000001,                /* 0196  trap 0 */
-    0x003B0042,                /* 0197  gget L0 <- g59   (mk_expand) */
-    0x00090245,                /* 0198  lsym L2 <- sym#9   ("fn_def") */
-    0x001B0345,                /* 0199  lsym L3 <- sym#27   ("$soft_keyword") */
-    0x00040003,                /* 019A  lnil L4 */
-    0x000B0745,                /* 019B  lsym L7 <- sym#11   ("param") */
-    0x001C0845,                /* 019C  lsym L8 <- sym#28   ("text") */
-    0x000D0A45,                /* 019D  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 019E  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 019F  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 01A1  lnil L10 */
-    0x00060484, 0x00070000,    /* 01A2  plist L6 <- L7, 4 items */
-    0x00050184, 0x00060000,    /* 01A4  plist L5 <- L6, 1 items */
-    0x000D0745,                /* 01A6  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 01A7  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 01A8  plist L6 <- L7, 2 items */
-    0x00160845,                /* 01AA  lsym L8 <- sym#22   ("do") */
-    0x00170A45,                /* 01AB  lsym L10 <- sym#23   ("define") */
-    0x00180B45,                /* 01AC  lsym L11 <- sym#24   ("tok") */
-    0x000D0D45,                /* 01AD  lsym L13 <- sym#13   ("type") */
-    0x000E0E45,                /* 01AE  lsym L14 <- sym#14   ("auto") */
-    0x000C0284, 0x000D0000,    /* 01AF  plist L12 <- L13, 2 items */
-    0x00050E45,                /* 01B1  lsym L14 <- sym#5   ("apply") */
-    0x00061045,                /* 01B2  lsym L16 <- sym#6   ("bind_msg") */
-    0x00071145,                /* 01B3  lsym L17 <- sym#7   ("this") */
-    0x00081245,                /* 01B4  lsym L18 <- sym#8   ("peek") */
-    0x000F0384, 0x00100000,    /* 01B5  plist L15 <- L16, 3 items */
-    0x00121145,                /* 01B7  lsym L17 <- sym#18   ("int") */
-    0x00120040,                /* 01B8  i8 L18 <- 0 */
-    0x00100284, 0x00110000,    /* 01B9  plist L16 <- L17, 2 items */
-    0x000D0384, 0x000E0000,    /* 01BB  plist L13 <- L14, 3 items */
-    0x00090484, 0x000A0000,    /* 01BD  plist L9 <- L10, 4 items */
-    0x000F0B45,                /* 01BF  lsym L11 <- sym#15   ("cond") */
-    0x001D0E45,                /* 01C0  lsym L14 <- sym#29   ("and") */
-    0x00101045,                /* 01C1  lsym L16 <- sym#16   ("==") */
-    0x00111245,                /* 01C2  lsym L18 <- sym#17   ("attr") */
-    0x00181345,                /* 01C3  lsym L19 <- sym#24   ("tok") */
-    0x000C1445,                /* 01C4  lsym L20 <- sym#12   ("kind") */
-    0x00110384, 0x00120000,    /* 01C5  plist L17 <- L18, 3 items */
-    0x00001345,                /* 01C7  lsym L19 <- sym#0   ("sym") */
-    0x001E1445,                /* 01C8  lsym L20 <- sym#30   ("TOK_XID") */
-    0x00120284, 0x00130000,    /* 01C9  plist L18 <- L19, 2 items */
-    0x000F0384, 0x00100000,    /* 01CB  plist L15 <- L16, 3 items */
-    0x00101145,                /* 01CD  lsym L17 <- sym#16   ("==") */
-    0x00051345,                /* 01CE  lsym L19 <- sym#5   ("apply") */
-    0x00061545,                /* 01CF  lsym L21 <- sym#6   ("bind_msg") */
-    0x00181645,                /* 01D0  lsym L22 <- sym#24   ("tok") */
-    0x00191745,                /* 01D1  lsym L23 <- sym#25   ("get_text") */
-    0x00140384, 0x00150000,    /* 01D2  plist L20 <- L21, 3 items */
-    0x00111645,                /* 01D4  lsym L22 <- sym#17   ("attr") */
-    0x00071745,                /* 01D5  lsym L23 <- sym#7   ("this") */
-    0x001A1845,                /* 01D6  lsym L24 <- sym#26   ("buffer") */
-    0x00150384, 0x00160000,    /* 01D7  plist L21 <- L22, 3 items */
-    0x00120384, 0x00130000,    /* 01D9  plist L18 <- L19, 3 items */
-    0x001C1345,                /* 01DB  lsym L19 <- sym#28   ("text") */
-    0x00100384, 0x00110000,    /* 01DC  plist L16 <- L17, 3 items */
-    0x000D0384, 0x000E0000,    /* 01DE  plist L13 <- L14, 3 items */
-    0x00050F45,                /* 01E0  lsym L15 <- sym#5   ("apply") */
-    0x00061145,                /* 01E1  lsym L17 <- sym#6   ("bind_msg") */
-    0x00071245,                /* 01E2  lsym L18 <- sym#7   ("this") */
-    0x00131345,                /* 01E3  lsym L19 <- sym#19   ("advance") */
-    0x00100384, 0x00110000,    /* 01E4  plist L16 <- L17, 3 items */
-    0x000E0284, 0x000F0000,    /* 01E6  plist L14 <- L15, 2 items */
-    0x000C0284, 0x000D0000,    /* 01E8  plist L12 <- L13, 2 items */
-    0x00140E45,                /* 01EA  lsym L14 <- sym#20   ("else") */
-    0x00001045,                /* 01EB  lsym L16 <- sym#0   ("sym") */
-    0x00011145,                /* 01EC  lsym L17 <- sym#1   ("NO_MATCH") */
-    0x000F0284, 0x00100000,    /* 01ED  plist L15 <- L16, 2 items */
-    0x000D0284, 0x000E0000,    /* 01EF  plist L13 <- L14, 2 items */
-    0x000A0384, 0x000B0000,    /* 01F1  plist L10 <- L11, 3 items */
-    0x00070384, 0x00080000,    /* 01F3  plist L7 <- L8, 3 items */
-    0x00010684, 0x00020000,    /* 01F5  plist L1 <- L2, 6 items */
-    0x001C0245,                /* 01F7  lsym L2 <- sym#28   ("text") */
-    0x00410342,                /* 01F8  gget L3 <- g65   (mk_str) */
-    0x00048041,                /* 01F9  move L4 <- P0 */
-    0x000301A0, 0x00010000,    /* 01FA  call base=L3 argc=1 nres=1 */
-    0x000003A0, 0x00010000,    /* 01FC  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 01FE  return L0 count=1 */
-    0x00008141,                /* 01FF  move L0 <- P1 */
-    0x00010245,                /* 0200  lsym L2 <- sym#1   ("NO_MATCH") */
-    0x0003008F, 0x00000002,    /* 0201  eq L3 <- L0 == L2 */
-    0x0006034B,                /* 0203  jf L3, +6 */
-    0x005B0242,                /* 0204  gget L2 <- g91   (error) */
-    0x00038041,                /* 0205  move L3 <- P0 */
-    0x000201A0, 0x00010000,    /* 0206  call base=L2 argc=1 nres=1 */
-    0x00010241,                /* 0208  move L1 <- L2 */
+    0x003B0142,                /* 0197  gget L1 <- g59   (mk_expand) */
+    0x00090345,                /* 0198  lsym L3 <- sym#9   ("fn_def") */
+    0x001B0445,                /* 0199  lsym L4 <- sym#27   ("$soft_keyword") */
+    0x00050003,                /* 019A  lnil L5 */
+    0x000B0845,                /* 019B  lsym L8 <- sym#11   ("param") */
+    0x001C0945,                /* 019C  lsym L9 <- sym#28   ("text") */
+    0x000D0B45,                /* 019D  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 019E  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 019F  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 01A1  lnil L11 */
+    0x00070484, 0x00080000,    /* 01A2  plist L7 <- L8, 4 items */
+    0x00060184, 0x00070000,    /* 01A4  plist L6 <- L7, 1 items */
+    0x000D0845,                /* 01A6  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 01A7  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 01A8  plist L7 <- L8, 2 items */
+    0x00160945,                /* 01AA  lsym L9 <- sym#22   ("do") */
+    0x00170B45,                /* 01AB  lsym L11 <- sym#23   ("define") */
+    0x00180C45,                /* 01AC  lsym L12 <- sym#24   ("tok") */
+    0x000D0E45,                /* 01AD  lsym L14 <- sym#13   ("type") */
+    0x000E0F45,                /* 01AE  lsym L15 <- sym#14   ("auto") */
+    0x000D0284, 0x000E0000,    /* 01AF  plist L13 <- L14, 2 items */
+    0x00050F45,                /* 01B1  lsym L15 <- sym#5   ("apply") */
+    0x00061145,                /* 01B2  lsym L17 <- sym#6   ("bind_msg") */
+    0x00071245,                /* 01B3  lsym L18 <- sym#7   ("this") */
+    0x00081345,                /* 01B4  lsym L19 <- sym#8   ("peek") */
+    0x00100384, 0x00110000,    /* 01B5  plist L16 <- L17, 3 items */
+    0x00121245,                /* 01B7  lsym L18 <- sym#18   ("int") */
+    0x00130040,                /* 01B8  i8 L19 <- 0 */
+    0x00110284, 0x00120000,    /* 01B9  plist L17 <- L18, 2 items */
+    0x000E0384, 0x000F0000,    /* 01BB  plist L14 <- L15, 3 items */
+    0x000A0484, 0x000B0000,    /* 01BD  plist L10 <- L11, 4 items */
+    0x000F0C45,                /* 01BF  lsym L12 <- sym#15   ("cond") */
+    0x001D0F45,                /* 01C0  lsym L15 <- sym#29   ("and") */
+    0x00101145,                /* 01C1  lsym L17 <- sym#16   ("==") */
+    0x00111345,                /* 01C2  lsym L19 <- sym#17   ("attr") */
+    0x00181445,                /* 01C3  lsym L20 <- sym#24   ("tok") */
+    0x000C1545,                /* 01C4  lsym L21 <- sym#12   ("kind") */
+    0x00120384, 0x00130000,    /* 01C5  plist L18 <- L19, 3 items */
+    0x00001445,                /* 01C7  lsym L20 <- sym#0   ("sym") */
+    0x001E1545,                /* 01C8  lsym L21 <- sym#30   ("TOK_XID") */
+    0x00130284, 0x00140000,    /* 01C9  plist L19 <- L20, 2 items */
+    0x00100384, 0x00110000,    /* 01CB  plist L16 <- L17, 3 items */
+    0x00101245,                /* 01CD  lsym L18 <- sym#16   ("==") */
+    0x00051445,                /* 01CE  lsym L20 <- sym#5   ("apply") */
+    0x00061645,                /* 01CF  lsym L22 <- sym#6   ("bind_msg") */
+    0x00181745,                /* 01D0  lsym L23 <- sym#24   ("tok") */
+    0x00191845,                /* 01D1  lsym L24 <- sym#25   ("get_text") */
+    0x00150384, 0x00160000,    /* 01D2  plist L21 <- L22, 3 items */
+    0x00111745,                /* 01D4  lsym L23 <- sym#17   ("attr") */
+    0x00071845,                /* 01D5  lsym L24 <- sym#7   ("this") */
+    0x001A1945,                /* 01D6  lsym L25 <- sym#26   ("buffer") */
+    0x00160384, 0x00170000,    /* 01D7  plist L22 <- L23, 3 items */
+    0x00130384, 0x00140000,    /* 01D9  plist L19 <- L20, 3 items */
+    0x001C1445,                /* 01DB  lsym L20 <- sym#28   ("text") */
+    0x00110384, 0x00120000,    /* 01DC  plist L17 <- L18, 3 items */
+    0x000E0384, 0x000F0000,    /* 01DE  plist L14 <- L15, 3 items */
+    0x00051045,                /* 01E0  lsym L16 <- sym#5   ("apply") */
+    0x00061245,                /* 01E1  lsym L18 <- sym#6   ("bind_msg") */
+    0x00071345,                /* 01E2  lsym L19 <- sym#7   ("this") */
+    0x00131445,                /* 01E3  lsym L20 <- sym#19   ("advance") */
+    0x00110384, 0x00120000,    /* 01E4  plist L17 <- L18, 3 items */
+    0x000F0284, 0x00100000,    /* 01E6  plist L15 <- L16, 2 items */
+    0x000D0284, 0x000E0000,    /* 01E8  plist L13 <- L14, 2 items */
+    0x00140F45,                /* 01EA  lsym L15 <- sym#20   ("else") */
+    0x00001145,                /* 01EB  lsym L17 <- sym#0   ("sym") */
+    0x00011245,                /* 01EC  lsym L18 <- sym#1   ("NO_MATCH") */
+    0x00100284, 0x00110000,    /* 01ED  plist L16 <- L17, 2 items */
+    0x000E0284, 0x000F0000,    /* 01EF  plist L14 <- L15, 2 items */
+    0x000B0384, 0x000C0000,    /* 01F1  plist L11 <- L12, 3 items */
+    0x00080384, 0x00090000,    /* 01F3  plist L8 <- L9, 3 items */
+    0x00020684, 0x00030000,    /* 01F5  plist L2 <- L3, 6 items */
+    0x001C0345,                /* 01F7  lsym L3 <- sym#28   ("text") */
+    0x00410442,                /* 01F8  gget L4 <- g65   (mk_str) */
+    0x00058041,                /* 01F9  move L5 <- P0 */
+    0x00040151,                /* 01FA  call base=L4 argc=1 */
+    0x00040041,                /* 01FB  move L4 <- L0 */
+    0x00010351,                /* 01FC  call base=L1 argc=3 */
+    0x00010041,                /* 01FD  move L1 <- L0 */
+    0x00010008,                /* 01FE  return L1 */
+    0x00018141,                /* 01FF  move L1 <- P1 */
+    0x00010345,                /* 0200  lsym L3 <- sym#1   ("NO_MATCH") */
+    0x0004008F, 0x00010003,    /* 0201  eq L4 <- L1 == L3 */
+    0x0006044B,                /* 0203  jf L4, +6 */
+    0x005B0342,                /* 0204  gget L3 <- g91   (error) */
+    0x00048041,                /* 0205  move L4 <- P0 */
+    0x00030151,                /* 0206  call base=L3 argc=1 */
+    0x00030041,                /* 0207  move L3 <- L0 */
+    0x00020341,                /* 0208  move L2 <- L3 */
     0x0001004F,                /* 0209  jmp +1 */
-    0x00010041,                /* 020A  move L1 <- L0 */
-    0x00010102,                /* 020B  return L1 count=1 */
-    0x003C0042,                /* 020C  gget L0 <- g60   (mk_expand_n) */
-    0x00090245,                /* 020D  lsym L2 <- sym#9   ("fn_def") */
-    0x001F0345,                /* 020E  lsym L3 <- sym#31   ("$_expect_tmpl") */
-    0x00040003,                /* 020F  lnil L4 */
-    0x000B0745,                /* 0210  lsym L7 <- sym#11   ("param") */
-    0x00200845,                /* 0211  lsym L8 <- sym#32   ("expect_text") */
-    0x000D0A45,                /* 0212  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 0213  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 0214  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 0216  lnil L10 */
-    0x00060484, 0x00070000,    /* 0217  plist L6 <- L7, 4 items */
-    0x000B0845,                /* 0219  lsym L8 <- sym#11   ("param") */
-    0x00210945,                /* 021A  lsym L9 <- sym#33   ("match_expr") */
-    0x000D0B45,                /* 021B  lsym L11 <- sym#13   ("type") */
-    0x000E0C45,                /* 021C  lsym L12 <- sym#14   ("auto") */
-    0x000A0284, 0x000B0000,    /* 021D  plist L10 <- L11, 2 items */
-    0x000B0003,                /* 021F  lnil L11 */
-    0x00070484, 0x00080000,    /* 0220  plist L7 <- L8, 4 items */
-    0x00050284, 0x00060000,    /* 0222  plist L5 <- L6, 2 items */
-    0x000D0745,                /* 0224  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 0225  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 0226  plist L6 <- L7, 2 items */
-    0x00160845,                /* 0228  lsym L8 <- sym#22   ("do") */
-    0x00170A45,                /* 0229  lsym L10 <- sym#23   ("define") */
-    0x00220B45,                /* 022A  lsym L11 <- sym#34   ("v") */
-    0x000D0D45,                /* 022B  lsym L13 <- sym#13   ("type") */
-    0x000E0E45,                /* 022C  lsym L14 <- sym#14   ("auto") */
-    0x000C0284, 0x000D0000,    /* 022D  plist L12 <- L13, 2 items */
-    0x00210D45,                /* 022F  lsym L13 <- sym#33   ("match_expr") */
-    0x00090484, 0x000A0000,    /* 0230  plist L9 <- L10, 4 items */
-    0x000F0B45,                /* 0232  lsym L11 <- sym#15   ("cond") */
-    0x00100E45,                /* 0233  lsym L14 <- sym#16   ("==") */
-    0x00220F45,                /* 0234  lsym L15 <- sym#34   ("v") */
-    0x00001145,                /* 0235  lsym L17 <- sym#0   ("sym") */
-    0x00011245,                /* 0236  lsym L18 <- sym#1   ("NO_MATCH") */
-    0x00100284, 0x00110000,    /* 0237  plist L16 <- L17, 2 items */
-    0x000D0384, 0x000E0000,    /* 0239  plist L13 <- L14, 3 items */
-    0x00050F45,                /* 023B  lsym L15 <- sym#5   ("apply") */
-    0x00041045,                /* 023C  lsym L16 <- sym#4   ("error") */
-    0x00201145,                /* 023D  lsym L17 <- sym#32   ("expect_text") */
-    0x000E0384, 0x000F0000,    /* 023E  plist L14 <- L15, 3 items */
-    0x000C0284, 0x000D0000,    /* 0240  plist L12 <- L13, 2 items */
-    0x00140E45,                /* 0242  lsym L14 <- sym#20   ("else") */
-    0x00220F45,                /* 0243  lsym L15 <- sym#34   ("v") */
-    0x000D0284, 0x000E0000,    /* 0244  plist L13 <- L14, 2 items */
-    0x000A0384, 0x000B0000,    /* 0246  plist L10 <- L11, 3 items */
-    0x00070384, 0x00080000,    /* 0248  plist L7 <- L8, 3 items */
-    0x00010684, 0x00020000,    /* 024A  plist L1 <- L2, 6 items */
-    0x005D0242,                /* 024C  gget L2 <- g93   (pair) */
-    0x00200345,                /* 024D  lsym L3 <- sym#32   ("expect_text") */
-    0x00048041,                /* 024E  move L4 <- P0 */
-    0x000202A0, 0x00010000,    /* 024F  call base=L2 argc=2 nres=1 */
-    0x005D0342,                /* 0251  gget L3 <- g93   (pair) */
-    0x00210445,                /* 0252  lsym L4 <- sym#33   ("match_expr") */
-    0x00220542,                /* 0253  gget L5 <- g34   (_decode_term) */
-    0x00068141,                /* 0254  move L6 <- P1 */
-    0x000501A0, 0x00010000,    /* 0255  call base=L5 argc=1 nres=1 */
-    0x000302A0, 0x00010000,    /* 0257  call base=L3 argc=2 nres=1 */
-    0x000003A0, 0x00010000,    /* 0259  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 025B  return L0 count=1 */
+    0x00020141,                /* 020A  move L2 <- L1 */
+    0x00020008,                /* 020B  return L2 */
+    0x003C0142,                /* 020C  gget L1 <- g60   (mk_expand_n) */
+    0x00090345,                /* 020D  lsym L3 <- sym#9   ("fn_def") */
+    0x001F0445,                /* 020E  lsym L4 <- sym#31   ("$_expect_tmpl") */
+    0x00050003,                /* 020F  lnil L5 */
+    0x000B0845,                /* 0210  lsym L8 <- sym#11   ("param") */
+    0x00200945,                /* 0211  lsym L9 <- sym#32   ("expect_text") */
+    0x000D0B45,                /* 0212  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 0213  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 0214  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 0216  lnil L11 */
+    0x00070484, 0x00080000,    /* 0217  plist L7 <- L8, 4 items */
+    0x000B0945,                /* 0219  lsym L9 <- sym#11   ("param") */
+    0x00210A45,                /* 021A  lsym L10 <- sym#33   ("match_expr") */
+    0x000D0C45,                /* 021B  lsym L12 <- sym#13   ("type") */
+    0x000E0D45,                /* 021C  lsym L13 <- sym#14   ("auto") */
+    0x000B0284, 0x000C0000,    /* 021D  plist L11 <- L12, 2 items */
+    0x000C0003,                /* 021F  lnil L12 */
+    0x00080484, 0x00090000,    /* 0220  plist L8 <- L9, 4 items */
+    0x00060284, 0x00070000,    /* 0222  plist L6 <- L7, 2 items */
+    0x000D0845,                /* 0224  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 0225  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 0226  plist L7 <- L8, 2 items */
+    0x00160945,                /* 0228  lsym L9 <- sym#22   ("do") */
+    0x00170B45,                /* 0229  lsym L11 <- sym#23   ("define") */
+    0x00220C45,                /* 022A  lsym L12 <- sym#34   ("v") */
+    0x000D0E45,                /* 022B  lsym L14 <- sym#13   ("type") */
+    0x000E0F45,                /* 022C  lsym L15 <- sym#14   ("auto") */
+    0x000D0284, 0x000E0000,    /* 022D  plist L13 <- L14, 2 items */
+    0x00210E45,                /* 022F  lsym L14 <- sym#33   ("match_expr") */
+    0x000A0484, 0x000B0000,    /* 0230  plist L10 <- L11, 4 items */
+    0x000F0C45,                /* 0232  lsym L12 <- sym#15   ("cond") */
+    0x00100F45,                /* 0233  lsym L15 <- sym#16   ("==") */
+    0x00221045,                /* 0234  lsym L16 <- sym#34   ("v") */
+    0x00001245,                /* 0235  lsym L18 <- sym#0   ("sym") */
+    0x00011345,                /* 0236  lsym L19 <- sym#1   ("NO_MATCH") */
+    0x00110284, 0x00120000,    /* 0237  plist L17 <- L18, 2 items */
+    0x000E0384, 0x000F0000,    /* 0239  plist L14 <- L15, 3 items */
+    0x00051045,                /* 023B  lsym L16 <- sym#5   ("apply") */
+    0x00041145,                /* 023C  lsym L17 <- sym#4   ("error") */
+    0x00201245,                /* 023D  lsym L18 <- sym#32   ("expect_text") */
+    0x000F0384, 0x00100000,    /* 023E  plist L15 <- L16, 3 items */
+    0x000D0284, 0x000E0000,    /* 0240  plist L13 <- L14, 2 items */
+    0x00140F45,                /* 0242  lsym L15 <- sym#20   ("else") */
+    0x00221045,                /* 0243  lsym L16 <- sym#34   ("v") */
+    0x000E0284, 0x000F0000,    /* 0244  plist L14 <- L15, 2 items */
+    0x000B0384, 0x000C0000,    /* 0246  plist L11 <- L12, 3 items */
+    0x00080384, 0x00090000,    /* 0248  plist L8 <- L9, 3 items */
+    0x00020684, 0x00030000,    /* 024A  plist L2 <- L3, 6 items */
+    0x005D0342,                /* 024C  gget L3 <- g93   (pair) */
+    0x00200445,                /* 024D  lsym L4 <- sym#32   ("expect_text") */
+    0x00058041,                /* 024E  move L5 <- P0 */
+    0x00030251,                /* 024F  call base=L3 argc=2 */
+    0x00030041,                /* 0250  move L3 <- L0 */
+    0x005D0442,                /* 0251  gget L4 <- g93   (pair) */
+    0x00210545,                /* 0252  lsym L5 <- sym#33   ("match_expr") */
+    0x00220642,                /* 0253  gget L6 <- g34   (_decode_term) */
+    0x00078141,                /* 0254  move L7 <- P1 */
+    0x00060151,                /* 0255  call base=L6 argc=1 */
+    0x00060041,                /* 0256  move L6 <- L0 */
+    0x00040251,                /* 0257  call base=L4 argc=2 */
+    0x00040041,                /* 0258  move L4 <- L0 */
+    0x00010351,                /* 0259  call base=L1 argc=3 */
+    0x00010041,                /* 025A  move L1 <- L0 */
+    0x00010008,                /* 025B  return L1 */
     0x00000001,                /* 025C  trap 0 */
-    0x003B0042,                /* 025D  gget L0 <- g59   (mk_expand) */
-    0x00090245,                /* 025E  lsym L2 <- sym#9   ("fn_def") */
-    0x00240345,                /* 025F  lsym L3 <- sym#36   ("$_many") */
-    0x00040003,                /* 0260  lnil L4 */
-    0x000B0745,                /* 0261  lsym L7 <- sym#11   ("param") */
-    0x00210845,                /* 0262  lsym L8 <- sym#33   ("match_expr") */
-    0x000D0A45,                /* 0263  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 0264  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 0265  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 0267  lnil L10 */
-    0x00060484, 0x00070000,    /* 0268  plist L6 <- L7, 4 items */
-    0x00050184, 0x00060000,    /* 026A  plist L5 <- L6, 1 items */
-    0x000D0745,                /* 026C  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 026D  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 026E  plist L6 <- L7, 2 items */
-    0x00160845,                /* 0270  lsym L8 <- sym#22   ("do") */
-    0x00170A45,                /* 0271  lsym L10 <- sym#23   ("define") */
-    0x00250B45,                /* 0272  lsym L11 <- sym#37   ("items") */
-    0x000D0D45,                /* 0273  lsym L13 <- sym#13   ("type") */
-    0x000E0E45,                /* 0274  lsym L14 <- sym#14   ("auto") */
-    0x000C0284, 0x000D0000,    /* 0275  plist L12 <- L13, 2 items */
-    0x00260E45,                /* 0277  lsym L14 <- sym#38   ("nil") */
-    0x000D0184, 0x000E0000,    /* 0278  plist L13 <- L14, 1 items */
-    0x00090484, 0x000A0000,    /* 027A  plist L9 <- L10, 4 items */
-    0x00270B45,                /* 027C  lsym L11 <- sym#39   ("while") */
-    0x00280D45,                /* 027D  lsym L13 <- sym#40   ("true") */
-    0x000C0184, 0x000D0000,    /* 027E  plist L12 <- L13, 1 items */
-    0x00160E45,                /* 0280  lsym L14 <- sym#22   ("do") */
-    0x00171045,                /* 0281  lsym L16 <- sym#23   ("define") */
-    0x00291145,                /* 0282  lsym L17 <- sym#41   ("_mark") */
-    0x000D1345,                /* 0283  lsym L19 <- sym#13   ("type") */
-    0x000E1445,                /* 0284  lsym L20 <- sym#14   ("auto") */
-    0x00120284, 0x00130000,    /* 0285  plist L18 <- L19, 2 items */
-    0x00051445,                /* 0287  lsym L20 <- sym#5   ("apply") */
-    0x00061645,                /* 0288  lsym L22 <- sym#6   ("bind_msg") */
-    0x00071745,                /* 0289  lsym L23 <- sym#7   ("this") */
-    0x00231845,                /* 028A  lsym L24 <- sym#35   ("mark") */
-    0x00150384, 0x00160000,    /* 028B  plist L21 <- L22, 3 items */
-    0x00130284, 0x00140000,    /* 028D  plist L19 <- L20, 2 items */
-    0x000F0484, 0x00100000,    /* 028F  plist L15 <- L16, 4 items */
-    0x00171145,                /* 0291  lsym L17 <- sym#23   ("define") */
-    0x002A1245,                /* 0292  lsym L18 <- sym#42   ("m") */
-    0x000D1445,                /* 0293  lsym L20 <- sym#13   ("type") */
-    0x000E1545,                /* 0294  lsym L21 <- sym#14   ("auto") */
-    0x00130284, 0x00140000,    /* 0295  plist L19 <- L20, 2 items */
-    0x00211445,                /* 0297  lsym L20 <- sym#33   ("match_expr") */
-    0x00100484, 0x00110000,    /* 0298  plist L16 <- L17, 4 items */
-    0x000F1245,                /* 029A  lsym L18 <- sym#15   ("cond") */
-    0x00101545,                /* 029B  lsym L21 <- sym#16   ("==") */
-    0x002A1645,                /* 029C  lsym L22 <- sym#42   ("m") */
-    0x00001845,                /* 029D  lsym L24 <- sym#0   ("sym") */
-    0x00011945,                /* 029E  lsym L25 <- sym#1   ("NO_MATCH") */
-    0x00170284, 0x00180000,    /* 029F  plist L23 <- L24, 2 items */
-    0x00140384, 0x00150000,    /* 02A1  plist L20 <- L21, 3 items */
-    0x00161645,                /* 02A3  lsym L22 <- sym#22   ("do") */
-    0x00051845,                /* 02A4  lsym L24 <- sym#5   ("apply") */
-    0x00061A45,                /* 02A5  lsym L26 <- sym#6   ("bind_msg") */
-    0x00071B45,                /* 02A6  lsym L27 <- sym#7   ("this") */
-    0x002B1C45,                /* 02A7  lsym L28 <- sym#43   ("reset") */
-    0x00190384, 0x001A0000,    /* 02A8  plist L25 <- L26, 3 items */
-    0x00291A45,                /* 02AA  lsym L26 <- sym#41   ("_mark") */
-    0x00170384, 0x00180000,    /* 02AB  plist L23 <- L24, 3 items */
-    0x002C1945,                /* 02AD  lsym L25 <- sym#44   ("break") */
-    0x00180184, 0x00190000,    /* 02AE  plist L24 <- L25, 1 items */
-    0x00150384, 0x00160000,    /* 02B0  plist L21 <- L22, 3 items */
-    0x00130284, 0x00140000,    /* 02B2  plist L19 <- L20, 2 items */
-    0x00110284, 0x00120000,    /* 02B4  plist L17 <- L18, 2 items */
-    0x000F1345,                /* 02B6  lsym L19 <- sym#15   ("cond") */
-    0x002D1645,                /* 02B7  lsym L22 <- sym#45   ("is") */
-    0x002A1745,                /* 02B8  lsym L23 <- sym#42   ("m") */
-    0x000D1945,                /* 02B9  lsym L25 <- sym#13   ("type") */
-    0x00041A45,                /* 02BA  lsym L26 <- sym#4   ("error") */
-    0x00180284, 0x00190000,    /* 02BB  plist L24 <- L25, 2 items */
-    0x00150384, 0x00160000,    /* 02BD  plist L21 <- L22, 3 items */
-    0x00161745,                /* 02BF  lsym L23 <- sym#22   ("do") */
-    0x00051945,                /* 02C0  lsym L25 <- sym#5   ("apply") */
-    0x00061B45,                /* 02C1  lsym L27 <- sym#6   ("bind_msg") */
-    0x00071C45,                /* 02C2  lsym L28 <- sym#7   ("this") */
-    0x002B1D45,                /* 02C3  lsym L29 <- sym#43   ("reset") */
-    0x001A0384, 0x001B0000,    /* 02C4  plist L26 <- L27, 3 items */
-    0x00291B45,                /* 02C6  lsym L27 <- sym#41   ("_mark") */
-    0x00180384, 0x00190000,    /* 02C7  plist L24 <- L25, 3 items */
-    0x002E1A45,                /* 02C9  lsym L26 <- sym#46   ("set") */
-    0x00251B45,                /* 02CA  lsym L27 <- sym#37   ("items") */
-    0x002A1C45,                /* 02CB  lsym L28 <- sym#42   ("m") */
-    0x00190384, 0x001A0000,    /* 02CC  plist L25 <- L26, 3 items */
-    0x002C1B45,                /* 02CE  lsym L27 <- sym#44   ("break") */
-    0x001A0184, 0x001B0000,    /* 02CF  plist L26 <- L27, 1 items */
-    0x00160484, 0x00170000,    /* 02D1  plist L22 <- L23, 4 items */
-    0x00140284, 0x00150000,    /* 02D3  plist L20 <- L21, 2 items */
-    0x00120284, 0x00130000,    /* 02D5  plist L18 <- L19, 2 items */
-    0x002E1445,                /* 02D7  lsym L20 <- sym#46   ("set") */
-    0x00251545,                /* 02D8  lsym L21 <- sym#37   ("items") */
-    0x00051745,                /* 02D9  lsym L23 <- sym#5   ("apply") */
-    0x002F1845,                /* 02DA  lsym L24 <- sym#47   ("cons") */
-    0x002A1945,                /* 02DB  lsym L25 <- sym#42   ("m") */
-    0x00251A45,                /* 02DC  lsym L26 <- sym#37   ("items") */
-    0x00160484, 0x00170000,    /* 02DD  plist L22 <- L23, 4 items */
-    0x00130384, 0x00140000,    /* 02DF  plist L19 <- L20, 3 items */
-    0x000D0684, 0x000E0000,    /* 02E1  plist L13 <- L14, 6 items */
-    0x000A0384, 0x000B0000,    /* 02E3  plist L10 <- L11, 3 items */
-    0x00050C45,                /* 02E5  lsym L12 <- sym#5   ("apply") */
-    0x00300D45,                /* 02E6  lsym L13 <- sym#48   ("reverse") */
-    0x00250E45,                /* 02E7  lsym L14 <- sym#37   ("items") */
-    0x000B0384, 0x000C0000,    /* 02E8  plist L11 <- L12, 3 items */
-    0x00070484, 0x00080000,    /* 02EA  plist L7 <- L8, 4 items */
-    0x00010684, 0x00020000,    /* 02EC  plist L1 <- L2, 6 items */
-    0x00210245,                /* 02EE  lsym L2 <- sym#33   ("match_expr") */
-    0x00250342,                /* 02EF  gget L3 <- g37   (_build_sequence_expr) */
-    0x00048041,                /* 02F0  move L4 <- P0 */
-    0x000301A0, 0x00010000,    /* 02F1  call base=L3 argc=1 nres=1 */
-    0x000003A0, 0x00010000,    /* 02F3  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 02F5  return L0 count=1 */
+    0x003B0142,                /* 025D  gget L1 <- g59   (mk_expand) */
+    0x00090345,                /* 025E  lsym L3 <- sym#9   ("fn_def") */
+    0x00240445,                /* 025F  lsym L4 <- sym#36   ("$_many") */
+    0x00050003,                /* 0260  lnil L5 */
+    0x000B0845,                /* 0261  lsym L8 <- sym#11   ("param") */
+    0x00210945,                /* 0262  lsym L9 <- sym#33   ("match_expr") */
+    0x000D0B45,                /* 0263  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 0264  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 0265  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 0267  lnil L11 */
+    0x00070484, 0x00080000,    /* 0268  plist L7 <- L8, 4 items */
+    0x00060184, 0x00070000,    /* 026A  plist L6 <- L7, 1 items */
+    0x000D0845,                /* 026C  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 026D  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 026E  plist L7 <- L8, 2 items */
+    0x00160945,                /* 0270  lsym L9 <- sym#22   ("do") */
+    0x00170B45,                /* 0271  lsym L11 <- sym#23   ("define") */
+    0x00250C45,                /* 0272  lsym L12 <- sym#37   ("items") */
+    0x000D0E45,                /* 0273  lsym L14 <- sym#13   ("type") */
+    0x000E0F45,                /* 0274  lsym L15 <- sym#14   ("auto") */
+    0x000D0284, 0x000E0000,    /* 0275  plist L13 <- L14, 2 items */
+    0x00260F45,                /* 0277  lsym L15 <- sym#38   ("nil") */
+    0x000E0184, 0x000F0000,    /* 0278  plist L14 <- L15, 1 items */
+    0x000A0484, 0x000B0000,    /* 027A  plist L10 <- L11, 4 items */
+    0x00270C45,                /* 027C  lsym L12 <- sym#39   ("while") */
+    0x00280E45,                /* 027D  lsym L14 <- sym#40   ("true") */
+    0x000D0184, 0x000E0000,    /* 027E  plist L13 <- L14, 1 items */
+    0x00160F45,                /* 0280  lsym L15 <- sym#22   ("do") */
+    0x00171145,                /* 0281  lsym L17 <- sym#23   ("define") */
+    0x00291245,                /* 0282  lsym L18 <- sym#41   ("_mark") */
+    0x000D1445,                /* 0283  lsym L20 <- sym#13   ("type") */
+    0x000E1545,                /* 0284  lsym L21 <- sym#14   ("auto") */
+    0x00130284, 0x00140000,    /* 0285  plist L19 <- L20, 2 items */
+    0x00051545,                /* 0287  lsym L21 <- sym#5   ("apply") */
+    0x00061745,                /* 0288  lsym L23 <- sym#6   ("bind_msg") */
+    0x00071845,                /* 0289  lsym L24 <- sym#7   ("this") */
+    0x00231945,                /* 028A  lsym L25 <- sym#35   ("mark") */
+    0x00160384, 0x00170000,    /* 028B  plist L22 <- L23, 3 items */
+    0x00140284, 0x00150000,    /* 028D  plist L20 <- L21, 2 items */
+    0x00100484, 0x00110000,    /* 028F  plist L16 <- L17, 4 items */
+    0x00171245,                /* 0291  lsym L18 <- sym#23   ("define") */
+    0x002A1345,                /* 0292  lsym L19 <- sym#42   ("m") */
+    0x000D1545,                /* 0293  lsym L21 <- sym#13   ("type") */
+    0x000E1645,                /* 0294  lsym L22 <- sym#14   ("auto") */
+    0x00140284, 0x00150000,    /* 0295  plist L20 <- L21, 2 items */
+    0x00211545,                /* 0297  lsym L21 <- sym#33   ("match_expr") */
+    0x00110484, 0x00120000,    /* 0298  plist L17 <- L18, 4 items */
+    0x000F1345,                /* 029A  lsym L19 <- sym#15   ("cond") */
+    0x00101645,                /* 029B  lsym L22 <- sym#16   ("==") */
+    0x002A1745,                /* 029C  lsym L23 <- sym#42   ("m") */
+    0x00001945,                /* 029D  lsym L25 <- sym#0   ("sym") */
+    0x00011A45,                /* 029E  lsym L26 <- sym#1   ("NO_MATCH") */
+    0x00180284, 0x00190000,    /* 029F  plist L24 <- L25, 2 items */
+    0x00150384, 0x00160000,    /* 02A1  plist L21 <- L22, 3 items */
+    0x00161745,                /* 02A3  lsym L23 <- sym#22   ("do") */
+    0x00051945,                /* 02A4  lsym L25 <- sym#5   ("apply") */
+    0x00061B45,                /* 02A5  lsym L27 <- sym#6   ("bind_msg") */
+    0x00071C45,                /* 02A6  lsym L28 <- sym#7   ("this") */
+    0x002B1D45,                /* 02A7  lsym L29 <- sym#43   ("reset") */
+    0x001A0384, 0x001B0000,    /* 02A8  plist L26 <- L27, 3 items */
+    0x00291B45,                /* 02AA  lsym L27 <- sym#41   ("_mark") */
+    0x00180384, 0x00190000,    /* 02AB  plist L24 <- L25, 3 items */
+    0x002C1A45,                /* 02AD  lsym L26 <- sym#44   ("break") */
+    0x00190184, 0x001A0000,    /* 02AE  plist L25 <- L26, 1 items */
+    0x00160384, 0x00170000,    /* 02B0  plist L22 <- L23, 3 items */
+    0x00140284, 0x00150000,    /* 02B2  plist L20 <- L21, 2 items */
+    0x00120284, 0x00130000,    /* 02B4  plist L18 <- L19, 2 items */
+    0x000F1445,                /* 02B6  lsym L20 <- sym#15   ("cond") */
+    0x002D1745,                /* 02B7  lsym L23 <- sym#45   ("is") */
+    0x002A1845,                /* 02B8  lsym L24 <- sym#42   ("m") */
+    0x000D1A45,                /* 02B9  lsym L26 <- sym#13   ("type") */
+    0x00041B45,                /* 02BA  lsym L27 <- sym#4   ("error") */
+    0x00190284, 0x001A0000,    /* 02BB  plist L25 <- L26, 2 items */
+    0x00160384, 0x00170000,    /* 02BD  plist L22 <- L23, 3 items */
+    0x00161845,                /* 02BF  lsym L24 <- sym#22   ("do") */
+    0x00051A45,                /* 02C0  lsym L26 <- sym#5   ("apply") */
+    0x00061C45,                /* 02C1  lsym L28 <- sym#6   ("bind_msg") */
+    0x00071D45,                /* 02C2  lsym L29 <- sym#7   ("this") */
+    0x002B1E45,                /* 02C3  lsym L30 <- sym#43   ("reset") */
+    0x001B0384, 0x001C0000,    /* 02C4  plist L27 <- L28, 3 items */
+    0x00291C45,                /* 02C6  lsym L28 <- sym#41   ("_mark") */
+    0x00190384, 0x001A0000,    /* 02C7  plist L25 <- L26, 3 items */
+    0x002E1B45,                /* 02C9  lsym L27 <- sym#46   ("set") */
+    0x00251C45,                /* 02CA  lsym L28 <- sym#37   ("items") */
+    0x002A1D45,                /* 02CB  lsym L29 <- sym#42   ("m") */
+    0x001A0384, 0x001B0000,    /* 02CC  plist L26 <- L27, 3 items */
+    0x002C1C45,                /* 02CE  lsym L28 <- sym#44   ("break") */
+    0x001B0184, 0x001C0000,    /* 02CF  plist L27 <- L28, 1 items */
+    0x00170484, 0x00180000,    /* 02D1  plist L23 <- L24, 4 items */
+    0x00150284, 0x00160000,    /* 02D3  plist L21 <- L22, 2 items */
+    0x00130284, 0x00140000,    /* 02D5  plist L19 <- L20, 2 items */
+    0x002E1545,                /* 02D7  lsym L21 <- sym#46   ("set") */
+    0x00251645,                /* 02D8  lsym L22 <- sym#37   ("items") */
+    0x00051845,                /* 02D9  lsym L24 <- sym#5   ("apply") */
+    0x002F1945,                /* 02DA  lsym L25 <- sym#47   ("cons") */
+    0x002A1A45,                /* 02DB  lsym L26 <- sym#42   ("m") */
+    0x00251B45,                /* 02DC  lsym L27 <- sym#37   ("items") */
+    0x00170484, 0x00180000,    /* 02DD  plist L23 <- L24, 4 items */
+    0x00140384, 0x00150000,    /* 02DF  plist L20 <- L21, 3 items */
+    0x000E0684, 0x000F0000,    /* 02E1  plist L14 <- L15, 6 items */
+    0x000B0384, 0x000C0000,    /* 02E3  plist L11 <- L12, 3 items */
+    0x00050D45,                /* 02E5  lsym L13 <- sym#5   ("apply") */
+    0x00300E45,                /* 02E6  lsym L14 <- sym#48   ("reverse") */
+    0x00250F45,                /* 02E7  lsym L15 <- sym#37   ("items") */
+    0x000C0384, 0x000D0000,    /* 02E8  plist L12 <- L13, 3 items */
+    0x00080484, 0x00090000,    /* 02EA  plist L8 <- L9, 4 items */
+    0x00020684, 0x00030000,    /* 02EC  plist L2 <- L3, 6 items */
+    0x00210345,                /* 02EE  lsym L3 <- sym#33   ("match_expr") */
+    0x00250442,                /* 02EF  gget L4 <- g37   (_build_sequence_expr) */
+    0x00058041,                /* 02F0  move L5 <- P0 */
+    0x00040151,                /* 02F1  call base=L4 argc=1 */
+    0x00040041,                /* 02F2  move L4 <- L0 */
+    0x00010351,                /* 02F3  call base=L1 argc=3 */
+    0x00010041,                /* 02F4  move L1 <- L0 */
+    0x00010008,                /* 02F5  return L1 */
     0x00000001,                /* 02F6  trap 0 */
-    0x003B0042,                /* 02F7  gget L0 <- g59   (mk_expand) */
-    0x00090245,                /* 02F8  lsym L2 <- sym#9   ("fn_def") */
-    0x00310345,                /* 02F9  lsym L3 <- sym#49   ("$_manyflat") */
-    0x00040003,                /* 02FA  lnil L4 */
-    0x000B0745,                /* 02FB  lsym L7 <- sym#11   ("param") */
-    0x00210845,                /* 02FC  lsym L8 <- sym#33   ("match_expr") */
-    0x000D0A45,                /* 02FD  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 02FE  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 02FF  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 0301  lnil L10 */
-    0x00060484, 0x00070000,    /* 0302  plist L6 <- L7, 4 items */
-    0x00050184, 0x00060000,    /* 0304  plist L5 <- L6, 1 items */
-    0x000D0745,                /* 0306  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 0307  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 0308  plist L6 <- L7, 2 items */
-    0x00160845,                /* 030A  lsym L8 <- sym#22   ("do") */
-    0x00170A45,                /* 030B  lsym L10 <- sym#23   ("define") */
-    0x00250B45,                /* 030C  lsym L11 <- sym#37   ("items") */
-    0x000D0D45,                /* 030D  lsym L13 <- sym#13   ("type") */
-    0x000E0E45,                /* 030E  lsym L14 <- sym#14   ("auto") */
-    0x000C0284, 0x000D0000,    /* 030F  plist L12 <- L13, 2 items */
-    0x00260E45,                /* 0311  lsym L14 <- sym#38   ("nil") */
-    0x000D0184, 0x000E0000,    /* 0312  plist L13 <- L14, 1 items */
-    0x00090484, 0x000A0000,    /* 0314  plist L9 <- L10, 4 items */
-    0x00270B45,                /* 0316  lsym L11 <- sym#39   ("while") */
-    0x00280D45,                /* 0317  lsym L13 <- sym#40   ("true") */
-    0x000C0184, 0x000D0000,    /* 0318  plist L12 <- L13, 1 items */
-    0x00160E45,                /* 031A  lsym L14 <- sym#22   ("do") */
-    0x00171045,                /* 031B  lsym L16 <- sym#23   ("define") */
-    0x00291145,                /* 031C  lsym L17 <- sym#41   ("_mark") */
-    0x000D1345,                /* 031D  lsym L19 <- sym#13   ("type") */
-    0x000E1445,                /* 031E  lsym L20 <- sym#14   ("auto") */
-    0x00120284, 0x00130000,    /* 031F  plist L18 <- L19, 2 items */
-    0x00051445,                /* 0321  lsym L20 <- sym#5   ("apply") */
-    0x00061645,                /* 0322  lsym L22 <- sym#6   ("bind_msg") */
-    0x00071745,                /* 0323  lsym L23 <- sym#7   ("this") */
-    0x00231845,                /* 0324  lsym L24 <- sym#35   ("mark") */
-    0x00150384, 0x00160000,    /* 0325  plist L21 <- L22, 3 items */
-    0x00130284, 0x00140000,    /* 0327  plist L19 <- L20, 2 items */
-    0x000F0484, 0x00100000,    /* 0329  plist L15 <- L16, 4 items */
-    0x00171145,                /* 032B  lsym L17 <- sym#23   ("define") */
-    0x002A1245,                /* 032C  lsym L18 <- sym#42   ("m") */
-    0x000D1445,                /* 032D  lsym L20 <- sym#13   ("type") */
-    0x000E1545,                /* 032E  lsym L21 <- sym#14   ("auto") */
-    0x00130284, 0x00140000,    /* 032F  plist L19 <- L20, 2 items */
-    0x00211445,                /* 0331  lsym L20 <- sym#33   ("match_expr") */
-    0x00100484, 0x00110000,    /* 0332  plist L16 <- L17, 4 items */
-    0x000F1245,                /* 0334  lsym L18 <- sym#15   ("cond") */
-    0x00101545,                /* 0335  lsym L21 <- sym#16   ("==") */
-    0x002A1645,                /* 0336  lsym L22 <- sym#42   ("m") */
-    0x00001845,                /* 0337  lsym L24 <- sym#0   ("sym") */
-    0x00011945,                /* 0338  lsym L25 <- sym#1   ("NO_MATCH") */
-    0x00170284, 0x00180000,    /* 0339  plist L23 <- L24, 2 items */
-    0x00140384, 0x00150000,    /* 033B  plist L20 <- L21, 3 items */
-    0x00161645,                /* 033D  lsym L22 <- sym#22   ("do") */
-    0x00051845,                /* 033E  lsym L24 <- sym#5   ("apply") */
-    0x00061A45,                /* 033F  lsym L26 <- sym#6   ("bind_msg") */
-    0x00071B45,                /* 0340  lsym L27 <- sym#7   ("this") */
-    0x002B1C45,                /* 0341  lsym L28 <- sym#43   ("reset") */
-    0x00190384, 0x001A0000,    /* 0342  plist L25 <- L26, 3 items */
-    0x00291A45,                /* 0344  lsym L26 <- sym#41   ("_mark") */
-    0x00170384, 0x00180000,    /* 0345  plist L23 <- L24, 3 items */
-    0x002C1945,                /* 0347  lsym L25 <- sym#44   ("break") */
-    0x00180184, 0x00190000,    /* 0348  plist L24 <- L25, 1 items */
-    0x00150384, 0x00160000,    /* 034A  plist L21 <- L22, 3 items */
-    0x00130284, 0x00140000,    /* 034C  plist L19 <- L20, 2 items */
-    0x00110284, 0x00120000,    /* 034E  plist L17 <- L18, 2 items */
-    0x000F1345,                /* 0350  lsym L19 <- sym#15   ("cond") */
-    0x002D1645,                /* 0351  lsym L22 <- sym#45   ("is") */
-    0x002A1745,                /* 0352  lsym L23 <- sym#42   ("m") */
-    0x000D1945,                /* 0353  lsym L25 <- sym#13   ("type") */
-    0x00041A45,                /* 0354  lsym L26 <- sym#4   ("error") */
-    0x00180284, 0x00190000,    /* 0355  plist L24 <- L25, 2 items */
-    0x00150384, 0x00160000,    /* 0357  plist L21 <- L22, 3 items */
-    0x00161745,                /* 0359  lsym L23 <- sym#22   ("do") */
-    0x00051945,                /* 035A  lsym L25 <- sym#5   ("apply") */
-    0x00061B45,                /* 035B  lsym L27 <- sym#6   ("bind_msg") */
-    0x00071C45,                /* 035C  lsym L28 <- sym#7   ("this") */
-    0x002B1D45,                /* 035D  lsym L29 <- sym#43   ("reset") */
-    0x001A0384, 0x001B0000,    /* 035E  plist L26 <- L27, 3 items */
-    0x00291B45,                /* 0360  lsym L27 <- sym#41   ("_mark") */
-    0x00180384, 0x00190000,    /* 0361  plist L24 <- L25, 3 items */
-    0x002E1A45,                /* 0363  lsym L26 <- sym#46   ("set") */
-    0x00251B45,                /* 0364  lsym L27 <- sym#37   ("items") */
-    0x002A1C45,                /* 0365  lsym L28 <- sym#42   ("m") */
-    0x00190384, 0x001A0000,    /* 0366  plist L25 <- L26, 3 items */
-    0x002C1B45,                /* 0368  lsym L27 <- sym#44   ("break") */
-    0x001A0184, 0x001B0000,    /* 0369  plist L26 <- L27, 1 items */
-    0x00160484, 0x00170000,    /* 036B  plist L22 <- L23, 4 items */
-    0x00140284, 0x00150000,    /* 036D  plist L20 <- L21, 2 items */
-    0x00120284, 0x00130000,    /* 036F  plist L18 <- L19, 2 items */
-    0x000F1445,                /* 0371  lsym L20 <- sym#15   ("cond") */
-    0x00321745,                /* 0372  lsym L23 <- sym#50   ("or") */
-    0x002D1945,                /* 0373  lsym L25 <- sym#45   ("is") */
-    0x002A1A45,                /* 0374  lsym L26 <- sym#42   ("m") */
-    0x000D1C45,                /* 0375  lsym L28 <- sym#13   ("type") */
-    0x00331D45,                /* 0376  lsym L29 <- sym#51   ("pair") */
-    0x001B0284, 0x001C0000,    /* 0377  plist L27 <- L28, 2 items */
-    0x00180384, 0x00190000,    /* 0379  plist L24 <- L25, 3 items */
-    0x002D1A45,                /* 037B  lsym L26 <- sym#45   ("is") */
-    0x002A1B45,                /* 037C  lsym L27 <- sym#42   ("m") */
-    0x000D1D45,                /* 037D  lsym L29 <- sym#13   ("type") */
-    0x00341E45,                /* 037E  lsym L30 <- sym#52   ("list") */
-    0x001C0284, 0x001D0000,    /* 037F  plist L28 <- L29, 2 items */
-    0x00190384, 0x001A0000,    /* 0381  plist L25 <- L26, 3 items */
-    0x002D1B45,                /* 0383  lsym L27 <- sym#45   ("is") */
-    0x002A1C45,                /* 0384  lsym L28 <- sym#42   ("m") */
-    0x000D1E45,                /* 0385  lsym L30 <- sym#13   ("type") */
-    0x00261F45,                /* 0386  lsym L31 <- sym#38   ("nil") */
-    0x001D0284, 0x001E0000,    /* 0387  plist L29 <- L30, 2 items */
-    0x001A0384, 0x001B0000,    /* 0389  plist L26 <- L27, 3 items */
-    0x00160484, 0x00170000,    /* 038B  plist L22 <- L23, 4 items */
-    0x00351845,                /* 038D  lsym L24 <- sym#53   ("for") */
-    0x00361945,                /* 038E  lsym L25 <- sym#54   ("x") */
-    0x002A1A45,                /* 038F  lsym L26 <- sym#42   ("m") */
-    0x001B0003,                /* 0390  lnil L27 */
-    0x002E1D45,                /* 0391  lsym L29 <- sym#46   ("set") */
-    0x00251E45,                /* 0392  lsym L30 <- sym#37   ("items") */
-    0x00052045,                /* 0393  lsym L32 <- sym#5   ("apply") */
-    0x002F2145,                /* 0394  lsym L33 <- sym#47   ("cons") */
-    0x00362245,                /* 0395  lsym L34 <- sym#54   ("x") */
-    0x00252345,                /* 0396  lsym L35 <- sym#37   ("items") */
-    0x001F0484, 0x00200000,    /* 0397  plist L31 <- L32, 4 items */
-    0x001C0384, 0x001D0000,    /* 0399  plist L28 <- L29, 3 items */
-    0x00170584, 0x00180000,    /* 039B  plist L23 <- L24, 5 items */
-    0x00150284, 0x00160000,    /* 039D  plist L21 <- L22, 2 items */
-    0x00141745,                /* 039F  lsym L23 <- sym#20   ("else") */
-    0x002E1945,                /* 03A0  lsym L25 <- sym#46   ("set") */
-    0x00251A45,                /* 03A1  lsym L26 <- sym#37   ("items") */
-    0x00051C45,                /* 03A2  lsym L28 <- sym#5   ("apply") */
-    0x002F1D45,                /* 03A3  lsym L29 <- sym#47   ("cons") */
-    0x002A1E45,                /* 03A4  lsym L30 <- sym#42   ("m") */
-    0x00251F45,                /* 03A5  lsym L31 <- sym#37   ("items") */
-    0x001B0484, 0x001C0000,    /* 03A6  plist L27 <- L28, 4 items */
-    0x00180384, 0x00190000,    /* 03A8  plist L24 <- L25, 3 items */
-    0x00160284, 0x00170000,    /* 03AA  plist L22 <- L23, 2 items */
-    0x00130384, 0x00140000,    /* 03AC  plist L19 <- L20, 3 items */
-    0x000D0684, 0x000E0000,    /* 03AE  plist L13 <- L14, 6 items */
-    0x000A0384, 0x000B0000,    /* 03B0  plist L10 <- L11, 3 items */
-    0x00050C45,                /* 03B2  lsym L12 <- sym#5   ("apply") */
-    0x00300D45,                /* 03B3  lsym L13 <- sym#48   ("reverse") */
-    0x00250E45,                /* 03B4  lsym L14 <- sym#37   ("items") */
-    0x000B0384, 0x000C0000,    /* 03B5  plist L11 <- L12, 3 items */
-    0x00070484, 0x00080000,    /* 03B7  plist L7 <- L8, 4 items */
-    0x00010684, 0x00020000,    /* 03B9  plist L1 <- L2, 6 items */
-    0x00210245,                /* 03BB  lsym L2 <- sym#33   ("match_expr") */
-    0x00250342,                /* 03BC  gget L3 <- g37   (_build_sequence_expr) */
-    0x00048041,                /* 03BD  move L4 <- P0 */
-    0x000301A0, 0x00010000,    /* 03BE  call base=L3 argc=1 nres=1 */
-    0x000003A0, 0x00010000,    /* 03C0  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 03C2  return L0 count=1 */
+    0x003B0142,                /* 02F7  gget L1 <- g59   (mk_expand) */
+    0x00090345,                /* 02F8  lsym L3 <- sym#9   ("fn_def") */
+    0x00310445,                /* 02F9  lsym L4 <- sym#49   ("$_manyflat") */
+    0x00050003,                /* 02FA  lnil L5 */
+    0x000B0845,                /* 02FB  lsym L8 <- sym#11   ("param") */
+    0x00210945,                /* 02FC  lsym L9 <- sym#33   ("match_expr") */
+    0x000D0B45,                /* 02FD  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 02FE  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 02FF  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 0301  lnil L11 */
+    0x00070484, 0x00080000,    /* 0302  plist L7 <- L8, 4 items */
+    0x00060184, 0x00070000,    /* 0304  plist L6 <- L7, 1 items */
+    0x000D0845,                /* 0306  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 0307  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 0308  plist L7 <- L8, 2 items */
+    0x00160945,                /* 030A  lsym L9 <- sym#22   ("do") */
+    0x00170B45,                /* 030B  lsym L11 <- sym#23   ("define") */
+    0x00250C45,                /* 030C  lsym L12 <- sym#37   ("items") */
+    0x000D0E45,                /* 030D  lsym L14 <- sym#13   ("type") */
+    0x000E0F45,                /* 030E  lsym L15 <- sym#14   ("auto") */
+    0x000D0284, 0x000E0000,    /* 030F  plist L13 <- L14, 2 items */
+    0x00260F45,                /* 0311  lsym L15 <- sym#38   ("nil") */
+    0x000E0184, 0x000F0000,    /* 0312  plist L14 <- L15, 1 items */
+    0x000A0484, 0x000B0000,    /* 0314  plist L10 <- L11, 4 items */
+    0x00270C45,                /* 0316  lsym L12 <- sym#39   ("while") */
+    0x00280E45,                /* 0317  lsym L14 <- sym#40   ("true") */
+    0x000D0184, 0x000E0000,    /* 0318  plist L13 <- L14, 1 items */
+    0x00160F45,                /* 031A  lsym L15 <- sym#22   ("do") */
+    0x00171145,                /* 031B  lsym L17 <- sym#23   ("define") */
+    0x00291245,                /* 031C  lsym L18 <- sym#41   ("_mark") */
+    0x000D1445,                /* 031D  lsym L20 <- sym#13   ("type") */
+    0x000E1545,                /* 031E  lsym L21 <- sym#14   ("auto") */
+    0x00130284, 0x00140000,    /* 031F  plist L19 <- L20, 2 items */
+    0x00051545,                /* 0321  lsym L21 <- sym#5   ("apply") */
+    0x00061745,                /* 0322  lsym L23 <- sym#6   ("bind_msg") */
+    0x00071845,                /* 0323  lsym L24 <- sym#7   ("this") */
+    0x00231945,                /* 0324  lsym L25 <- sym#35   ("mark") */
+    0x00160384, 0x00170000,    /* 0325  plist L22 <- L23, 3 items */
+    0x00140284, 0x00150000,    /* 0327  plist L20 <- L21, 2 items */
+    0x00100484, 0x00110000,    /* 0329  plist L16 <- L17, 4 items */
+    0x00171245,                /* 032B  lsym L18 <- sym#23   ("define") */
+    0x002A1345,                /* 032C  lsym L19 <- sym#42   ("m") */
+    0x000D1545,                /* 032D  lsym L21 <- sym#13   ("type") */
+    0x000E1645,                /* 032E  lsym L22 <- sym#14   ("auto") */
+    0x00140284, 0x00150000,    /* 032F  plist L20 <- L21, 2 items */
+    0x00211545,                /* 0331  lsym L21 <- sym#33   ("match_expr") */
+    0x00110484, 0x00120000,    /* 0332  plist L17 <- L18, 4 items */
+    0x000F1345,                /* 0334  lsym L19 <- sym#15   ("cond") */
+    0x00101645,                /* 0335  lsym L22 <- sym#16   ("==") */
+    0x002A1745,                /* 0336  lsym L23 <- sym#42   ("m") */
+    0x00001945,                /* 0337  lsym L25 <- sym#0   ("sym") */
+    0x00011A45,                /* 0338  lsym L26 <- sym#1   ("NO_MATCH") */
+    0x00180284, 0x00190000,    /* 0339  plist L24 <- L25, 2 items */
+    0x00150384, 0x00160000,    /* 033B  plist L21 <- L22, 3 items */
+    0x00161745,                /* 033D  lsym L23 <- sym#22   ("do") */
+    0x00051945,                /* 033E  lsym L25 <- sym#5   ("apply") */
+    0x00061B45,                /* 033F  lsym L27 <- sym#6   ("bind_msg") */
+    0x00071C45,                /* 0340  lsym L28 <- sym#7   ("this") */
+    0x002B1D45,                /* 0341  lsym L29 <- sym#43   ("reset") */
+    0x001A0384, 0x001B0000,    /* 0342  plist L26 <- L27, 3 items */
+    0x00291B45,                /* 0344  lsym L27 <- sym#41   ("_mark") */
+    0x00180384, 0x00190000,    /* 0345  plist L24 <- L25, 3 items */
+    0x002C1A45,                /* 0347  lsym L26 <- sym#44   ("break") */
+    0x00190184, 0x001A0000,    /* 0348  plist L25 <- L26, 1 items */
+    0x00160384, 0x00170000,    /* 034A  plist L22 <- L23, 3 items */
+    0x00140284, 0x00150000,    /* 034C  plist L20 <- L21, 2 items */
+    0x00120284, 0x00130000,    /* 034E  plist L18 <- L19, 2 items */
+    0x000F1445,                /* 0350  lsym L20 <- sym#15   ("cond") */
+    0x002D1745,                /* 0351  lsym L23 <- sym#45   ("is") */
+    0x002A1845,                /* 0352  lsym L24 <- sym#42   ("m") */
+    0x000D1A45,                /* 0353  lsym L26 <- sym#13   ("type") */
+    0x00041B45,                /* 0354  lsym L27 <- sym#4   ("error") */
+    0x00190284, 0x001A0000,    /* 0355  plist L25 <- L26, 2 items */
+    0x00160384, 0x00170000,    /* 0357  plist L22 <- L23, 3 items */
+    0x00161845,                /* 0359  lsym L24 <- sym#22   ("do") */
+    0x00051A45,                /* 035A  lsym L26 <- sym#5   ("apply") */
+    0x00061C45,                /* 035B  lsym L28 <- sym#6   ("bind_msg") */
+    0x00071D45,                /* 035C  lsym L29 <- sym#7   ("this") */
+    0x002B1E45,                /* 035D  lsym L30 <- sym#43   ("reset") */
+    0x001B0384, 0x001C0000,    /* 035E  plist L27 <- L28, 3 items */
+    0x00291C45,                /* 0360  lsym L28 <- sym#41   ("_mark") */
+    0x00190384, 0x001A0000,    /* 0361  plist L25 <- L26, 3 items */
+    0x002E1B45,                /* 0363  lsym L27 <- sym#46   ("set") */
+    0x00251C45,                /* 0364  lsym L28 <- sym#37   ("items") */
+    0x002A1D45,                /* 0365  lsym L29 <- sym#42   ("m") */
+    0x001A0384, 0x001B0000,    /* 0366  plist L26 <- L27, 3 items */
+    0x002C1C45,                /* 0368  lsym L28 <- sym#44   ("break") */
+    0x001B0184, 0x001C0000,    /* 0369  plist L27 <- L28, 1 items */
+    0x00170484, 0x00180000,    /* 036B  plist L23 <- L24, 4 items */
+    0x00150284, 0x00160000,    /* 036D  plist L21 <- L22, 2 items */
+    0x00130284, 0x00140000,    /* 036F  plist L19 <- L20, 2 items */
+    0x000F1545,                /* 0371  lsym L21 <- sym#15   ("cond") */
+    0x00321845,                /* 0372  lsym L24 <- sym#50   ("or") */
+    0x002D1A45,                /* 0373  lsym L26 <- sym#45   ("is") */
+    0x002A1B45,                /* 0374  lsym L27 <- sym#42   ("m") */
+    0x000D1D45,                /* 0375  lsym L29 <- sym#13   ("type") */
+    0x00331E45,                /* 0376  lsym L30 <- sym#51   ("pair") */
+    0x001C0284, 0x001D0000,    /* 0377  plist L28 <- L29, 2 items */
+    0x00190384, 0x001A0000,    /* 0379  plist L25 <- L26, 3 items */
+    0x002D1B45,                /* 037B  lsym L27 <- sym#45   ("is") */
+    0x002A1C45,                /* 037C  lsym L28 <- sym#42   ("m") */
+    0x000D1E45,                /* 037D  lsym L30 <- sym#13   ("type") */
+    0x00341F45,                /* 037E  lsym L31 <- sym#52   ("list") */
+    0x001D0284, 0x001E0000,    /* 037F  plist L29 <- L30, 2 items */
+    0x001A0384, 0x001B0000,    /* 0381  plist L26 <- L27, 3 items */
+    0x002D1C45,                /* 0383  lsym L28 <- sym#45   ("is") */
+    0x002A1D45,                /* 0384  lsym L29 <- sym#42   ("m") */
+    0x000D1F45,                /* 0385  lsym L31 <- sym#13   ("type") */
+    0x00262045,                /* 0386  lsym L32 <- sym#38   ("nil") */
+    0x001E0284, 0x001F0000,    /* 0387  plist L30 <- L31, 2 items */
+    0x001B0384, 0x001C0000,    /* 0389  plist L27 <- L28, 3 items */
+    0x00170484, 0x00180000,    /* 038B  plist L23 <- L24, 4 items */
+    0x00351945,                /* 038D  lsym L25 <- sym#53   ("for") */
+    0x00361A45,                /* 038E  lsym L26 <- sym#54   ("x") */
+    0x002A1B45,                /* 038F  lsym L27 <- sym#42   ("m") */
+    0x001C0003,                /* 0390  lnil L28 */
+    0x002E1E45,                /* 0391  lsym L30 <- sym#46   ("set") */
+    0x00251F45,                /* 0392  lsym L31 <- sym#37   ("items") */
+    0x00052145,                /* 0393  lsym L33 <- sym#5   ("apply") */
+    0x002F2245,                /* 0394  lsym L34 <- sym#47   ("cons") */
+    0x00362345,                /* 0395  lsym L35 <- sym#54   ("x") */
+    0x00252445,                /* 0396  lsym L36 <- sym#37   ("items") */
+    0x00200484, 0x00210000,    /* 0397  plist L32 <- L33, 4 items */
+    0x001D0384, 0x001E0000,    /* 0399  plist L29 <- L30, 3 items */
+    0x00180584, 0x00190000,    /* 039B  plist L24 <- L25, 5 items */
+    0x00160284, 0x00170000,    /* 039D  plist L22 <- L23, 2 items */
+    0x00141845,                /* 039F  lsym L24 <- sym#20   ("else") */
+    0x002E1A45,                /* 03A0  lsym L26 <- sym#46   ("set") */
+    0x00251B45,                /* 03A1  lsym L27 <- sym#37   ("items") */
+    0x00051D45,                /* 03A2  lsym L29 <- sym#5   ("apply") */
+    0x002F1E45,                /* 03A3  lsym L30 <- sym#47   ("cons") */
+    0x002A1F45,                /* 03A4  lsym L31 <- sym#42   ("m") */
+    0x00252045,                /* 03A5  lsym L32 <- sym#37   ("items") */
+    0x001C0484, 0x001D0000,    /* 03A6  plist L28 <- L29, 4 items */
+    0x00190384, 0x001A0000,    /* 03A8  plist L25 <- L26, 3 items */
+    0x00170284, 0x00180000,    /* 03AA  plist L23 <- L24, 2 items */
+    0x00140384, 0x00150000,    /* 03AC  plist L20 <- L21, 3 items */
+    0x000E0684, 0x000F0000,    /* 03AE  plist L14 <- L15, 6 items */
+    0x000B0384, 0x000C0000,    /* 03B0  plist L11 <- L12, 3 items */
+    0x00050D45,                /* 03B2  lsym L13 <- sym#5   ("apply") */
+    0x00300E45,                /* 03B3  lsym L14 <- sym#48   ("reverse") */
+    0x00250F45,                /* 03B4  lsym L15 <- sym#37   ("items") */
+    0x000C0384, 0x000D0000,    /* 03B5  plist L12 <- L13, 3 items */
+    0x00080484, 0x00090000,    /* 03B7  plist L8 <- L9, 4 items */
+    0x00020684, 0x00030000,    /* 03B9  plist L2 <- L3, 6 items */
+    0x00210345,                /* 03BB  lsym L3 <- sym#33   ("match_expr") */
+    0x00250442,                /* 03BC  gget L4 <- g37   (_build_sequence_expr) */
+    0x00058041,                /* 03BD  move L5 <- P0 */
+    0x00040151,                /* 03BE  call base=L4 argc=1 */
+    0x00040041,                /* 03BF  move L4 <- L0 */
+    0x00010351,                /* 03C0  call base=L1 argc=3 */
+    0x00010041,                /* 03C1  move L1 <- L0 */
+    0x00010008,                /* 03C2  return L1 */
     0x00000001,                /* 03C3  trap 0 */
-    0x003B0042,                /* 03C4  gget L0 <- g59   (mk_expand) */
-    0x00090245,                /* 03C5  lsym L2 <- sym#9   ("fn_def") */
-    0x00370345,                /* 03C6  lsym L3 <- sym#55   ("_tmpl_bool") */
-    0x00040003,                /* 03C7  lnil L4 */
-    0x000B0745,                /* 03C8  lsym L7 <- sym#11   ("param") */
-    0x00210845,                /* 03C9  lsym L8 <- sym#33   ("match_expr") */
-    0x000D0A45,                /* 03CA  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 03CB  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 03CC  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 03CE  lnil L10 */
-    0x00060484, 0x00070000,    /* 03CF  plist L6 <- L7, 4 items */
-    0x00050184, 0x00060000,    /* 03D1  plist L5 <- L6, 1 items */
-    0x000D0745,                /* 03D3  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 03D4  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 03D5  plist L6 <- L7, 2 items */
-    0x00160845,                /* 03D7  lsym L8 <- sym#22   ("do") */
-    0x00170A45,                /* 03D8  lsym L10 <- sym#23   ("define") */
-    0x00290B45,                /* 03D9  lsym L11 <- sym#41   ("_mark") */
-    0x000D0D45,                /* 03DA  lsym L13 <- sym#13   ("type") */
-    0x000E0E45,                /* 03DB  lsym L14 <- sym#14   ("auto") */
-    0x000C0284, 0x000D0000,    /* 03DC  plist L12 <- L13, 2 items */
-    0x00050E45,                /* 03DE  lsym L14 <- sym#5   ("apply") */
-    0x00061045,                /* 03DF  lsym L16 <- sym#6   ("bind_msg") */
-    0x00071145,                /* 03E0  lsym L17 <- sym#7   ("this") */
-    0x00231245,                /* 03E1  lsym L18 <- sym#35   ("mark") */
-    0x000F0384, 0x00100000,    /* 03E2  plist L15 <- L16, 3 items */
-    0x000D0284, 0x000E0000,    /* 03E4  plist L13 <- L14, 2 items */
-    0x00090484, 0x000A0000,    /* 03E6  plist L9 <- L10, 4 items */
-    0x00170B45,                /* 03E8  lsym L11 <- sym#23   ("define") */
-    0x00220C45,                /* 03E9  lsym L12 <- sym#34   ("v") */
-    0x000D0E45,                /* 03EA  lsym L14 <- sym#13   ("type") */
-    0x000E0F45,                /* 03EB  lsym L15 <- sym#14   ("auto") */
-    0x000D0284, 0x000E0000,    /* 03EC  plist L13 <- L14, 2 items */
-    0x00210E45,                /* 03EE  lsym L14 <- sym#33   ("match_expr") */
-    0x000A0484, 0x000B0000,    /* 03EF  plist L10 <- L11, 4 items */
-    0x000F0C45,                /* 03F1  lsym L12 <- sym#15   ("cond") */
-    0x002D0F45,                /* 03F2  lsym L15 <- sym#45   ("is") */
-    0x00221045,                /* 03F3  lsym L16 <- sym#34   ("v") */
-    0x000D1245,                /* 03F4  lsym L18 <- sym#13   ("type") */
-    0x00041345,                /* 03F5  lsym L19 <- sym#4   ("error") */
-    0x00110284, 0x00120000,    /* 03F6  plist L17 <- L18, 2 items */
-    0x000E0384, 0x000F0000,    /* 03F8  plist L14 <- L15, 3 items */
-    0x00220F45,                /* 03FA  lsym L15 <- sym#34   ("v") */
-    0x000D0284, 0x000E0000,    /* 03FB  plist L13 <- L14, 2 items */
-    0x000B0284, 0x000C0000,    /* 03FD  plist L11 <- L12, 2 items */
-    0x000F0D45,                /* 03FF  lsym L13 <- sym#15   ("cond") */
-    0x00101045,                /* 0400  lsym L16 <- sym#16   ("==") */
-    0x00221145,                /* 0401  lsym L17 <- sym#34   ("v") */
-    0x00001345,                /* 0402  lsym L19 <- sym#0   ("sym") */
-    0x00011445,                /* 0403  lsym L20 <- sym#1   ("NO_MATCH") */
-    0x00120284, 0x00130000,    /* 0404  plist L18 <- L19, 2 items */
-    0x000F0384, 0x00100000,    /* 0406  plist L15 <- L16, 3 items */
-    0x00161145,                /* 0408  lsym L17 <- sym#22   ("do") */
-    0x00051345,                /* 0409  lsym L19 <- sym#5   ("apply") */
-    0x00061545,                /* 040A  lsym L21 <- sym#6   ("bind_msg") */
-    0x00071645,                /* 040B  lsym L22 <- sym#7   ("this") */
-    0x002B1745,                /* 040C  lsym L23 <- sym#43   ("reset") */
-    0x00140384, 0x00150000,    /* 040D  plist L20 <- L21, 3 items */
-    0x00291545,                /* 040F  lsym L21 <- sym#41   ("_mark") */
-    0x00120384, 0x00130000,    /* 0410  plist L18 <- L19, 3 items */
-    0x00381445,                /* 0412  lsym L20 <- sym#56   ("false") */
-    0x00130184, 0x00140000,    /* 0413  plist L19 <- L20, 1 items */
-    0x00100384, 0x00110000,    /* 0415  plist L16 <- L17, 3 items */
-    0x000E0284, 0x000F0000,    /* 0417  plist L14 <- L15, 2 items */
-    0x00141045,                /* 0419  lsym L16 <- sym#20   ("else") */
-    0x00281245,                /* 041A  lsym L18 <- sym#40   ("true") */
-    0x00110184, 0x00120000,    /* 041B  plist L17 <- L18, 1 items */
-    0x000F0284, 0x00100000,    /* 041D  plist L15 <- L16, 2 items */
-    0x000C0384, 0x000D0000,    /* 041F  plist L12 <- L13, 3 items */
-    0x00070584, 0x00080000,    /* 0421  plist L7 <- L8, 5 items */
-    0x00010684, 0x00020000,    /* 0423  plist L1 <- L2, 6 items */
-    0x00210245,                /* 0425  lsym L2 <- sym#33   ("match_expr") */
-    0x00250342,                /* 0426  gget L3 <- g37   (_build_sequence_expr) */
-    0x00048041,                /* 0427  move L4 <- P0 */
-    0x000301A0, 0x00010000,    /* 0428  call base=L3 argc=1 nres=1 */
-    0x000003A0, 0x00010000,    /* 042A  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 042C  return L0 count=1 */
-    0x00008141,                /* 042D  move L0 <- P1 */
-    0x00010345,                /* 042E  lsym L3 <- sym#1   ("NO_MATCH") */
-    0x00020090, 0x00000003,    /* 042F  ne L2 <- L0 != L3 */
-    0x0004024B,                /* 0431  jf L2, +4 */
-    0x00070346,                /* 0432  lconst L3 <- static#7   ("error") */
-    0x00040097, 0x00000003,    /* 0433  is L4 <- L0 is L3 */
-    0x0002044A,                /* 0435  not L2 <- L4 */
-    0x0002024B,                /* 0436  jf L2, +2 */
-    0x00018041,                /* 0437  move L1 <- P0 */
+    0x003B0142,                /* 03C4  gget L1 <- g59   (mk_expand) */
+    0x00090345,                /* 03C5  lsym L3 <- sym#9   ("fn_def") */
+    0x00370445,                /* 03C6  lsym L4 <- sym#55   ("_tmpl_bool") */
+    0x00050003,                /* 03C7  lnil L5 */
+    0x000B0845,                /* 03C8  lsym L8 <- sym#11   ("param") */
+    0x00210945,                /* 03C9  lsym L9 <- sym#33   ("match_expr") */
+    0x000D0B45,                /* 03CA  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 03CB  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 03CC  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 03CE  lnil L11 */
+    0x00070484, 0x00080000,    /* 03CF  plist L7 <- L8, 4 items */
+    0x00060184, 0x00070000,    /* 03D1  plist L6 <- L7, 1 items */
+    0x000D0845,                /* 03D3  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 03D4  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 03D5  plist L7 <- L8, 2 items */
+    0x00160945,                /* 03D7  lsym L9 <- sym#22   ("do") */
+    0x00170B45,                /* 03D8  lsym L11 <- sym#23   ("define") */
+    0x00290C45,                /* 03D9  lsym L12 <- sym#41   ("_mark") */
+    0x000D0E45,                /* 03DA  lsym L14 <- sym#13   ("type") */
+    0x000E0F45,                /* 03DB  lsym L15 <- sym#14   ("auto") */
+    0x000D0284, 0x000E0000,    /* 03DC  plist L13 <- L14, 2 items */
+    0x00050F45,                /* 03DE  lsym L15 <- sym#5   ("apply") */
+    0x00061145,                /* 03DF  lsym L17 <- sym#6   ("bind_msg") */
+    0x00071245,                /* 03E0  lsym L18 <- sym#7   ("this") */
+    0x00231345,                /* 03E1  lsym L19 <- sym#35   ("mark") */
+    0x00100384, 0x00110000,    /* 03E2  plist L16 <- L17, 3 items */
+    0x000E0284, 0x000F0000,    /* 03E4  plist L14 <- L15, 2 items */
+    0x000A0484, 0x000B0000,    /* 03E6  plist L10 <- L11, 4 items */
+    0x00170C45,                /* 03E8  lsym L12 <- sym#23   ("define") */
+    0x00220D45,                /* 03E9  lsym L13 <- sym#34   ("v") */
+    0x000D0F45,                /* 03EA  lsym L15 <- sym#13   ("type") */
+    0x000E1045,                /* 03EB  lsym L16 <- sym#14   ("auto") */
+    0x000E0284, 0x000F0000,    /* 03EC  plist L14 <- L15, 2 items */
+    0x00210F45,                /* 03EE  lsym L15 <- sym#33   ("match_expr") */
+    0x000B0484, 0x000C0000,    /* 03EF  plist L11 <- L12, 4 items */
+    0x000F0D45,                /* 03F1  lsym L13 <- sym#15   ("cond") */
+    0x002D1045,                /* 03F2  lsym L16 <- sym#45   ("is") */
+    0x00221145,                /* 03F3  lsym L17 <- sym#34   ("v") */
+    0x000D1345,                /* 03F4  lsym L19 <- sym#13   ("type") */
+    0x00041445,                /* 03F5  lsym L20 <- sym#4   ("error") */
+    0x00120284, 0x00130000,    /* 03F6  plist L18 <- L19, 2 items */
+    0x000F0384, 0x00100000,    /* 03F8  plist L15 <- L16, 3 items */
+    0x00221045,                /* 03FA  lsym L16 <- sym#34   ("v") */
+    0x000E0284, 0x000F0000,    /* 03FB  plist L14 <- L15, 2 items */
+    0x000C0284, 0x000D0000,    /* 03FD  plist L12 <- L13, 2 items */
+    0x000F0E45,                /* 03FF  lsym L14 <- sym#15   ("cond") */
+    0x00101145,                /* 0400  lsym L17 <- sym#16   ("==") */
+    0x00221245,                /* 0401  lsym L18 <- sym#34   ("v") */
+    0x00001445,                /* 0402  lsym L20 <- sym#0   ("sym") */
+    0x00011545,                /* 0403  lsym L21 <- sym#1   ("NO_MATCH") */
+    0x00130284, 0x00140000,    /* 0404  plist L19 <- L20, 2 items */
+    0x00100384, 0x00110000,    /* 0406  plist L16 <- L17, 3 items */
+    0x00161245,                /* 0408  lsym L18 <- sym#22   ("do") */
+    0x00051445,                /* 0409  lsym L20 <- sym#5   ("apply") */
+    0x00061645,                /* 040A  lsym L22 <- sym#6   ("bind_msg") */
+    0x00071745,                /* 040B  lsym L23 <- sym#7   ("this") */
+    0x002B1845,                /* 040C  lsym L24 <- sym#43   ("reset") */
+    0x00150384, 0x00160000,    /* 040D  plist L21 <- L22, 3 items */
+    0x00291645,                /* 040F  lsym L22 <- sym#41   ("_mark") */
+    0x00130384, 0x00140000,    /* 0410  plist L19 <- L20, 3 items */
+    0x00381545,                /* 0412  lsym L21 <- sym#56   ("false") */
+    0x00140184, 0x00150000,    /* 0413  plist L20 <- L21, 1 items */
+    0x00110384, 0x00120000,    /* 0415  plist L17 <- L18, 3 items */
+    0x000F0284, 0x00100000,    /* 0417  plist L15 <- L16, 2 items */
+    0x00141145,                /* 0419  lsym L17 <- sym#20   ("else") */
+    0x00281345,                /* 041A  lsym L19 <- sym#40   ("true") */
+    0x00120184, 0x00130000,    /* 041B  plist L18 <- L19, 1 items */
+    0x00100284, 0x00110000,    /* 041D  plist L16 <- L17, 2 items */
+    0x000D0384, 0x000E0000,    /* 041F  plist L13 <- L14, 3 items */
+    0x00080584, 0x00090000,    /* 0421  plist L8 <- L9, 5 items */
+    0x00020684, 0x00030000,    /* 0423  plist L2 <- L3, 6 items */
+    0x00210345,                /* 0425  lsym L3 <- sym#33   ("match_expr") */
+    0x00250442,                /* 0426  gget L4 <- g37   (_build_sequence_expr) */
+    0x00058041,                /* 0427  move L5 <- P0 */
+    0x00040151,                /* 0428  call base=L4 argc=1 */
+    0x00040041,                /* 0429  move L4 <- L0 */
+    0x00010351,                /* 042A  call base=L1 argc=3 */
+    0x00010041,                /* 042B  move L1 <- L0 */
+    0x00010008,                /* 042C  return L1 */
+    0x00018141,                /* 042D  move L1 <- P1 */
+    0x00010445,                /* 042E  lsym L4 <- sym#1   ("NO_MATCH") */
+    0x00030090, 0x00010004,    /* 042F  ne L3 <- L1 != L4 */
+    0x0004034B,                /* 0431  jf L3, +4 */
+    0x00070446,                /* 0432  lconst L4 <- static#7   ("error") */
+    0x00050097, 0x00010004,    /* 0433  is L5 <- L1 is L4 */
+    0x0003054A,                /* 0435  not L3 <- L5 */
+    0x0002034B,                /* 0436  jf L3, +2 */
+    0x00028041,                /* 0437  move L2 <- P0 */
     0x0001004F,                /* 0438  jmp +1 */
-    0x00010041,                /* 0439  move L1 <- L0 */
-    0x00010102,                /* 043A  return L1 count=1 */
-    0x005C0042,                /* 043B  gget L0 <- g92   (car) */
-    0x00018041,                /* 043C  move L1 <- P0 */
-    0x000001A0, 0x00010000,    /* 043D  call base=L0 argc=1 nres=1 */
-    0x00000145,                /* 043F  lsym L1 <- sym#0   ("sym") */
-    0x00020090, 0x00000001,    /* 0440  ne L2 <- L0 != L1 */
-    0x0005024B,                /* 0442  jf L2, +5 */
-    0x005B0042,                /* 0443  gget L0 <- g91   (error) */
-    0x00080146,                /* 0444  lconst L1 <- static#8   ("value(): first argument must be a bare symbol, e.g. value('true, ...)") */
-    0x000001A0, 0x00010000,    /* 0445  call base=L0 argc=1 nres=1 */
-    0x00000102,                /* 0447  return L0 count=1 */
-    0x003C0042,                /* 0448  gget L0 <- g60   (mk_expand_n) */
-    0x00090245,                /* 0449  lsym L2 <- sym#9   ("fn_def") */
-    0x00390345,                /* 044A  lsym L3 <- sym#57   ("$_tmpl_value") */
-    0x00040003,                /* 044B  lnil L4 */
-    0x000B0745,                /* 044C  lsym L7 <- sym#11   ("param") */
-    0x003A0845,                /* 044D  lsym L8 <- sym#58   ("repl") */
-    0x000D0A45,                /* 044E  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 044F  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 0450  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 0452  lnil L10 */
-    0x00060484, 0x00070000,    /* 0453  plist L6 <- L7, 4 items */
-    0x000B0845,                /* 0455  lsym L8 <- sym#11   ("param") */
-    0x00210945,                /* 0456  lsym L9 <- sym#33   ("match_expr") */
-    0x000D0B45,                /* 0457  lsym L11 <- sym#13   ("type") */
-    0x000E0C45,                /* 0458  lsym L12 <- sym#14   ("auto") */
-    0x000A0284, 0x000B0000,    /* 0459  plist L10 <- L11, 2 items */
-    0x000B0003,                /* 045B  lnil L11 */
-    0x00070484, 0x00080000,    /* 045C  plist L7 <- L8, 4 items */
-    0x00050284, 0x00060000,    /* 045E  plist L5 <- L6, 2 items */
-    0x000D0745,                /* 0460  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 0461  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 0462  plist L6 <- L7, 2 items */
-    0x00160845,                /* 0464  lsym L8 <- sym#22   ("do") */
-    0x00170A45,                /* 0465  lsym L10 <- sym#23   ("define") */
-    0x00220B45,                /* 0466  lsym L11 <- sym#34   ("v") */
-    0x000D0D45,                /* 0467  lsym L13 <- sym#13   ("type") */
-    0x000E0E45,                /* 0468  lsym L14 <- sym#14   ("auto") */
-    0x000C0284, 0x000D0000,    /* 0469  plist L12 <- L13, 2 items */
-    0x00210D45,                /* 046B  lsym L13 <- sym#33   ("match_expr") */
-    0x00090484, 0x000A0000,    /* 046C  plist L9 <- L10, 4 items */
-    0x000F0B45,                /* 046E  lsym L11 <- sym#15   ("cond") */
-    0x001D0E45,                /* 046F  lsym L14 <- sym#29   ("and") */
-    0x00031045,                /* 0470  lsym L16 <- sym#3   ("!=") */
-    0x00221145,                /* 0471  lsym L17 <- sym#34   ("v") */
-    0x00001345,                /* 0472  lsym L19 <- sym#0   ("sym") */
-    0x00011445,                /* 0473  lsym L20 <- sym#1   ("NO_MATCH") */
-    0x00120284, 0x00130000,    /* 0474  plist L18 <- L19, 2 items */
-    0x000F0384, 0x00100000,    /* 0476  plist L15 <- L16, 3 items */
-    0x003B1145,                /* 0478  lsym L17 <- sym#59   ("not") */
-    0x002D1345,                /* 0479  lsym L19 <- sym#45   ("is") */
-    0x00221445,                /* 047A  lsym L20 <- sym#34   ("v") */
-    0x000D1645,                /* 047B  lsym L22 <- sym#13   ("type") */
-    0x00041745,                /* 047C  lsym L23 <- sym#4   ("error") */
-    0x00150284, 0x00160000,    /* 047D  plist L21 <- L22, 2 items */
-    0x00120384, 0x00130000,    /* 047F  plist L18 <- L19, 3 items */
-    0x00100284, 0x00110000,    /* 0481  plist L16 <- L17, 2 items */
-    0x000D0384, 0x000E0000,    /* 0483  plist L13 <- L14, 3 items */
-    0x003A0E45,                /* 0485  lsym L14 <- sym#58   ("repl") */
-    0x000C0284, 0x000D0000,    /* 0486  plist L12 <- L13, 2 items */
-    0x00140E45,                /* 0488  lsym L14 <- sym#20   ("else") */
-    0x00220F45,                /* 0489  lsym L15 <- sym#34   ("v") */
-    0x000D0284, 0x000E0000,    /* 048A  plist L13 <- L14, 2 items */
-    0x000A0384, 0x000B0000,    /* 048C  plist L10 <- L11, 3 items */
-    0x00070384, 0x00080000,    /* 048E  plist L7 <- L8, 3 items */
-    0x00010684, 0x00020000,    /* 0490  plist L1 <- L2, 6 items */
-    0x005D0242,                /* 0492  gget L2 <- g93   (pair) */
-    0x003A0345,                /* 0493  lsym L3 <- sym#58   ("repl") */
-    0x00048041,                /* 0494  move L4 <- P0 */
-    0x000202A0, 0x00010000,    /* 0495  call base=L2 argc=2 nres=1 */
-    0x005D0342,                /* 0497  gget L3 <- g93   (pair) */
-    0x00210445,                /* 0498  lsym L4 <- sym#33   ("match_expr") */
-    0x00250542,                /* 0499  gget L5 <- g37   (_build_sequence_expr) */
-    0x00068141,                /* 049A  move L6 <- P1 */
-    0x000501A0, 0x00010000,    /* 049B  call base=L5 argc=1 nres=1 */
-    0x000302A0, 0x00010000,    /* 049D  call base=L3 argc=2 nres=1 */
-    0x000003A0, 0x00010000,    /* 049F  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 04A1  return L0 count=1 */
-    0x00008041,                /* 04A2  move L0 <- P0 */
-    0x00000102,                /* 04A3  return L0 count=1 */
-    0x005C0042,                /* 04A4  gget L0 <- g92   (car) */
-    0x00018041,                /* 04A5  move L1 <- P0 */
-    0x000001A0, 0x00010000,    /* 04A6  call base=L0 argc=1 nres=1 */
-    0x00000145,                /* 04A8  lsym L1 <- sym#0   ("sym") */
-    0x00020090, 0x00000001,    /* 04A9  ne L2 <- L0 != L1 */
-    0x0005024B,                /* 04AB  jf L2, +5 */
-    0x005B0042,                /* 04AC  gget L0 <- g91   (error) */
-    0x00090146,                /* 04AD  lconst L1 <- static#9   ("push(): argument must be a bare symbol, e.g. push('foo)") */
-    0x000001A0, 0x00010000,    /* 04AE  call base=L0 argc=1 nres=1 */
-    0x00000102,                /* 04B0  return L0 count=1 */
-    0x003B0042,                /* 04B1  gget L0 <- g59   (mk_expand) */
-    0x00090245,                /* 04B2  lsym L2 <- sym#9   ("fn_def") */
-    0x003C0345,                /* 04B3  lsym L3 <- sym#60   ("$_tmpl_push") */
-    0x00040003,                /* 04B4  lnil L4 */
-    0x000B0745,                /* 04B5  lsym L7 <- sym#11   ("param") */
-    0x003A0845,                /* 04B6  lsym L8 <- sym#58   ("repl") */
-    0x000D0A45,                /* 04B7  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 04B8  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 04B9  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 04BB  lnil L10 */
-    0x00060484, 0x00070000,    /* 04BC  plist L6 <- L7, 4 items */
-    0x00050184, 0x00060000,    /* 04BE  plist L5 <- L6, 1 items */
-    0x000D0745,                /* 04C0  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 04C1  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 04C2  plist L6 <- L7, 2 items */
-    0x003A0745,                /* 04C4  lsym L7 <- sym#58   ("repl") */
-    0x00010684, 0x00020000,    /* 04C5  plist L1 <- L2, 6 items */
-    0x003A0245,                /* 04C7  lsym L2 <- sym#58   ("repl") */
-    0x00038041,                /* 04C8  move L3 <- P0 */
-    0x000003A0, 0x00010000,    /* 04C9  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 04CB  return L0 count=1 */
-    0x00008041,                /* 04CC  move L0 <- P0 */
-    0x00010345,                /* 04CD  lsym L3 <- sym#1   ("NO_MATCH") */
-    0x0004008F, 0x00000003,    /* 04CE  eq L4 <- L0 == L3 */
-    0x0002044B,                /* 04D0  jf L4, +2 */
-    0x00020041,                /* 04D1  move L2 <- L0 */
+    0x00020141,                /* 0439  move L2 <- L1 */
+    0x00020008,                /* 043A  return L2 */
+    0x005C0142,                /* 043B  gget L1 <- g92   (car) */
+    0x00028041,                /* 043C  move L2 <- P0 */
+    0x00010151,                /* 043D  call base=L1 argc=1 */
+    0x00010041,                /* 043E  move L1 <- L0 */
+    0x00000245,                /* 043F  lsym L2 <- sym#0   ("sym") */
+    0x00030090, 0x00010002,    /* 0440  ne L3 <- L1 != L2 */
+    0x0005034B,                /* 0442  jf L3, +5 */
+    0x005B0142,                /* 0443  gget L1 <- g91   (error) */
+    0x00080246,                /* 0444  lconst L2 <- static#8   ("value(): first argument must be a bare symbol, e.g. value('true, ...)") */
+    0x00010151,                /* 0445  call base=L1 argc=1 */
+    0x00010041,                /* 0446  move L1 <- L0 */
+    0x00010008,                /* 0447  return L1 */
+    0x003C0142,                /* 0448  gget L1 <- g60   (mk_expand_n) */
+    0x00090345,                /* 0449  lsym L3 <- sym#9   ("fn_def") */
+    0x00390445,                /* 044A  lsym L4 <- sym#57   ("$_tmpl_value") */
+    0x00050003,                /* 044B  lnil L5 */
+    0x000B0845,                /* 044C  lsym L8 <- sym#11   ("param") */
+    0x003A0945,                /* 044D  lsym L9 <- sym#58   ("repl") */
+    0x000D0B45,                /* 044E  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 044F  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 0450  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 0452  lnil L11 */
+    0x00070484, 0x00080000,    /* 0453  plist L7 <- L8, 4 items */
+    0x000B0945,                /* 0455  lsym L9 <- sym#11   ("param") */
+    0x00210A45,                /* 0456  lsym L10 <- sym#33   ("match_expr") */
+    0x000D0C45,                /* 0457  lsym L12 <- sym#13   ("type") */
+    0x000E0D45,                /* 0458  lsym L13 <- sym#14   ("auto") */
+    0x000B0284, 0x000C0000,    /* 0459  plist L11 <- L12, 2 items */
+    0x000C0003,                /* 045B  lnil L12 */
+    0x00080484, 0x00090000,    /* 045C  plist L8 <- L9, 4 items */
+    0x00060284, 0x00070000,    /* 045E  plist L6 <- L7, 2 items */
+    0x000D0845,                /* 0460  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 0461  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 0462  plist L7 <- L8, 2 items */
+    0x00160945,                /* 0464  lsym L9 <- sym#22   ("do") */
+    0x00170B45,                /* 0465  lsym L11 <- sym#23   ("define") */
+    0x00220C45,                /* 0466  lsym L12 <- sym#34   ("v") */
+    0x000D0E45,                /* 0467  lsym L14 <- sym#13   ("type") */
+    0x000E0F45,                /* 0468  lsym L15 <- sym#14   ("auto") */
+    0x000D0284, 0x000E0000,    /* 0469  plist L13 <- L14, 2 items */
+    0x00210E45,                /* 046B  lsym L14 <- sym#33   ("match_expr") */
+    0x000A0484, 0x000B0000,    /* 046C  plist L10 <- L11, 4 items */
+    0x000F0C45,                /* 046E  lsym L12 <- sym#15   ("cond") */
+    0x001D0F45,                /* 046F  lsym L15 <- sym#29   ("and") */
+    0x00031145,                /* 0470  lsym L17 <- sym#3   ("!=") */
+    0x00221245,                /* 0471  lsym L18 <- sym#34   ("v") */
+    0x00001445,                /* 0472  lsym L20 <- sym#0   ("sym") */
+    0x00011545,                /* 0473  lsym L21 <- sym#1   ("NO_MATCH") */
+    0x00130284, 0x00140000,    /* 0474  plist L19 <- L20, 2 items */
+    0x00100384, 0x00110000,    /* 0476  plist L16 <- L17, 3 items */
+    0x003B1245,                /* 0478  lsym L18 <- sym#59   ("not") */
+    0x002D1445,                /* 0479  lsym L20 <- sym#45   ("is") */
+    0x00221545,                /* 047A  lsym L21 <- sym#34   ("v") */
+    0x000D1745,                /* 047B  lsym L23 <- sym#13   ("type") */
+    0x00041845,                /* 047C  lsym L24 <- sym#4   ("error") */
+    0x00160284, 0x00170000,    /* 047D  plist L22 <- L23, 2 items */
+    0x00130384, 0x00140000,    /* 047F  plist L19 <- L20, 3 items */
+    0x00110284, 0x00120000,    /* 0481  plist L17 <- L18, 2 items */
+    0x000E0384, 0x000F0000,    /* 0483  plist L14 <- L15, 3 items */
+    0x003A0F45,                /* 0485  lsym L15 <- sym#58   ("repl") */
+    0x000D0284, 0x000E0000,    /* 0486  plist L13 <- L14, 2 items */
+    0x00140F45,                /* 0488  lsym L15 <- sym#20   ("else") */
+    0x00221045,                /* 0489  lsym L16 <- sym#34   ("v") */
+    0x000E0284, 0x000F0000,    /* 048A  plist L14 <- L15, 2 items */
+    0x000B0384, 0x000C0000,    /* 048C  plist L11 <- L12, 3 items */
+    0x00080384, 0x00090000,    /* 048E  plist L8 <- L9, 3 items */
+    0x00020684, 0x00030000,    /* 0490  plist L2 <- L3, 6 items */
+    0x005D0342,                /* 0492  gget L3 <- g93   (pair) */
+    0x003A0445,                /* 0493  lsym L4 <- sym#58   ("repl") */
+    0x00058041,                /* 0494  move L5 <- P0 */
+    0x00030251,                /* 0495  call base=L3 argc=2 */
+    0x00030041,                /* 0496  move L3 <- L0 */
+    0x005D0442,                /* 0497  gget L4 <- g93   (pair) */
+    0x00210545,                /* 0498  lsym L5 <- sym#33   ("match_expr") */
+    0x00250642,                /* 0499  gget L6 <- g37   (_build_sequence_expr) */
+    0x00078141,                /* 049A  move L7 <- P1 */
+    0x00060151,                /* 049B  call base=L6 argc=1 */
+    0x00060041,                /* 049C  move L6 <- L0 */
+    0x00040251,                /* 049D  call base=L4 argc=2 */
+    0x00040041,                /* 049E  move L4 <- L0 */
+    0x00010351,                /* 049F  call base=L1 argc=3 */
+    0x00010041,                /* 04A0  move L1 <- L0 */
+    0x00010008,                /* 04A1  return L1 */
+    0x00018041,                /* 04A2  move L1 <- P0 */
+    0x00010008,                /* 04A3  return L1 */
+    0x005C0142,                /* 04A4  gget L1 <- g92   (car) */
+    0x00028041,                /* 04A5  move L2 <- P0 */
+    0x00010151,                /* 04A6  call base=L1 argc=1 */
+    0x00010041,                /* 04A7  move L1 <- L0 */
+    0x00000245,                /* 04A8  lsym L2 <- sym#0   ("sym") */
+    0x00030090, 0x00010002,    /* 04A9  ne L3 <- L1 != L2 */
+    0x0005034B,                /* 04AB  jf L3, +5 */
+    0x005B0142,                /* 04AC  gget L1 <- g91   (error) */
+    0x00090246,                /* 04AD  lconst L2 <- static#9   ("push(): argument must be a bare symbol, e.g. push('foo)") */
+    0x00010151,                /* 04AE  call base=L1 argc=1 */
+    0x00010041,                /* 04AF  move L1 <- L0 */
+    0x00010008,                /* 04B0  return L1 */
+    0x003B0142,                /* 04B1  gget L1 <- g59   (mk_expand) */
+    0x00090345,                /* 04B2  lsym L3 <- sym#9   ("fn_def") */
+    0x003C0445,                /* 04B3  lsym L4 <- sym#60   ("$_tmpl_push") */
+    0x00050003,                /* 04B4  lnil L5 */
+    0x000B0845,                /* 04B5  lsym L8 <- sym#11   ("param") */
+    0x003A0945,                /* 04B6  lsym L9 <- sym#58   ("repl") */
+    0x000D0B45,                /* 04B7  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 04B8  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 04B9  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 04BB  lnil L11 */
+    0x00070484, 0x00080000,    /* 04BC  plist L7 <- L8, 4 items */
+    0x00060184, 0x00070000,    /* 04BE  plist L6 <- L7, 1 items */
+    0x000D0845,                /* 04C0  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 04C1  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 04C2  plist L7 <- L8, 2 items */
+    0x003A0845,                /* 04C4  lsym L8 <- sym#58   ("repl") */
+    0x00020684, 0x00030000,    /* 04C5  plist L2 <- L3, 6 items */
+    0x003A0345,                /* 04C7  lsym L3 <- sym#58   ("repl") */
+    0x00048041,                /* 04C8  move L4 <- P0 */
+    0x00010351,                /* 04C9  call base=L1 argc=3 */
+    0x00010041,                /* 04CA  move L1 <- L0 */
+    0x00010008,                /* 04CB  return L1 */
+    0x00018041,                /* 04CC  move L1 <- P0 */
+    0x00010445,                /* 04CD  lsym L4 <- sym#1   ("NO_MATCH") */
+    0x0005008F, 0x00010004,    /* 04CE  eq L5 <- L1 == L4 */
+    0x0002054B,                /* 04D0  jf L5, +2 */
+    0x00030141,                /* 04D1  move L3 <- L1 */
     0x0019004F,                /* 04D2  jmp +25 */
-    0x00070346,                /* 04D3  lconst L3 <- static#7   ("error") */
-    0x00040097, 0x00000003,    /* 04D4  is L4 <- L0 is L3 */
-    0x0002044B,                /* 04D6  jf L4, +2 */
-    0x00020041,                /* 04D7  move L2 <- L0 */
+    0x00070446,                /* 04D3  lconst L4 <- static#7   ("error") */
+    0x00050097, 0x00010004,    /* 04D4  is L5 <- L1 is L4 */
+    0x0002054B,                /* 04D6  jf L5, +2 */
+    0x00030141,                /* 04D7  move L3 <- L1 */
     0x0013004F,                /* 04D8  jmp +19 */
-    0x00018141,                /* 04D9  move L1 <- P1 */
-    0x00010345,                /* 04DA  lsym L3 <- sym#1   ("NO_MATCH") */
-    0x0004008F, 0x00010003,    /* 04DB  eq L4 <- L1 == L3 */
-    0x0002044B,                /* 04DD  jf L4, +2 */
-    0x00020141,                /* 04DE  move L2 <- L1 */
+    0x00028141,                /* 04D9  move L2 <- P1 */
+    0x00010445,                /* 04DA  lsym L4 <- sym#1   ("NO_MATCH") */
+    0x0005008F, 0x00020004,    /* 04DB  eq L5 <- L2 == L4 */
+    0x0002054B,                /* 04DD  jf L5, +2 */
+    0x00030241,                /* 04DE  move L3 <- L2 */
     0x000C004F,                /* 04DF  jmp +12 */
-    0x00070346,                /* 04E0  lconst L3 <- static#7   ("error") */
-    0x00040097, 0x00010003,    /* 04E1  is L4 <- L1 is L3 */
-    0x0002044B,                /* 04E3  jf L4, +2 */
-    0x00020141,                /* 04E4  move L2 <- L1 */
+    0x00070446,                /* 04E0  lconst L4 <- static#7   ("error") */
+    0x00050097, 0x00020004,    /* 04E1  is L5 <- L2 is L4 */
+    0x0002054B,                /* 04E3  jf L5, +2 */
+    0x00030241,                /* 04E4  move L3 <- L2 */
     0x0006004F,                /* 04E5  jmp +6 */
-    0x005E0342,                /* 04E6  gget L3 <- g94   (cons) */
-    0x00040041,                /* 04E7  move L4 <- L0 */
-    0x00050141,                /* 04E8  move L5 <- L1 */
-    0x000302A0, 0x00010000,    /* 04E9  call base=L3 argc=2 nres=1 */
-    0x00020341,                /* 04EB  move L2 <- L3 */
-    0x00020102,                /* 04EC  return L2 count=1 */
-    0x005F0142,                /* 04ED  gget L1 <- g95   (cdr) */
-    0x00028041,                /* 04EE  move L2 <- P0 */
-    0x000101A0, 0x00010000,    /* 04EF  call base=L1 argc=1 nres=1 */
-    0x000A0246,                /* 04F1  lconst L2 <- static#10   ("nil") */
-    0x00000097, 0x00010002,    /* 04F2  is L0 <- L1 is L2 */
-    0x0008004C,                /* 04F4  jt L0, +8 */
-    0x00050142,                /* 04F5  gget L1 <- g5   (std::pairs::cddr) */
-    0x00028041,                /* 04F6  move L2 <- P0 */
-    0x000101A0, 0x00010000,    /* 04F7  call base=L1 argc=1 nres=1 */
-    0x000A0246,                /* 04F9  lconst L2 <- static#10   ("nil") */
-    0x00030097, 0x00010002,    /* 04FA  is L3 <- L1 is L2 */
-    0x0000034A,                /* 04FC  not L0 <- L3 */
-    0x0005004B,                /* 04FD  jf L0, +5 */
-    0x005B0042,                /* 04FE  gget L0 <- g91   (error) */
-    0x000B0146,                /* 04FF  lconst L1 <- static#11   ("cons(): exactly 2 arguments required") */
-    0x000001A0, 0x00010000,    /* 0500  call base=L0 argc=1 nres=1 */
-    0x00000102,                /* 0502  return L0 count=1 */
-    0x003C0042,                /* 0503  gget L0 <- g60   (mk_expand_n) */
-    0x00090245,                /* 0504  lsym L2 <- sym#9   ("fn_def") */
-    0x003D0345,                /* 0505  lsym L3 <- sym#61   ("$_tmpl_cons") */
-    0x00040003,                /* 0506  lnil L4 */
-    0x000B0745,                /* 0507  lsym L7 <- sym#11   ("param") */
-    0x003E0845,                /* 0508  lsym L8 <- sym#62   ("a_expr") */
-    0x000D0A45,                /* 0509  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 050A  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 050B  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 050D  lnil L10 */
-    0x00060484, 0x00070000,    /* 050E  plist L6 <- L7, 4 items */
-    0x000B0845,                /* 0510  lsym L8 <- sym#11   ("param") */
-    0x003F0945,                /* 0511  lsym L9 <- sym#63   ("b_expr") */
-    0x000D0B45,                /* 0512  lsym L11 <- sym#13   ("type") */
-    0x000E0C45,                /* 0513  lsym L12 <- sym#14   ("auto") */
-    0x000A0284, 0x000B0000,    /* 0514  plist L10 <- L11, 2 items */
-    0x000B0003,                /* 0516  lnil L11 */
-    0x00070484, 0x00080000,    /* 0517  plist L7 <- L8, 4 items */
-    0x00050284, 0x00060000,    /* 0519  plist L5 <- L6, 2 items */
-    0x000D0745,                /* 051B  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 051C  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 051D  plist L6 <- L7, 2 items */
-    0x00160845,                /* 051F  lsym L8 <- sym#22   ("do") */
-    0x00170A45,                /* 0520  lsym L10 <- sym#23   ("define") */
-    0x00400B45,                /* 0521  lsym L11 <- sym#64   ("a") */
-    0x000D0D45,                /* 0522  lsym L13 <- sym#13   ("type") */
-    0x000E0E45,                /* 0523  lsym L14 <- sym#14   ("auto") */
-    0x000C0284, 0x000D0000,    /* 0524  plist L12 <- L13, 2 items */
-    0x003E0D45,                /* 0526  lsym L13 <- sym#62   ("a_expr") */
-    0x00090484, 0x000A0000,    /* 0527  plist L9 <- L10, 4 items */
-    0x000F0B45,                /* 0529  lsym L11 <- sym#15   ("cond") */
-    0x00100E45,                /* 052A  lsym L14 <- sym#16   ("==") */
-    0x00400F45,                /* 052B  lsym L15 <- sym#64   ("a") */
-    0x00001145,                /* 052C  lsym L17 <- sym#0   ("sym") */
-    0x00011245,                /* 052D  lsym L18 <- sym#1   ("NO_MATCH") */
-    0x00100284, 0x00110000,    /* 052E  plist L16 <- L17, 2 items */
-    0x000D0384, 0x000E0000,    /* 0530  plist L13 <- L14, 3 items */
-    0x00400E45,                /* 0532  lsym L14 <- sym#64   ("a") */
-    0x000C0284, 0x000D0000,    /* 0533  plist L12 <- L13, 2 items */
-    0x002D0F45,                /* 0535  lsym L15 <- sym#45   ("is") */
-    0x00401045,                /* 0536  lsym L16 <- sym#64   ("a") */
-    0x000D1245,                /* 0537  lsym L18 <- sym#13   ("type") */
-    0x00041345,                /* 0538  lsym L19 <- sym#4   ("error") */
-    0x00110284, 0x00120000,    /* 0539  plist L17 <- L18, 2 items */
-    0x000E0384, 0x000F0000,    /* 053B  plist L14 <- L15, 3 items */
-    0x00400F45,                /* 053D  lsym L15 <- sym#64   ("a") */
-    0x000D0284, 0x000E0000,    /* 053E  plist L13 <- L14, 2 items */
-    0x00140F45,                /* 0540  lsym L15 <- sym#20   ("else") */
-    0x00161145,                /* 0541  lsym L17 <- sym#22   ("do") */
-    0x00171345,                /* 0542  lsym L19 <- sym#23   ("define") */
-    0x00411445,                /* 0543  lsym L20 <- sym#65   ("b") */
-    0x000D1645,                /* 0544  lsym L22 <- sym#13   ("type") */
-    0x000E1745,                /* 0545  lsym L23 <- sym#14   ("auto") */
-    0x00150284, 0x00160000,    /* 0546  plist L21 <- L22, 2 items */
-    0x003F1645,                /* 0548  lsym L22 <- sym#63   ("b_expr") */
-    0x00120484, 0x00130000,    /* 0549  plist L18 <- L19, 4 items */
-    0x000F1445,                /* 054B  lsym L20 <- sym#15   ("cond") */
-    0x00101745,                /* 054C  lsym L23 <- sym#16   ("==") */
-    0x00411845,                /* 054D  lsym L24 <- sym#65   ("b") */
-    0x00001A45,                /* 054E  lsym L26 <- sym#0   ("sym") */
-    0x00011B45,                /* 054F  lsym L27 <- sym#1   ("NO_MATCH") */
-    0x00190284, 0x001A0000,    /* 0550  plist L25 <- L26, 2 items */
-    0x00160384, 0x00170000,    /* 0552  plist L22 <- L23, 3 items */
-    0x00411745,                /* 0554  lsym L23 <- sym#65   ("b") */
-    0x00150284, 0x00160000,    /* 0555  plist L21 <- L22, 2 items */
-    0x002D1845,                /* 0557  lsym L24 <- sym#45   ("is") */
-    0x00411945,                /* 0558  lsym L25 <- sym#65   ("b") */
-    0x000D1B45,                /* 0559  lsym L27 <- sym#13   ("type") */
-    0x00041C45,                /* 055A  lsym L28 <- sym#4   ("error") */
-    0x001A0284, 0x001B0000,    /* 055B  plist L26 <- L27, 2 items */
-    0x00170384, 0x00180000,    /* 055D  plist L23 <- L24, 3 items */
-    0x00411845,                /* 055F  lsym L24 <- sym#65   ("b") */
-    0x00160284, 0x00170000,    /* 0560  plist L22 <- L23, 2 items */
-    0x00141845,                /* 0562  lsym L24 <- sym#20   ("else") */
-    0x00051A45,                /* 0563  lsym L26 <- sym#5   ("apply") */
-    0x002F1B45,                /* 0564  lsym L27 <- sym#47   ("cons") */
-    0x00401C45,                /* 0565  lsym L28 <- sym#64   ("a") */
-    0x00411D45,                /* 0566  lsym L29 <- sym#65   ("b") */
-    0x00190484, 0x001A0000,    /* 0567  plist L25 <- L26, 4 items */
-    0x00170284, 0x00180000,    /* 0569  plist L23 <- L24, 2 items */
-    0x00130484, 0x00140000,    /* 056B  plist L19 <- L20, 4 items */
-    0x00100384, 0x00110000,    /* 056D  plist L16 <- L17, 3 items */
-    0x000E0284, 0x000F0000,    /* 056F  plist L14 <- L15, 2 items */
-    0x000A0484, 0x000B0000,    /* 0571  plist L10 <- L11, 4 items */
-    0x00070384, 0x00080000,    /* 0573  plist L7 <- L8, 3 items */
-    0x00010684, 0x00020000,    /* 0575  plist L1 <- L2, 6 items */
-    0x005D0242,                /* 0577  gget L2 <- g93   (pair) */
-    0x003E0345,                /* 0578  lsym L3 <- sym#62   ("a_expr") */
-    0x00220442,                /* 0579  gget L4 <- g34   (_decode_term) */
-    0x005C0542,                /* 057A  gget L5 <- g92   (car) */
-    0x00068041,                /* 057B  move L6 <- P0 */
-    0x000501A0, 0x00010000,    /* 057C  call base=L5 argc=1 nres=1 */
-    0x000401A0, 0x00010000,    /* 057E  call base=L4 argc=1 nres=1 */
-    0x000202A0, 0x00010000,    /* 0580  call base=L2 argc=2 nres=1 */
-    0x005D0342,                /* 0582  gget L3 <- g93   (pair) */
-    0x003F0445,                /* 0583  lsym L4 <- sym#63   ("b_expr") */
-    0x00220542,                /* 0584  gget L5 <- g34   (_decode_term) */
-    0x00040642,                /* 0585  gget L6 <- g4   (std::pairs::cadr) */
-    0x00078041,                /* 0586  move L7 <- P0 */
-    0x000601A0, 0x00010000,    /* 0587  call base=L6 argc=1 nres=1 */
-    0x000501A0, 0x00010000,    /* 0589  call base=L5 argc=1 nres=1 */
-    0x000302A0, 0x00010000,    /* 058B  call base=L3 argc=2 nres=1 */
-    0x000003A0, 0x00010000,    /* 058D  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 058F  return L0 count=1 */
+    0x005E0442,                /* 04E6  gget L4 <- g94   (cons) */
+    0x00050141,                /* 04E7  move L5 <- L1 */
+    0x00060241,                /* 04E8  move L6 <- L2 */
+    0x00040251,                /* 04E9  call base=L4 argc=2 */
+    0x00040041,                /* 04EA  move L4 <- L0 */
+    0x00030441,                /* 04EB  move L3 <- L4 */
+    0x00030008,                /* 04EC  return L3 */
+    0x005F0242,                /* 04ED  gget L2 <- g95   (cdr) */
+    0x00038041,                /* 04EE  move L3 <- P0 */
+    0x00020151,                /* 04EF  call base=L2 argc=1 */
+    0x00020041,                /* 04F0  move L2 <- L0 */
+    0x000A0346,                /* 04F1  lconst L3 <- static#10   ("nil") */
+    0x00010097, 0x00020003,    /* 04F2  is L1 <- L2 is L3 */
+    0x0008014C,                /* 04F4  jt L1, +8 */
+    0x00050242,                /* 04F5  gget L2 <- g5   (std::pairs::cddr) */
+    0x00038041,                /* 04F6  move L3 <- P0 */
+    0x00020151,                /* 04F7  call base=L2 argc=1 */
+    0x00020041,                /* 04F8  move L2 <- L0 */
+    0x000A0346,                /* 04F9  lconst L3 <- static#10   ("nil") */
+    0x00040097, 0x00020003,    /* 04FA  is L4 <- L2 is L3 */
+    0x0001044A,                /* 04FC  not L1 <- L4 */
+    0x0005014B,                /* 04FD  jf L1, +5 */
+    0x005B0142,                /* 04FE  gget L1 <- g91   (error) */
+    0x000B0246,                /* 04FF  lconst L2 <- static#11   ("cons(): exactly 2 arguments required") */
+    0x00010151,                /* 0500  call base=L1 argc=1 */
+    0x00010041,                /* 0501  move L1 <- L0 */
+    0x00010008,                /* 0502  return L1 */
+    0x003C0142,                /* 0503  gget L1 <- g60   (mk_expand_n) */
+    0x00090345,                /* 0504  lsym L3 <- sym#9   ("fn_def") */
+    0x003D0445,                /* 0505  lsym L4 <- sym#61   ("$_tmpl_cons") */
+    0x00050003,                /* 0506  lnil L5 */
+    0x000B0845,                /* 0507  lsym L8 <- sym#11   ("param") */
+    0x003E0945,                /* 0508  lsym L9 <- sym#62   ("a_expr") */
+    0x000D0B45,                /* 0509  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 050A  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 050B  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 050D  lnil L11 */
+    0x00070484, 0x00080000,    /* 050E  plist L7 <- L8, 4 items */
+    0x000B0945,                /* 0510  lsym L9 <- sym#11   ("param") */
+    0x003F0A45,                /* 0511  lsym L10 <- sym#63   ("b_expr") */
+    0x000D0C45,                /* 0512  lsym L12 <- sym#13   ("type") */
+    0x000E0D45,                /* 0513  lsym L13 <- sym#14   ("auto") */
+    0x000B0284, 0x000C0000,    /* 0514  plist L11 <- L12, 2 items */
+    0x000C0003,                /* 0516  lnil L12 */
+    0x00080484, 0x00090000,    /* 0517  plist L8 <- L9, 4 items */
+    0x00060284, 0x00070000,    /* 0519  plist L6 <- L7, 2 items */
+    0x000D0845,                /* 051B  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 051C  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 051D  plist L7 <- L8, 2 items */
+    0x00160945,                /* 051F  lsym L9 <- sym#22   ("do") */
+    0x00170B45,                /* 0520  lsym L11 <- sym#23   ("define") */
+    0x00400C45,                /* 0521  lsym L12 <- sym#64   ("a") */
+    0x000D0E45,                /* 0522  lsym L14 <- sym#13   ("type") */
+    0x000E0F45,                /* 0523  lsym L15 <- sym#14   ("auto") */
+    0x000D0284, 0x000E0000,    /* 0524  plist L13 <- L14, 2 items */
+    0x003E0E45,                /* 0526  lsym L14 <- sym#62   ("a_expr") */
+    0x000A0484, 0x000B0000,    /* 0527  plist L10 <- L11, 4 items */
+    0x000F0C45,                /* 0529  lsym L12 <- sym#15   ("cond") */
+    0x00100F45,                /* 052A  lsym L15 <- sym#16   ("==") */
+    0x00401045,                /* 052B  lsym L16 <- sym#64   ("a") */
+    0x00001245,                /* 052C  lsym L18 <- sym#0   ("sym") */
+    0x00011345,                /* 052D  lsym L19 <- sym#1   ("NO_MATCH") */
+    0x00110284, 0x00120000,    /* 052E  plist L17 <- L18, 2 items */
+    0x000E0384, 0x000F0000,    /* 0530  plist L14 <- L15, 3 items */
+    0x00400F45,                /* 0532  lsym L15 <- sym#64   ("a") */
+    0x000D0284, 0x000E0000,    /* 0533  plist L13 <- L14, 2 items */
+    0x002D1045,                /* 0535  lsym L16 <- sym#45   ("is") */
+    0x00401145,                /* 0536  lsym L17 <- sym#64   ("a") */
+    0x000D1345,                /* 0537  lsym L19 <- sym#13   ("type") */
+    0x00041445,                /* 0538  lsym L20 <- sym#4   ("error") */
+    0x00120284, 0x00130000,    /* 0539  plist L18 <- L19, 2 items */
+    0x000F0384, 0x00100000,    /* 053B  plist L15 <- L16, 3 items */
+    0x00401045,                /* 053D  lsym L16 <- sym#64   ("a") */
+    0x000E0284, 0x000F0000,    /* 053E  plist L14 <- L15, 2 items */
+    0x00141045,                /* 0540  lsym L16 <- sym#20   ("else") */
+    0x00161245,                /* 0541  lsym L18 <- sym#22   ("do") */
+    0x00171445,                /* 0542  lsym L20 <- sym#23   ("define") */
+    0x00411545,                /* 0543  lsym L21 <- sym#65   ("b") */
+    0x000D1745,                /* 0544  lsym L23 <- sym#13   ("type") */
+    0x000E1845,                /* 0545  lsym L24 <- sym#14   ("auto") */
+    0x00160284, 0x00170000,    /* 0546  plist L22 <- L23, 2 items */
+    0x003F1745,                /* 0548  lsym L23 <- sym#63   ("b_expr") */
+    0x00130484, 0x00140000,    /* 0549  plist L19 <- L20, 4 items */
+    0x000F1545,                /* 054B  lsym L21 <- sym#15   ("cond") */
+    0x00101845,                /* 054C  lsym L24 <- sym#16   ("==") */
+    0x00411945,                /* 054D  lsym L25 <- sym#65   ("b") */
+    0x00001B45,                /* 054E  lsym L27 <- sym#0   ("sym") */
+    0x00011C45,                /* 054F  lsym L28 <- sym#1   ("NO_MATCH") */
+    0x001A0284, 0x001B0000,    /* 0550  plist L26 <- L27, 2 items */
+    0x00170384, 0x00180000,    /* 0552  plist L23 <- L24, 3 items */
+    0x00411845,                /* 0554  lsym L24 <- sym#65   ("b") */
+    0x00160284, 0x00170000,    /* 0555  plist L22 <- L23, 2 items */
+    0x002D1945,                /* 0557  lsym L25 <- sym#45   ("is") */
+    0x00411A45,                /* 0558  lsym L26 <- sym#65   ("b") */
+    0x000D1C45,                /* 0559  lsym L28 <- sym#13   ("type") */
+    0x00041D45,                /* 055A  lsym L29 <- sym#4   ("error") */
+    0x001B0284, 0x001C0000,    /* 055B  plist L27 <- L28, 2 items */
+    0x00180384, 0x00190000,    /* 055D  plist L24 <- L25, 3 items */
+    0x00411945,                /* 055F  lsym L25 <- sym#65   ("b") */
+    0x00170284, 0x00180000,    /* 0560  plist L23 <- L24, 2 items */
+    0x00141945,                /* 0562  lsym L25 <- sym#20   ("else") */
+    0x00051B45,                /* 0563  lsym L27 <- sym#5   ("apply") */
+    0x002F1C45,                /* 0564  lsym L28 <- sym#47   ("cons") */
+    0x00401D45,                /* 0565  lsym L29 <- sym#64   ("a") */
+    0x00411E45,                /* 0566  lsym L30 <- sym#65   ("b") */
+    0x001A0484, 0x001B0000,    /* 0567  plist L26 <- L27, 4 items */
+    0x00180284, 0x00190000,    /* 0569  plist L24 <- L25, 2 items */
+    0x00140484, 0x00150000,    /* 056B  plist L20 <- L21, 4 items */
+    0x00110384, 0x00120000,    /* 056D  plist L17 <- L18, 3 items */
+    0x000F0284, 0x00100000,    /* 056F  plist L15 <- L16, 2 items */
+    0x000B0484, 0x000C0000,    /* 0571  plist L11 <- L12, 4 items */
+    0x00080384, 0x00090000,    /* 0573  plist L8 <- L9, 3 items */
+    0x00020684, 0x00030000,    /* 0575  plist L2 <- L3, 6 items */
+    0x005D0342,                /* 0577  gget L3 <- g93   (pair) */
+    0x003E0445,                /* 0578  lsym L4 <- sym#62   ("a_expr") */
+    0x00220542,                /* 0579  gget L5 <- g34   (_decode_term) */
+    0x005C0642,                /* 057A  gget L6 <- g92   (car) */
+    0x00078041,                /* 057B  move L7 <- P0 */
+    0x00060151,                /* 057C  call base=L6 argc=1 */
+    0x00060041,                /* 057D  move L6 <- L0 */
+    0x00050151,                /* 057E  call base=L5 argc=1 */
+    0x00050041,                /* 057F  move L5 <- L0 */
+    0x00030251,                /* 0580  call base=L3 argc=2 */
+    0x00030041,                /* 0581  move L3 <- L0 */
+    0x005D0442,                /* 0582  gget L4 <- g93   (pair) */
+    0x003F0545,                /* 0583  lsym L5 <- sym#63   ("b_expr") */
+    0x00220642,                /* 0584  gget L6 <- g34   (_decode_term) */
+    0x00040742,                /* 0585  gget L7 <- g4   (std::pairs::cadr) */
+    0x00088041,                /* 0586  move L8 <- P0 */
+    0x00070151,                /* 0587  call base=L7 argc=1 */
+    0x00070041,                /* 0588  move L7 <- L0 */
+    0x00060151,                /* 0589  call base=L6 argc=1 */
+    0x00060041,                /* 058A  move L6 <- L0 */
+    0x00040251,                /* 058B  call base=L4 argc=2 */
+    0x00040041,                /* 058C  move L4 <- L0 */
+    0x00010351,                /* 058D  call base=L1 argc=3 */
+    0x00010041,                /* 058E  move L1 <- L0 */
+    0x00010008,                /* 058F  return L1 */
     0x00000001,                /* 0590  trap 0 */
-    0x003B0042,                /* 0591  gget L0 <- g59   (mk_expand) */
-    0x00090245,                /* 0592  lsym L2 <- sym#9   ("fn_def") */
-    0x00420345,                /* 0593  lsym L3 <- sym#66   ("_tmpl_opt") */
-    0x00040003,                /* 0594  lnil L4 */
-    0x000B0745,                /* 0595  lsym L7 <- sym#11   ("param") */
-    0x00210845,                /* 0596  lsym L8 <- sym#33   ("match_expr") */
-    0x000D0A45,                /* 0597  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 0598  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 0599  plist L9 <- L10, 2 items */
-    0x000A0003,                /* 059B  lnil L10 */
-    0x00060484, 0x00070000,    /* 059C  plist L6 <- L7, 4 items */
-    0x00050184, 0x00060000,    /* 059E  plist L5 <- L6, 1 items */
-    0x000D0745,                /* 05A0  lsym L7 <- sym#13   ("type") */
-    0x000E0845,                /* 05A1  lsym L8 <- sym#14   ("auto") */
-    0x00060284, 0x00070000,    /* 05A2  plist L6 <- L7, 2 items */
-    0x00160845,                /* 05A4  lsym L8 <- sym#22   ("do") */
-    0x00170A45,                /* 05A5  lsym L10 <- sym#23   ("define") */
-    0x00290B45,                /* 05A6  lsym L11 <- sym#41   ("_mark") */
-    0x000D0D45,                /* 05A7  lsym L13 <- sym#13   ("type") */
-    0x000E0E45,                /* 05A8  lsym L14 <- sym#14   ("auto") */
-    0x000C0284, 0x000D0000,    /* 05A9  plist L12 <- L13, 2 items */
-    0x00050E45,                /* 05AB  lsym L14 <- sym#5   ("apply") */
-    0x00061045,                /* 05AC  lsym L16 <- sym#6   ("bind_msg") */
-    0x00071145,                /* 05AD  lsym L17 <- sym#7   ("this") */
-    0x00231245,                /* 05AE  lsym L18 <- sym#35   ("mark") */
-    0x000F0384, 0x00100000,    /* 05AF  plist L15 <- L16, 3 items */
-    0x000D0284, 0x000E0000,    /* 05B1  plist L13 <- L14, 2 items */
-    0x00090484, 0x000A0000,    /* 05B3  plist L9 <- L10, 4 items */
-    0x00170B45,                /* 05B5  lsym L11 <- sym#23   ("define") */
-    0x00220C45,                /* 05B6  lsym L12 <- sym#34   ("v") */
-    0x000D0E45,                /* 05B7  lsym L14 <- sym#13   ("type") */
-    0x000E0F45,                /* 05B8  lsym L15 <- sym#14   ("auto") */
-    0x000D0284, 0x000E0000,    /* 05B9  plist L13 <- L14, 2 items */
-    0x00210E45,                /* 05BB  lsym L14 <- sym#33   ("match_expr") */
-    0x000A0484, 0x000B0000,    /* 05BC  plist L10 <- L11, 4 items */
-    0x000F0C45,                /* 05BE  lsym L12 <- sym#15   ("cond") */
-    0x00100F45,                /* 05BF  lsym L15 <- sym#16   ("==") */
-    0x00221045,                /* 05C0  lsym L16 <- sym#34   ("v") */
-    0x00001245,                /* 05C1  lsym L18 <- sym#0   ("sym") */
-    0x00011345,                /* 05C2  lsym L19 <- sym#1   ("NO_MATCH") */
-    0x00110284, 0x00120000,    /* 05C3  plist L17 <- L18, 2 items */
-    0x000E0384, 0x000F0000,    /* 05C5  plist L14 <- L15, 3 items */
-    0x00161045,                /* 05C7  lsym L16 <- sym#22   ("do") */
-    0x00051245,                /* 05C8  lsym L18 <- sym#5   ("apply") */
-    0x00061445,                /* 05C9  lsym L20 <- sym#6   ("bind_msg") */
-    0x00071545,                /* 05CA  lsym L21 <- sym#7   ("this") */
-    0x002B1645,                /* 05CB  lsym L22 <- sym#43   ("reset") */
-    0x00130384, 0x00140000,    /* 05CC  plist L19 <- L20, 3 items */
-    0x00291445,                /* 05CE  lsym L20 <- sym#41   ("_mark") */
-    0x00110384, 0x00120000,    /* 05CF  plist L17 <- L18, 3 items */
-    0x00261345,                /* 05D1  lsym L19 <- sym#38   ("nil") */
-    0x00120184, 0x00130000,    /* 05D2  plist L18 <- L19, 1 items */
-    0x000F0384, 0x00100000,    /* 05D4  plist L15 <- L16, 3 items */
-    0x000D0284, 0x000E0000,    /* 05D6  plist L13 <- L14, 2 items */
-    0x00140F45,                /* 05D8  lsym L15 <- sym#20   ("else") */
-    0x00221045,                /* 05D9  lsym L16 <- sym#34   ("v") */
-    0x000E0284, 0x000F0000,    /* 05DA  plist L14 <- L15, 2 items */
-    0x000B0384, 0x000C0000,    /* 05DC  plist L11 <- L12, 3 items */
-    0x00070484, 0x00080000,    /* 05DE  plist L7 <- L8, 4 items */
-    0x00010684, 0x00020000,    /* 05E0  plist L1 <- L2, 6 items */
-    0x00210245,                /* 05E2  lsym L2 <- sym#33   ("match_expr") */
-    0x00250342,                /* 05E3  gget L3 <- g37   (_build_sequence_expr) */
-    0x00048041,                /* 05E4  move L4 <- P0 */
-    0x000301A0, 0x00010000,    /* 05E5  call base=L3 argc=1 nres=1 */
-    0x000003A0, 0x00010000,    /* 05E7  call base=L0 argc=3 nres=1 */
-    0x00000102,                /* 05E9  return L0 count=1 */
-    0x00500342,                /* 05EA  gget L3 <- g80   (s_call_target) */
-    0x00048041,                /* 05EB  move L4 <- P0 */
-    0x000301A0, 0x00010000,    /* 05EC  call base=L3 argc=1 nres=1 */
-    0x00000341,                /* 05EE  move L0 <- L3 */
-    0x004F0342,                /* 05EF  gget L3 <- g79   (s_call_args) */
-    0x00048041,                /* 05F0  move L4 <- P0 */
-    0x000301A0, 0x00010000,    /* 05F1  call base=L3 argc=1 nres=1 */
-    0x00010341,                /* 05F3  move L1 <- L3 */
-    0x00060342,                /* 05F4  gget L3 <- g6   (_req_name) */
-    0x00040041,                /* 05F5  move L4 <- L0 */
-    0x000301A0, 0x00010000,    /* 05F6  call base=L3 argc=1 nres=1 */
-    0x00020341,                /* 05F8  move L2 <- L3 */
-    0x00430345,                /* 05F9  lsym L3 <- sym#67   ("apply_if") */
-    0x0004008F, 0x00020003,    /* 05FA  eq L4 <- L2 == L3 */
-    0x000C044B,                /* 05FC  jf L4, +12 */
-    0x00070342,                /* 05FD  gget L3 <- g7   (_decode_apply_if) */
-    0x005C0442,                /* 05FE  gget L4 <- g92   (car) */
-    0x00050141,                /* 05FF  move L5 <- L1 */
-    0x000401A0, 0x00010000,    /* 0600  call base=L4 argc=1 nres=1 */
-    0x005F0542,                /* 0602  gget L5 <- g95   (cdr) */
-    0x00060141,                /* 0603  move L6 <- L1 */
-    0x000501A0, 0x00010000,    /* 0604  call base=L5 argc=1 nres=1 */
-    0x000302A0, 0x00010000,    /* 0606  call base=L3 argc=2 nres=1 */
-    0x00030102,                /* 0608  return L3 count=1 */
-    0x00440345,                /* 0609  lsym L3 <- sym#68   ("many") */
-    0x0004008F, 0x00020003,    /* 060A  eq L4 <- L2 == L3 */
-    0x0005044B,                /* 060C  jf L4, +5 */
-    0x00120342,                /* 060D  gget L3 <- g18   (_decode_many) */
-    0x00040141,                /* 060E  move L4 <- L1 */
-    0x000301A0, 0x00010000,    /* 060F  call base=L3 argc=1 nres=1 */
-    0x00030102,                /* 0611  return L3 count=1 */
-    0x00450345,                /* 0612  lsym L3 <- sym#69   ("manyflat") */
-    0x0004008F, 0x00020003,    /* 0613  eq L4 <- L2 == L3 */
-    0x0005044B,                /* 0615  jf L4, +5 */
-    0x00140342,                /* 0616  gget L3 <- g20   (_decode_manyflat) */
-    0x00040141,                /* 0617  move L4 <- L1 */
-    0x000301A0, 0x00010000,    /* 0618  call base=L3 argc=1 nres=1 */
-    0x00030102,                /* 061A  return L3 count=1 */
-    0x00460345,                /* 061B  lsym L3 <- sym#70   ("opt") */
-    0x0004008F, 0x00020003,    /* 061C  eq L4 <- L2 == L3 */
-    0x0005044B,                /* 061E  jf L4, +5 */
-    0x001E0342,                /* 061F  gget L3 <- g30   (_decode_opt) */
-    0x00040141,                /* 0620  move L4 <- L1 */
-    0x000301A0, 0x00010000,    /* 0621  call base=L3 argc=1 nres=1 */
-    0x00030102,                /* 0623  return L3 count=1 */
-    0x001C0345,                /* 0624  lsym L3 <- sym#28   ("text") */
-    0x0004008F, 0x00020003,    /* 0625  eq L4 <- L2 == L3 */
-    0x0008044B,                /* 0627  jf L4, +8 */
-    0x000C0342,                /* 0628  gget L3 <- g12   (_decode_text) */
-    0x005C0442,                /* 0629  gget L4 <- g92   (car) */
-    0x00050141,                /* 062A  move L5 <- L1 */
-    0x000401A0, 0x00010000,    /* 062B  call base=L4 argc=1 nres=1 */
-    0x000301A0, 0x00010000,    /* 062D  call base=L3 argc=1 nres=1 */
-    0x00030102,                /* 062F  return L3 count=1 */
-    0x00470345,                /* 0630  lsym L3 <- sym#71   ("expect") */
-    0x0004008F, 0x00020003,    /* 0631  eq L4 <- L2 == L3 */
-    0x000C044B,                /* 0633  jf L4, +12 */
-    0x00100342,                /* 0634  gget L3 <- g16   (_decode_expect) */
-    0x005C0442,                /* 0635  gget L4 <- g92   (car) */
-    0x00050141,                /* 0636  move L5 <- L1 */
-    0x000401A0, 0x00010000,    /* 0637  call base=L4 argc=1 nres=1 */
-    0x00040542,                /* 0639  gget L5 <- g4   (std::pairs::cadr) */
-    0x00060141,                /* 063A  move L6 <- L1 */
-    0x000501A0, 0x00010000,    /* 063B  call base=L5 argc=1 nres=1 */
-    0x000302A0, 0x00010000,    /* 063D  call base=L3 argc=2 nres=1 */
-    0x00030102,                /* 063F  return L3 count=1 */
-    0x00480345,                /* 0640  lsym L3 <- sym#72   ("bool") */
-    0x0004008F, 0x00020003,    /* 0641  eq L4 <- L2 == L3 */
-    0x0005044B,                /* 0643  jf L4, +5 */
-    0x00160342,                /* 0644  gget L3 <- g22   (_decode_bool) */
-    0x00040141,                /* 0645  move L4 <- L1 */
-    0x000301A0, 0x00010000,    /* 0646  call base=L3 argc=1 nres=1 */
-    0x00030102,                /* 0648  return L3 count=1 */
-    0x00490345,                /* 0649  lsym L3 <- sym#73   ("value") */
-    0x0004008F, 0x00020003,    /* 064A  eq L4 <- L2 == L3 */
-    0x000C044B,                /* 064C  jf L4, +12 */
-    0x00180342,                /* 064D  gget L3 <- g24   (_decode_value) */
-    0x005C0442,                /* 064E  gget L4 <- g92   (car) */
-    0x00050141,                /* 064F  move L5 <- L1 */
-    0x000401A0, 0x00010000,    /* 0650  call base=L4 argc=1 nres=1 */
-    0x005F0542,                /* 0652  gget L5 <- g95   (cdr) */
-    0x00060141,                /* 0653  move L6 <- L1 */
-    0x000501A0, 0x00010000,    /* 0654  call base=L5 argc=1 nres=1 */
-    0x000302A0, 0x00010000,    /* 0656  call base=L3 argc=2 nres=1 */
-    0x00030102,                /* 0658  return L3 count=1 */
-    0x004A0345,                /* 0659  lsym L3 <- sym#74   ("push") */
-    0x0004008F, 0x00020003,    /* 065A  eq L4 <- L2 == L3 */
-    0x0008044B,                /* 065C  jf L4, +8 */
-    0x001A0342,                /* 065D  gget L3 <- g26   (_decode_push) */
-    0x005C0442,                /* 065E  gget L4 <- g92   (car) */
-    0x00050141,                /* 065F  move L5 <- L1 */
-    0x000401A0, 0x00010000,    /* 0660  call base=L4 argc=1 nres=1 */
-    0x000301A0, 0x00010000,    /* 0662  call base=L3 argc=1 nres=1 */
-    0x00030102,                /* 0664  return L3 count=1 */
-    0x002F0345,                /* 0665  lsym L3 <- sym#47   ("cons") */
-    0x0004008F, 0x00020003,    /* 0666  eq L4 <- L2 == L3 */
-    0x0005044B,                /* 0668  jf L4, +5 */
-    0x001C0342,                /* 0669  gget L3 <- g28   (_decode_cons) */
-    0x00040141,                /* 066A  move L4 <- L1 */
-    0x000301A0, 0x00010000,    /* 066B  call base=L3 argc=1 nres=1 */
-    0x00030102,                /* 066D  return L3 count=1 */
-    0x005B0342,                /* 066E  gget L3 <- g91   (error) */
-    0x000C0446,                /* 066F  lconst L4 <- static#12   ("@accept: unknown term form '") */
-    0x00600542,                /* 0670  gget L5 <- g96   (str) */
-    0x00060241,                /* 0671  move L6 <- L2 */
-    0x000501A0, 0x00010000,    /* 0672  call base=L5 argc=1 nres=1 */
-    0x00060085, 0x00040005,    /* 0674  add L6 <- L4 + L5 */
-    0x000D0746,                /* 0676  lconst L7 <- static#13   ("'") */
-    0x00080085, 0x00060007,    /* 0677  add L8 <- L6 + L7 */
-    0x00040841,                /* 0679  move L4 <- L8 */
-    0x000301A0, 0x00010000,    /* 067A  call base=L3 argc=1 nres=1 */
-    0x00030102,                /* 067C  return L3 count=1 */
+    0x003B0142,                /* 0591  gget L1 <- g59   (mk_expand) */
+    0x00090345,                /* 0592  lsym L3 <- sym#9   ("fn_def") */
+    0x00420445,                /* 0593  lsym L4 <- sym#66   ("_tmpl_opt") */
+    0x00050003,                /* 0594  lnil L5 */
+    0x000B0845,                /* 0595  lsym L8 <- sym#11   ("param") */
+    0x00210945,                /* 0596  lsym L9 <- sym#33   ("match_expr") */
+    0x000D0B45,                /* 0597  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 0598  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 0599  plist L10 <- L11, 2 items */
+    0x000B0003,                /* 059B  lnil L11 */
+    0x00070484, 0x00080000,    /* 059C  plist L7 <- L8, 4 items */
+    0x00060184, 0x00070000,    /* 059E  plist L6 <- L7, 1 items */
+    0x000D0845,                /* 05A0  lsym L8 <- sym#13   ("type") */
+    0x000E0945,                /* 05A1  lsym L9 <- sym#14   ("auto") */
+    0x00070284, 0x00080000,    /* 05A2  plist L7 <- L8, 2 items */
+    0x00160945,                /* 05A4  lsym L9 <- sym#22   ("do") */
+    0x00170B45,                /* 05A5  lsym L11 <- sym#23   ("define") */
+    0x00290C45,                /* 05A6  lsym L12 <- sym#41   ("_mark") */
+    0x000D0E45,                /* 05A7  lsym L14 <- sym#13   ("type") */
+    0x000E0F45,                /* 05A8  lsym L15 <- sym#14   ("auto") */
+    0x000D0284, 0x000E0000,    /* 05A9  plist L13 <- L14, 2 items */
+    0x00050F45,                /* 05AB  lsym L15 <- sym#5   ("apply") */
+    0x00061145,                /* 05AC  lsym L17 <- sym#6   ("bind_msg") */
+    0x00071245,                /* 05AD  lsym L18 <- sym#7   ("this") */
+    0x00231345,                /* 05AE  lsym L19 <- sym#35   ("mark") */
+    0x00100384, 0x00110000,    /* 05AF  plist L16 <- L17, 3 items */
+    0x000E0284, 0x000F0000,    /* 05B1  plist L14 <- L15, 2 items */
+    0x000A0484, 0x000B0000,    /* 05B3  plist L10 <- L11, 4 items */
+    0x00170C45,                /* 05B5  lsym L12 <- sym#23   ("define") */
+    0x00220D45,                /* 05B6  lsym L13 <- sym#34   ("v") */
+    0x000D0F45,                /* 05B7  lsym L15 <- sym#13   ("type") */
+    0x000E1045,                /* 05B8  lsym L16 <- sym#14   ("auto") */
+    0x000E0284, 0x000F0000,    /* 05B9  plist L14 <- L15, 2 items */
+    0x00210F45,                /* 05BB  lsym L15 <- sym#33   ("match_expr") */
+    0x000B0484, 0x000C0000,    /* 05BC  plist L11 <- L12, 4 items */
+    0x000F0D45,                /* 05BE  lsym L13 <- sym#15   ("cond") */
+    0x00101045,                /* 05BF  lsym L16 <- sym#16   ("==") */
+    0x00221145,                /* 05C0  lsym L17 <- sym#34   ("v") */
+    0x00001345,                /* 05C1  lsym L19 <- sym#0   ("sym") */
+    0x00011445,                /* 05C2  lsym L20 <- sym#1   ("NO_MATCH") */
+    0x00120284, 0x00130000,    /* 05C3  plist L18 <- L19, 2 items */
+    0x000F0384, 0x00100000,    /* 05C5  plist L15 <- L16, 3 items */
+    0x00161145,                /* 05C7  lsym L17 <- sym#22   ("do") */
+    0x00051345,                /* 05C8  lsym L19 <- sym#5   ("apply") */
+    0x00061545,                /* 05C9  lsym L21 <- sym#6   ("bind_msg") */
+    0x00071645,                /* 05CA  lsym L22 <- sym#7   ("this") */
+    0x002B1745,                /* 05CB  lsym L23 <- sym#43   ("reset") */
+    0x00140384, 0x00150000,    /* 05CC  plist L20 <- L21, 3 items */
+    0x00291545,                /* 05CE  lsym L21 <- sym#41   ("_mark") */
+    0x00120384, 0x00130000,    /* 05CF  plist L18 <- L19, 3 items */
+    0x00261445,                /* 05D1  lsym L20 <- sym#38   ("nil") */
+    0x00130184, 0x00140000,    /* 05D2  plist L19 <- L20, 1 items */
+    0x00100384, 0x00110000,    /* 05D4  plist L16 <- L17, 3 items */
+    0x000E0284, 0x000F0000,    /* 05D6  plist L14 <- L15, 2 items */
+    0x00141045,                /* 05D8  lsym L16 <- sym#20   ("else") */
+    0x00221145,                /* 05D9  lsym L17 <- sym#34   ("v") */
+    0x000F0284, 0x00100000,    /* 05DA  plist L15 <- L16, 2 items */
+    0x000C0384, 0x000D0000,    /* 05DC  plist L12 <- L13, 3 items */
+    0x00080484, 0x00090000,    /* 05DE  plist L8 <- L9, 4 items */
+    0x00020684, 0x00030000,    /* 05E0  plist L2 <- L3, 6 items */
+    0x00210345,                /* 05E2  lsym L3 <- sym#33   ("match_expr") */
+    0x00250442,                /* 05E3  gget L4 <- g37   (_build_sequence_expr) */
+    0x00058041,                /* 05E4  move L5 <- P0 */
+    0x00040151,                /* 05E5  call base=L4 argc=1 */
+    0x00040041,                /* 05E6  move L4 <- L0 */
+    0x00010351,                /* 05E7  call base=L1 argc=3 */
+    0x00010041,                /* 05E8  move L1 <- L0 */
+    0x00010008,                /* 05E9  return L1 */
+    0x00500442,                /* 05EA  gget L4 <- g80   (s_call_target) */
+    0x00058041,                /* 05EB  move L5 <- P0 */
+    0x00040151,                /* 05EC  call base=L4 argc=1 */
+    0x00040041,                /* 05ED  move L4 <- L0 */
+    0x00010441,                /* 05EE  move L1 <- L4 */
+    0x004F0442,                /* 05EF  gget L4 <- g79   (s_call_args) */
+    0x00058041,                /* 05F0  move L5 <- P0 */
+    0x00040151,                /* 05F1  call base=L4 argc=1 */
+    0x00040041,                /* 05F2  move L4 <- L0 */
+    0x00020441,                /* 05F3  move L2 <- L4 */
+    0x00060442,                /* 05F4  gget L4 <- g6   (_req_name) */
+    0x00050141,                /* 05F5  move L5 <- L1 */
+    0x00040151,                /* 05F6  call base=L4 argc=1 */
+    0x00040041,                /* 05F7  move L4 <- L0 */
+    0x00030441,                /* 05F8  move L3 <- L4 */
+    0x00430445,                /* 05F9  lsym L4 <- sym#67   ("apply_if") */
+    0x0005008F, 0x00030004,    /* 05FA  eq L5 <- L3 == L4 */
+    0x000C054B,                /* 05FC  jf L5, +12 */
+    0x00070442,                /* 05FD  gget L4 <- g7   (_decode_apply_if) */
+    0x005C0542,                /* 05FE  gget L5 <- g92   (car) */
+    0x00060241,                /* 05FF  move L6 <- L2 */
+    0x00050151,                /* 0600  call base=L5 argc=1 */
+    0x00050041,                /* 0601  move L5 <- L0 */
+    0x005F0642,                /* 0602  gget L6 <- g95   (cdr) */
+    0x00070241,                /* 0603  move L7 <- L2 */
+    0x00060151,                /* 0604  call base=L6 argc=1 */
+    0x00060041,                /* 0605  move L6 <- L0 */
+    0x00040251,                /* 0606  call base=L4 argc=2 */
+    0x00040041,                /* 0607  move L4 <- L0 */
+    0x00040008,                /* 0608  return L4 */
+    0x00440445,                /* 0609  lsym L4 <- sym#68   ("many") */
+    0x0005008F, 0x00030004,    /* 060A  eq L5 <- L3 == L4 */
+    0x0005054B,                /* 060C  jf L5, +5 */
+    0x00120442,                /* 060D  gget L4 <- g18   (_decode_many) */
+    0x00050241,                /* 060E  move L5 <- L2 */
+    0x00040151,                /* 060F  call base=L4 argc=1 */
+    0x00040041,                /* 0610  move L4 <- L0 */
+    0x00040008,                /* 0611  return L4 */
+    0x00450445,                /* 0612  lsym L4 <- sym#69   ("manyflat") */
+    0x0005008F, 0x00030004,    /* 0613  eq L5 <- L3 == L4 */
+    0x0005054B,                /* 0615  jf L5, +5 */
+    0x00140442,                /* 0616  gget L4 <- g20   (_decode_manyflat) */
+    0x00050241,                /* 0617  move L5 <- L2 */
+    0x00040151,                /* 0618  call base=L4 argc=1 */
+    0x00040041,                /* 0619  move L4 <- L0 */
+    0x00040008,                /* 061A  return L4 */
+    0x00460445,                /* 061B  lsym L4 <- sym#70   ("opt") */
+    0x0005008F, 0x00030004,    /* 061C  eq L5 <- L3 == L4 */
+    0x0005054B,                /* 061E  jf L5, +5 */
+    0x001E0442,                /* 061F  gget L4 <- g30   (_decode_opt) */
+    0x00050241,                /* 0620  move L5 <- L2 */
+    0x00040151,                /* 0621  call base=L4 argc=1 */
+    0x00040041,                /* 0622  move L4 <- L0 */
+    0x00040008,                /* 0623  return L4 */
+    0x001C0445,                /* 0624  lsym L4 <- sym#28   ("text") */
+    0x0005008F, 0x00030004,    /* 0625  eq L5 <- L3 == L4 */
+    0x0008054B,                /* 0627  jf L5, +8 */
+    0x000C0442,                /* 0628  gget L4 <- g12   (_decode_text) */
+    0x005C0542,                /* 0629  gget L5 <- g92   (car) */
+    0x00060241,                /* 062A  move L6 <- L2 */
+    0x00050151,                /* 062B  call base=L5 argc=1 */
+    0x00050041,                /* 062C  move L5 <- L0 */
+    0x00040151,                /* 062D  call base=L4 argc=1 */
+    0x00040041,                /* 062E  move L4 <- L0 */
+    0x00040008,                /* 062F  return L4 */
+    0x00470445,                /* 0630  lsym L4 <- sym#71   ("expect") */
+    0x0005008F, 0x00030004,    /* 0631  eq L5 <- L3 == L4 */
+    0x000C054B,                /* 0633  jf L5, +12 */
+    0x00100442,                /* 0634  gget L4 <- g16   (_decode_expect) */
+    0x005C0542,                /* 0635  gget L5 <- g92   (car) */
+    0x00060241,                /* 0636  move L6 <- L2 */
+    0x00050151,                /* 0637  call base=L5 argc=1 */
+    0x00050041,                /* 0638  move L5 <- L0 */
+    0x00040642,                /* 0639  gget L6 <- g4   (std::pairs::cadr) */
+    0x00070241,                /* 063A  move L7 <- L2 */
+    0x00060151,                /* 063B  call base=L6 argc=1 */
+    0x00060041,                /* 063C  move L6 <- L0 */
+    0x00040251,                /* 063D  call base=L4 argc=2 */
+    0x00040041,                /* 063E  move L4 <- L0 */
+    0x00040008,                /* 063F  return L4 */
+    0x00480445,                /* 0640  lsym L4 <- sym#72   ("bool") */
+    0x0005008F, 0x00030004,    /* 0641  eq L5 <- L3 == L4 */
+    0x0005054B,                /* 0643  jf L5, +5 */
+    0x00160442,                /* 0644  gget L4 <- g22   (_decode_bool) */
+    0x00050241,                /* 0645  move L5 <- L2 */
+    0x00040151,                /* 0646  call base=L4 argc=1 */
+    0x00040041,                /* 0647  move L4 <- L0 */
+    0x00040008,                /* 0648  return L4 */
+    0x00490445,                /* 0649  lsym L4 <- sym#73   ("value") */
+    0x0005008F, 0x00030004,    /* 064A  eq L5 <- L3 == L4 */
+    0x000C054B,                /* 064C  jf L5, +12 */
+    0x00180442,                /* 064D  gget L4 <- g24   (_decode_value) */
+    0x005C0542,                /* 064E  gget L5 <- g92   (car) */
+    0x00060241,                /* 064F  move L6 <- L2 */
+    0x00050151,                /* 0650  call base=L5 argc=1 */
+    0x00050041,                /* 0651  move L5 <- L0 */
+    0x005F0642,                /* 0652  gget L6 <- g95   (cdr) */
+    0x00070241,                /* 0653  move L7 <- L2 */
+    0x00060151,                /* 0654  call base=L6 argc=1 */
+    0x00060041,                /* 0655  move L6 <- L0 */
+    0x00040251,                /* 0656  call base=L4 argc=2 */
+    0x00040041,                /* 0657  move L4 <- L0 */
+    0x00040008,                /* 0658  return L4 */
+    0x004A0445,                /* 0659  lsym L4 <- sym#74   ("push") */
+    0x0005008F, 0x00030004,    /* 065A  eq L5 <- L3 == L4 */
+    0x0008054B,                /* 065C  jf L5, +8 */
+    0x001A0442,                /* 065D  gget L4 <- g26   (_decode_push) */
+    0x005C0542,                /* 065E  gget L5 <- g92   (car) */
+    0x00060241,                /* 065F  move L6 <- L2 */
+    0x00050151,                /* 0660  call base=L5 argc=1 */
+    0x00050041,                /* 0661  move L5 <- L0 */
+    0x00040151,                /* 0662  call base=L4 argc=1 */
+    0x00040041,                /* 0663  move L4 <- L0 */
+    0x00040008,                /* 0664  return L4 */
+    0x002F0445,                /* 0665  lsym L4 <- sym#47   ("cons") */
+    0x0005008F, 0x00030004,    /* 0666  eq L5 <- L3 == L4 */
+    0x0005054B,                /* 0668  jf L5, +5 */
+    0x001C0442,                /* 0669  gget L4 <- g28   (_decode_cons) */
+    0x00050241,                /* 066A  move L5 <- L2 */
+    0x00040151,                /* 066B  call base=L4 argc=1 */
+    0x00040041,                /* 066C  move L4 <- L0 */
+    0x00040008,                /* 066D  return L4 */
+    0x005B0442,                /* 066E  gget L4 <- g91   (error) */
+    0x000C0546,                /* 066F  lconst L5 <- static#12   ("@accept: unknown term form '") */
+    0x00600642,                /* 0670  gget L6 <- g96   (str) */
+    0x00070341,                /* 0671  move L7 <- L3 */
+    0x00060151,                /* 0672  call base=L6 argc=1 */
+    0x00060041,                /* 0673  move L6 <- L0 */
+    0x00070085, 0x00050006,    /* 0674  add L7 <- L5 + L6 */
+    0x000D0846,                /* 0676  lconst L8 <- static#13   ("'") */
+    0x00090085, 0x00070008,    /* 0677  add L9 <- L7 + L8 */
+    0x00050941,                /* 0679  move L5 <- L9 */
+    0x00040151,                /* 067A  call base=L4 argc=1 */
+    0x00040041,                /* 067B  move L4 <- L0 */
+    0x00040008,                /* 067C  return L4 */
     0x00000001,                /* 067D  trap 0 */
-    0x004C0142,                /* 067E  gget L1 <- g76   (s_binop_op) */
-    0x00028041,                /* 067F  move L2 <- P0 */
-    0x000101A0, 0x00010000,    /* 0680  call base=L1 argc=1 nres=1 */
-    0x00000141,                /* 0682  move L0 <- L1 */
-    0x004B0145,                /* 0683  lsym L1 <- sym#75   ("|") */
-    0x0002008F, 0x00000001,    /* 0684  eq L2 <- L0 == L1 */
-    0x0071024B,                /* 0686  jf L2, +113 */
-    0x003C0142,                /* 0687  gget L1 <- g60   (mk_expand_n) */
-    0x00090345,                /* 0688  lsym L3 <- sym#9   ("fn_def") */
-    0x004C0445,                /* 0689  lsym L4 <- sym#76   ("$_binop_or") */
-    0x00050003,                /* 068A  lnil L5 */
-    0x000B0845,                /* 068B  lsym L8 <- sym#11   ("param") */
-    0x004D0945,                /* 068C  lsym L9 <- sym#77   ("first_expr") */
-    0x000D0B45,                /* 068D  lsym L11 <- sym#13   ("type") */
-    0x000E0C45,                /* 068E  lsym L12 <- sym#14   ("auto") */
-    0x000A0284, 0x000B0000,    /* 068F  plist L10 <- L11, 2 items */
-    0x000B0003,                /* 0691  lnil L11 */
-    0x00070484, 0x00080000,    /* 0692  plist L7 <- L8, 4 items */
-    0x000B0945,                /* 0694  lsym L9 <- sym#11   ("param") */
-    0x004E0A45,                /* 0695  lsym L10 <- sym#78   ("second_expr") */
-    0x000D0C45,                /* 0696  lsym L12 <- sym#13   ("type") */
-    0x000E0D45,                /* 0697  lsym L13 <- sym#14   ("auto") */
-    0x000B0284, 0x000C0000,    /* 0698  plist L11 <- L12, 2 items */
-    0x000C0003,                /* 069A  lnil L12 */
-    0x00080484, 0x00090000,    /* 069B  plist L8 <- L9, 4 items */
-    0x00060284, 0x00070000,    /* 069D  plist L6 <- L7, 2 items */
-    0x000D0845,                /* 069F  lsym L8 <- sym#13   ("type") */
-    0x000E0945,                /* 06A0  lsym L9 <- sym#14   ("auto") */
-    0x00070284, 0x00080000,    /* 06A1  plist L7 <- L8, 2 items */
-    0x00160945,                /* 06A3  lsym L9 <- sym#22   ("do") */
-    0x00170B45,                /* 06A4  lsym L11 <- sym#23   ("define") */
-    0x00290C45,                /* 06A5  lsym L12 <- sym#41   ("_mark") */
-    0x000D0E45,                /* 06A6  lsym L14 <- sym#13   ("type") */
-    0x000E0F45,                /* 06A7  lsym L15 <- sym#14   ("auto") */
-    0x000D0284, 0x000E0000,    /* 06A8  plist L13 <- L14, 2 items */
-    0x00050F45,                /* 06AA  lsym L15 <- sym#5   ("apply") */
-    0x00061145,                /* 06AB  lsym L17 <- sym#6   ("bind_msg") */
-    0x00071245,                /* 06AC  lsym L18 <- sym#7   ("this") */
-    0x00231345,                /* 06AD  lsym L19 <- sym#35   ("mark") */
-    0x00100384, 0x00110000,    /* 06AE  plist L16 <- L17, 3 items */
-    0x000E0284, 0x000F0000,    /* 06B0  plist L14 <- L15, 2 items */
-    0x000A0484, 0x000B0000,    /* 06B2  plist L10 <- L11, 4 items */
-    0x00170C45,                /* 06B4  lsym L12 <- sym#23   ("define") */
-    0x00220D45,                /* 06B5  lsym L13 <- sym#34   ("v") */
-    0x000D0F45,                /* 06B6  lsym L15 <- sym#13   ("type") */
-    0x000E1045,                /* 06B7  lsym L16 <- sym#14   ("auto") */
-    0x000E0284, 0x000F0000,    /* 06B8  plist L14 <- L15, 2 items */
-    0x004D0F45,                /* 06BA  lsym L15 <- sym#77   ("first_expr") */
-    0x000B0484, 0x000C0000,    /* 06BB  plist L11 <- L12, 4 items */
-    0x000F0D45,                /* 06BD  lsym L13 <- sym#15   ("cond") */
-    0x00031045,                /* 06BE  lsym L16 <- sym#3   ("!=") */
-    0x00221145,                /* 06BF  lsym L17 <- sym#34   ("v") */
-    0x00001345,                /* 06C0  lsym L19 <- sym#0   ("sym") */
-    0x00011445,                /* 06C1  lsym L20 <- sym#1   ("NO_MATCH") */
-    0x00120284, 0x00130000,    /* 06C2  plist L18 <- L19, 2 items */
-    0x000F0384, 0x00100000,    /* 06C4  plist L15 <- L16, 3 items */
-    0x00221045,                /* 06C6  lsym L16 <- sym#34   ("v") */
-    0x000E0284, 0x000F0000,    /* 06C7  plist L14 <- L15, 2 items */
-    0x00141045,                /* 06C9  lsym L16 <- sym#20   ("else") */
-    0x00161245,                /* 06CA  lsym L18 <- sym#22   ("do") */
-    0x00051445,                /* 06CB  lsym L20 <- sym#5   ("apply") */
-    0x00061645,                /* 06CC  lsym L22 <- sym#6   ("bind_msg") */
-    0x00071745,                /* 06CD  lsym L23 <- sym#7   ("this") */
-    0x002B1845,                /* 06CE  lsym L24 <- sym#43   ("reset") */
-    0x00150384, 0x00160000,    /* 06CF  plist L21 <- L22, 3 items */
-    0x00291645,                /* 06D1  lsym L22 <- sym#41   ("_mark") */
-    0x00130384, 0x00140000,    /* 06D2  plist L19 <- L20, 3 items */
-    0x004E1445,                /* 06D4  lsym L20 <- sym#78   ("second_expr") */
-    0x00110384, 0x00120000,    /* 06D5  plist L17 <- L18, 3 items */
-    0x000F0284, 0x00100000,    /* 06D7  plist L15 <- L16, 2 items */
-    0x000C0384, 0x000D0000,    /* 06D9  plist L12 <- L13, 3 items */
-    0x00080484, 0x00090000,    /* 06DB  plist L8 <- L9, 4 items */
-    0x00020684, 0x00030000,    /* 06DD  plist L2 <- L3, 6 items */
-    0x005D0342,                /* 06DF  gget L3 <- g93   (pair) */
-    0x004D0445,                /* 06E0  lsym L4 <- sym#77   ("first_expr") */
-    0x00220542,                /* 06E1  gget L5 <- g34   (_decode_term) */
-    0x004B0642,                /* 06E2  gget L6 <- g75   (s_binop_lhs) */
-    0x00078041,                /* 06E3  move L7 <- P0 */
-    0x000601A0, 0x00010000,    /* 06E4  call base=L6 argc=1 nres=1 */
-    0x000501A0, 0x00010000,    /* 06E6  call base=L5 argc=1 nres=1 */
-    0x000302A0, 0x00010000,    /* 06E8  call base=L3 argc=2 nres=1 */
-    0x005D0442,                /* 06EA  gget L4 <- g93   (pair) */
-    0x004E0545,                /* 06EB  lsym L5 <- sym#78   ("second_expr") */
-    0x00220642,                /* 06EC  gget L6 <- g34   (_decode_term) */
-    0x004D0742,                /* 06ED  gget L7 <- g77   (s_binop_rhs) */
-    0x00088041,                /* 06EE  move L8 <- P0 */
-    0x000701A0, 0x00010000,    /* 06EF  call base=L7 argc=1 nres=1 */
-    0x000601A0, 0x00010000,    /* 06F1  call base=L6 argc=1 nres=1 */
-    0x000402A0, 0x00010000,    /* 06F3  call base=L4 argc=2 nres=1 */
-    0x000103A0, 0x00010000,    /* 06F5  call base=L1 argc=3 nres=1 */
-    0x00010102,                /* 06F7  return L1 count=1 */
-    0x005B0142,                /* 06F8  gget L1 <- g91   (error) */
-    0x000E0246,                /* 06F9  lconst L2 <- static#14   ("@accept: unsupported operator '") */
-    0x00600342,                /* 06FA  gget L3 <- g96   (str) */
-    0x00040041,                /* 06FB  move L4 <- L0 */
-    0x000301A0, 0x00010000,    /* 06FC  call base=L3 argc=1 nres=1 */
-    0x00040085, 0x00020003,    /* 06FE  add L4 <- L2 + L3 */
-    0x000D0546,                /* 0700  lconst L5 <- static#13   ("'") */
-    0x00060085, 0x00040005,    /* 0701  add L6 <- L4 + L5 */
-    0x00020641,                /* 0703  move L2 <- L6 */
-    0x000101A0, 0x00010000,    /* 0704  call base=L1 argc=1 nres=1 */
-    0x00010102,                /* 0706  return L1 count=1 */
-    0x00560142,                /* 0707  gget L1 <- g86   (s_kind) */
-    0x00028041,                /* 0708  move L2 <- P0 */
-    0x000101A0, 0x00010000,    /* 0709  call base=L1 argc=1 nres=1 */
-    0x00000141,                /* 070B  move L0 <- L1 */
-    0x004F0145,                /* 070C  lsym L1 <- sym#79   ("name") */
-    0x0002008F, 0x00000001,    /* 070D  eq L2 <- L0 == L1 */
-    0x0008024B,                /* 070F  jf L2, +8 */
-    0x00080142,                /* 0710  gget L1 <- g8   (_decode_rule_call) */
-    0x00060242,                /* 0711  gget L2 <- g6   (_req_name) */
-    0x00038041,                /* 0712  move L3 <- P0 */
-    0x000201A0, 0x00010000,    /* 0713  call base=L2 argc=1 nres=1 */
-    0x000101A0, 0x00010000,    /* 0715  call base=L1 argc=1 nres=1 */
-    0x00010102,                /* 0717  return L1 count=1 */
-    0x00000145,                /* 0718  lsym L1 <- sym#0   ("sym") */
-    0x0002008F, 0x00000001,    /* 0719  eq L2 <- L0 == L1 */
-    0x0008024B,                /* 071B  jf L2, +8 */
-    0x000A0142,                /* 071C  gget L1 <- g10   (_decode_token_kind) */
-    0x00040242,                /* 071D  gget L2 <- g4   (std::pairs::cadr) */
-    0x00038041,                /* 071E  move L3 <- P0 */
-    0x000201A0, 0x00010000,    /* 071F  call base=L2 argc=1 nres=1 */
-    0x000101A0, 0x00010000,    /* 0721  call base=L1 argc=1 nres=1 */
-    0x00010102,                /* 0723  return L1 count=1 */
-    0x00500145,                /* 0724  lsym L1 <- sym#80   ("str") */
-    0x0002008F, 0x00000001,    /* 0725  eq L2 <- L0 == L1 */
-    0x0008024B,                /* 0727  jf L2, +8 */
-    0x000E0142,                /* 0728  gget L1 <- g14   (_decode_soft_keyword) */
-    0x00040242,                /* 0729  gget L2 <- g4   (std::pairs::cadr) */
-    0x00038041,                /* 072A  move L3 <- P0 */
-    0x000201A0, 0x00010000,    /* 072B  call base=L2 argc=1 nres=1 */
-    0x000101A0, 0x00010000,    /* 072D  call base=L1 argc=1 nres=1 */
-    0x00010102,                /* 072F  return L1 count=1 */
-    0x00050145,                /* 0730  lsym L1 <- sym#5   ("apply") */
-    0x0002008F, 0x00000001,    /* 0731  eq L2 <- L0 == L1 */
-    0x0005024B,                /* 0733  jf L2, +5 */
-    0x001F0142,                /* 0734  gget L1 <- g31   (_decode_call) */
-    0x00028041,                /* 0735  move L2 <- P0 */
-    0x000101A0, 0x00010000,    /* 0736  call base=L1 argc=1 nres=1 */
-    0x00010102,                /* 0738  return L1 count=1 */
-    0x004B0145,                /* 0739  lsym L1 <- sym#75   ("|") */
-    0x0002008F, 0x00000001,    /* 073A  eq L2 <- L0 == L1 */
-    0x0005024B,                /* 073C  jf L2, +5 */
-    0x00210142,                /* 073D  gget L1 <- g33   (_decode_binop) */
-    0x00028041,                /* 073E  move L2 <- P0 */
-    0x000101A0, 0x00010000,    /* 073F  call base=L1 argc=1 nres=1 */
-    0x00010102,                /* 0741  return L1 count=1 */
-    0x00540142,                /* 0742  gget L1 <- g84   (s_is_pairlist) */
-    0x00028041,                /* 0743  move L2 <- P0 */
-    0x000101A0, 0x00010000,    /* 0744  call base=L1 argc=1 nres=1 */
-    0x0008014B,                /* 0746  jf L1, +8 */
-    0x00250142,                /* 0747  gget L1 <- g37   (_build_sequence_expr) */
-    0x00570242,                /* 0748  gget L2 <- g87   (s_pairlist_items) */
-    0x00038041,                /* 0749  move L3 <- P0 */
-    0x000201A0, 0x00010000,    /* 074A  call base=L2 argc=1 nres=1 */
-    0x000101A0, 0x00010000,    /* 074C  call base=L1 argc=1 nres=1 */
-    0x00010102,                /* 074E  return L1 count=1 */
-    0x005B0142,                /* 074F  gget L1 <- g91   (error) */
-    0x000F0246,                /* 0750  lconst L2 <- static#15   ("@accept: this is not something the notation can match yet") */
-    0x000101A0, 0x00010000,    /* 0751  call base=L1 argc=1 nres=1 */
-    0x00010102,                /* 0753  return L1 count=1 */
-    0x00100146,                /* 0754  lconst L1 <- static#16   ("pair") */
-    0x00000097, 0x80000001,    /* 0755  is L0 <- P0 is L1 */
-    0x0007004B,                /* 0757  jf L0, +7 */
-    0x005C0142,                /* 0758  gget L1 <- g92   (car) */
-    0x00028041,                /* 0759  move L2 <- P0 */
-    0x000101A0, 0x00010000,    /* 075A  call base=L1 argc=1 nres=1 */
-    0x00510245,                /* 075C  lsym L2 <- sym#81   ("~") */
-    0x0000008F, 0x00010002,    /* 075D  eq L0 <- L1 == L2 */
-    0x00000102,                /* 075F  return L0 count=1 */
-    0x00060003,                /* 0760  lnil L6 */
-    0x0007008F, 0x80000006,    /* 0761  eq L7 <- P0 == L6 */
-    0x001E074B,                /* 0763  jf L7, +30 */
-    0x00060040,                /* 0764  i8 L6 <- 0 */
-    0x0007008F, 0x80010006,    /* 0765  eq L7 <- P1 == L6 */
-    0x0002074B,                /* 0767  jf L7, +2 */
-    0x002C0642,                /* 0768  gget L6 <- g44   (NIL_EXPR) */
-    0x00060102,                /* 0769  return L6 count=1 */
-    0x00060140,                /* 076A  i8 L6 <- 1 */
-    0x0007008F, 0x80010006,    /* 076B  eq L7 <- P1 == L6 */
-    0x000B074B,                /* 076D  jf L7, +11 */
-    0x003E0642,                /* 076E  gget L6 <- g62   (mk_index) */
-    0x00520745,                /* 076F  lsym L7 <- sym#82   ("_acc") */
-    0x00120845,                /* 0770  lsym L8 <- sym#18   ("int") */
-    0x00090040,                /* 0771  i8 L9 <- 0 */
-    0x000A0284, 0x00080000,    /* 0772  plist L10 <- L8, 2 items */
-    0x00080A41,                /* 0774  move L8 <- L10 */
-    0x000602A0, 0x00010000,    /* 0775  call base=L6 argc=2 nres=1 */
-    0x00060102,                /* 0777  return L6 count=1 */
+    0x004C0242,                /* 067E  gget L2 <- g76   (s_binop_op) */
+    0x00038041,                /* 067F  move L3 <- P0 */
+    0x00020151,                /* 0680  call base=L2 argc=1 */
+    0x00020041,                /* 0681  move L2 <- L0 */
+    0x00010241,                /* 0682  move L1 <- L2 */
+    0x004B0245,                /* 0683  lsym L2 <- sym#75   ("|") */
+    0x0003008F, 0x00010002,    /* 0684  eq L3 <- L1 == L2 */
+    0x0071034B,                /* 0686  jf L3, +113 */
+    0x003C0242,                /* 0687  gget L2 <- g60   (mk_expand_n) */
+    0x00090445,                /* 0688  lsym L4 <- sym#9   ("fn_def") */
+    0x004C0545,                /* 0689  lsym L5 <- sym#76   ("$_binop_or") */
+    0x00060003,                /* 068A  lnil L6 */
+    0x000B0945,                /* 068B  lsym L9 <- sym#11   ("param") */
+    0x004D0A45,                /* 068C  lsym L10 <- sym#77   ("first_expr") */
+    0x000D0C45,                /* 068D  lsym L12 <- sym#13   ("type") */
+    0x000E0D45,                /* 068E  lsym L13 <- sym#14   ("auto") */
+    0x000B0284, 0x000C0000,    /* 068F  plist L11 <- L12, 2 items */
+    0x000C0003,                /* 0691  lnil L12 */
+    0x00080484, 0x00090000,    /* 0692  plist L8 <- L9, 4 items */
+    0x000B0A45,                /* 0694  lsym L10 <- sym#11   ("param") */
+    0x004E0B45,                /* 0695  lsym L11 <- sym#78   ("second_expr") */
+    0x000D0D45,                /* 0696  lsym L13 <- sym#13   ("type") */
+    0x000E0E45,                /* 0697  lsym L14 <- sym#14   ("auto") */
+    0x000C0284, 0x000D0000,    /* 0698  plist L12 <- L13, 2 items */
+    0x000D0003,                /* 069A  lnil L13 */
+    0x00090484, 0x000A0000,    /* 069B  plist L9 <- L10, 4 items */
+    0x00070284, 0x00080000,    /* 069D  plist L7 <- L8, 2 items */
+    0x000D0945,                /* 069F  lsym L9 <- sym#13   ("type") */
+    0x000E0A45,                /* 06A0  lsym L10 <- sym#14   ("auto") */
+    0x00080284, 0x00090000,    /* 06A1  plist L8 <- L9, 2 items */
+    0x00160A45,                /* 06A3  lsym L10 <- sym#22   ("do") */
+    0x00170C45,                /* 06A4  lsym L12 <- sym#23   ("define") */
+    0x00290D45,                /* 06A5  lsym L13 <- sym#41   ("_mark") */
+    0x000D0F45,                /* 06A6  lsym L15 <- sym#13   ("type") */
+    0x000E1045,                /* 06A7  lsym L16 <- sym#14   ("auto") */
+    0x000E0284, 0x000F0000,    /* 06A8  plist L14 <- L15, 2 items */
+    0x00051045,                /* 06AA  lsym L16 <- sym#5   ("apply") */
+    0x00061245,                /* 06AB  lsym L18 <- sym#6   ("bind_msg") */
+    0x00071345,                /* 06AC  lsym L19 <- sym#7   ("this") */
+    0x00231445,                /* 06AD  lsym L20 <- sym#35   ("mark") */
+    0x00110384, 0x00120000,    /* 06AE  plist L17 <- L18, 3 items */
+    0x000F0284, 0x00100000,    /* 06B0  plist L15 <- L16, 2 items */
+    0x000B0484, 0x000C0000,    /* 06B2  plist L11 <- L12, 4 items */
+    0x00170D45,                /* 06B4  lsym L13 <- sym#23   ("define") */
+    0x00220E45,                /* 06B5  lsym L14 <- sym#34   ("v") */
+    0x000D1045,                /* 06B6  lsym L16 <- sym#13   ("type") */
+    0x000E1145,                /* 06B7  lsym L17 <- sym#14   ("auto") */
+    0x000F0284, 0x00100000,    /* 06B8  plist L15 <- L16, 2 items */
+    0x004D1045,                /* 06BA  lsym L16 <- sym#77   ("first_expr") */
+    0x000C0484, 0x000D0000,    /* 06BB  plist L12 <- L13, 4 items */
+    0x000F0E45,                /* 06BD  lsym L14 <- sym#15   ("cond") */
+    0x00031145,                /* 06BE  lsym L17 <- sym#3   ("!=") */
+    0x00221245,                /* 06BF  lsym L18 <- sym#34   ("v") */
+    0x00001445,                /* 06C0  lsym L20 <- sym#0   ("sym") */
+    0x00011545,                /* 06C1  lsym L21 <- sym#1   ("NO_MATCH") */
+    0x00130284, 0x00140000,    /* 06C2  plist L19 <- L20, 2 items */
+    0x00100384, 0x00110000,    /* 06C4  plist L16 <- L17, 3 items */
+    0x00221145,                /* 06C6  lsym L17 <- sym#34   ("v") */
+    0x000F0284, 0x00100000,    /* 06C7  plist L15 <- L16, 2 items */
+    0x00141145,                /* 06C9  lsym L17 <- sym#20   ("else") */
+    0x00161345,                /* 06CA  lsym L19 <- sym#22   ("do") */
+    0x00051545,                /* 06CB  lsym L21 <- sym#5   ("apply") */
+    0x00061745,                /* 06CC  lsym L23 <- sym#6   ("bind_msg") */
+    0x00071845,                /* 06CD  lsym L24 <- sym#7   ("this") */
+    0x002B1945,                /* 06CE  lsym L25 <- sym#43   ("reset") */
+    0x00160384, 0x00170000,    /* 06CF  plist L22 <- L23, 3 items */
+    0x00291745,                /* 06D1  lsym L23 <- sym#41   ("_mark") */
+    0x00140384, 0x00150000,    /* 06D2  plist L20 <- L21, 3 items */
+    0x004E1545,                /* 06D4  lsym L21 <- sym#78   ("second_expr") */
+    0x00120384, 0x00130000,    /* 06D5  plist L18 <- L19, 3 items */
+    0x00100284, 0x00110000,    /* 06D7  plist L16 <- L17, 2 items */
+    0x000D0384, 0x000E0000,    /* 06D9  plist L13 <- L14, 3 items */
+    0x00090484, 0x000A0000,    /* 06DB  plist L9 <- L10, 4 items */
+    0x00030684, 0x00040000,    /* 06DD  plist L3 <- L4, 6 items */
+    0x005D0442,                /* 06DF  gget L4 <- g93   (pair) */
+    0x004D0545,                /* 06E0  lsym L5 <- sym#77   ("first_expr") */
+    0x00220642,                /* 06E1  gget L6 <- g34   (_decode_term) */
+    0x004B0742,                /* 06E2  gget L7 <- g75   (s_binop_lhs) */
+    0x00088041,                /* 06E3  move L8 <- P0 */
+    0x00070151,                /* 06E4  call base=L7 argc=1 */
+    0x00070041,                /* 06E5  move L7 <- L0 */
+    0x00060151,                /* 06E6  call base=L6 argc=1 */
+    0x00060041,                /* 06E7  move L6 <- L0 */
+    0x00040251,                /* 06E8  call base=L4 argc=2 */
+    0x00040041,                /* 06E9  move L4 <- L0 */
+    0x005D0542,                /* 06EA  gget L5 <- g93   (pair) */
+    0x004E0645,                /* 06EB  lsym L6 <- sym#78   ("second_expr") */
+    0x00220742,                /* 06EC  gget L7 <- g34   (_decode_term) */
+    0x004D0842,                /* 06ED  gget L8 <- g77   (s_binop_rhs) */
+    0x00098041,                /* 06EE  move L9 <- P0 */
+    0x00080151,                /* 06EF  call base=L8 argc=1 */
+    0x00080041,                /* 06F0  move L8 <- L0 */
+    0x00070151,                /* 06F1  call base=L7 argc=1 */
+    0x00070041,                /* 06F2  move L7 <- L0 */
+    0x00050251,                /* 06F3  call base=L5 argc=2 */
+    0x00050041,                /* 06F4  move L5 <- L0 */
+    0x00020351,                /* 06F5  call base=L2 argc=3 */
+    0x00020041,                /* 06F6  move L2 <- L0 */
+    0x00020008,                /* 06F7  return L2 */
+    0x005B0242,                /* 06F8  gget L2 <- g91   (error) */
+    0x000E0346,                /* 06F9  lconst L3 <- static#14   ("@accept: unsupported operator '") */
+    0x00600442,                /* 06FA  gget L4 <- g96   (str) */
+    0x00050141,                /* 06FB  move L5 <- L1 */
+    0x00040151,                /* 06FC  call base=L4 argc=1 */
+    0x00040041,                /* 06FD  move L4 <- L0 */
+    0x00050085, 0x00030004,    /* 06FE  add L5 <- L3 + L4 */
+    0x000D0646,                /* 0700  lconst L6 <- static#13   ("'") */
+    0x00070085, 0x00050006,    /* 0701  add L7 <- L5 + L6 */
+    0x00030741,                /* 0703  move L3 <- L7 */
+    0x00020151,                /* 0704  call base=L2 argc=1 */
+    0x00020041,                /* 0705  move L2 <- L0 */
+    0x00020008,                /* 0706  return L2 */
+    0x00560242,                /* 0707  gget L2 <- g86   (s_kind) */
+    0x00038041,                /* 0708  move L3 <- P0 */
+    0x00020151,                /* 0709  call base=L2 argc=1 */
+    0x00020041,                /* 070A  move L2 <- L0 */
+    0x00010241,                /* 070B  move L1 <- L2 */
+    0x004F0245,                /* 070C  lsym L2 <- sym#79   ("name") */
+    0x0003008F, 0x00010002,    /* 070D  eq L3 <- L1 == L2 */
+    0x0008034B,                /* 070F  jf L3, +8 */
+    0x00080242,                /* 0710  gget L2 <- g8   (_decode_rule_call) */
+    0x00060342,                /* 0711  gget L3 <- g6   (_req_name) */
+    0x00048041,                /* 0712  move L4 <- P0 */
+    0x00030151,                /* 0713  call base=L3 argc=1 */
+    0x00030041,                /* 0714  move L3 <- L0 */
+    0x00020151,                /* 0715  call base=L2 argc=1 */
+    0x00020041,                /* 0716  move L2 <- L0 */
+    0x00020008,                /* 0717  return L2 */
+    0x00000245,                /* 0718  lsym L2 <- sym#0   ("sym") */
+    0x0003008F, 0x00010002,    /* 0719  eq L3 <- L1 == L2 */
+    0x0008034B,                /* 071B  jf L3, +8 */
+    0x000A0242,                /* 071C  gget L2 <- g10   (_decode_token_kind) */
+    0x00040342,                /* 071D  gget L3 <- g4   (std::pairs::cadr) */
+    0x00048041,                /* 071E  move L4 <- P0 */
+    0x00030151,                /* 071F  call base=L3 argc=1 */
+    0x00030041,                /* 0720  move L3 <- L0 */
+    0x00020151,                /* 0721  call base=L2 argc=1 */
+    0x00020041,                /* 0722  move L2 <- L0 */
+    0x00020008,                /* 0723  return L2 */
+    0x00500245,                /* 0724  lsym L2 <- sym#80   ("str") */
+    0x0003008F, 0x00010002,    /* 0725  eq L3 <- L1 == L2 */
+    0x0008034B,                /* 0727  jf L3, +8 */
+    0x000E0242,                /* 0728  gget L2 <- g14   (_decode_soft_keyword) */
+    0x00040342,                /* 0729  gget L3 <- g4   (std::pairs::cadr) */
+    0x00048041,                /* 072A  move L4 <- P0 */
+    0x00030151,                /* 072B  call base=L3 argc=1 */
+    0x00030041,                /* 072C  move L3 <- L0 */
+    0x00020151,                /* 072D  call base=L2 argc=1 */
+    0x00020041,                /* 072E  move L2 <- L0 */
+    0x00020008,                /* 072F  return L2 */
+    0x00050245,                /* 0730  lsym L2 <- sym#5   ("apply") */
+    0x0003008F, 0x00010002,    /* 0731  eq L3 <- L1 == L2 */
+    0x0005034B,                /* 0733  jf L3, +5 */
+    0x001F0242,                /* 0734  gget L2 <- g31   (_decode_call) */
+    0x00038041,                /* 0735  move L3 <- P0 */
+    0x00020151,                /* 0736  call base=L2 argc=1 */
+    0x00020041,                /* 0737  move L2 <- L0 */
+    0x00020008,                /* 0738  return L2 */
+    0x004B0245,                /* 0739  lsym L2 <- sym#75   ("|") */
+    0x0003008F, 0x00010002,    /* 073A  eq L3 <- L1 == L2 */
+    0x0005034B,                /* 073C  jf L3, +5 */
+    0x00210242,                /* 073D  gget L2 <- g33   (_decode_binop) */
+    0x00038041,                /* 073E  move L3 <- P0 */
+    0x00020151,                /* 073F  call base=L2 argc=1 */
+    0x00020041,                /* 0740  move L2 <- L0 */
+    0x00020008,                /* 0741  return L2 */
+    0x00540242,                /* 0742  gget L2 <- g84   (s_is_pairlist) */
+    0x00038041,                /* 0743  move L3 <- P0 */
+    0x00020151,                /* 0744  call base=L2 argc=1 */
+    0x00020041,                /* 0745  move L2 <- L0 */
+    0x0008024B,                /* 0746  jf L2, +8 */
+    0x00250242,                /* 0747  gget L2 <- g37   (_build_sequence_expr) */
+    0x00570342,                /* 0748  gget L3 <- g87   (s_pairlist_items) */
+    0x00048041,                /* 0749  move L4 <- P0 */
+    0x00030151,                /* 074A  call base=L3 argc=1 */
+    0x00030041,                /* 074B  move L3 <- L0 */
+    0x00020151,                /* 074C  call base=L2 argc=1 */
+    0x00020041,                /* 074D  move L2 <- L0 */
+    0x00020008,                /* 074E  return L2 */
+    0x005B0242,                /* 074F  gget L2 <- g91   (error) */
+    0x000F0346,                /* 0750  lconst L3 <- static#15   ("@accept: this is not something the notation can match yet") */
+    0x00020151,                /* 0751  call base=L2 argc=1 */
+    0x00020041,                /* 0752  move L2 <- L0 */
+    0x00020008,                /* 0753  return L2 */
+    0x00100246,                /* 0754  lconst L2 <- static#16   ("pair") */
+    0x00010097, 0x80000002,    /* 0755  is L1 <- P0 is L2 */
+    0x0007014B,                /* 0757  jf L1, +7 */
+    0x005C0242,                /* 0758  gget L2 <- g92   (car) */
+    0x00038041,                /* 0759  move L3 <- P0 */
+    0x00020151,                /* 075A  call base=L2 argc=1 */
+    0x00020041,                /* 075B  move L2 <- L0 */
+    0x00510345,                /* 075C  lsym L3 <- sym#81   ("~") */
+    0x0001008F, 0x00020003,    /* 075D  eq L1 <- L2 == L3 */
+    0x00010008,                /* 075F  return L1 */
+    0x00070003,                /* 0760  lnil L7 */
+    0x0008008F, 0x80000007,    /* 0761  eq L8 <- P0 == L7 */
+    0x001E084B,                /* 0763  jf L8, +30 */
+    0x00070040,                /* 0764  i8 L7 <- 0 */
+    0x0008008F, 0x80010007,    /* 0765  eq L8 <- P1 == L7 */
+    0x0002084B,                /* 0767  jf L8, +2 */
+    0x002C0742,                /* 0768  gget L7 <- g44   (NIL_EXPR) */
+    0x00070008,                /* 0769  return L7 */
+    0x00070140,                /* 076A  i8 L7 <- 1 */
+    0x0008008F, 0x80010007,    /* 076B  eq L8 <- P1 == L7 */
+    0x000B084B,                /* 076D  jf L8, +11 */
+    0x003E0742,                /* 076E  gget L7 <- g62   (mk_index) */
+    0x00520845,                /* 076F  lsym L8 <- sym#82   ("_acc") */
+    0x00120945,                /* 0770  lsym L9 <- sym#18   ("int") */
+    0x000A0040,                /* 0771  i8 L10 <- 0 */
+    0x000B0284, 0x00090000,    /* 0772  plist L11 <- L9, 2 items */
+    0x00090B41,                /* 0774  move L9 <- L11 */
+    0x00070251,                /* 0775  call base=L7 argc=2 */
+    0x00070041,                /* 0776  move L7 <- L0 */
+    0x00070008,                /* 0777  return L7 */
     0x0009004F,                /* 0778  jmp +9 */
-    0x00380642,                /* 0779  gget L6 <- g56   (mk_call) */
-    0x00300745,                /* 077A  lsym L7 <- sym#48   ("reverse") */
-    0x00520845,                /* 077B  lsym L8 <- sym#82   ("_acc") */
-    0x00090184, 0x00080000,    /* 077C  plist L9 <- L8, 1 items */
-    0x00080941,                /* 077E  move L8 <- L9 */
-    0x000602A0, 0x00010000,    /* 077F  call base=L6 argc=2 nres=1 */
-    0x00060102,                /* 0781  return L6 count=1 */
-    0x005C0642,                /* 0782  gget L6 <- g92   (car) */
-    0x00078041,                /* 0783  move L7 <- P0 */
-    0x000601A0, 0x00010000,    /* 0784  call base=L6 argc=1 nres=1 */
-    0x00000641,                /* 0786  move L0 <- L6 */
-    0x00010140,                /* 0787  i8 L1 <- 1 */
-    0x00020082, 0x00060000,    /* 0788  list L2 <- L6, 0 items */
-    0x00230642,                /* 078A  gget L6 <- g35   (_is_drop) */
-    0x00070041,                /* 078B  move L7 <- L0 */
-    0x000601A0, 0x00010000,    /* 078C  call base=L6 argc=1 nres=1 */
-    0x0007064B,                /* 078E  jf L6, +7 */
-    0x00590642,                /* 078F  gget L6 <- g89   (s_unary_target) */
-    0x00070041,                /* 0790  move L7 <- L0 */
-    0x000601A0, 0x00010000,    /* 0791  call base=L6 argc=1 nres=1 */
-    0x00000641,                /* 0793  move L0 <- L6 */
-    0x00010040,                /* 0794  i8 L1 <- 0 */
-    0x0010004F,                /* 0795  jmp +16 */
-    0x00060241,                /* 0796  move L6 <- L2 */
-    0x00460742,                /* 0797  gget L7 <- g70   (n_set) */
-    0x00520845,                /* 0798  lsym L8 <- sym#82   ("_acc") */
-    0x00380942,                /* 0799  gget L9 <- g56   (mk_call) */
-    0x002F0A45,                /* 079A  lsym L10 <- sym#47   ("cons") */
-    0x00540B45,                /* 079B  lsym L11 <- sym#84   ("_t") */
-    0x00520C45,                /* 079C  lsym L12 <- sym#82   ("_acc") */
-    0x000D0284, 0x000B0000,    /* 079D  plist L13 <- L11, 2 items */
-    0x000B0D41,                /* 079F  move L11 <- L13 */
-    0x000902A0, 0x00010000,    /* 07A0  call base=L9 argc=2 nres=1 */
-    0x000702A0, 0x00010000,    /* 07A2  call base=L7 argc=2 nres=1 */
-    0x000601A2, 0x00020001,    /* 07A4  msg base=L6 argc=1 msg#2 nres=1   (append) */
-    0x00240642,                /* 07A6  gget L6 <- g36   (_build_sequence_steps) */
-    0x005F0742,                /* 07A7  gget L7 <- g95   (cdr) */
-    0x00088041,                /* 07A8  move L8 <- P0 */
-    0x000701A0, 0x00010000,    /* 07A9  call base=L7 argc=1 nres=1 */
-    0x00080085, 0x80010001,    /* 07AB  add L8 <- P1 + L1 */
-    0x000602A0, 0x00010000,    /* 07AD  call base=L6 argc=2 nres=1 */
-    0x00030641,                /* 07AF  move L3 <- L6 */
-    0x00060241,                /* 07B0  move L6 <- L2 */
+    0x00380742,                /* 0779  gget L7 <- g56   (mk_call) */
+    0x00300845,                /* 077A  lsym L8 <- sym#48   ("reverse") */
+    0x00520945,                /* 077B  lsym L9 <- sym#82   ("_acc") */
+    0x000A0184, 0x00090000,    /* 077C  plist L10 <- L9, 1 items */
+    0x00090A41,                /* 077E  move L9 <- L10 */
+    0x00070251,                /* 077F  call base=L7 argc=2 */
+    0x00070041,                /* 0780  move L7 <- L0 */
+    0x00070008,                /* 0781  return L7 */
+    0x005C0742,                /* 0782  gget L7 <- g92   (car) */
+    0x00088041,                /* 0783  move L8 <- P0 */
+    0x00070151,                /* 0784  call base=L7 argc=1 */
+    0x00070041,                /* 0785  move L7 <- L0 */
+    0x00010741,                /* 0786  move L1 <- L7 */
+    0x00020140,                /* 0787  i8 L2 <- 1 */
+    0x00030082, 0x00070000,    /* 0788  list L3 <- L7, 0 items */
+    0x00230742,                /* 078A  gget L7 <- g35   (_is_drop) */
+    0x00080141,                /* 078B  move L8 <- L1 */
+    0x00070151,                /* 078C  call base=L7 argc=1 */
+    0x00070041,                /* 078D  move L7 <- L0 */
+    0x0007074B,                /* 078E  jf L7, +7 */
+    0x00590742,                /* 078F  gget L7 <- g89   (s_unary_target) */
+    0x00080141,                /* 0790  move L8 <- L1 */
+    0x00070151,                /* 0791  call base=L7 argc=1 */
+    0x00070041,                /* 0792  move L7 <- L0 */
+    0x00010741,                /* 0793  move L1 <- L7 */
+    0x00020040,                /* 0794  i8 L2 <- 0 */
+    0x0011004F,                /* 0795  jmp +17 */
+    0x00070341,                /* 0796  move L7 <- L3 */
+    0x00460842,                /* 0797  gget L8 <- g70   (n_set) */
+    0x00520945,                /* 0798  lsym L9 <- sym#82   ("_acc") */
+    0x00380A42,                /* 0799  gget L10 <- g56   (mk_call) */
+    0x002F0B45,                /* 079A  lsym L11 <- sym#47   ("cons") */
+    0x00540C45,                /* 079B  lsym L12 <- sym#84   ("_t") */
+    0x00520D45,                /* 079C  lsym L13 <- sym#82   ("_acc") */
+    0x000E0284, 0x000C0000,    /* 079D  plist L14 <- L12, 2 items */
+    0x000C0E41,                /* 079F  move L12 <- L14 */
+    0x000A0251,                /* 07A0  call base=L10 argc=2 */
+    0x000A0041,                /* 07A1  move L10 <- L0 */
+    0x00080251,                /* 07A2  call base=L8 argc=2 */
+    0x00080041,                /* 07A3  move L8 <- L0 */
+    0x000701B7, 0x00020000,    /* 07A4  msg base=L7 argc=1 msg#2   (append) */
+    0x00070041,                /* 07A6  move L7 <- L0 */
+    0x00240742,                /* 07A7  gget L7 <- g36   (_build_sequence_steps) */
+    0x005F0842,                /* 07A8  gget L8 <- g95   (cdr) */
+    0x00098041,                /* 07A9  move L9 <- P0 */
+    0x00080151,                /* 07AA  call base=L8 argc=1 */
+    0x00080041,                /* 07AB  move L8 <- L0 */
+    0x00090085, 0x80010002,    /* 07AC  add L9 <- P1 + L2 */
+    0x00070251,                /* 07AE  call base=L7 argc=2 */
+    0x00070041,                /* 07AF  move L7 <- L0 */
+    0x00040741,                /* 07B0  move L4 <- L7 */
     0x00070341,                /* 07B1  move L7 <- L3 */
-    0x000601A2, 0x00020001,    /* 07B2  msg base=L6 argc=1 msg#2 nres=1   (append) */
-    0x00370642,                /* 07B4  gget L6 <- g55   (mk_binop) */
-    0x00540745,                /* 07B5  lsym L7 <- sym#84   ("_t") */
-    0x00030845,                /* 07B6  lsym L8 <- sym#3   ("!=") */
-    0x002B0942,                /* 07B7  gget L9 <- g43   (NO_MATCH_EXPR) */
-    0x000603A0, 0x00010000,    /* 07B8  call base=L6 argc=3 nres=1 */
-    0x00040641,                /* 07BA  move L4 <- L6 */
-    0x003F0642,                /* 07BB  gget L6 <- g63   (mk_is_type) */
-    0x00540745,                /* 07BC  lsym L7 <- sym#84   ("_t") */
-    0x00040845,                /* 07BD  lsym L8 <- sym#4   ("error") */
-    0x000602A0, 0x00010000,    /* 07BE  call base=L6 argc=2 nres=1 */
-    0x00050641,                /* 07C0  move L5 <- L6 */
-    0x003A0642,                /* 07C1  gget L6 <- g58   (mk_do) */
-    0x00460742,                /* 07C2  gget L7 <- g70   (n_set) */
-    0x00540845,                /* 07C3  lsym L8 <- sym#84   ("_t") */
-    0x00220942,                /* 07C4  gget L9 <- g34   (_decode_term) */
-    0x000A0041,                /* 07C5  move L10 <- L0 */
-    0x000901A0, 0x00010000,    /* 07C6  call base=L9 argc=1 nres=1 */
-    0x000702A0, 0x00010000,    /* 07C8  call base=L7 argc=2 nres=1 */
-    0x003D0842,                /* 07CA  gget L8 <- g61   (mk_if) */
-    0x00090541,                /* 07CB  move L9 <- L5 */
-    0x00540A45,                /* 07CC  lsym L10 <- sym#84   ("_t") */
-    0x000B0184, 0x000A0000,    /* 07CD  plist L11 <- L10, 1 items */
-    0x000A0B41,                /* 07CF  move L10 <- L11 */
-    0x003D0B42,                /* 07D0  gget L11 <- g61   (mk_if) */
-    0x000C0441,                /* 07D1  move L12 <- L4 */
-    0x00030D42,                /* 07D2  gget L13 <- g3   (std::pairs::chain) */
-    0x000E0241,                /* 07D3  move L14 <- L2 */
-    0x000D01A0, 0x00010000,    /* 07D4  call base=L13 argc=1 nres=1 */
-    0x002B0E42,                /* 07D6  gget L14 <- g43   (NO_MATCH_EXPR) */
-    0x000F0184, 0x000E0000,    /* 07D7  plist L15 <- L14, 1 items */
-    0x000E0F41,                /* 07D9  move L14 <- L15 */
-    0x000B03A0, 0x00010000,    /* 07DA  call base=L11 argc=3 nres=1 */
-    0x000C0184, 0x000B0000,    /* 07DC  plist L12 <- L11, 1 items */
-    0x000B0C41,                /* 07DE  move L11 <- L12 */
-    0x000803A0, 0x00010000,    /* 07DF  call base=L8 argc=3 nres=1 */
-    0x00090284, 0x00070000,    /* 07E1  plist L9 <- L7, 2 items */
-    0x00070941,                /* 07E3  move L7 <- L9 */
-    0x000601A0, 0x00010000,    /* 07E4  call base=L6 argc=1 nres=1 */
-    0x00060102,                /* 07E6  return L6 count=1 */
-    0x003A0042,                /* 07E7  gget L0 <- g58   (mk_do) */
-    0x00450142,                /* 07E8  gget L1 <- g69   (n_define) */
-    0x00520245,                /* 07E9  lsym L2 <- sym#82   ("_acc") */
-    0x002D0342,                /* 07EA  gget L3 <- g45   (N_AUTO_TYPE) */
-    0x002C0442,                /* 07EB  gget L4 <- g44   (NIL_EXPR) */
-    0x000103A0, 0x00010000,    /* 07EC  call base=L1 argc=3 nres=1 */
-    0x00450242,                /* 07EE  gget L2 <- g69   (n_define) */
-    0x00540345,                /* 07EF  lsym L3 <- sym#84   ("_t") */
-    0x002D0442,                /* 07F0  gget L4 <- g45   (N_AUTO_TYPE) */
-    0x002C0542,                /* 07F1  gget L5 <- g44   (NIL_EXPR) */
-    0x000203A0, 0x00010000,    /* 07F2  call base=L2 argc=3 nres=1 */
-    0x00240342,                /* 07F4  gget L3 <- g36   (_build_sequence_steps) */
-    0x00048041,                /* 07F5  move L4 <- P0 */
-    0x00050040,                /* 07F6  i8 L5 <- 0 */
-    0x000302A0, 0x00010000,    /* 07F7  call base=L3 argc=2 nres=1 */
-    0x00040384, 0x00010000,    /* 07F9  plist L4 <- L1, 3 items */
-    0x00010441,                /* 07FB  move L1 <- L4 */
-    0x000001A0, 0x00010000,    /* 07FC  call base=L0 argc=1 nres=1 */
-    0x00000102,                /* 07FE  return L0 count=1 */
-    0x00540042,                /* 07FF  gget L0 <- g84   (s_is_pairlist) */
-    0x00018041,                /* 0800  move L1 <- P0 */
-    0x000001A0, 0x00010000,    /* 0801  call base=L0 argc=1 nres=1 */
-    0x0005004B,                /* 0803  jf L0, +5 */
-    0x00570042,                /* 0804  gget L0 <- g87   (s_pairlist_items) */
-    0x00018041,                /* 0805  move L1 <- P0 */
-    0x000001A0, 0x00010000,    /* 0806  call base=L0 argc=1 nres=1 */
-    0x00000102,                /* 0808  return L0 count=1 */
-    0x00008041,                /* 0809  move L0 <- P0 */
-    0x00010184, 0x00000000,    /* 080A  plist L1 <- L0, 1 items */
-    0x00010102,                /* 080C  return L1 count=1 */
-    0x00000001,                /* 080D  trap 0 */
-    0x00610142,                /* 080E  gget L1 <- g97   (_next_accept_site_id::id) */
-    0x00020140,                /* 080F  i8 L2 <- 1 */
-    0x00000085, 0x00010002,    /* 0810  add L0 <- L1 + L2 */
-    0x00610043,                /* 0812  gset g97 <- L0   (_next_accept_site_id::id) */
-    0x00610042,                /* 0813  gget L0 <- g97   (_next_accept_site_id::id) */
-    0x00000102,                /* 0814  return L0 count=1 */
-    0x00630442,                /* 0815  gget L4 <- g99   (sexpr) */
-    0x00058041,                /* 0816  move L5 <- P0 */
-    0x000401A0, 0x00010000,    /* 0817  call base=L4 argc=1 nres=1 */
-    0x00000441,                /* 0819  move L0 <- L4 */
-    0x00260442,                /* 081A  gget L4 <- g38   (_sequence_elements) */
-    0x00050041,                /* 081B  move L5 <- L0 */
-    0x000401A0, 0x00010000,    /* 081C  call base=L4 argc=1 nres=1 */
-    0x00010441,                /* 081E  move L1 <- L4 */
-    0x00250442,                /* 081F  gget L4 <- g37   (_build_sequence_expr) */
-    0x00050141,                /* 0820  move L5 <- L1 */
-    0x000401A0, 0x00010000,    /* 0821  call base=L4 argc=1 nres=1 */
-    0x00020441,                /* 0823  move L2 <- L4 */
-    0x00280442,                /* 0824  gget L4 <- g40   (_next_accept_site_id) */
-    0x000400A0, 0x00010000,    /* 0825  call base=L4 argc=0 nres=1 */
-    0x00030441,                /* 0827  move L3 <- L4 */
-    0x003C0442,                /* 0828  gget L4 <- g60   (mk_expand_n) */
-    0x00090645,                /* 0829  lsym L6 <- sym#9   ("fn_def") */
-    0x00550745,                /* 082A  lsym L7 <- sym#85   ("$_accept_cache") */
-    0x00080003,                /* 082B  lnil L8 */
-    0x000B0B45,                /* 082C  lsym L11 <- sym#11   ("param") */
-    0x00560C45,                /* 082D  lsym L12 <- sym#86   ("_site_id") */
-    0x000D0E45,                /* 082E  lsym L14 <- sym#13   ("type") */
-    0x000E0F45,                /* 082F  lsym L15 <- sym#14   ("auto") */
-    0x000D0284, 0x000E0000,    /* 0830  plist L13 <- L14, 2 items */
-    0x000E0003,                /* 0832  lnil L14 */
-    0x000A0484, 0x000B0000,    /* 0833  plist L10 <- L11, 4 items */
-    0x000B0C45,                /* 0835  lsym L12 <- sym#11   ("param") */
-    0x00570D45,                /* 0836  lsym L13 <- sym#87   ("seq_expr") */
-    0x000D0F45,                /* 0837  lsym L15 <- sym#13   ("type") */
-    0x000E1045,                /* 0838  lsym L16 <- sym#14   ("auto") */
-    0x000E0284, 0x000F0000,    /* 0839  plist L14 <- L15, 2 items */
-    0x000F0003,                /* 083B  lnil L15 */
-    0x000B0484, 0x000C0000,    /* 083C  plist L11 <- L12, 4 items */
-    0x00090284, 0x000A0000,    /* 083E  plist L9 <- L10, 2 items */
-    0x000D0B45,                /* 0840  lsym L11 <- sym#13   ("type") */
-    0x000E0C45,                /* 0841  lsym L12 <- sym#14   ("auto") */
-    0x000A0284, 0x000B0000,    /* 0842  plist L10 <- L11, 2 items */
-    0x00160C45,                /* 0844  lsym L12 <- sym#22   ("do") */
-    0x00170E45,                /* 0845  lsym L14 <- sym#23   ("define") */
-    0x00580F45,                /* 0846  lsym L15 <- sym#88   ("_accept_start") */
-    0x000D1145,                /* 0847  lsym L17 <- sym#13   ("type") */
-    0x000E1245,                /* 0848  lsym L18 <- sym#14   ("auto") */
-    0x00100284, 0x00110000,    /* 0849  plist L16 <- L17, 2 items */
-    0x00051245,                /* 084B  lsym L18 <- sym#5   ("apply") */
-    0x00061445,                /* 084C  lsym L20 <- sym#6   ("bind_msg") */
-    0x00071545,                /* 084D  lsym L21 <- sym#7   ("this") */
-    0x00231645,                /* 084E  lsym L22 <- sym#35   ("mark") */
-    0x00130384, 0x00140000,    /* 084F  plist L19 <- L20, 3 items */
-    0x00110284, 0x00120000,    /* 0851  plist L17 <- L18, 2 items */
-    0x000D0484, 0x000E0000,    /* 0853  plist L13 <- L14, 4 items */
-    0x00170F45,                /* 0855  lsym L15 <- sym#23   ("define") */
-    0x00591045,                /* 0856  lsym L16 <- sym#89   ("_accept_cached") */
-    0x000D1245,                /* 0857  lsym L18 <- sym#13   ("type") */
-    0x000E1345,                /* 0858  lsym L19 <- sym#14   ("auto") */
-    0x00110284, 0x00120000,    /* 0859  plist L17 <- L18, 2 items */
-    0x00051345,                /* 085B  lsym L19 <- sym#5   ("apply") */
-    0x00061545,                /* 085C  lsym L21 <- sym#6   ("bind_msg") */
-    0x00071645,                /* 085D  lsym L22 <- sym#7   ("this") */
-    0x005A1745,                /* 085E  lsym L23 <- sym#90   ("get_cache") */
-    0x00140384, 0x00150000,    /* 085F  plist L20 <- L21, 3 items */
-    0x00561545,                /* 0861  lsym L21 <- sym#86   ("_site_id") */
-    0x00581645,                /* 0862  lsym L22 <- sym#88   ("_accept_start") */
-    0x00120484, 0x00130000,    /* 0863  plist L18 <- L19, 4 items */
-    0x000E0484, 0x000F0000,    /* 0865  plist L14 <- L15, 4 items */
-    0x000F1045,                /* 0867  lsym L16 <- sym#15   ("cond") */
-    0x00031345,                /* 0868  lsym L19 <- sym#3   ("!=") */
-    0x00591445,                /* 0869  lsym L20 <- sym#89   ("_accept_cached") */
-    0x00001645,                /* 086A  lsym L22 <- sym#0   ("sym") */
-    0x005B1745,                /* 086B  lsym L23 <- sym#91   ("NO_CACHE") */
-    0x00150284, 0x00160000,    /* 086C  plist L21 <- L22, 2 items */
-    0x00120384, 0x00130000,    /* 086E  plist L18 <- L19, 3 items */
-    0x00591345,                /* 0870  lsym L19 <- sym#89   ("_accept_cached") */
-    0x00110284, 0x00120000,    /* 0871  plist L17 <- L18, 2 items */
-    0x00141345,                /* 0873  lsym L19 <- sym#20   ("else") */
-    0x00161545,                /* 0874  lsym L21 <- sym#22   ("do") */
-    0x00171745,                /* 0875  lsym L23 <- sym#23   ("define") */
-    0x005C1845,                /* 0876  lsym L24 <- sym#92   ("_accept_result") */
-    0x000D1A45,                /* 0877  lsym L26 <- sym#13   ("type") */
-    0x000E1B45,                /* 0878  lsym L27 <- sym#14   ("auto") */
-    0x00190284, 0x001A0000,    /* 0879  plist L25 <- L26, 2 items */
-    0x00571A45,                /* 087B  lsym L26 <- sym#87   ("seq_expr") */
-    0x00160484, 0x00170000,    /* 087C  plist L22 <- L23, 4 items */
-    0x000F1845,                /* 087E  lsym L24 <- sym#15   ("cond") */
-    0x00101B45,                /* 087F  lsym L27 <- sym#16   ("==") */
-    0x005C1C45,                /* 0880  lsym L28 <- sym#92   ("_accept_result") */
-    0x00001E45,                /* 0881  lsym L30 <- sym#0   ("sym") */
-    0x00011F45,                /* 0882  lsym L31 <- sym#1   ("NO_MATCH") */
-    0x001D0284, 0x001E0000,    /* 0883  plist L29 <- L30, 2 items */
-    0x001A0384, 0x001B0000,    /* 0885  plist L26 <- L27, 3 items */
-    0x00051C45,                /* 0887  lsym L28 <- sym#5   ("apply") */
-    0x00061E45,                /* 0888  lsym L30 <- sym#6   ("bind_msg") */
-    0x00071F45,                /* 0889  lsym L31 <- sym#7   ("this") */
-    0x005D2045,                /* 088A  lsym L32 <- sym#93   ("put_miss") */
-    0x001D0384, 0x001E0000,    /* 088B  plist L29 <- L30, 3 items */
-    0x00561E45,                /* 088D  lsym L30 <- sym#86   ("_site_id") */
-    0x00581F45,                /* 088E  lsym L31 <- sym#88   ("_accept_start") */
-    0x001B0484, 0x001C0000,    /* 088F  plist L27 <- L28, 4 items */
-    0x00190284, 0x001A0000,    /* 0891  plist L25 <- L26, 2 items */
-    0x003B1C45,                /* 0893  lsym L28 <- sym#59   ("not") */
-    0x002D1E45,                /* 0894  lsym L30 <- sym#45   ("is") */
-    0x005C1F45,                /* 0895  lsym L31 <- sym#92   ("_accept_result") */
-    0x000D2145,                /* 0896  lsym L33 <- sym#13   ("type") */
-    0x00042245,                /* 0897  lsym L34 <- sym#4   ("error") */
-    0x00200284, 0x00210000,    /* 0898  plist L32 <- L33, 2 items */
-    0x001D0384, 0x001E0000,    /* 089A  plist L29 <- L30, 3 items */
-    0x001B0284, 0x001C0000,    /* 089C  plist L27 <- L28, 2 items */
-    0x00051D45,                /* 089E  lsym L29 <- sym#5   ("apply") */
-    0x00061F45,                /* 089F  lsym L31 <- sym#6   ("bind_msg") */
-    0x00072045,                /* 08A0  lsym L32 <- sym#7   ("this") */
-    0x005E2145,                /* 08A1  lsym L33 <- sym#94   ("put_hit") */
-    0x001E0384, 0x001F0000,    /* 08A2  plist L30 <- L31, 3 items */
-    0x00561F45,                /* 08A4  lsym L31 <- sym#86   ("_site_id") */
-    0x00582045,                /* 08A5  lsym L32 <- sym#88   ("_accept_start") */
-    0x00052245,                /* 08A6  lsym L34 <- sym#5   ("apply") */
-    0x00062445,                /* 08A7  lsym L36 <- sym#6   ("bind_msg") */
-    0x00072545,                /* 08A8  lsym L37 <- sym#7   ("this") */
-    0x00232645,                /* 08A9  lsym L38 <- sym#35   ("mark") */
-    0x00230384, 0x00240000,    /* 08AA  plist L35 <- L36, 3 items */
-    0x00210284, 0x00220000,    /* 08AC  plist L33 <- L34, 2 items */
-    0x005C2245,                /* 08AE  lsym L34 <- sym#92   ("_accept_result") */
-    0x001C0684, 0x001D0000,    /* 08AF  plist L28 <- L29, 6 items */
-    0x001A0284, 0x001B0000,    /* 08B1  plist L26 <- L27, 2 items */
-    0x00170384, 0x00180000,    /* 08B3  plist L23 <- L24, 3 items */
-    0x005C1845,                /* 08B5  lsym L24 <- sym#92   ("_accept_result") */
-    0x00140484, 0x00150000,    /* 08B6  plist L20 <- L21, 4 items */
-    0x00120284, 0x00130000,    /* 08B8  plist L18 <- L19, 2 items */
-    0x000F0384, 0x00100000,    /* 08BA  plist L15 <- L16, 3 items */
-    0x000B0484, 0x000C0000,    /* 08BC  plist L11 <- L12, 4 items */
-    0x00050684, 0x00060000,    /* 08BE  plist L5 <- L6, 6 items */
-    0x005D0642,                /* 08C0  gget L6 <- g93   (pair) */
-    0x00560745,                /* 08C1  lsym L7 <- sym#86   ("_site_id") */
-    0x00120845,                /* 08C2  lsym L8 <- sym#18   ("int") */
-    0x00090341,                /* 08C3  move L9 <- L3 */
-    0x000A0284, 0x00080000,    /* 08C4  plist L10 <- L8, 2 items */
-    0x00080A41,                /* 08C6  move L8 <- L10 */
-    0x000602A0, 0x00010000,    /* 08C7  call base=L6 argc=2 nres=1 */
-    0x005D0742,                /* 08C9  gget L7 <- g93   (pair) */
-    0x00570845,                /* 08CA  lsym L8 <- sym#87   ("seq_expr") */
-    0x00090241,                /* 08CB  move L9 <- L2 */
-    0x000702A0, 0x00010000,    /* 08CC  call base=L7 argc=2 nres=1 */
-    0x000403A0, 0x00010000,    /* 08CE  call base=L4 argc=3 nres=1 */
-    0x00040102,                /* 08D0  return L4 count=1 */
-    0x00008041,                /* 08D1  move L0 <- P0 */
-    0x00010245,                /* 08D2  lsym L2 <- sym#1   ("NO_MATCH") */
-    0x0003008F, 0x00000002,    /* 08D3  eq L3 <- L0 == L2 */
-    0x0005034B,                /* 08D5  jf L3, +5 */
-    0x005B0242,                /* 08D6  gget L2 <- g91   (error) */
-    0x00038141,                /* 08D7  move L3 <- P1 */
-    0x000201A0, 0x00010000,    /* 08D8  call base=L2 argc=1 nres=1 */
-    0x00020102,                /* 08DA  return L2 count=1 */
-    0x00010041,                /* 08DB  move L1 <- L0 */
-    0x00010102,                /* 08DC  return L1 count=1 */
-    0x00630342,                /* 08DD  gget L3 <- g99   (sexpr) */
-    0x00048041,                /* 08DE  move L4 <- P0 */
-    0x000301A0, 0x00010000,    /* 08DF  call base=L3 argc=1 nres=1 */
-    0x00000341,                /* 08E1  move L0 <- L3 */
-    0x00260342,                /* 08E2  gget L3 <- g38   (_sequence_elements) */
-    0x00040041,                /* 08E3  move L4 <- L0 */
-    0x000301A0, 0x00010000,    /* 08E4  call base=L3 argc=1 nres=1 */
-    0x00010341,                /* 08E6  move L1 <- L3 */
-    0x00250342,                /* 08E7  gget L3 <- g37   (_build_sequence_expr) */
-    0x00040141,                /* 08E8  move L4 <- L1 */
-    0x000301A0, 0x00010000,    /* 08E9  call base=L3 argc=1 nres=1 */
-    0x00020341,                /* 08EB  move L2 <- L3 */
-    0x003C0342,                /* 08EC  gget L3 <- g60   (mk_expand_n) */
-    0x00090545,                /* 08ED  lsym L5 <- sym#9   ("fn_def") */
-    0x00600645,                /* 08EE  lsym L6 <- sym#96   ("$_expect") */
-    0x00070003,                /* 08EF  lnil L7 */
-    0x000B0A45,                /* 08F0  lsym L10 <- sym#11   ("param") */
-    0x00210B45,                /* 08F1  lsym L11 <- sym#33   ("match_expr") */
-    0x000D0D45,                /* 08F2  lsym L13 <- sym#13   ("type") */
-    0x000E0E45,                /* 08F3  lsym L14 <- sym#14   ("auto") */
-    0x000C0284, 0x000D0000,    /* 08F4  plist L12 <- L13, 2 items */
-    0x000D0003,                /* 08F6  lnil L13 */
-    0x00090484, 0x000A0000,    /* 08F7  plist L9 <- L10, 4 items */
-    0x000B0B45,                /* 08F9  lsym L11 <- sym#11   ("param") */
-    0x00610C45,                /* 08FA  lsym L12 <- sym#97   ("desc") */
-    0x000D0E45,                /* 08FB  lsym L14 <- sym#13   ("type") */
-    0x000E0F45,                /* 08FC  lsym L15 <- sym#14   ("auto") */
-    0x000D0284, 0x000E0000,    /* 08FD  plist L13 <- L14, 2 items */
-    0x000E0003,                /* 08FF  lnil L14 */
-    0x000A0484, 0x000B0000,    /* 0900  plist L10 <- L11, 4 items */
-    0x00080284, 0x00090000,    /* 0902  plist L8 <- L9, 2 items */
-    0x000D0A45,                /* 0904  lsym L10 <- sym#13   ("type") */
-    0x000E0B45,                /* 0905  lsym L11 <- sym#14   ("auto") */
-    0x00090284, 0x000A0000,    /* 0906  plist L9 <- L10, 2 items */
-    0x00160B45,                /* 0908  lsym L11 <- sym#22   ("do") */
-    0x00170D45,                /* 0909  lsym L13 <- sym#23   ("define") */
-    0x00620E45,                /* 090A  lsym L14 <- sym#98   ("r") */
-    0x000D1045,                /* 090B  lsym L16 <- sym#13   ("type") */
-    0x000E1145,                /* 090C  lsym L17 <- sym#14   ("auto") */
-    0x000F0284, 0x00100000,    /* 090D  plist L15 <- L16, 2 items */
-    0x00211045,                /* 090F  lsym L16 <- sym#33   ("match_expr") */
-    0x000C0484, 0x000D0000,    /* 0910  plist L12 <- L13, 4 items */
-    0x000F0E45,                /* 0912  lsym L14 <- sym#15   ("cond") */
-    0x00101145,                /* 0913  lsym L17 <- sym#16   ("==") */
-    0x00621245,                /* 0914  lsym L18 <- sym#98   ("r") */
-    0x00001445,                /* 0915  lsym L20 <- sym#0   ("sym") */
-    0x00011545,                /* 0916  lsym L21 <- sym#1   ("NO_MATCH") */
-    0x00130284, 0x00140000,    /* 0917  plist L19 <- L20, 2 items */
-    0x00100384, 0x00110000,    /* 0919  plist L16 <- L17, 3 items */
-    0x00631245,                /* 091B  lsym L18 <- sym#99   ("return") */
-    0x00051445,                /* 091C  lsym L20 <- sym#5   ("apply") */
-    0x00041545,                /* 091D  lsym L21 <- sym#4   ("error") */
-    0x00611645,                /* 091E  lsym L22 <- sym#97   ("desc") */
-    0x00130384, 0x00140000,    /* 091F  plist L19 <- L20, 3 items */
-    0x00110284, 0x00120000,    /* 0921  plist L17 <- L18, 2 items */
-    0x000F0284, 0x00100000,    /* 0923  plist L15 <- L16, 2 items */
-    0x000D0284, 0x000E0000,    /* 0925  plist L13 <- L14, 2 items */
-    0x00620E45,                /* 0927  lsym L14 <- sym#98   ("r") */
-    0x000A0484, 0x000B0000,    /* 0928  plist L10 <- L11, 4 items */
-    0x00040684, 0x00050000,    /* 092A  plist L4 <- L5, 6 items */
-    0x005D0542,                /* 092C  gget L5 <- g93   (pair) */
-    0x00210645,                /* 092D  lsym L6 <- sym#33   ("match_expr") */
-    0x00070241,                /* 092E  move L7 <- L2 */
-    0x000502A0, 0x00010000,    /* 092F  call base=L5 argc=2 nres=1 */
-    0x005D0642,                /* 0931  gget L6 <- g93   (pair) */
-    0x00610745,                /* 0932  lsym L7 <- sym#97   ("desc") */
-    0x00500845,                /* 0933  lsym L8 <- sym#80   ("str") */
-    0x00098141,                /* 0934  move L9 <- P1 */
-    0x000A0284, 0x00080000,    /* 0935  plist L10 <- L8, 2 items */
-    0x00080A41,                /* 0937  move L8 <- L10 */
-    0x000602A0, 0x00010000,    /* 0938  call base=L6 argc=2 nres=1 */
-    0x000303A0, 0x00010000,    /* 093A  call base=L3 argc=3 nres=1 */
-    0x00030102,                /* 093C  return L3 count=1 */
-    0x00070146,                /* 093D  lconst L1 <- static#7   ("error") */
-    0x00020097, 0x80000001,    /* 093E  is L2 <- P0 is L1 */
-    0x0000024A,                /* 0940  not L0 <- L2 */
-    0x0003004B,                /* 0941  jf L0, +3 */
-    0x00010145,                /* 0942  lsym L1 <- sym#1   ("NO_MATCH") */
-    0x00000090, 0x80000001,    /* 0943  ne L0 <- P0 != L1 */
-    0x00000102,                /* 0945  return L0 count=1 */
+    0x00080441,                /* 07B2  move L8 <- L4 */
+    0x000701B7, 0x00020000,    /* 07B3  msg base=L7 argc=1 msg#2   (append) */
+    0x00070041,                /* 07B5  move L7 <- L0 */
+    0x00370742,                /* 07B6  gget L7 <- g55   (mk_binop) */
+    0x00540845,                /* 07B7  lsym L8 <- sym#84   ("_t") */
+    0x00030945,                /* 07B8  lsym L9 <- sym#3   ("!=") */
+    0x002B0A42,                /* 07B9  gget L10 <- g43   (NO_MATCH_EXPR) */
+    0x00070351,                /* 07BA  call base=L7 argc=3 */
+    0x00070041,                /* 07BB  move L7 <- L0 */
+    0x00050741,                /* 07BC  move L5 <- L7 */
+    0x003F0742,                /* 07BD  gget L7 <- g63   (mk_is_type) */
+    0x00540845,                /* 07BE  lsym L8 <- sym#84   ("_t") */
+    0x00040945,                /* 07BF  lsym L9 <- sym#4   ("error") */
+    0x00070251,                /* 07C0  call base=L7 argc=2 */
+    0x00070041,                /* 07C1  move L7 <- L0 */
+    0x00060741,                /* 07C2  move L6 <- L7 */
+    0x003A0742,                /* 07C3  gget L7 <- g58   (mk_do) */
+    0x00460842,                /* 07C4  gget L8 <- g70   (n_set) */
+    0x00540945,                /* 07C5  lsym L9 <- sym#84   ("_t") */
+    0x00220A42,                /* 07C6  gget L10 <- g34   (_decode_term) */
+    0x000B0141,                /* 07C7  move L11 <- L1 */
+    0x000A0151,                /* 07C8  call base=L10 argc=1 */
+    0x000A0041,                /* 07C9  move L10 <- L0 */
+    0x00080251,                /* 07CA  call base=L8 argc=2 */
+    0x00080041,                /* 07CB  move L8 <- L0 */
+    0x003D0942,                /* 07CC  gget L9 <- g61   (mk_if) */
+    0x000A0641,                /* 07CD  move L10 <- L6 */
+    0x00540B45,                /* 07CE  lsym L11 <- sym#84   ("_t") */
+    0x000C0184, 0x000B0000,    /* 07CF  plist L12 <- L11, 1 items */
+    0x000B0C41,                /* 07D1  move L11 <- L12 */
+    0x003D0C42,                /* 07D2  gget L12 <- g61   (mk_if) */
+    0x000D0541,                /* 07D3  move L13 <- L5 */
+    0x00030E42,                /* 07D4  gget L14 <- g3   (std::pairs::chain) */
+    0x000F0341,                /* 07D5  move L15 <- L3 */
+    0x000E0151,                /* 07D6  call base=L14 argc=1 */
+    0x000E0041,                /* 07D7  move L14 <- L0 */
+    0x002B0F42,                /* 07D8  gget L15 <- g43   (NO_MATCH_EXPR) */
+    0x00100184, 0x000F0000,    /* 07D9  plist L16 <- L15, 1 items */
+    0x000F1041,                /* 07DB  move L15 <- L16 */
+    0x000C0351,                /* 07DC  call base=L12 argc=3 */
+    0x000C0041,                /* 07DD  move L12 <- L0 */
+    0x000D0184, 0x000C0000,    /* 07DE  plist L13 <- L12, 1 items */
+    0x000C0D41,                /* 07E0  move L12 <- L13 */
+    0x00090351,                /* 07E1  call base=L9 argc=3 */
+    0x00090041,                /* 07E2  move L9 <- L0 */
+    0x000A0284, 0x00080000,    /* 07E3  plist L10 <- L8, 2 items */
+    0x00080A41,                /* 07E5  move L8 <- L10 */
+    0x00070151,                /* 07E6  call base=L7 argc=1 */
+    0x00070041,                /* 07E7  move L7 <- L0 */
+    0x00070008,                /* 07E8  return L7 */
+    0x003A0142,                /* 07E9  gget L1 <- g58   (mk_do) */
+    0x00450242,                /* 07EA  gget L2 <- g69   (n_define) */
+    0x00520345,                /* 07EB  lsym L3 <- sym#82   ("_acc") */
+    0x002D0442,                /* 07EC  gget L4 <- g45   (N_AUTO_TYPE) */
+    0x002C0542,                /* 07ED  gget L5 <- g44   (NIL_EXPR) */
+    0x00020351,                /* 07EE  call base=L2 argc=3 */
+    0x00020041,                /* 07EF  move L2 <- L0 */
+    0x00450342,                /* 07F0  gget L3 <- g69   (n_define) */
+    0x00540445,                /* 07F1  lsym L4 <- sym#84   ("_t") */
+    0x002D0542,                /* 07F2  gget L5 <- g45   (N_AUTO_TYPE) */
+    0x002C0642,                /* 07F3  gget L6 <- g44   (NIL_EXPR) */
+    0x00030351,                /* 07F4  call base=L3 argc=3 */
+    0x00030041,                /* 07F5  move L3 <- L0 */
+    0x00240442,                /* 07F6  gget L4 <- g36   (_build_sequence_steps) */
+    0x00058041,                /* 07F7  move L5 <- P0 */
+    0x00060040,                /* 07F8  i8 L6 <- 0 */
+    0x00040251,                /* 07F9  call base=L4 argc=2 */
+    0x00040041,                /* 07FA  move L4 <- L0 */
+    0x00050384, 0x00020000,    /* 07FB  plist L5 <- L2, 3 items */
+    0x00020541,                /* 07FD  move L2 <- L5 */
+    0x00010151,                /* 07FE  call base=L1 argc=1 */
+    0x00010041,                /* 07FF  move L1 <- L0 */
+    0x00010008,                /* 0800  return L1 */
+    0x00540142,                /* 0801  gget L1 <- g84   (s_is_pairlist) */
+    0x00028041,                /* 0802  move L2 <- P0 */
+    0x00010151,                /* 0803  call base=L1 argc=1 */
+    0x00010041,                /* 0804  move L1 <- L0 */
+    0x0005014B,                /* 0805  jf L1, +5 */
+    0x00570142,                /* 0806  gget L1 <- g87   (s_pairlist_items) */
+    0x00028041,                /* 0807  move L2 <- P0 */
+    0x00010151,                /* 0808  call base=L1 argc=1 */
+    0x00010041,                /* 0809  move L1 <- L0 */
+    0x00010008,                /* 080A  return L1 */
+    0x00018041,                /* 080B  move L1 <- P0 */
+    0x00020184, 0x00010000,    /* 080C  plist L2 <- L1, 1 items */
+    0x00020008,                /* 080E  return L2 */
+    0x00000001,                /* 080F  trap 0 */
+    0x00610242,                /* 0810  gget L2 <- g97   (_next_accept_site_id::id) */
+    0x00030140,                /* 0811  i8 L3 <- 1 */
+    0x00010085, 0x00020003,    /* 0812  add L1 <- L2 + L3 */
+    0x00610143,                /* 0814  gset g97 <- L1   (_next_accept_site_id::id) */
+    0x00610142,                /* 0815  gget L1 <- g97   (_next_accept_site_id::id) */
+    0x00010008,                /* 0816  return L1 */
+    0x00630542,                /* 0817  gget L5 <- g99   (sexpr) */
+    0x00068041,                /* 0818  move L6 <- P0 */
+    0x00050151,                /* 0819  call base=L5 argc=1 */
+    0x00050041,                /* 081A  move L5 <- L0 */
+    0x00010541,                /* 081B  move L1 <- L5 */
+    0x00260542,                /* 081C  gget L5 <- g38   (_sequence_elements) */
+    0x00060141,                /* 081D  move L6 <- L1 */
+    0x00050151,                /* 081E  call base=L5 argc=1 */
+    0x00050041,                /* 081F  move L5 <- L0 */
+    0x00020541,                /* 0820  move L2 <- L5 */
+    0x00250542,                /* 0821  gget L5 <- g37   (_build_sequence_expr) */
+    0x00060241,                /* 0822  move L6 <- L2 */
+    0x00050151,                /* 0823  call base=L5 argc=1 */
+    0x00050041,                /* 0824  move L5 <- L0 */
+    0x00030541,                /* 0825  move L3 <- L5 */
+    0x00280542,                /* 0826  gget L5 <- g40   (_next_accept_site_id) */
+    0x00050051,                /* 0827  call base=L5 argc=0 */
+    0x00050041,                /* 0828  move L5 <- L0 */
+    0x00040541,                /* 0829  move L4 <- L5 */
+    0x003C0542,                /* 082A  gget L5 <- g60   (mk_expand_n) */
+    0x00090745,                /* 082B  lsym L7 <- sym#9   ("fn_def") */
+    0x00550845,                /* 082C  lsym L8 <- sym#85   ("$_accept_cache") */
+    0x00090003,                /* 082D  lnil L9 */
+    0x000B0C45,                /* 082E  lsym L12 <- sym#11   ("param") */
+    0x00560D45,                /* 082F  lsym L13 <- sym#86   ("_site_id") */
+    0x000D0F45,                /* 0830  lsym L15 <- sym#13   ("type") */
+    0x000E1045,                /* 0831  lsym L16 <- sym#14   ("auto") */
+    0x000E0284, 0x000F0000,    /* 0832  plist L14 <- L15, 2 items */
+    0x000F0003,                /* 0834  lnil L15 */
+    0x000B0484, 0x000C0000,    /* 0835  plist L11 <- L12, 4 items */
+    0x000B0D45,                /* 0837  lsym L13 <- sym#11   ("param") */
+    0x00570E45,                /* 0838  lsym L14 <- sym#87   ("seq_expr") */
+    0x000D1045,                /* 0839  lsym L16 <- sym#13   ("type") */
+    0x000E1145,                /* 083A  lsym L17 <- sym#14   ("auto") */
+    0x000F0284, 0x00100000,    /* 083B  plist L15 <- L16, 2 items */
+    0x00100003,                /* 083D  lnil L16 */
+    0x000C0484, 0x000D0000,    /* 083E  plist L12 <- L13, 4 items */
+    0x000A0284, 0x000B0000,    /* 0840  plist L10 <- L11, 2 items */
+    0x000D0C45,                /* 0842  lsym L12 <- sym#13   ("type") */
+    0x000E0D45,                /* 0843  lsym L13 <- sym#14   ("auto") */
+    0x000B0284, 0x000C0000,    /* 0844  plist L11 <- L12, 2 items */
+    0x00160D45,                /* 0846  lsym L13 <- sym#22   ("do") */
+    0x00170F45,                /* 0847  lsym L15 <- sym#23   ("define") */
+    0x00581045,                /* 0848  lsym L16 <- sym#88   ("_accept_start") */
+    0x000D1245,                /* 0849  lsym L18 <- sym#13   ("type") */
+    0x000E1345,                /* 084A  lsym L19 <- sym#14   ("auto") */
+    0x00110284, 0x00120000,    /* 084B  plist L17 <- L18, 2 items */
+    0x00051345,                /* 084D  lsym L19 <- sym#5   ("apply") */
+    0x00061545,                /* 084E  lsym L21 <- sym#6   ("bind_msg") */
+    0x00071645,                /* 084F  lsym L22 <- sym#7   ("this") */
+    0x00231745,                /* 0850  lsym L23 <- sym#35   ("mark") */
+    0x00140384, 0x00150000,    /* 0851  plist L20 <- L21, 3 items */
+    0x00120284, 0x00130000,    /* 0853  plist L18 <- L19, 2 items */
+    0x000E0484, 0x000F0000,    /* 0855  plist L14 <- L15, 4 items */
+    0x00171045,                /* 0857  lsym L16 <- sym#23   ("define") */
+    0x00591145,                /* 0858  lsym L17 <- sym#89   ("_accept_cached") */
+    0x000D1345,                /* 0859  lsym L19 <- sym#13   ("type") */
+    0x000E1445,                /* 085A  lsym L20 <- sym#14   ("auto") */
+    0x00120284, 0x00130000,    /* 085B  plist L18 <- L19, 2 items */
+    0x00051445,                /* 085D  lsym L20 <- sym#5   ("apply") */
+    0x00061645,                /* 085E  lsym L22 <- sym#6   ("bind_msg") */
+    0x00071745,                /* 085F  lsym L23 <- sym#7   ("this") */
+    0x005A1845,                /* 0860  lsym L24 <- sym#90   ("get_cache") */
+    0x00150384, 0x00160000,    /* 0861  plist L21 <- L22, 3 items */
+    0x00561645,                /* 0863  lsym L22 <- sym#86   ("_site_id") */
+    0x00581745,                /* 0864  lsym L23 <- sym#88   ("_accept_start") */
+    0x00130484, 0x00140000,    /* 0865  plist L19 <- L20, 4 items */
+    0x000F0484, 0x00100000,    /* 0867  plist L15 <- L16, 4 items */
+    0x000F1145,                /* 0869  lsym L17 <- sym#15   ("cond") */
+    0x00031445,                /* 086A  lsym L20 <- sym#3   ("!=") */
+    0x00591545,                /* 086B  lsym L21 <- sym#89   ("_accept_cached") */
+    0x00001745,                /* 086C  lsym L23 <- sym#0   ("sym") */
+    0x005B1845,                /* 086D  lsym L24 <- sym#91   ("NO_CACHE") */
+    0x00160284, 0x00170000,    /* 086E  plist L22 <- L23, 2 items */
+    0x00130384, 0x00140000,    /* 0870  plist L19 <- L20, 3 items */
+    0x00591445,                /* 0872  lsym L20 <- sym#89   ("_accept_cached") */
+    0x00120284, 0x00130000,    /* 0873  plist L18 <- L19, 2 items */
+    0x00141445,                /* 0875  lsym L20 <- sym#20   ("else") */
+    0x00161645,                /* 0876  lsym L22 <- sym#22   ("do") */
+    0x00171845,                /* 0877  lsym L24 <- sym#23   ("define") */
+    0x005C1945,                /* 0878  lsym L25 <- sym#92   ("_accept_result") */
+    0x000D1B45,                /* 0879  lsym L27 <- sym#13   ("type") */
+    0x000E1C45,                /* 087A  lsym L28 <- sym#14   ("auto") */
+    0x001A0284, 0x001B0000,    /* 087B  plist L26 <- L27, 2 items */
+    0x00571B45,                /* 087D  lsym L27 <- sym#87   ("seq_expr") */
+    0x00170484, 0x00180000,    /* 087E  plist L23 <- L24, 4 items */
+    0x000F1945,                /* 0880  lsym L25 <- sym#15   ("cond") */
+    0x00101C45,                /* 0881  lsym L28 <- sym#16   ("==") */
+    0x005C1D45,                /* 0882  lsym L29 <- sym#92   ("_accept_result") */
+    0x00001F45,                /* 0883  lsym L31 <- sym#0   ("sym") */
+    0x00012045,                /* 0884  lsym L32 <- sym#1   ("NO_MATCH") */
+    0x001E0284, 0x001F0000,    /* 0885  plist L30 <- L31, 2 items */
+    0x001B0384, 0x001C0000,    /* 0887  plist L27 <- L28, 3 items */
+    0x00051D45,                /* 0889  lsym L29 <- sym#5   ("apply") */
+    0x00061F45,                /* 088A  lsym L31 <- sym#6   ("bind_msg") */
+    0x00072045,                /* 088B  lsym L32 <- sym#7   ("this") */
+    0x005D2145,                /* 088C  lsym L33 <- sym#93   ("put_miss") */
+    0x001E0384, 0x001F0000,    /* 088D  plist L30 <- L31, 3 items */
+    0x00561F45,                /* 088F  lsym L31 <- sym#86   ("_site_id") */
+    0x00582045,                /* 0890  lsym L32 <- sym#88   ("_accept_start") */
+    0x001C0484, 0x001D0000,    /* 0891  plist L28 <- L29, 4 items */
+    0x001A0284, 0x001B0000,    /* 0893  plist L26 <- L27, 2 items */
+    0x003B1D45,                /* 0895  lsym L29 <- sym#59   ("not") */
+    0x002D1F45,                /* 0896  lsym L31 <- sym#45   ("is") */
+    0x005C2045,                /* 0897  lsym L32 <- sym#92   ("_accept_result") */
+    0x000D2245,                /* 0898  lsym L34 <- sym#13   ("type") */
+    0x00042345,                /* 0899  lsym L35 <- sym#4   ("error") */
+    0x00210284, 0x00220000,    /* 089A  plist L33 <- L34, 2 items */
+    0x001E0384, 0x001F0000,    /* 089C  plist L30 <- L31, 3 items */
+    0x001C0284, 0x001D0000,    /* 089E  plist L28 <- L29, 2 items */
+    0x00051E45,                /* 08A0  lsym L30 <- sym#5   ("apply") */
+    0x00062045,                /* 08A1  lsym L32 <- sym#6   ("bind_msg") */
+    0x00072145,                /* 08A2  lsym L33 <- sym#7   ("this") */
+    0x005E2245,                /* 08A3  lsym L34 <- sym#94   ("put_hit") */
+    0x001F0384, 0x00200000,    /* 08A4  plist L31 <- L32, 3 items */
+    0x00562045,                /* 08A6  lsym L32 <- sym#86   ("_site_id") */
+    0x00582145,                /* 08A7  lsym L33 <- sym#88   ("_accept_start") */
+    0x00052345,                /* 08A8  lsym L35 <- sym#5   ("apply") */
+    0x00062545,                /* 08A9  lsym L37 <- sym#6   ("bind_msg") */
+    0x00072645,                /* 08AA  lsym L38 <- sym#7   ("this") */
+    0x00232745,                /* 08AB  lsym L39 <- sym#35   ("mark") */
+    0x00240384, 0x00250000,    /* 08AC  plist L36 <- L37, 3 items */
+    0x00220284, 0x00230000,    /* 08AE  plist L34 <- L35, 2 items */
+    0x005C2345,                /* 08B0  lsym L35 <- sym#92   ("_accept_result") */
+    0x001D0684, 0x001E0000,    /* 08B1  plist L29 <- L30, 6 items */
+    0x001B0284, 0x001C0000,    /* 08B3  plist L27 <- L28, 2 items */
+    0x00180384, 0x00190000,    /* 08B5  plist L24 <- L25, 3 items */
+    0x005C1945,                /* 08B7  lsym L25 <- sym#92   ("_accept_result") */
+    0x00150484, 0x00160000,    /* 08B8  plist L21 <- L22, 4 items */
+    0x00130284, 0x00140000,    /* 08BA  plist L19 <- L20, 2 items */
+    0x00100384, 0x00110000,    /* 08BC  plist L16 <- L17, 3 items */
+    0x000C0484, 0x000D0000,    /* 08BE  plist L12 <- L13, 4 items */
+    0x00060684, 0x00070000,    /* 08C0  plist L6 <- L7, 6 items */
+    0x005D0742,                /* 08C2  gget L7 <- g93   (pair) */
+    0x00560845,                /* 08C3  lsym L8 <- sym#86   ("_site_id") */
+    0x00120945,                /* 08C4  lsym L9 <- sym#18   ("int") */
+    0x000A0441,                /* 08C5  move L10 <- L4 */
+    0x000B0284, 0x00090000,    /* 08C6  plist L11 <- L9, 2 items */
+    0x00090B41,                /* 08C8  move L9 <- L11 */
+    0x00070251,                /* 08C9  call base=L7 argc=2 */
+    0x00070041,                /* 08CA  move L7 <- L0 */
+    0x005D0842,                /* 08CB  gget L8 <- g93   (pair) */
+    0x00570945,                /* 08CC  lsym L9 <- sym#87   ("seq_expr") */
+    0x000A0341,                /* 08CD  move L10 <- L3 */
+    0x00080251,                /* 08CE  call base=L8 argc=2 */
+    0x00080041,                /* 08CF  move L8 <- L0 */
+    0x00050351,                /* 08D0  call base=L5 argc=3 */
+    0x00050041,                /* 08D1  move L5 <- L0 */
+    0x00050008,                /* 08D2  return L5 */
+    0x00018041,                /* 08D3  move L1 <- P0 */
+    0x00010345,                /* 08D4  lsym L3 <- sym#1   ("NO_MATCH") */
+    0x0004008F, 0x00010003,    /* 08D5  eq L4 <- L1 == L3 */
+    0x0005044B,                /* 08D7  jf L4, +5 */
+    0x005B0342,                /* 08D8  gget L3 <- g91   (error) */
+    0x00048141,                /* 08D9  move L4 <- P1 */
+    0x00030151,                /* 08DA  call base=L3 argc=1 */
+    0x00030041,                /* 08DB  move L3 <- L0 */
+    0x00030008,                /* 08DC  return L3 */
+    0x00020141,                /* 08DD  move L2 <- L1 */
+    0x00020008,                /* 08DE  return L2 */
+    0x00630442,                /* 08DF  gget L4 <- g99   (sexpr) */
+    0x00058041,                /* 08E0  move L5 <- P0 */
+    0x00040151,                /* 08E1  call base=L4 argc=1 */
+    0x00040041,                /* 08E2  move L4 <- L0 */
+    0x00010441,                /* 08E3  move L1 <- L4 */
+    0x00260442,                /* 08E4  gget L4 <- g38   (_sequence_elements) */
+    0x00050141,                /* 08E5  move L5 <- L1 */
+    0x00040151,                /* 08E6  call base=L4 argc=1 */
+    0x00040041,                /* 08E7  move L4 <- L0 */
+    0x00020441,                /* 08E8  move L2 <- L4 */
+    0x00250442,                /* 08E9  gget L4 <- g37   (_build_sequence_expr) */
+    0x00050241,                /* 08EA  move L5 <- L2 */
+    0x00040151,                /* 08EB  call base=L4 argc=1 */
+    0x00040041,                /* 08EC  move L4 <- L0 */
+    0x00030441,                /* 08ED  move L3 <- L4 */
+    0x003C0442,                /* 08EE  gget L4 <- g60   (mk_expand_n) */
+    0x00090645,                /* 08EF  lsym L6 <- sym#9   ("fn_def") */
+    0x00600745,                /* 08F0  lsym L7 <- sym#96   ("$_expect") */
+    0x00080003,                /* 08F1  lnil L8 */
+    0x000B0B45,                /* 08F2  lsym L11 <- sym#11   ("param") */
+    0x00210C45,                /* 08F3  lsym L12 <- sym#33   ("match_expr") */
+    0x000D0E45,                /* 08F4  lsym L14 <- sym#13   ("type") */
+    0x000E0F45,                /* 08F5  lsym L15 <- sym#14   ("auto") */
+    0x000D0284, 0x000E0000,    /* 08F6  plist L13 <- L14, 2 items */
+    0x000E0003,                /* 08F8  lnil L14 */
+    0x000A0484, 0x000B0000,    /* 08F9  plist L10 <- L11, 4 items */
+    0x000B0C45,                /* 08FB  lsym L12 <- sym#11   ("param") */
+    0x00610D45,                /* 08FC  lsym L13 <- sym#97   ("desc") */
+    0x000D0F45,                /* 08FD  lsym L15 <- sym#13   ("type") */
+    0x000E1045,                /* 08FE  lsym L16 <- sym#14   ("auto") */
+    0x000E0284, 0x000F0000,    /* 08FF  plist L14 <- L15, 2 items */
+    0x000F0003,                /* 0901  lnil L15 */
+    0x000B0484, 0x000C0000,    /* 0902  plist L11 <- L12, 4 items */
+    0x00090284, 0x000A0000,    /* 0904  plist L9 <- L10, 2 items */
+    0x000D0B45,                /* 0906  lsym L11 <- sym#13   ("type") */
+    0x000E0C45,                /* 0907  lsym L12 <- sym#14   ("auto") */
+    0x000A0284, 0x000B0000,    /* 0908  plist L10 <- L11, 2 items */
+    0x00160C45,                /* 090A  lsym L12 <- sym#22   ("do") */
+    0x00170E45,                /* 090B  lsym L14 <- sym#23   ("define") */
+    0x00620F45,                /* 090C  lsym L15 <- sym#98   ("r") */
+    0x000D1145,                /* 090D  lsym L17 <- sym#13   ("type") */
+    0x000E1245,                /* 090E  lsym L18 <- sym#14   ("auto") */
+    0x00100284, 0x00110000,    /* 090F  plist L16 <- L17, 2 items */
+    0x00211145,                /* 0911  lsym L17 <- sym#33   ("match_expr") */
+    0x000D0484, 0x000E0000,    /* 0912  plist L13 <- L14, 4 items */
+    0x000F0F45,                /* 0914  lsym L15 <- sym#15   ("cond") */
+    0x00101245,                /* 0915  lsym L18 <- sym#16   ("==") */
+    0x00621345,                /* 0916  lsym L19 <- sym#98   ("r") */
+    0x00001545,                /* 0917  lsym L21 <- sym#0   ("sym") */
+    0x00011645,                /* 0918  lsym L22 <- sym#1   ("NO_MATCH") */
+    0x00140284, 0x00150000,    /* 0919  plist L20 <- L21, 2 items */
+    0x00110384, 0x00120000,    /* 091B  plist L17 <- L18, 3 items */
+    0x00631345,                /* 091D  lsym L19 <- sym#99   ("return") */
+    0x00051545,                /* 091E  lsym L21 <- sym#5   ("apply") */
+    0x00041645,                /* 091F  lsym L22 <- sym#4   ("error") */
+    0x00611745,                /* 0920  lsym L23 <- sym#97   ("desc") */
+    0x00140384, 0x00150000,    /* 0921  plist L20 <- L21, 3 items */
+    0x00120284, 0x00130000,    /* 0923  plist L18 <- L19, 2 items */
+    0x00100284, 0x00110000,    /* 0925  plist L16 <- L17, 2 items */
+    0x000E0284, 0x000F0000,    /* 0927  plist L14 <- L15, 2 items */
+    0x00620F45,                /* 0929  lsym L15 <- sym#98   ("r") */
+    0x000B0484, 0x000C0000,    /* 092A  plist L11 <- L12, 4 items */
+    0x00050684, 0x00060000,    /* 092C  plist L5 <- L6, 6 items */
+    0x005D0642,                /* 092E  gget L6 <- g93   (pair) */
+    0x00210745,                /* 092F  lsym L7 <- sym#33   ("match_expr") */
+    0x00080341,                /* 0930  move L8 <- L3 */
+    0x00060251,                /* 0931  call base=L6 argc=2 */
+    0x00060041,                /* 0932  move L6 <- L0 */
+    0x005D0742,                /* 0933  gget L7 <- g93   (pair) */
+    0x00610845,                /* 0934  lsym L8 <- sym#97   ("desc") */
+    0x00500945,                /* 0935  lsym L9 <- sym#80   ("str") */
+    0x000A8141,                /* 0936  move L10 <- P1 */
+    0x000B0284, 0x00090000,    /* 0937  plist L11 <- L9, 2 items */
+    0x00090B41,                /* 0939  move L9 <- L11 */
+    0x00070251,                /* 093A  call base=L7 argc=2 */
+    0x00070041,                /* 093B  move L7 <- L0 */
+    0x00040351,                /* 093C  call base=L4 argc=3 */
+    0x00040041,                /* 093D  move L4 <- L0 */
+    0x00040008,                /* 093E  return L4 */
+    0x00070246,                /* 093F  lconst L2 <- static#7   ("error") */
+    0x00030097, 0x80000002,    /* 0940  is L3 <- P0 is L2 */
+    0x0001034A,                /* 0942  not L1 <- L3 */
+    0x0003014B,                /* 0943  jf L1, +3 */
+    0x00010245,                /* 0944  lsym L2 <- sym#1   ("NO_MATCH") */
+    0x00010090, 0x80000002,    /* 0945  ne L1 <- P0 != L2 */
+    0x00010008,                /* 0947  return L1 */
 };
 
 const wy_module_image _dsl_image = {

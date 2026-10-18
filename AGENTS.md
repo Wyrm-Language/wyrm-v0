@@ -56,8 +56,8 @@ The in-repo binary is self-sufficient: it compiles and runs `.wy` scripts
 with no Python and no external wyrm installation (the compiler, the `src/embed/`
 library modules, and the front end are embedded in the binary). Prefer it
 over any `wyrm` in user `$PATH` -- a pre-existing installation may be an
-older, divergent variant of the language. pypoc (a nested checkout) is
-optional: `meson test` passes without it.
+older, divergent variant of the language. An external wyrm is optional:
+`meson test` passes without one.
 
 ### Testing
 
@@ -89,7 +89,7 @@ Tests check behavior, plus our own compiler's self-consistency:
   slow whole-corpus differential is its own test, `cwyrm-session-differential`.
 
 External wyrm selection (`scripts/wytest_env.py`): exported `$WYRM`, else
-`pypoc/.venv/bin/wyrm`, else `wyrm` on `$PATH`; `$WYRM_FLAGS` sets its
+`wyrm` on `$PATH`; `$WYRM_FLAGS` sets its
 arguments (default `-I<repo>/wy`; `~` expands):
 
 ```sh

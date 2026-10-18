@@ -13,6 +13,7 @@
 #include <wyrm/string.h>
 #include <wyrm/vm.h>
 #include <test_common/test_fiber_fixture.h>
+#include <test_common/test_call.h>
 
 /*
  * Epic 5/M3 (design_c_vm.md §3): coroutines get their own fiber; `next`/
@@ -123,34 +124,35 @@ TEST_SUITE("coroutine") {
         ctx->builtins = builtins;
 
         const wy_u32 fn0_code[] = {
-            enc2a(WY_OP_CLOSURE, 0, 0), enc2b(1, 0),    // L0 <- fn1 (co body)
-            enc2a(WY_OP_CALL, 0, 0), enc2b(1, 0),       // L0 <- construct coroutine (argc=0, nres=1)
-            enc1(WY_OP_LCONST, 1, 0),                   // L1 <- next native (static 0)
+            enc2a(WY_OP_CLOSURE, 0, 1), enc2b(1, 0),    // L1 <- fn1 (co body)
+            enc1(WY_OP_CALL, 0, 1),                     // L0 <- construct coroutine (argc=0)
+            enc1(WY_OP_MOVE, 0, 6),                     // L6 <- the coroutine
+            enc1(WY_OP_LCONST, 7, 0),                   // L7 <- next native (static 0)
             // call 1
-            enc1(WY_OP_MOVE, 1, 10), enc1(WY_OP_MOVE, 0, 11),
-            enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),      // L10 <- next(L0)
-            enc1(WY_OP_MOVE, 10, 2),                    // L2 <- result 1
+            enc1(WY_OP_MOVE, 7, 10), enc1(WY_OP_MOVE, 6, 11),
+            enc1(WY_OP_CALL, 1, 10),                    // L0 <- next(L11)
+            enc1(WY_OP_MOVE, 0, 2),                     // L2 <- result 1
             // call 2
-            enc1(WY_OP_MOVE, 1, 10), enc1(WY_OP_MOVE, 0, 11),
-            enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),
-            enc1(WY_OP_MOVE, 10, 3),                    // L3 <- result 2
+            enc1(WY_OP_MOVE, 7, 10), enc1(WY_OP_MOVE, 6, 11),
+            enc1(WY_OP_CALL, 1, 10),
+            enc1(WY_OP_MOVE, 0, 3),                     // L3 <- result 2
             // call 3 (exhausted)
-            enc1(WY_OP_MOVE, 1, 10), enc1(WY_OP_MOVE, 0, 11),
-            enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),
-            enc1(WY_OP_MOVE, 10, 4),                    // L4 <- StopIteration
+            enc1(WY_OP_MOVE, 7, 10), enc1(WY_OP_MOVE, 6, 11),
+            enc1(WY_OP_CALL, 1, 10),
+            enc1(WY_OP_MOVE, 0, 4),                     // L4 <- StopIteration
             // call 4 (still exhausted, idempotent)
-            enc1(WY_OP_MOVE, 1, 10), enc1(WY_OP_MOVE, 0, 11),
-            enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),
-            enc1(WY_OP_MOVE, 10, 5),                    // L5 <- StopIteration
-            enc1(WY_OP_RETURN, 4, 2),                   // return L2..L5
+            enc1(WY_OP_MOVE, 7, 10), enc1(WY_OP_MOVE, 6, 11),
+            enc1(WY_OP_CALL, 1, 10),
+            enc1(WY_OP_MOVE, 0, 5),                     // L5 <- StopIteration
+            enc2a(WY_OP_TUPLE, 4, 2), enc2b(2, 0), enc1(WY_OP_RETURN, 0, 2),                   // return L2..L5
         };
         // fn1 body (coroutine): yield 10, yield 20, return.
         const wy_u32 fn1_code[] = {
-            enc1(WY_OP_I8, 10, 0),
-            enc2a(WY_OP_YIELD, 1, 0), enc2b(0, 0),      // yield L0 (=10)
-            enc1(WY_OP_I8, 20, 0),
-            enc2a(WY_OP_YIELD, 1, 0), enc2b(0, 0),      // yield L0 (=20)
-            enc1(WY_OP_RETURN, 0, 0),
+            enc1(WY_OP_I8, 10, 1),
+            enc1(WY_OP_YIELD, 0, 1),                    // yield L1 (=10)
+            enc1(WY_OP_I8, 20, 1),
+            enc1(WY_OP_YIELD, 0, 1),                    // yield L1 (=20)
+            enc1(WY_OP_RETURN, 0, 1),
         };
         std::vector<wy_u32> code(std::begin(fn0_code), std::end(fn0_code));
         const wy_uword fn1_offset = code.size();
@@ -159,7 +161,7 @@ TEST_SUITE("coroutine") {
         wy_value next_native = builtin_value(ctx, builtins, "next");
         std::vector<wy_function_proto> protos = {
             proto_at(0, 12, 0),
-            proto_at((wy_u32) fn1_offset, 1, WY_FN_COROUTINE),
+            proto_at((wy_u32) fn1_offset, 2, WY_FN_COROUTINE),
         };
         wy_module* module = make_code_module(ctx, code.data(), code.size(), protos, 0, &next_native, 1);
         REQUIRE_EQ(wy_context_module_register(ctx, module, nullptr), WY_ERR_NONE);
@@ -168,7 +170,7 @@ TEST_SUITE("coroutine") {
         REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
 
         wy_value out[4];
-        wy_error err = wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+        wy_error err = test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
             WY_NULL, 0, out, 4);
         INFO(fault_message(fix.get_fiber_ptr()));
         REQUIRE_EQ(err, WY_ERR_NONE);
@@ -206,18 +208,19 @@ TEST_SUITE("coroutine") {
         // fn1 (coroutine body): import "b" (compact, dst=L1), gget qualified
         // global slot 0 (owned by the enclosing module), yield it, return.
         const wy_u32 fn0_code[] = {
-            enc2a(WY_OP_CLOSURE, 0, 0), enc2b(1, 0),    // L0 <- fn1
-            enc2a(WY_OP_CALL, 0, 0), enc2b(1, 0),       // L0 <- construct coroutine
-            enc1(WY_OP_LCONST, 1, 0),                   // L1 <- next native
-            enc1(WY_OP_MOVE, 1, 10), enc1(WY_OP_MOVE, 0, 11),
-            enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),      // L10 <- next(L0)
-            enc1(WY_OP_RETURN, 1, 10),                  // return L10
+            enc2a(WY_OP_CLOSURE, 0, 1), enc2b(1, 0),    // L1 <- fn1
+            enc1(WY_OP_CALL, 0, 1),                     // L0 <- construct coroutine
+            enc1(WY_OP_MOVE, 0, 6),                     // L6 <- the coroutine
+            enc1(WY_OP_LCONST, 7, 0),                   // L7 <- next native
+            enc1(WY_OP_MOVE, 7, 10), enc1(WY_OP_MOVE, 6, 11),
+            enc1(WY_OP_CALL, 1, 10),                    // L0 <- next(L11)
+            enc1(WY_OP_RETURN, 0, 0),                   // return L0
         };
         const wy_u32 fn1_code[] = {
             enc1(WY_OP_IMPORT, 1, 1),                   // L1 <- import "b" (static 1)
             enc1(WY_OP_GGET, 2, 0),                     // L2 <- module global 0 ("b::value")
-            enc2a(WY_OP_YIELD, 1, 2), enc2b(0, 0),      // yield L2
-            enc1(WY_OP_RETURN, 0, 0),
+            enc1(WY_OP_YIELD, 0, 2),                    // yield L2
+            enc1(WY_OP_RETURN, 0, 2),
         };
         std::vector<wy_u32> code(std::begin(fn0_code), std::end(fn0_code));
         const wy_uword fn1_offset = code.size();
@@ -243,7 +246,7 @@ TEST_SUITE("coroutine") {
         REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
 
         wy_value out[1];
-        wy_error err = wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+        wy_error err = test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
             WY_NULL, 0, out, 1);
         INFO(fault_message(fix.get_fiber_ptr()));
         REQUIRE_EQ(err, WY_ERR_NONE);
@@ -260,21 +263,21 @@ TEST_SUITE("coroutine") {
         ctx->builtins = builtins;
 
         const wy_u32 fn0_code[] = {
-            enc2a(WY_OP_CLOSURE, 0, 0), enc2b(1, 0),    // L0 <- fn1
-            enc2a(WY_OP_CALL, 0, 0), enc2b(1, 0),       // L0 <- construct coroutine
+            enc2a(WY_OP_CLOSURE, 0, 1), enc2b(1, 0),    // L1 <- fn1
+            enc1(WY_OP_CALL, 0, 1),                     // L0 <- construct coroutine
             enc1(WY_OP_LCONST, 1, 0),                   // L1 <- next native
             enc1(WY_OP_MOVE, 1, 10), enc1(WY_OP_MOVE, 0, 11),
-            enc2a(WY_OP_CALL, 1, 10), enc2b(1, 0),      // L10 <- next(L0) - suspends the coroutine
+            enc1(WY_OP_CALL, 1, 10),                    // L0 <- next(L11) - suspends the coroutine
             // Deliberately never store L0 anywhere else and never call
             // next() again: once this frame returns, nothing references the
             // coroutine or its fiber any more.
-            enc1(WY_OP_RETURN, 1, 10),
+            enc1(WY_OP_RETURN, 0, 0),
         };
         // fn1 body: yield once, forever suspended thereafter.
         const wy_u32 fn1_code[] = {
-            enc1(WY_OP_I8, 7, 0),
-            enc2a(WY_OP_YIELD, 1, 0), enc2b(0, 0),
-            enc1(WY_OP_RETURN, 0, 0),
+            enc1(WY_OP_I8, 7, 1),
+            enc1(WY_OP_YIELD, 0, 1),
+            enc1(WY_OP_RETURN, 0, 1),
         };
         std::vector<wy_u32> code(std::begin(fn0_code), std::end(fn0_code));
         const wy_uword fn1_offset = code.size();
@@ -283,7 +286,7 @@ TEST_SUITE("coroutine") {
         wy_value next_native = builtin_value(ctx, builtins, "next");
         std::vector<wy_function_proto> protos = {
             proto_at(0, 12, 0),
-            proto_at((wy_u32) fn1_offset, 1, WY_FN_COROUTINE),
+            proto_at((wy_u32) fn1_offset, 2, WY_FN_COROUTINE),
         };
         wy_module* module = make_code_module(ctx, code.data(), code.size(), protos, 0, &next_native, 1);
         REQUIRE_EQ(wy_context_module_register(ctx, module, nullptr), WY_ERR_NONE);
@@ -292,7 +295,7 @@ TEST_SUITE("coroutine") {
         REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
 
         wy_value out[1];
-        wy_error err = wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+        wy_error err = test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
             WY_NULL, 0, out, 1);
         INFO(fault_message(fix.get_fiber_ptr()));
         REQUIRE_EQ(err, WY_ERR_NONE);
@@ -310,5 +313,125 @@ TEST_SUITE("coroutine") {
         // after-free on this path across every other fixture.
         wy_context_gc_full_run(ctx);
         CHECK_EQ(wy_context_exec(ctx), WY_ERR_NONE);
+    }
+
+    TEST_CASE("one-result ops: yield returns the sent value in L0, next and send deliver to L0") {
+        test_fiber_fixture fix;
+        wy_context* ctx = fix.get_context_ptr();
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(ctx, &builtins), WY_ERR_NONE);
+        ctx->builtins = builtins;
+
+        const wy_u32 fn0_code[] = {
+            enc2a(WY_OP_CLOSURE, 0, 1), enc2b(1, 0),    // L1 <- fn1 (co body)
+            enc1(WY_OP_CALL, 0, 1),                     // L0 <- construct coroutine (argc=0)
+            enc1(WY_OP_MOVE, 0, 1),                     // L1 <- the coroutine
+            enc1(WY_OP_LCONST, 2, 0),                   // L2 <- next (static 0)
+            enc1(WY_OP_MOVE, 1, 3),                     // L3 <- coroutine
+            enc1(WY_OP_CALL, 1, 2),                     // L0 <- next(L3)
+            enc1(WY_OP_MOVE, 0, 6),                     // L6 <- first yield
+            enc1(WY_OP_LCONST, 2, 1),                   // L2 <- send (static 1)
+            enc1(WY_OP_MOVE, 1, 3),
+            enc1(WY_OP_I8, 5, 4),                       // L4 <- 5, the sent value
+            enc1(WY_OP_CALL, 2, 2),                     // L0 <- send(L3, L4)
+            enc1(WY_OP_MOVE, 0, 7),                     // L7 <- second yield
+            enc2a(WY_OP_TUPLE, 2, 8), enc2b(6, 0),      // L8 <- (L6, L7)
+            enc1(WY_OP_RETURN, 0, 8),
+        };
+        // fn1 (coroutine): yield 7; the value sent comes back in L0; yield 2 * it
+        const wy_u32 fn1_code[] = {
+            enc1(WY_OP_I8, 7, 1),
+            enc1(WY_OP_YIELD, 0, 1),
+            enc2a(WY_OP_ADD, 0, 1), enc2b(0, 0),        // L1 <- L0 + L0
+            enc1(WY_OP_YIELD, 0, 1),
+            enc1(WY_OP_RETURN, 0, 1),
+        };
+        std::vector<wy_u32> code(std::begin(fn0_code), std::end(fn0_code));
+        const wy_uword fn1_offset = code.size();
+        code.insert(code.end(), std::begin(fn1_code), std::end(fn1_code));
+
+        wy_value statics[2] = { builtin_value(ctx, builtins, "next"), builtin_value(ctx, builtins, "send") };
+        std::vector<wy_function_proto> protos = {
+            proto_at(0, 9, 0),
+            proto_at((wy_u32) fn1_offset, 2, WY_FN_COROUTINE),
+        };
+        wy_module* module = make_code_module(ctx, code.data(), code.size(), protos, 0, statics, 2);
+        REQUIRE_EQ(wy_context_module_register(ctx, module, nullptr), WY_ERR_NONE);
+
+        wy_function* fn0 = WY_NULL;
+        REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
+
+        wy_value out[2];
+        wy_error err = test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+            WY_NULL, 0, out, 2);
+        INFO(fault_message(fix.get_fiber_ptr()));
+        REQUIRE_EQ(err, WY_ERR_NONE);
+        CHECK_EQ(out[0].data.word, 7);
+        CHECK_EQ(out[1].data.word, 10);
+    }
+
+    TEST_CASE("yield_from delivers the delegate's return value to L0") {
+        test_fiber_fixture fix;
+        wy_context* ctx = fix.get_context_ptr();
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(ctx, &builtins), WY_ERR_NONE);
+        ctx->builtins = builtins;
+
+        const wy_u32 fn0_code[] = {
+            enc2a(WY_OP_CLOSURE, 0, 1), enc2b(1, 0),    // L1 <- outer
+            enc1(WY_OP_CALL, 0, 1),                     // L0 <- outer coroutine
+            enc1(WY_OP_MOVE, 0, 6),
+            enc1(WY_OP_LCONST, 7, 0),                   // L7 <- next
+            enc1(WY_OP_MOVE, 7, 10), enc1(WY_OP_MOVE, 6, 11),
+            enc1(WY_OP_CALL, 1, 10),                    // L0 <- next(outer): the inner's first yield
+            enc1(WY_OP_MOVE, 0, 2),
+            enc1(WY_OP_MOVE, 7, 10), enc1(WY_OP_MOVE, 6, 11),
+            enc1(WY_OP_CALL, 1, 10),                    // L0 <- next(outer): the outer's own yield
+            enc1(WY_OP_MOVE, 0, 3),
+            enc2a(WY_OP_TUPLE, 2, 4), enc2b(2, 0),      // L4 <- (L2, L3)
+            enc1(WY_OP_RETURN, 0, 4),
+        };
+        // outer: delegate to the inner, then yield its return value plus one
+        const wy_u32 outer_code[] = {
+            enc2a(WY_OP_CLOSURE, 0, 1), enc2b(2, 0),    // L1 <- inner
+            enc1(WY_OP_CALL, 0, 1),                     // L0 <- inner coroutine
+            enc1(WY_OP_MOVE, 0, 1),                     // L1 <- the delegate
+            enc2a(WY_OP_YIELD_FROM, 0, 0), enc2b(1, 0), // L0 <- the inner's return value
+            enc1(WY_OP_I8, 1, 2),
+            enc2a(WY_OP_ADD, 0, 1), enc2b(0, 2),        // L1 <- L0 + 1
+            enc1(WY_OP_YIELD, 0, 1),
+            enc1(WY_OP_RETURN, 0, 1),
+        };
+        // inner: yield 5, return 9
+        const wy_u32 inner_code[] = {
+            enc1(WY_OP_I8, 5, 1),
+            enc1(WY_OP_YIELD, 0, 1),
+            enc1(WY_OP_I8, 9, 1),
+            enc1(WY_OP_RETURN, 0, 1),
+        };
+        std::vector<wy_u32> code(std::begin(fn0_code), std::end(fn0_code));
+        const wy_uword outer_offset = code.size();
+        code.insert(code.end(), std::begin(outer_code), std::end(outer_code));
+        const wy_uword inner_offset = code.size();
+        code.insert(code.end(), std::begin(inner_code), std::end(inner_code));
+
+        wy_value next_native = builtin_value(ctx, builtins, "next");
+        std::vector<wy_function_proto> protos = {
+            proto_at(0, 12, 0),
+            proto_at((wy_u32) outer_offset, 3, WY_FN_COROUTINE),
+            proto_at((wy_u32) inner_offset, 2, WY_FN_COROUTINE),
+        };
+        wy_module* module = make_code_module(ctx, code.data(), code.size(), protos, 0, &next_native, 1);
+        REQUIRE_EQ(wy_context_module_register(ctx, module, nullptr), WY_ERR_NONE);
+        wy_function* fn0 = WY_NULL;
+        REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
+
+        wy_value out[2];
+        wy_error err = test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+            WY_NULL, 0, out, 2);
+        INFO(fault_message(fix.get_fiber_ptr()));
+        REQUIRE_EQ(err, WY_ERR_NONE);
+        CHECK_EQ(out[0].data.word, 5);
+        CHECK_EQ(out[1].data.word, 10);
     }
 }

@@ -94,7 +94,7 @@ constexpr wy_u32 enc1(wy_u8 op, wy_u8 f, wy_u16 a0) { return (wy_u32(a0) << 16) 
 // `L0 <- value; return L0`
 std::vector<wy_u32> returns_const(int value)
 {
-    return {enc1(WY_OP_I8, (wy_u8) value, 0), enc1(WY_OP_RETURN, 1, 0)};
+    return {enc1(WY_OP_I8, (wy_u8) value, 0), enc1(WY_OP_RETURN, 0, 0)};
 }
 
 wy_word run_int(wy_context* ctx, wy_module* session, wy_uword fn)
@@ -420,7 +420,7 @@ TEST_SUITE("session")
 
         // `L0 <- static[index]; return L0`
         auto returns_static = [](int index) {
-            return std::vector<wy_u32>{enc1(WY_OP_LCONST, 0, (wy_u16) index), enc1(WY_OP_RETURN, 1, 0)};
+            return std::vector<wy_u32>{enc1(WY_OP_LCONST, 0, (wy_u16) index), enc1(WY_OP_RETURN, 0, 0)};
         };
 
         Delta d1;

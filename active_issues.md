@@ -22,8 +22,6 @@ These sources compile under pypoc but not under the embedded compiler. They are 
 `DIVERGES` in `test/corpus/manifest.txt`; the runner fails when a row starts passing, so
 fixing one forces the manifest update.
 
-- **Raw strings** (`R"C(...)C"`, `samples/eval_strings.wy`): the tokenizer lexes `R` as an
-  identifier.
 - **`try` / `catch` expressions** (`samples/eval_error_handling.wy`): `try x`, `x catch y`,
   `catch return`. Compile fails; not diagnosed.
 - **`...` has no lowering** (`samples/decolib.wy`): the tree is `(ellipsis)`, but the VM has

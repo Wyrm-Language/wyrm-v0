@@ -14,7 +14,6 @@ wy_error wy_coroutine_new_f(wy_context* context, wy_fiber* fiber, wy_coroutine**
     self->delegate = WY_NULL;
     self->outer = WY_NULL;
     self->delegate_dst = WY_NULL;
-    self->yield_base = 0;
     self->state = WY_CO_CREATED;
     self->result = wy_value_nil();
 

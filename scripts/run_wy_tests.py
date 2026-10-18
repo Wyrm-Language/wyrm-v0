@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Epic 8 M5: run every test/wy/*.wy under the external wyrm (see
-wytest_env.py: $WYRM / $WYRM_FLAGS, else pypoc, else PATH) and fail if any
+wytest_env.py: $WYRM / $WYRM_FLAGS, else PATH) and fail if any
 of them reports trouble.
 
 Each test/wy/*.wy file now calls exit(1) itself at the point of failure

@@ -38,7 +38,7 @@ wy_error wy_builtins_add(wy_context* context, const char* name, wy_value value);
  * already has its own `println`/`print` design distinct from the reference
  * corelib/std/io.wy wrapper (epic 5/M4's report).
  */
-wy_error wy_builtin_println_body_f(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres);
+wy_error wy_builtin_println_body_f(wy_context* context, wy_value* args, wy_uword argc, wy_value* out);
 
 WY_END_DECLS
 

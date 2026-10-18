@@ -4,7 +4,7 @@
 #include <wyrm/platform/hosted/import_fs.h>
 
 /* The embedded images were generated for this format version; a stale table fails the build. */
-_Static_assert(WY_IMAGE_VERSION == 340739680u, "embedded images are for another .wyc version; run scripts/regen_builtins.py");
+_Static_assert(WY_IMAGE_VERSION == 340758572u, "embedded images are for another .wyc version; run scripts/regen_builtins.py");
 
 /* Image symbols, defined in embedded_images.c's translation units: */
 

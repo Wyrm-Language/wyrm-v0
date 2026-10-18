@@ -5,7 +5,7 @@
 
 static const uint8_t template_header[] = {
     0xA3, 0x61, 0x6E, 0x68, 0x74, 0x65, 0x6D, 0x70, 0x6C, 0x61, 0x74, 0x65,
-    0x61, 0x67, 0x02, 0x61, 0x6C, 0x03,
+    0x61, 0x67, 0x02, 0x61, 0x6C, 0x04,
 };
 
 static const uint8_t template_statics[] = {
@@ -19,7 +19,7 @@ static const uint8_t template_symbols[] = {
 
 static const uint8_t template_functions[] = {
     0x81, 0xA6, 0x61, 0x6E, 0x69, 0x74, 0x65, 0x6D, 0x70, 0x6C, 0x61, 0x74,
-    0x65, 0x21, 0x61, 0x70, 0x80, 0x61, 0x6C, 0x05, 0x61, 0x63, 0x08, 0x61,
+    0x65, 0x21, 0x61, 0x70, 0x80, 0x61, 0x6C, 0x06, 0x61, 0x63, 0x09, 0x61,
     0x66, 0x02, 0x61, 0x74, 0x81, 0x00,
 };
 
@@ -37,21 +37,23 @@ static const uint8_t template_free[] = {
 };
 
 static const uint32_t template_code[] = {
-    0x000000A8, 0x00000000,    /* 0000  closure L0 <- fn#0, 0 caps */
-    0x00000142,                /* 0002  gget L1 <- g0   (TreeBase) */
-    0x00020181, 0x00010000,    /* 0003  tuple L2 <- L1, 1 items */
-    0x000000AC, 0x00000002,    /* 0005  reg_msg msg#0 <- L0, types L2   (template) */
-    0x00000002,                /* 0007  return count=0 */
-    0x00000045,                /* 0008  lsym L0 <- sym#0   ("annotate") */
-    0x00010145,                /* 0009  lsym L1 <- sym#1   ("template") */
-    0x00020245,                /* 000A  lsym L2 <- sym#2   ("true") */
-    0x00030184, 0x00020000,    /* 000B  plist L3 <- L2, 1 items */
-    0x00020341,                /* 000D  move L2 <- L3 */
-    0x00010342,                /* 000E  gget L3 <- g1   (sexpr) */
-    0x00048041,                /* 000F  move L4 <- P0 */
-    0x000301A0, 0x00010000,    /* 0010  call base=L3 argc=1 nres=1 */
-    0x00040484, 0x00000000,    /* 0012  plist L4 <- L0, 4 items */
-    0x00040102,                /* 0014  return L4 count=1 */
+    0x000100A8, 0x00000000,    /* 0000  closure L1 <- fn#0, 0 caps */
+    0x00000242,                /* 0002  gget L2 <- g0   (TreeBase) */
+    0x00030181, 0x00020000,    /* 0003  tuple L3 <- L2, 1 items */
+    0x000000AC, 0x00010003,    /* 0005  reg_msg msg#0 <- L1, types L3   (template) */
+    0x00000003,                /* 0007  lnil L0 */
+    0x00000008,                /* 0008  return L0 */
+    0x00000145,                /* 0009  lsym L1 <- sym#0   ("annotate") */
+    0x00010245,                /* 000A  lsym L2 <- sym#1   ("template") */
+    0x00020345,                /* 000B  lsym L3 <- sym#2   ("true") */
+    0x00040184, 0x00030000,    /* 000C  plist L4 <- L3, 1 items */
+    0x00030441,                /* 000E  move L3 <- L4 */
+    0x00010442,                /* 000F  gget L4 <- g1   (sexpr) */
+    0x00058041,                /* 0010  move L5 <- P0 */
+    0x00040151,                /* 0011  call base=L4 argc=1 */
+    0x00040041,                /* 0012  move L4 <- L0 */
+    0x00050484, 0x00010000,    /* 0013  plist L5 <- L1, 4 items */
+    0x00050008,                /* 0015  return L5 */
 };
 
 const wy_module_image template_image = {

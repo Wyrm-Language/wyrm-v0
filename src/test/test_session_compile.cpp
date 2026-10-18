@@ -144,7 +144,7 @@ struct harness
     wy_value call(wy_value fn, std::vector<wy_value> args)
     {
         wy_value result = wy_value_nil();
-        wy_error err = wy_vm_call_sync(ctx, fn, args.data(), args.size(), &result, 1);
+        wy_error err = wy_vm_call_sync(ctx, fn, args.data(), args.size(), &result);
         REQUIRE_EQ(err, WY_ERR_NONE);
         return result;
     }

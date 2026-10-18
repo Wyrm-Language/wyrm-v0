@@ -1,9 +1,9 @@
 # source	expected stdout	status	note
-arith.wy	arith.out	local-only	the interpreter models `return a, b` as a single tuple value, so `println(f())` prints the whole pair. A VM implementing spec 1.3 honestly drops every result past the first, because the call asked for one. This is doc/llm-bytecode.md 9's multi-value gap, and it is the only divergence any fixture has shown so far.
+arith.wy	arith.out	local-only	a tuple prints its str and sym elements bare (`ready`, `{one: 1}`); the interpreter prints their reprs (`'ready`, `{"one": 1}`). Container repr is a separate gap, not the return rule.
 bodies.wy	bodies.out	matches	one-statement bodies that are scope owners (plan C4/C5)
 classes.wy	classes.out	matches	
 closures.wy	closures.out	matches	
-collections.wy	collections.out	local-only	the interpreter models `return a, b` as a single tuple value, so `println(f())` prints the whole pair. A VM implementing spec 1.3 honestly drops every result past the first, because the call asked for one. This is doc/llm-bytecode.md 9's multi-value gap, and it is the only divergence any fixture has shown so far.
+collections.wy	collections.out	local-only	a tuple prints its str and sym elements bare (`ready`, `{one: 1}`); the interpreter prints their reprs (`'ready`, `{"one": 1}`). Container repr is a separate gap, not the return rule.
 control_flow.wy	control_flow.out	matches	
 coroutines.wy	coroutines.out	matches	
 decorators/declib.wy	decorators/declib.out	matches	
@@ -15,7 +15,8 @@ hello_2.wy	hello_2.out	matches
 hello_3.wy	hello_3.out	matches	
 int_text.wy	int_text.out	matches	int(str) reads integer literals like the tree walker's int(x, 0): 0b/0o/0x, `_`, no implicit octal
 messages.wy	messages.out	matches	
-multiret.wy	multiret.out	local-only	the interpreter models `return a, b` as a single tuple value, so `println(f())` prints the whole pair. A VM implementing spec 1.3 honestly drops every result past the first, because the call asked for one. This is doc/llm-bytecode.md 9's multi-value gap, and it is the only divergence any fixture has shown so far.
+multiret.wy	multiret.out	matches	`return a, b` is one tuple (project H-single-result W1)
+unpack_call.wy	unpack_call.out	local-only	unpacking a call's single tuple result (`a, b := f()`, `var a, b = f()`, `a, b = f()`); wypoc cannot unpack from a single value yet (queue.md)
 pair_index.wy	pair_index.out	matches	indexing a pair list walks the cdr chain, for reads and assignment
 slots.wy	slots.out	matches	G3 virtual slots (plan C9b)
 template.wy	template.out	matches	Added by epic 10a M0: `@template` marks `twice`/`_shadowed`; `_shadowed` uses `this` in a plain fn and exists only under the marking (a trapping stub in both engines' images, never called). `twice::$ast` yields the definition's tree - raw on the C VM, TreeBase-boxed on the walker - and the fixture only inspects it through what both agree on (`is nil`). The marking relieves a lowering failure, not semantics: `twice(21)` still runs. The source is checked in beside these artifacts (a fixture this repo authors, not one inherited from pypoc); the sweep still compiles it from pypoc/test/bytecode, where a copy must exist.
@@ -51,7 +52,7 @@ samples/eval_messages.wy	samples/eval_messages.out	DIVERGES	compiles from source
 samples/eval_modules.wy	samples/eval_modules.out	DIVERGES	`import std::io::println as alias_println` compiles a bare `import` of the full leaf path; the reference (pypoc/wypoc/vm/imports.py's `import_path`) falls back to importing the parent path and reading the last segment as a plain member when the full path does not itself resolve as a module ("`import a::b::c` is ambiguous... may name a member of the module before it"). `wy_link_import` (src/link.c) has no such member fallback, so it asks the import hook for a nonexistent `std/io/println.wyc`. Needs the parent-then-member fallback ported into `wy_link_import`/`WY_OP_IMPORT`, deferred to epic 6. (`import shapes` and `import std::io` in the same fixture now resolve correctly - the shapes corelib module is compiled into test/bytecode/samples/shapes.wyc, and `std::io::println` now exists as a plain qualified global read.)
 samples/eval_range.wy	samples/eval_range.out	matches	
 samples/eval_signals.wy	-	REFUSED	`signal` in a class body is not lowered (§8.5)
-samples/eval_strings.wy	samples/eval_strings.out	DIVERGES	the self-hosted tokenizer has no raw strings (`R"C(...)C"` lexes `R` as an identifier); the parser then returns a non-module node and the error surfaces only as "compile_module needs a 'module node". Found by run_behavior (the old sweep never compiled the samples from source).
+samples/eval_strings.wy	samples/eval_strings.out	matches	
 samples/lexical.wy	-	REFUSED	`with` has been removed from the language
 samples/shapes.wy	-	matches	C-VM-only corpus entry, not one of pypoc/test/test_vm_samples.py's own rows: pypoc/wypoc/corelib/shapes.wy (`wyrm_modules.DEFAULT_COREPATH`), compiled here because samples/eval_modules.wy's `import shapes` resolves against it. No standalone `.out` (it has no init-time output of its own); its class definitions are exercised through eval_modules.wy.
 bytes_header/cvm_header.wy	-	local-only	Epic 7 M5 exit criterion: builds the CBOR `header` map (`A3 61 6E 65 68 65 6C 6C 6F 61 67 02 61 6C 03`) by hand with `bytes` methods and writes it to a file. Not wired into the golden harness: its result is a written file, not stdout, so it doesn't fit `check_fixture`'s stdout-diff contract.
@@ -59,3 +60,4 @@ two_module/dunder_name.wy	two_module/dunder_name.out	matches	Added with `__name_
 two_module/dunder_name_main.wy	two_module/dunder_name_main.out	matches	Added with `__name__` injection at import time (wy_link_seed_global, src/link.c): an imported module reads its import path, the entry module reads __main__.
 range.wy	range.out	matches	native range: for-loop, next(), StopIteration as an error value, empty and nested ranges
 io_file.wy	io_file.out	local-only	std::io File API end to end. [local-only: pypoc cannot resolve `!write` on a File returned to an external caller - see the note on write_bytes_file in std/io.wy]
+delegate_return.wy	delegate_return.out	matches	yield from whose delegate returns (the delegate_dst of the outer coroutine was never set before project H)

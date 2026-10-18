@@ -20,10 +20,12 @@ enum wy_native_kind
 
 /**
  * A signature for a "leaf" native: runs to completion synchronously, writing
- * up to `nres` results directly, with no access to the fiber machinery an
- * WY_NATIVE_EXEC callable would need.
+ * its one result to `*out`, with no access to the fiber machinery an
+ * WY_NATIVE_EXEC callable would need. A call produces exactly one value
+ * (design runtime.md D12): a native that has several things to return
+ * builds a tuple.
  */
-typedef wy_error (*wy_native_leaf_fn)(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres);
+typedef wy_error (*wy_native_leaf_fn)(wy_context* context, wy_value* args, wy_uword argc, wy_value* out);
 
 extern const wy_object_type wy_native_type;
 

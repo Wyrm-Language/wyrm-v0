@@ -1,0 +1,10 @@
+# A delegate that returns: `yield from` evaluates to its return value and the outer coroutine carries on.
+co inner():
+    yield 5
+    return 9
+co outer():
+    r := yield from inner()
+    yield r + 1
+g := outer()
+println(next(g))
+println(next(g))

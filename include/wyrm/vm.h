@@ -21,29 +21,30 @@ wy_exec_state wy_vm_run(wy_context* context, wy_primitive unused);
  * Call `callee` synchronously from host/loader code (never from a native -
  * natives use wy_vm_call_continue instead, since C recursion into the VM
  * is not allowed there). Pushes a WY_RET_RESERVED frame and drives
- * wy_fiber_exec_f to completion.
+ * wy_fiber_exec_f to completion. The call's one value goes to `*out`; `out`
+ * may be WY_NULL to drop it.
  */
 wy_error wy_vm_call_sync(wy_context* context, wy_value callee, const wy_value* args, wy_uword argc,
-    wy_value* out, wy_uword nres);
+    wy_value* out);
 
 /**
  * Call `callee`, resuming at `continuation` once it returns. For use from
  * native exec callables (design_c_vm.md §1.4).
  */
 wy_error wy_vm_call_continue(wy_context* context, wy_exec_fn continuation, wy_value callee,
-    const wy_value* args, wy_uword argc, wy_uword nres);
+    const wy_value* args, wy_uword argc);
 
 /* -- Native bridge (design_c_vm.md §1.3), src/vm_call.c -- */
 
 /** Call a leaf native inline; see src/vm_call.c for the full contract. */
-wy_error wy_vm_call_leaf_f(wy_context* ctx, wy_native* native, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres);
+wy_error wy_vm_call_leaf_f(wy_context* ctx, wy_native* native, wy_value* args, wy_uword argc, wy_value* out);
 
 /** Push an exec native's call via the reservation trampoline; see src/vm_call.c. */
 wy_error wy_vm_call_exec_push_f(wy_context* ctx, wy_exec_fn continuation, wy_native* native,
-    const wy_value* args, wy_uword argc, wy_uword nres);
+    const wy_value* args, wy_uword argc);
 
 /** Complete an exec native call once its continuation runs; see src/vm_call.c. */
-wy_error wy_vm_native_await_complete_f(wy_context* ctx, wy_uword base_count, wy_value* dst, wy_uword nres);
+wy_error wy_vm_native_await_complete_f(wy_context* ctx, wy_uword base_count, wy_value* dst);
 
 /**
  * Build a callable that enters bytecode at `address` in module `module_id`

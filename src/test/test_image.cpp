@@ -54,7 +54,7 @@ TEST_SUITE("image")
         REQUIRE_GT(blob.size(), 11u);
         Bytes pre = preamble();
         CHECK(std::equal(pre.begin(), pre.end(), blob.begin()));
-        CHECK_EQ(WY_IMAGE_VERSION, 340739680u);
+        CHECK_EQ(WY_IMAGE_VERSION, 340758572u);
         wy_module_image image;
 
         REQUIRE_EQ(wy_image_from_bytes(blob.data(), blob.size(), &image), WY_ERR_NONE);

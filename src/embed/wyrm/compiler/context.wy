@@ -376,7 +376,7 @@ fn [ModuleImage] global_index(name: str) -> int | error:
 fn [ModuleImage] add_function(name: str, params: list | nil = nil, nlocals: int = 0,
                 code_offset: int = 0, flags: int = 0,
                 dispatch: list | nil = nil, ncaptures: int = 0,
-                nresults: int = 1, uses: list | nil = nil) -> int | error:
+                uses: list | nil = nil) -> int | error:
     index := this ! _next_index(this.functions, "functions per module")
     if index is error:
         return index
@@ -385,7 +385,6 @@ fn [ModuleImage] add_function(name: str, params: list | nil = nil, nlocals: int 
     entry["flags"] = flags
     entry["dispatch"] = _or_empty(dispatch)
     entry["ncaptures"] = ncaptures
-    entry["nresults"] = nresults
     entry["uses"] = _or_empty(uses)
     (this.functions) ! append(entry)
     return index
@@ -522,8 +521,6 @@ class FnContext:
     slot is_module_init: bool
     # [continue label, break label] per enclosing loop
     slot loops: list
-    # the widest `return` in this body, the `r` field
-    slot max_results: int
     # Names whose register holds a one-element cell rather than the value
     # itself, because a nested scope both captures and assigns them
     # (spec 8.3). Reads and writes go through the cell; a capture copies the
@@ -542,7 +539,8 @@ class FnContext:
     slot _emitted_line
     # name -> L slot
     slot locals: dict
-    # named locals occupy L0 .. L(nnamed-1)
+    # L0 is the accumulator, where every call, send, super and yield leaves
+    # its value (runtime.md D12); named locals occupy L1 .. L(nnamed-1)
     slot nnamed: int
     # next free temp slot
     slot top: int
@@ -586,7 +584,6 @@ class FnContext:
         this.name = name
         this.is_module_init = is_module_init
         this.loops = []
-        this.max_results = 1
         this.cells = []
         this._zero = nil
         this.code = []
@@ -596,9 +593,9 @@ class FnContext:
         this.lines = {}
         this._emitted_line = nil
         this.locals = {}
-        this.nnamed = 0
-        this.top = 0
-        this.high = 0
+        this.nnamed = 1
+        this.top = 1
+        this.high = 1
         this.params = {}
         this.captures = {}
         this.this_count = this_count
@@ -963,23 +960,10 @@ fn [FnContext] emit_words(words: list) -> int:
     return offset
 
 
-# Emit `return`, keeping the value window in the L frame.
-#
-# `return` reads its values from consecutive L slots (spec 3.1), so a
-# single value that happens to live in a parameter or capture register is
-# copied down into a temp first.
-fn [FnContext] emit_return(reg: int, count: int = 1) -> nil | error:
-    source := reg
-    if (count == 1) and is_p(source):
-        out := this ! push()
-        if out is error:
-            return out
-        words := pack_pairable('move, out, source)
-        if words is error:
-            return words
-        this ! emit_words(words)
-        source = out
-    tail := pack('return, a0=source, f=count)
+# Emit `return`: the one value in `reg` (an L or P register) goes to the
+# caller's accumulator (L0).
+fn [FnContext] emit_return(reg: int) -> nil | error:
+    tail := pack('return, a0=reg)
     if tail is error:
         return tail
     this ! emit_words(tail)

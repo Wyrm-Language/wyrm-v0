@@ -18,13 +18,13 @@ typedef enum wy_frame_kind
 /** How a frame's results reach its caller. */
 typedef enum wy_ret_kind
 {
-    WY_RET_WINDOW = 0,     /**< copy results to ret_dst[0..nres) with nil backfill */
-    WY_RET_RESERVED,       /**< results into reserved slots below caller base (C caller / native) */
+    WY_RET_WINDOW = 0,     /**< copy the one result to *ret_dst */
+    WY_RET_RESERVED,       /**< the result into the reserved slot below caller base (C caller / native) */
     WY_RET_DISCARD,        /**< defers */
-    WY_RET_CONSTRUCT,      /**< result[0] error -> that error, else the instance in aux */
-    WY_RET_IMPORT,         /**< dependency init finished: fill free slots, ret_dst[0] = module */
+    WY_RET_CONSTRUCT,      /**< result an error -> that error, else the instance in aux */
+    WY_RET_IMPORT,         /**< dependency init finished: fill free slots, *ret_dst = module */
     WY_RET_IMPORT_STAR,    /**< register wildcard, layer-2 fill */
-    WY_RET_COROUTINE,      /**< body returned: co->result = result[0], DONE, switch back */
+    WY_RET_COROUTINE,      /**< body returned: co->result = the result, DONE, switch back */
 } wy_ret_kind;
 
 /** Where a bytecode frame is in the dispatch loop across trampoline re-entries. */
@@ -51,7 +51,7 @@ typedef struct wy_frame wy_frame;
  * One call frame on a fiber's stack (design_c_vm.md §1.1).
  *
  * A native frame (`kind == WY_FRAME_NATIVE`) uses only `ret_kind` (always
- * WY_RET_RESERVED), `ret_nres`, `native` (the continuation to run once the
+ * WY_RET_RESERVED), `native` (the continuation to run once the
  * call returns) and `restore_base` - exactly the fields the old
  * `wy_fiber_frame` had, so the reservation trampoline
  * (`wy_fiber_push_frame_f`/`wy_fiber_pop_continuation_f`/
@@ -67,10 +67,9 @@ struct wy_frame
     wy_u8 phase;      /**< wy_frame_phase */
     wy_u8 flags;      /**< WY_FRAME_FLAG_* */
 
-    wy_u16 ret_nres;  /**< NATIVE: reserved result count. BYTECODE/WINDOW: caller's nres */
     wy_u16 p_count;
 
-    wy_value* ret_dst;      /**< WINDOW: &caller->l[base]; RESERVED: first reserved slot */
+    wy_value* ret_dst;      /**< WINDOW: the caller's accumulator (L0), or a getter's destination; RESERVED: the reserved slot */
     wy_value* p;             /**< P frame = stack base of this frame (BYTECODE only) */
     wy_value* l;             /**< L frame = p + p_count (BYTECODE only) */
     wy_value* restore_base;  /**< caller's wy_stack.base, restored on pop */
@@ -82,8 +81,7 @@ struct wy_frame
     wy_exec_fn native;   /**< NATIVE: the continuation to run once the call returns */
     wy_pair* defers;     /**< (closure . mode) chain, most recent first (BYTECODE only) */
 
-    wy_u16 ret_base;   /**< RETURNING: own L return window base */
-    wy_u16 ret_count;  /**< RETURNING: own L return window count */
+    wy_u16 ret_src;    /**< RETURNING: the register (L or P) holding the returned value */
 
     wy_message* dispatch_msg;  /**< for `super` (BYTECODE method frames only) */
     wy_value dispatch_body;

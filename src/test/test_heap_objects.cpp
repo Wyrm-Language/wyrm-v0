@@ -28,7 +28,7 @@ wy_error make_str(wy_context* context, const char* text, wy_string** out)
     return wy_string_strdup(context, text, out);
 }
 
-wy_error leaf_stub(wy_context*, wy_value*, wy_uword, wy_value*, wy_uword)
+wy_error leaf_stub(wy_context*, wy_value*, wy_uword, wy_value*)
 {
     return WY_ERR_NONE;
 }

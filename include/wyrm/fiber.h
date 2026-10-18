@@ -46,7 +46,6 @@ struct wy_fiber
      * wy_vm_run. Valid only between that CALL and its continuation. */
     wy_value* pending_native_dst;
     wy_uword pending_native_base_count;
-    wy_u16 pending_native_nres;
 };
 
 
@@ -83,52 +82,36 @@ WY_INLINE wy_error wy_fiber_push_value_f(wy_fiber* self, wy_value value)
 }
 
 /**
- * Get the number of result slots the caller reserved for this call
+ * The result slot the caller reserved for the active call
  *
- * @param self Fiber
- * @return Reserved result count for the active frame
+ * Every call has exactly one (design runtime.md D12). It sits just below the
+ * frame's base.
  */
-WY_INLINE wy_uword wy_fiber_result_count_f(wy_fiber* self)
+WY_INLINE wy_value* wy_fiber_result_f(wy_fiber* self)
 {
     WY_ASSERT(self != WY_NULL);
-    return self->current_frame->ret_nres;
+    return &self->value_stack.base[-1];
 }
 
 /**
- * Get reserved slot result for the current call
+ * Store the result of the active call
  */
-WY_INLINE wy_value* wy_fiber_result_n(wy_fiber* self, wy_uword index)
+WY_INLINE void wy_fiber_set_result_f(wy_fiber* self, wy_value value)
 {
-    WY_ASSERT(self != WY_NULL);
-    if (index >= self->current_frame->ret_nres) { return WY_NULL; }
-    return &self->value_stack.base[-(wy_word) (index + 1)];
+    *wy_fiber_result_f(self) = value;
 }
 
-/**
- * Store result `index` of the active call, truncating if unreserved
- * @return true when stored, false when truncated
- */
-WY_INLINE bool wy_fiber_set_result_f(wy_fiber* self, wy_uword index, wy_value value)
-{
-    WY_ASSERT(self != WY_NULL);
-    wy_value* slot = wy_fiber_result_n(self, index);
-    if (slot == WY_NULL) { return false; }
-
-    *slot = value;
-    return true;
-}
-
-wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn, wy_uword result_count);
+wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn);
 wy_error wy_fiber_pop_continuation_f(wy_fiber* self, wy_exec_fn* out_continuation);
 wy_error wy_fiber_tail_call_f(wy_fiber* self, wy_exec_fn fn, wy_uword arg_count);
 
 /**
  * Push a frame whose continuation is the C function `fn`
  */
-WY_INLINE wy_error wy_fiber_push_frame_c_call_f(wy_fiber* self, wy_exec_fn_c_call fn, wy_uword result_count)
+WY_INLINE wy_error wy_fiber_push_frame_c_call_f(wy_fiber* self, wy_exec_fn_c_call fn)
 {
     if (fn == WY_NULL) { return WY_ERR_INVAL; }
-    return wy_fiber_push_frame_f(self, wy_exec_fn_create(fn, wy_primitive_null()), result_count);
+    return wy_fiber_push_frame_f(self, wy_exec_fn_create(fn, wy_primitive_null()));
 }
 
 /**
@@ -150,19 +133,18 @@ WY_INLINE wy_uword wy_fiber_frame_depth_f(wy_fiber* self)
 }
 
 /**
- * Push a frame whose continuation is `fn`, reserving `result_count` results
+ * Push a frame whose continuation is `fn`, reserving the one result slot
  *
  * @param self Fiber
  * @param fn Continuation to run once the frame returns
- * @param result_count Number of result slots to reserve for the call
  * @return WY_ERR_NONE on success, WY_ERR_BUSY if a call is already pending
  */
-WY_INLINE wy_error wy_fiber_push_continuation(wy_fiber* self, wy_exec_fn fn, wy_uword result_count)
+WY_INLINE wy_error wy_fiber_push_continuation(wy_fiber* self, wy_exec_fn fn)
 {
     if (self == WY_NULL || wy_exec_fn_is_empty(&fn)) { return WY_ERR_INVAL; }
     if (!wy_exec_fn_is_empty(&self->pending)) { return WY_ERR_BUSY; }
 
-    return wy_fiber_push_frame_f(self, fn, result_count);
+    return wy_fiber_push_frame_f(self, fn);
 }
 
 /**
@@ -170,16 +152,16 @@ WY_INLINE wy_error wy_fiber_push_continuation(wy_fiber* self, wy_exec_fn fn, wy_
  *
  * @see wy_fiber_push_continuation
  */
-WY_INLINE wy_error wy_fiber_push_continuation_c_call(wy_fiber* self, wy_exec_fn_c_call fn, wy_uword result_count)
+WY_INLINE wy_error wy_fiber_push_continuation_c_call(wy_fiber* self, wy_exec_fn_c_call fn)
 {
     if (fn == WY_NULL) { return WY_ERR_INVAL; }
-    return wy_fiber_push_continuation(self, wy_exec_fn_create(fn, wy_primitive_null()), result_count);
+    return wy_fiber_push_continuation(self, wy_exec_fn_create(fn, wy_primitive_null()));
 }
 
 /**
- * Call `fn` with `args`, resuming at `continuation` with `result_count` results
+ * Call `fn` with `args`, resuming at `continuation` with its one result
  *
- * Reserves the result slots, opens the frame, and lays the arguments down
+ * Reserves the result slot, opens the frame, and lays the arguments down
  * above the new base.
  *
  * @param self Fiber
@@ -187,18 +169,17 @@ WY_INLINE wy_error wy_fiber_push_continuation_c_call(wy_fiber* self, wy_exec_fn_
  * @param fn Function to call
  * @param args Argument values
  * @param arg_count Number of arguments
- * @param result_count Number of results to reserve for the call
  * @return WY_ERR_NONE on success, WY_ERR_BUSY if a call is already pending,
  *         WY_ERR_STACK_OVERFLOW if out of stack or frame space
  */
-WY_INLINE wy_error wy_fiber_exec_continue_f(wy_fiber* self, wy_exec_fn continuation, wy_exec_fn fn, const wy_value* args, wy_uword arg_count, wy_uword result_count)
+WY_INLINE wy_error wy_fiber_exec_continue_f(wy_fiber* self, wy_exec_fn continuation, wy_exec_fn fn, const wy_value* args, wy_uword arg_count)
 {
     WY_ASSERT(self != WY_NULL && !wy_exec_fn_is_empty(&continuation) && !wy_exec_fn_is_empty(&fn));
     WY_ASSERT(args != WY_NULL || arg_count == 0);
 
     if (!wy_exec_fn_is_empty(&self->pending)) { return WY_ERR_BUSY; }
 
-    wy_error last_error = wy_fiber_push_frame_f(self, continuation, result_count);
+    wy_error last_error = wy_fiber_push_frame_f(self, continuation);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
     last_error = wy_stack_push_array_f(&self->value_stack, args, arg_count);
@@ -217,10 +198,10 @@ WY_INLINE wy_error wy_fiber_exec_continue_f(wy_fiber* self, wy_exec_fn continuat
  *
  * @see wy_fiber_exec_continue_f
  */
-WY_INLINE wy_error wy_fiber_exec_continue_c_call_f(wy_fiber* self, wy_exec_fn_c_call continuation, wy_exec_fn_c_call fn, const wy_value* args, wy_uword arg_count, wy_uword result_count)
+WY_INLINE wy_error wy_fiber_exec_continue_c_call_f(wy_fiber* self, wy_exec_fn_c_call continuation, wy_exec_fn_c_call fn, const wy_value* args, wy_uword arg_count)
 {
     if (continuation == WY_NULL || fn == WY_NULL) { return WY_ERR_INVAL; }
-    return wy_fiber_exec_continue_f(self, wy_exec_fn_create(continuation, wy_primitive_null()), wy_exec_fn_create(fn, wy_primitive_null()), args, arg_count, result_count);
+    return wy_fiber_exec_continue_f(self, wy_exec_fn_create(continuation, wy_primitive_null()), wy_exec_fn_create(fn, wy_primitive_null()), args, arg_count);
 }
 
 WY_END_DECLS

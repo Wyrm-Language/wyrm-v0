@@ -15,7 +15,7 @@ can be written against. It defines:
 **Not in scope:** the VM/interpreter implementation itself (that comes later,
 also likely staged in this codebase), garbage collection, and the runtime
 value representation. Where the VM's behavior matters to the compiler (call
-convention, result backfill, import order) it is specified here; how the VM
+convention, the accumulator, import order) it is specified here; how the VM
 achieves it is not.
 
 Design pressure throughout is **small code size and fast dispatch** — the
@@ -23,8 +23,9 @@ targets are MCUs and desktop GUI apps from one image format:
 
 - Fixed-size instructions (one or two `u32` words) decode with one `switch`
   and no length decoding beyond a single opcode bit.
-- Call arguments and results live in overlapping register windows, so a call
-  copies nothing that isn't already in place.
+- Call arguments live in a register window the callee binds from, and every
+  result lands in one fixed register, the accumulator L0, so a call needs no
+  result operand and fits one instruction word.
 - Section payloads are usable as loaded: statics and code can stay in flash
   (`const` arrays in the `.c` container). Name references resolve in
   batches into a bind table — at module init and at each function's first
@@ -72,14 +73,25 @@ Native scalar types are `i32` and `f32`; both have immediate-load opcodes.
 Everything else arrives through the static pool, the symbol table, or
 runtime construction.
 
-Every function returns 0–128 values from a contiguous L-window. The caller
-declares how many results it wants; the VM **backfills missing results with
-`nil` and drops extras**. This one rule implements both multi-value return
-and "statement value is nil when nothing ran".
+**Every call produces one value** (project design `runtime.md` D12). It lands
+in the caller's *accumulator*, register L0 of its frame. A function with
+several things to return returns a tuple, and `a, b := f()` unpacks it
+(`unpack`, §3.3); a length or type mismatch is a fault at the `unpack`.
+`return src` copies the register `src` (L or P) into the caller's
+accumulator; a body that ends without `return` returns its last statement's
+value, `nil` when nothing ran.
+
+L0 is clobbered by every `call`, `call_va`, `msg`, `msg_va`, `super`,
+`yield` and `yield_from`. The compiler therefore starts locals and temps at
+L1, never gives L0 to a variable, and never keeps a live value in it across
+one of those instructions: it copies the value out at once. L0 is an
+ordinary slot of the frame, so it is a GC root, visible to a debugger, and
+saved with the frame when a coroutine suspends. A frame's `nlocals` counts
+L0.
 
 Module code offset 0 is the **module init routine**: it runs at import, after
 the loader has processed the sections (see §6). It is an ordinary function
-with 0 parameters and returns 0 values.
+with 0 parameters and returns nil (`lnil L0; return L0`).
 
 ### 1.1 Limits
 
@@ -88,7 +100,6 @@ with 0 parameters and returns 0 values.
 | Locals per function (L frame) | 32767 | bit 15 of a u16 register ref selects the P stack |
 | P frame size (this + params + captures) | 32767 | same encoding |
 | Parameters per call | 128 | `f`-field counts are 7-bit safe |
-| Return values per call | 128 | same |
 | this values (dispatch arity) | 4 min, 16 max | language spec minimum; message map bound |
 | Tuple literal | 128 elements | language limit; larger data uses `list` |
 | Message map per class | 16 entries | fixed-size scan/cache on MCU |
@@ -174,13 +185,15 @@ current L frame.
 |---|---|---|---|
 | `0x00` | `noop` | — | no operation (`pass` compiles to nothing; `noop` exists for patching/alignment) |
 | `0x01` | `trap` | `f`=code | halt with error; code 0 = unreachable, 1 = debugger break, 2–255 reserved |
-| `0x02` | `return` | `a0`=base, `f`=count | return `count` values starting at L`base`; runs registered defers first |
+| `0x02` | — | | reserved (was the window `return`; retired by project H, see §1) |
 | `0x03` | `lnil` | `a0`=dst | dst ← nil |
 | `0x04` | `lbool` | `a0`=dst, `f`=0\|1 | dst ← false/true |
 | `0x05` | `lunset` | `a0`=dst | dst ← the Unset error value |
 | `0x06` | `import_star` | `a0`=reloc idx (wildcard) | register the target module's namespace (minus the relocation's except-list) for resolution search (§6.2); appears only in module init code — wildcard imports are top-level statements |
 | `0x07` | `resolve` | — | resolve every not-yet-bound entry in the module's referenced-name set (header `u`, §4.2); emitted once in module init, immediately after the import sequence (§6.2) |
-| `0x08–0x3F` | — | | reserved |
+| `0x08` | `return` | `a0`=src (L or P reg), `f`=0 | copy `src` into the caller's accumulator L0 and return; runs registered defers first |
+| `0x09` | `yield` | `a0`=src, `f`=0 | yield the value in `src`; on resume the sent value is in L0 (§1) |
+| `0x0A–0x3F` | — | | reserved |
 
 ### 3.2 Pairable ops (`0x40–0x7F` compact, `0xC0–0xFF` wide)
 
@@ -207,7 +220,9 @@ the register moves to `f`/`a1`.
 | `0x4E`/`0xCE` | `jnerr` | same | same | jump if cond is not an `error` |
 | `0x4F`/`0xCF` | `jmp` | `a0`=rel i16 (`f` unused) | word1=rel i32 (`a0` unused) | unconditional jump |
 | `0x50`/`0xD0` | `rset` | `a0`=reloc idx, `f`=src reg8 | `a1`=src | bound variable ← src; the write-through twin of `rget` (resolution per §6.2; an unresolved or non-variable binding makes this a failed store — Appendix C) |
-| `0x51–0x7F` | — | | | reserved (immediate-operand arithmetic is the planned tenant) |
+| `0x51`/`0xD1` | `call` | `a0`=base, `f`=argc | `a0`=base, `a1`=argc (`a2`=0) | callee at L`base`, args at L`base+1`…; the result goes to L0 (§1). The wide form exists for argc > 255; the language caps a call at 128 arguments, so the compiler emits only the compact form |
+| `0x52`/`0xD2` | `super` | `a0`=base, `f`=argc | `a0`=base, `a1`=argc (`a2`=0) | chain to the next-most-general method of the current dispatch; args at L`base`…; the result goes to L0 |
+| `0x53–0x7F` | — | | | reserved (immediate-operand arithmetic is the planned tenant) |
 
 ### 3.3 Two-word-only ops (`0x80–0xBF`)
 
@@ -252,18 +267,12 @@ dispatch honors the `__add__`-family overloads):
 | `0x9C` | `getslot` | `a0`=dst, `a1`=obj, `a2`=slot # imm | dst ← slot by fixed index — an optimization the compiler may emit only when the receiver's whole inheritance chain is module-local (§7.1); symbolic `getattr` is the general path |
 | `0x9D` | `setslot` | `a0`=obj, `a1`=slot # imm, `a2`=src | slot ← src (same restriction) |
 
-**Calls and returns:**
+**Calls and returns** (`return` and `yield` are in §3.1, `call` and `super` in §3.2, and `call_va`, `msg`, `msg_va`, `yield_from` after the iteration rows below; every one of them delivers its single value to the caller's L0, §1):
 
 | Op | Mnemonic | Fields | Semantics |
 |---|---|---|---|
-| `0xA0` | `call` | `a0`=base, `f`=argc, `a1`=nres | callee at L`base`, args at L`base+1`…; results land at L`base`… with nil backfill (§1) |
-| `0xA1` | `call_va` | `a0`=base, `a1`=nres | callee at L`base`, positional tuple at L`base+1`, kwargs dict at L`base+2`; for `f(*a, **k)` shapes |
-| `0xA2` | `msg` | `a0`=base, `f`=argc, `a1`=reloc idx (message), `a2`=nres | receiver (value, or tuple for multi-dispatch) at L`base`, args at L`base+1`…; dispatch, results at L`base`… |
-| `0xA3` | `msg_va` | `a0`=base, `a1`=reloc idx, `a2`=nres | receiver, positional tuple, kwargs dict at L`base`…L`base+2` |
 | `0xA4` | `getmsg` | `a0`=dst, `a1`=receiver, `a2`=reloc idx | dst ← bound closure (`recv ! name` without call) |
-| `0xA5` | `super` | `a0`=base, `f`=argc, `a1`=nres | chain to next-most-general method of the current dispatch; args at L`base`… |
 | `0xA6` | `return_cps` | `a0`=base, `f`=argc, `a1`=continuation closure reg | tail call: reuse frame, continuation receives the result. **Reserved in v1** — the compiler does not emit it yet (Appendix C) |
-| `0xA7` | `yield` | `a0`=base, `f`=count | yield `count` values from L`base`…; on resume the sent value is written to L`base` |
 
 **Construction and registration:**
 
@@ -287,12 +296,20 @@ dispatch honors the `__add__`-family overloads):
 
 | Op | Mnemonic | Fields | Semantics |
 |---|---|---|---|
-| `0xB0` | `yield_from` | `a0`=dst, `a1`=sub coroutine reg | delegate: every yield of the subgenerator flows out of this coroutine, every sent/`next` value flows in, until the subgenerator returns; dst ← its return value |
-| `0xB1` | `unpack` | `a0`=dst base, `a1`=src, `f`=count | unpack an indexable of exactly `count` items into L`dst`…L`dst+count−1`; on length or type mismatch every dst reg receives the error value |
+| `0xB1` | `unpack` | `a0`=dst base, `a1`=src, `f`=count | unpack an indexable of exactly `count` items into L`dst`…L`dst+count−1`; on a length or type mismatch the instruction faults |
 | `0xB2` | `cmp3` | `a0`=dst, `a1`=lhs, `a2`=rhs | dst ← −1/0/1 three-way comparison (`<=>`) |
 | `0xB3` | `getscope` | `a0`=dst, `a1`=obj, `a2`=symbol idx | dst ← `::` namespace member of a runtime value (module / class / function statics); a namespace lookup, distinct from the property namespace |
 | `0xB4` | `setscope` | `a0`=obj, `a1`=symbol idx, `a2`=src | `::` namespace member ← src |
-| `0xB5–0xBF` | — | | reserved |
+| `0xB6` | `call_va` | `a0`=base | callee at L`base`, positional tuple at L`base+1`, kwargs dict at L`base+2`; for `f(*a, **k)` shapes; the result goes to L0 |
+| `0xB7` | `msg` | `a0`=base, `f`=argc, `a1`=reloc idx (message) | receiver (value, or tuple for multi-dispatch) at L`base`, args at L`base+1`…; dispatch; the result goes to L0 |
+| `0xB8` | `msg_va` | `a0`=base, `a1`=reloc idx | receiver, positional tuple, kwargs dict at L`base`…L`base+2`; the result goes to L0 |
+| `0xB9` | `yield_from` | `a1`=sub coroutine reg | delegate: every yield of the subgenerator flows out of this coroutine, every sent/`next` value flows in, until the subgenerator returns; its return value goes to L0 |
+| `0xBA–0xBF` | — | | reserved |
+
+Unused fields of these instructions (`f` of `return`, `yield`, `call_va`,
+`msg_va` and `yield_from`; `a1` of `call_va`; `a0` of `yield_from`; `a2` of
+`msg`, `msg_va`, `yield_from` and the wide `call`/`super`) are reserved and
+must be 0. The verifier rejects an image that sets one.
 
 ---
 
@@ -614,8 +631,8 @@ Any change to the format (the container, a section's shape, a key, a value
 encoding) sets a new version, in `WY_IMAGE_VERSION` (`include/wyrm/image.h`)
 and `WYC_VERSION` (`src/embed/wyrm/image.wy`) together. Every version from
 2^16 seconds up to 2^32 - 1 (the year 2152) needs the 4-byte argument, so the
-preamble is always 11 bytes. The current version is 340739680 (`0x144F4660`,
-2026-10-18 17:54:40Z).
+preamble is always 11 bytes. The current version is 340758572 (`0x144F902C`,
+2026-10-18 23:09:32Z).
 
 Canonical byte order for the code words is little-endian (a big-endian MCU
 target byte-swaps code at load, or uses the `.c` container which is
@@ -751,9 +768,9 @@ the expression temp stack (§8.3); labels are patched to §2.2 offsets.
 | slot name inside class fn | `getattr`/`setattr` on `this` — symbolic, because an external superclass makes absolute slot offsets unknowable at compile time (§6.3). The compiler MAY emit `getslot`/`setslot` as an optimization only when the entire inheritance chain is module-local |
 | `mod::a::b` (path of names) | one relocation → `rget` (§6.2 — never resolved at compile time) |
 | `expr::name` (dynamic base) | `getscope` |
-| `f(a, b)` | window: callee, args contiguous at fresh temps; `call base, argc, nres` |
+| `f(a, b)` | window: callee, args contiguous at fresh temps; `call base, argc`; then `move W, L0` into the window base W, which holds the value |
 | any call with spreads or keywords — `f(*a, **k)`, `f(x, key=1)`, mixed | build the positional `tuple` (concatenating spreads via runtime concat) and the kwargs `dict`; `call_va` |
-| `recv ! name(args)` | receiver at base, args after; `msg base, argc, reloc(name), nres` |
+| `recv ! name(args)` | receiver at base, args after; `msg base, argc, reloc(name)`; then `move W, L0` |
 | `recv ! mod::name(args)` | same, reloc path `[mod, name]` |
 | `(a, b) ! name(args)` | `tuple` the receivers first; identical `msg` |
 | `recv ! name` (no call) | `getmsg` |
@@ -761,12 +778,12 @@ the expression temp stack (§8.3); labels are patched to §2.2 offsets.
 | tuple/list/dict/`$[…]` literal | elements into a window; `tuple`/`list`/`dict`/`plist` |
 | lambda / nested `fn` | compile body as function entry; `closure dst, fn#, caps` |
 | `do:` block | inlined — compile the block in the current frame into a result temp (it is only *scoping*, which the compiler resolves statically; no call) |
-| `try expr` | `move T,expr; jnerr T,+1words; return T,1` (defers still run — `return` semantics) |
+| `try expr` | `move T,expr; jnerr T,+1words; return T` (defers still run — `return` semantics) |
 | `expr catch handler` | `move T,expr; jnerr T,done; <handler → T>; done:` |
-| `expr catch return v` | `move T,expr; jnerr T,done; <v → T2>; return T2,1; done:` |
-| `yield v` | window with v; `yield base,1`; expression value = L`base` after resume |
-| `yield a, b` | same with count 2 |
-| `yield from e` | eval e (the sub coroutine) into a temp; `yield_from dst, T` |
+| `expr catch return v` | `move T,expr; jnerr T,done; <v → T2>; return T2; done:` |
+| `yield v` | v into a temp T; `yield T`; then `move T, L0`: the expression value is what `send` delivered |
+| `yield a, b` | yields the tuple `(a, b)`: one value |
+| `yield from e` | eval e (the sub coroutine) into a temp T; `yield_from T`; then `move dst, L0` |
 
 ### 7.2 Statements
 
@@ -776,16 +793,15 @@ the expression temp stack (§8.3); labels are patched to §2.2 offsets.
 | `var x: T` | `lunset x` |
 | `x = e` | eval into x's slot; global target → `gset`; `obj.a = e` → `setattr`; `obj[i] = e` → `setidx` |
 | `mod::x = e` / cross-module static | `rset` (static path); `setscope` when the base is a runtime value; own-module statics are just `gset` |
-| `a, b = call()` (multivalue) | eval call with nres 2 into a window; `move` out |
-| `a, b = e` (tuple/iterable value) | eval e; `unpack base, e, 2`; `move` out. RHS that is a literal tuple expression (`a, b = b, a`) is decomposed by the compiler instead — no tuple is materialized |
+| `a, b = e`, `a, b := f()`, `var a, b = e` (one tuple/iterable value) | eval e (a call included: its one value is a tuple); `unpack base, e, 2`; `move` out. A mismatch faults at the `unpack`. RHS that is a literal tuple expression (`a, b = b, a`) is decomposed by the compiler instead — no tuple is materialized |
 | `x ?= e` | `jnerr x, done; <e → x>; done:` |
 | `if/elif/else` as value | each branch ends `move R, branch_value`; skipped-entirely → `lnil R` before the chain |
 | `while` | standard; the loop's own value is `lnil R` before the loop (see below) |
 | `for x in e / else` | `iter T, e`; loop head `itnext x, T, else_lbl`; `break` jumps *past* else, exhaustion jumps *to* else |
 | `continue` / `break` | `jmp` to head / end |
-| `return a, b` | values to a window; `return base, 2` |
-| bare `return` | `lnil T; return T, 1` |
-| implicit return (last stmt) | function body keeps a result temp R; epilogue `return R, 1` (or `return R0, r` for multivalue tails) |
+| `return a, b` | build the tuple `(a, b)` (`tuple`), then `return T` — a tuple is one value (the bare form `return a, b` parses as `(return (tuple a b))`) |
+| bare `return` | `lnil T; return T` |
+| implicit return (last stmt) | function body keeps a result temp R; epilogue `return R` |
 | `defer:` block | block → closure (captures by the closure rules); `closure T, fn#, caps; defer_reg T, 0`. v1 arms at **frame** granularity — defers run at function return, a deliberate narrowing of the spec's "containing block" (Appendix C) |
 | `defer on error:` | mode 1; `defer on error \| nil:` mode 2 |
 | `pass` | nothing |
@@ -954,16 +970,14 @@ loop to `nil`. The compiler therefore lowers a loop's value as `lnil R` and
 the grammar and interpreter gain `break v`, this row and §8.5 stage 0 change
 together — PoC first, then the compiler (see AGENTS.md).
 
-**Multi-value return vs. the POC's tuple.** doc/language-spec.md's `fn f() ->
-int, str` returns *several values*, and `a, b := f()` binds them. The compiler
-lowers both as the spec here describes — `return base, n` and a call with
-`nres = n` — but the POC interpreter models `return a, b` as returning one
-tuple, and rejects *every* multi-target declaration whose right-hand side is a
-single expression: `a, b := f()` and `a, b := point` (the `unpack` case) both
-raise "target/value count mismatch". So those two lowerings are exercised by
-unit tests on the emitted listing rather than by runnable golden fixtures,
-until the interpreter catches up. `a, b = b, a`, whose right-hand side is two
-expressions, works in both and is in a golden.
+**Multi-value return.** There is none (`runtime.md` D12): `fn f() -> int, str`
+returns one tuple, and `a, b := f()` unpacks it with `unpack`, which faults on
+a length or type mismatch. The compiler lowers `return a, b` to `tuple` then
+`return`, so the VM, the POC interpreter and wypoc agree on `println(f())`.
+Only the unpacking half still differs: the POC cannot unpack a single value
+yet (`a, b := f()` and `a, b := point` raise "target/value count mismatch"),
+so `test/corpus/unpack_call.wy` is a local-only fixture. `a, b = b, a`, whose
+right-hand side is two expressions, works in both and is in a golden.
 
 **`super`, `mod::x = e`, and `import static`.** Three more places where the
 compiler emits what this document specifies but the POC cannot exercise it:
@@ -1075,7 +1089,7 @@ println(greet("World"))
 Image: 1 global (`g0` = greet), statics `#0` = `"Hello "`, `#1` = `"World"`,
 symbol `#0` = `"println"`, relocation `#0` = `{t:3, p:[0]}` (function
 `println`), header `u:[0]` (init references `println`), function `#0` =
-greet (1 param, `l:2`, code word offset 12, no `u` — its body references
+greet (1 param, `l:3`, code word offset 12, no `u` — its body references
 nothing external).
 
 The full `statics` and `code` sections as `.wy_a` (header, symbols,
@@ -1097,32 +1111,36 @@ SECTION symbols
 0010: 6C 6E 00 00
 
 SECTION functions
-; …  [0] greet  p:[name]  l:2  c:12  f:0
+; …  [0] greet  p:[name]  l:3  c:12  f:0
 
 SECTION relocations
 ; …  [0] function println
 
 SECTION code
-; module init (no imports to hoist; resolve binds header u:[0])
-0000: 07 00 00 00                                     ; resolve
-0004: A8 00 00 00 00 00 00 00                         ; closure L0 <- fn#0, 0 caps
-000C: 43 00 00 00                                     ; gset g0 <- L0        (greet)
-0010: 44 00 00 00                                     ; rget L0 <- reloc#0   (println)
-0014: 42 01 00 00                                     ; gget L1 <- g0        (greet)
-0018: 46 02 01 00                                     ; lconst L2 <- static#1 ("World")
-001C: A0 01 01 00 00 00 01 00                         ; call base=L1 argc=1 nres=1
-0024: A0 01 00 00 00 00 01 00                         ; call base=L0 argc=1 nres=1
-002C: 02 00 00 00                                     ; return count=0
-; fn greet (word offset 12)
-0030: 46 00 00 00                                     ; lconst L0 <- static#0 ("Hello ")
-0034: 85 00 01 00 00 80 00 00                         ; add L1 <- L0 + P0    (name)
-003C: 02 01 01 00                                     ; return L1 count=1
+; module init (l:4). The compiler copies each call's value out of L0 at once.
+0000: A8 00 01 00 00 00 00 00                         ; closure L1 <- fn#0, 0 caps
+0008: 43 01 00 00                                     ; gset g0 <- L1        (greet)
+000C: 42 01 01 00                                     ; gget L1 <- g1        (println, a free name)
+0010: 42 02 00 00                                     ; gget L2 <- g0        (greet)
+0014: 46 03 01 00                                     ; lconst L3 <- static#1 ("World")
+0018: 51 01 02 00                                     ; call base=L2 argc=1  ; L0 <- greet("World")
+001C: 41 00 02 00                                     ; move L2 <- L0
+0020: 51 01 01 00                                     ; call base=L1 argc=1  ; L0 <- println(L2)
+0024: 41 00 01 00                                     ; move L1 <- L0
+0028: 03 00 00 00                                     ; lnil L0
+002C: 08 00 00 00                                     ; return L0
+; fn greet (word offset 12, l:3)
+0030: 46 01 00 00                                     ; lconst L1 <- static#0 ("Hello ")
+0034: 85 00 02 00 00 80 01 00                         ; add L2 <- L1 + P0    (name)
+003C: 08 00 02 00                                     ; return L2
 ```
 
-Reading one encoding out loud: `add L1 <- L0 + P0` is opcode `0x85`, word 0
-= `85 00 01 00` (op, f unused, a0 = 0x0001 = L1), word 1 = `00 80 00 00`
-(a2 = 0x8000 = P0 in the low half, a1 = 0x0000 = L0 in the high half) —
-little-endian bytes of `a1<<16 | a2`.
+Reading one encoding out loud: `add L2 <- L1 + P0` is opcode `0x85`, word 0
+= `85 00 02 00` (op, f unused, a0 = 0x0002 = L2), word 1 = `00 80 01 00`
+(a2 = 0x8000 = P0 in the low half, a1 = 0x0001 = L1 in the high half) —
+little-endian bytes of `a1<<16 | a2`. The listing is what `test/corpus/hello.wy`
+compiles to now (the relocation-based names of the sections above predate the
+free-name tables; the code is the current compiler's output).
 
 ## Appendix B — deviations from bytecode.md
 
@@ -1136,10 +1154,13 @@ little-endian bytes of `a1<<16 | a2`.
 - **D3 — locals per function capped at 32767**, not 65535: bit 15 of a u16
   register ref selects the P stack, which is what lets every three-address
   op read parameters and captures directly.
-- **D4 — Lua-style call windows.** `call`/`msg`/`yield` results land at the
-  window base with declared-count backfill, instead of separate
-  result-target operands. This is what keeps `call` inside two words with
-  room for `nres`, and makes multi-value returns free.
+- **D4 — one result, in the accumulator.** (Originally Lua-style call
+  windows: `call`/`msg`/`yield` results landed at the window base with
+  declared-count backfill, which cost an `nres` operand on every call and a
+  result count in every frame and native.) A call, send, `super`, `yield` or
+  resume now produces one value, delivered to the caller's L0, so `call` fits
+  one instruction word and natives write one `out`. See §1 and `runtime.md`
+  D12.
 - **D5 — the C container emits `code` as `uint32_t[]`**, not `uint8_t[]`:
   a byte array has alignment 1, and casting it to `u32*` is undefined (and
   genuinely faults on Cortex-M0). All other sections stay byte arrays as

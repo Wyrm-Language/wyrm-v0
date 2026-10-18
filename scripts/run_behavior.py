@@ -6,7 +6,7 @@ Every row of test/corpus/manifest.txt is a .wy source plus its expected
 stdout. Each source is run from source (the binary compiles it in-process)
 by the local build ($WYRM_BUILD_DIR, default buildDir), and its stdout and
 exit status are checked against the committed .out. When an external wyrm is
-available (see wytest_env.py: $WYRM / $WYRM_FLAGS, else pypoc, else PATH) the
+available (see wytest_env.py: $WYRM / $WYRM_FLAGS, else PATH) the
 same source is also run there and the two runs must agree. No bytecode is
 compared - only behavior - so the bytecode format and compiler may change
 freely.

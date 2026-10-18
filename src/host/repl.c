@@ -32,8 +32,8 @@ static void show_value_(wy_host* host, wy_value value)
         emit_(host, "'\n", 2);
         return;
     }
-    wy_value ignored[1] = { wy_value_nil() };
-    if (wy_builtin_println_body_f(host->context, &value, 1, ignored, 0) != WY_ERR_NONE) {
+    wy_value ignored = wy_value_nil();
+    if (wy_builtin_println_body_f(host->context, &value, 1, &ignored) != WY_ERR_NONE) {
         fprintf(stderr, "wyrm: cannot display the result\n");
     }
 }

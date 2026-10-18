@@ -155,11 +155,6 @@ fn _field(node, index: int):
         return rest
     return car(rest)
 
-fn _max2(a: int, b: int) -> int:
-    if a > b:
-        return a
-    return b
-
 fn _join_parts(parts: list) -> str:
     out := ""
     first := true
@@ -621,14 +616,25 @@ fn has_spread_or_keyword(args) -> bool:
             return true
     return false
 
-fn _compile_call(node, frame: FnContext, nres: int) -> int | error:
+# After a call-like instruction the value sits in L0, the accumulator, which
+# the next call or yield clobbers: copy it into the window base `window`
+# (free again, the callee and arguments having been consumed) and keep that
+# one register held as the expression's result.
+fn _take_accumulator(frame: FnContext, base: int, window: int) -> int | error:
+    e := _emit_pairable(frame, 'move, window, L(0))
+    if e is error:
+        return e
+    fr := frame ! free_to(base + 1)
+    if fr is error:
+        return fr
+    return window
+
+fn _compile_call(node, frame: FnContext) -> int | error:
     func_node := (_field(node, 1) catch nil)
     args := (_tail(node, 2) catch nil)
     argc := len(args)
     if argc > 128:
         return error(str(argc) + " arguments, over the 128-parameter call limit")
-    if nres > 128:
-        return error(str(nres) + " results wanted, over the 128-result call limit")
     base := frame ! mark()
     window := frame ! push()
     if window is error:
@@ -650,29 +656,20 @@ fn _compile_call(node, frame: FnContext, nres: int) -> int | error:
         w := compile_into_window(arg, frame)
         if w is error:
             return w
-    e := _emit_pack(frame, 'call, a0=window, f=argc, a1=nres)
+    e := _emit_pack(frame, 'call, a0=window, f=argc)
     if e is error:
         return e
-    held := base + _max2(nres, 1)
-    while (frame ! mark()) < held:
-        p := frame ! push()
-        if p is error:
-            return p
-    fr := frame ! free_to(held)
-    if fr is error:
-        return fr
-    return window
+    return _take_accumulator(frame, base, window)
 
 # `trap([code])`: an intrinsic, not a function. Lowers to the `trap` opcode,
 # whose `code` is an 8-bit immediate - hence an integer *literal* 0-255
 # (default 1, "debugger break"; 0 is what the compiler itself emits for a
 # body it could not lower; 2-255 are the program's own). The fault ends the
-# call, so the instructions after it are dead: `nres` registers are still
-# reserved (and one is nil-filled) only so callers that expect a window keep
-# their register discipline. It is recognised only as a call whose name is
+# call, so the instructions after it are dead: one register is still
+# reserved (and nil-filled) only so callers keep their register discipline. It is recognised only as a call whose name is
 # not bound (a local, parameter, capture or module global named `trap`
 # shadows it), and never as a value.
-fn _compile_trap(node, frame: FnContext, nres: int) -> int | error:
+fn _compile_trap(node, frame: FnContext) -> int | error:
     args := (_tail(node, 2) catch nil)
     code := 1
     if len(args) > 1:
@@ -694,31 +691,23 @@ fn _compile_trap(node, frame: FnContext, nres: int) -> int | error:
     e2 := _emit_pack(frame, 'lnil, a0=window)
     if e2 is error:
         return e2
-    held := base + _max2(nres, 1)
-    while (frame ! mark()) < held:
-        p := frame ! push()
-        if p is error:
-            return p
-    fr := frame ! free_to(held)
-    if fr is error:
-        return fr
     return window
 
-fn compile_call(node, frame: FnContext, nres: int) -> int | error:
+fn compile_call(node, frame: FnContext) -> int | error:
     func_node := (_field(node, 1) catch nil)
     if (func_node is sym) and (func_node == 'trap) and ((frame ! storage(func_node)) is nil):
-        return _compile_trap(node, frame, nres)
+        return _compile_trap(node, frame)
     args := (_tail(node, 2) catch nil)
     if has_spread_or_keyword(args):
         func_node := (_field(node, 1) catch nil)
-        return compile_va(frame, nres, 'call_va, func_node, args, nil, nil)
-    return _compile_call(node, frame, nres)
+        return compile_va(frame, 'call_va, func_node, args, nil, nil)
+    return _compile_call(node, frame)
 
 # An application is `(apply callee arg...)` (ast.md R5): a direct send when
 # the callee is `(bind_msg recv sel)` (_message), otherwise a call. The
 # arguments are the apply's tail.
 fn _call(node, frame: FnContext, dst):
-    r := compile_call(node, frame, 1)
+    r := compile_call(node, frame)
     if r is error:
         return r
     return _land(frame, dst, r)
@@ -911,7 +900,7 @@ fn _try(node, frame: FnContext, dst):
     e := frame ! emit_jump('jnerr, ok, reg)
     if e is error:
         return e
-    e2 := frame ! emit_return(reg, 1)
+    e2 := frame ! emit_return(reg)
     if e2 is error:
         return e2
     e3 := frame ! mark_label(ok)
@@ -954,7 +943,7 @@ fn _catch(node, frame: FnContext, dst):
             if o is error:
                 return o
             out = o
-        er := frame ! emit_return(out, 1)
+        er := frame ! emit_return(out)
         if er is error:
             return er
         fe2 := frame ! free_to(mark)
@@ -992,7 +981,7 @@ fn _msg_binding(node):
         return (_field(node, 1) catch nil)
     return node
 
-fn compile_message(node, frame: FnContext, nres: int, receivers: list | nil = nil) -> int | error:
+fn compile_message(node, frame: FnContext, receivers: list | nil = nil) -> int | error:
     args := (_tail(node, 2) catch nil)
     if args is nil:
         # `recv ! name()` - a send whose argument list is empty.
@@ -1002,7 +991,7 @@ fn compile_message(node, frame: FnContext, nres: int, receivers: list | nil = ni
         if reloc is error:
             return reloc
         target_node := (_field(_msg_binding(node), 1) catch nil)
-        return compile_va(frame, nres, 'msg_va, nil, args, reloc, target_node)
+        return compile_va(frame, 'msg_va, nil, args, reloc, target_node)
     argc := len(args)
     if argc > 128:
         return error(str(argc) + " arguments, over the 128-parameter call limit")
@@ -1043,18 +1032,10 @@ fn compile_message(node, frame: FnContext, nres: int, receivers: list | nil = ni
         w2 := compile_into_window(arg, frame)
         if w2 is error:
             return w2
-    e2 := _emit_pack(frame, 'msg, a0=window, f=argc, a1=reloc, a2=nres)
+    e2 := _emit_pack(frame, 'msg, a0=window, f=argc, a1=reloc)
     if e2 is error:
         return e2
-    held := base + _max2(nres, 1)
-    while (frame ! mark()) < held:
-        p := frame ! push()
-        if p is error:
-            return p
-    fr := frame ! free_to(held)
-    if fr is error:
-        return fr
-    return window
+    return _take_accumulator(frame, base, window)
 
 # See deviation 5: a `'tuple` target subsumes ast.MessageTupleExpr.
 # The tree carries a fifth field (`parser.wy`'s $_mk_postfix): 'bound for
@@ -1082,11 +1063,11 @@ fn _message(node, frame: FnContext, dst):
         receivers := []
         for it in items:
             receivers ! append(it)
-        r := compile_message(node, frame, 1, receivers)
+        r := compile_message(node, frame, receivers)
         if r is error:
             return r
         return _land(frame, dst, r)
-    r2 := compile_message(node, frame, 1, nil)
+    r2 := compile_message(node, frame, nil)
     if r2 is error:
         return r2
     return _land(frame, dst, r2)
@@ -1190,7 +1171,6 @@ fn compile_yield(node, frame: FnContext, dst):
         return error("`yield` is only meaningful inside a `co`")
     value_node := (_field(node, 1) catch nil)
     base := frame ! mark()
-    var count: int
     if value_node is nil:
         p := frame ! push()
         if p is error:
@@ -1198,24 +1178,17 @@ fn compile_yield(node, frame: FnContext, dst):
         e := _emit_pack(frame, 'lnil, a0=p)
         if e is error:
             return e
-        count = 1
-    elif node_kind(value_node) == 'tuple:
-        items := (_tail(value_node, 1) catch nil)
-        for item in items:
-            w := compile_into_window(item, frame)
-            if w is error:
-                return w
-        count = len(items)
     else:
         w2 := compile_into_window(value_node, frame)
         if w2 is error:
             return w2
-        count = 1
-    if count > 128:
-        return error(str(count) + " yielded values, over the 128-result limit")
-    e2 := _emit_pack(frame, 'yield, a0=L(base), f=count)
+    # The value sent on resume comes back in L0, the accumulator.
+    e2 := _emit_pack(frame, 'yield, a0=L(base))
     if e2 is error:
         return e2
+    e3 := _emit_pairable(frame, 'move, L(base), L(0))
+    if e3 is error:
+        return e3
     fr := frame ! free_to(base + 1)
     if fr is error:
         return fr
@@ -1234,9 +1207,12 @@ fn _yield_from(node, frame: FnContext, dst):
     reg := _target(frame, dst)
     if reg is error:
         return reg
-    e := _emit_pack(frame, 'yield_from, a0=reg, a1=sub)
+    e := _emit_pack(frame, 'yield_from, a1=sub)
     if e is error:
         return e
+    e2 := _emit_pairable(frame, 'move, reg, L(0))
+    if e2 is error:
+        return e2
     return reg
 
 # ---------------------------------------------------------------------------
@@ -1341,7 +1317,7 @@ fn _keyword_argument_dict(args, frame: FnContext):
 # - so every spread shape reaches the VM the same way (spec 7.1).
 # `callee_node` is nil when `receiver_node` is given (the message form) and
 # vice versa.
-fn compile_va(frame: FnContext, nres: int, op, callee_node, args, reloc, receiver_node) -> int | error:
+fn compile_va(frame: FnContext, op, callee_node, args, reloc, receiver_node) -> int | error:
     base := frame ! mark()
     window := frame ! push()
     if window is error:
@@ -1385,22 +1361,14 @@ fn compile_va(frame: FnContext, nres: int, op, callee_node, args, reloc, receive
     if f2 is error:
         return f2
     if op == 'call_va:
-        e3 := _emit_pack(frame, op, a0=window, a1=nres)
+        e3 := _emit_pack(frame, op, a0=window)
         if e3 is error:
             return e3
     else:
-        e4 := _emit_pack(frame, op, a0=window, a1=reloc, a2=nres)
+        e4 := _emit_pack(frame, op, a0=window, a1=reloc)
         if e4 is error:
             return e4
-    held := base + _max2(nres, 3)
-    while (frame ! mark()) < held:
-        p := frame ! push()
-        if p is error:
-            return p
-    f3 := frame ! free_to(base + _max2(nres, 1))
-    if f3 is error:
-        return f3
-    return window
+    return _take_accumulator(frame, base, window)
 
 # ---------------------------------------------------------------------------
 # constant materialization - see deviation 8. `_astref` (above) resolves

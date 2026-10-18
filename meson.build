@@ -16,7 +16,7 @@ if get_option('hosted') and not get_option('wyrm').disabled()
 endif
 
 # Epic 8 M5: run every test/wy/*.wy under an external wyrm ($WYRM/$WYRM_FLAGS,
-# else pypoc's venv wyrm, else `wyrm` on PATH; see scripts/wytest_env.py) -
+# else `wyrm` on PATH; see scripts/wytest_env.py) -
 # the self-hosted front-end tests (parser/tokenizer/DSL macro suite written in
 # wyrm itself, not this project's C VM). Skipped when none is available.
 run_wy_tests = find_program('scripts/run_wy_tests.py', required: false)
@@ -26,7 +26,7 @@ endif
 
 # Behavioral conformance: every test/corpus source, run from source by this
 # build tree and diffed against its committed .out and (when one is
-# available - $WYRM/$WYRM_FLAGS, else pypoc, else PATH) an external wyrm.
+# available - $WYRM/$WYRM_FLAGS, else PATH) an external wyrm.
 run_behavior = find_program('scripts/run_behavior.py', required: false)
 if run_behavior.found()
     test('behavior', run_behavior, suite: 'behavior', timeout: 600, workdir: meson.project_source_root(),

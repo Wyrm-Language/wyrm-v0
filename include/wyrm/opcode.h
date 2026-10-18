@@ -36,10 +36,11 @@
 typedef enum wy_opcode {
     WY_OP_NOOP          = 0x00,  /* core */
     WY_OP_TRAP          = 0x01,  /* core */
-    WY_OP_RETURN        = 0x02,  /* core */
     WY_OP_LNIL          = 0x03,  /* core */
     WY_OP_LBOOL         = 0x04,  /* core */
     WY_OP_LUNSET        = 0x05,  /* core */
+    WY_OP_RETURN        = 0x08,  /* core: a0 = src, the result goes to the caller's L0 */
+    WY_OP_YIELD         = 0x09,  /* core: a0 = src; the sent value comes back in L0 */
     WY_OP_I8            = 0x40,  /* pairable */
     WY_OP_I32_WIDE      = 0xC0,  /* wide */
     WY_OP_MOVE          = 0x41,  /* pairable */
@@ -70,6 +71,10 @@ typedef enum wy_opcode {
     WY_OP_JNERR_WIDE    = 0xCE,  /* wide */
     WY_OP_JMP           = 0x4F,  /* pairable */
     WY_OP_JMP_WIDE      = 0xCF,  /* wide */
+    WY_OP_CALL          = 0x51,  /* pairable: a0 = base, f = argc; the result goes to L0 */
+    WY_OP_CALL_WIDE     = 0xD1,  /* wide: a0 = base, a1 = argc */
+    WY_OP_SUPER         = 0x52,  /* pairable: a0 = base, f = argc; the result goes to L0 */
+    WY_OP_SUPER_WIDE    = 0xD2,  /* wide: a0 = base, a1 = argc */
     WY_OP_F32           = 0x80,  /* long */
     WY_OP_TUPLE         = 0x81,  /* long */
     WY_OP_LIST          = 0x82,  /* long */
@@ -100,14 +105,8 @@ typedef enum wy_opcode {
     WY_OP_SETATTR       = 0x9B,  /* long */
     WY_OP_GETSLOT       = 0x9C,  /* long */
     WY_OP_SETSLOT       = 0x9D,  /* long */
-    WY_OP_CALL          = 0xA0,  /* long */
-    WY_OP_CALL_VA       = 0xA1,  /* long */
-    WY_OP_MSG           = 0xA2,  /* long */
-    WY_OP_MSG_VA        = 0xA3,  /* long */
     WY_OP_GETMSG        = 0xA4,  /* long */
-    WY_OP_SUPER         = 0xA5,  /* long */
     WY_OP_RETURN_CPS    = 0xA6,  /* long */
-    WY_OP_YIELD         = 0xA7,  /* long */
     WY_OP_CLOSURE       = 0xA8,  /* long */
     WY_OP_CLASS         = 0xA9,  /* long */
     WY_OP_NEW_INSTANCE  = 0xAA,  /* long */
@@ -116,14 +115,17 @@ typedef enum wy_opcode {
     WY_OP_DEFER_REG     = 0xAD,  /* long */
     WY_OP_ITER          = 0xAE,  /* long */
     WY_OP_ITNEXT        = 0xAF,  /* long */
-    WY_OP_YIELD_FROM    = 0xB0,  /* long */
     WY_OP_UNPACK        = 0xB1,  /* long */
     WY_OP_CMP3          = 0xB2,  /* long */
     WY_OP_GETSCOPE      = 0xB3,  /* long */
     WY_OP_SETSCOPE      = 0xB4,  /* long */
     WY_OP_IMPORT_STAR   = 0xB5,  /* long */
+    WY_OP_CALL_VA       = 0xB6,  /* long: a0 = base; the result goes to L0 */
+    WY_OP_MSG           = 0xB7,  /* long: a0 = base, f = argc, a1 = message; the result goes to L0 */
+    WY_OP_MSG_VA        = 0xB8,  /* long: a0 = base, a1 = message; the result goes to L0 */
+    WY_OP_YIELD_FROM    = 0xB9,  /* long: a1 = sub coroutine; the result goes to L0 */
 } wy_opcode;
 
-#define WYRM_OP_COUNT 88
+#define WYRM_OP_COUNT 90
 
 #endif /* WYRM_OPCODE_H */

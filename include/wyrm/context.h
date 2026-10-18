@@ -279,30 +279,24 @@ WY_INLINE wy_error wy_context_set_pending_c_call(wy_context* self, wy_exec_fn_c_
 }
 
 /**
- * Get the number of results the caller reserved for this call
+ * Access the result slot of the current call
  */
-WY_INLINE wy_uword wy_context_result_count(wy_context* self)
-{
-    if (self == WY_NULL || self->current_fiber == WY_NULL) { return 0; }
-    return wy_fiber_result_count_f(self->current_fiber);
-}
-
-/**
- * Access a reserved result slot of the current call
- */
-WY_INLINE wy_value* wy_context_result_n(wy_context* self, wy_uword index)
+WY_INLINE wy_value* wy_context_result(wy_context* self)
 {
     if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_NULL; }
-    return wy_fiber_result_n(self->current_fiber, index);
+    return wy_fiber_result_f(self->current_fiber);
 }
 
 /**
- * Store result `result` of the current call, truncating if unreserved
+ * Store the result of the current call
+ *
+ * @return true when stored, false when there is no current fiber
  */
-WY_INLINE bool wy_context_set_result(wy_context* self, wy_uword index, wy_value value)
+WY_INLINE bool wy_context_set_result(wy_context* self, wy_value value)
 {
     if (self == WY_NULL || self->current_fiber == WY_NULL) { return false; }
-    return wy_fiber_set_result_f(self->current_fiber, index, value);
+    wy_fiber_set_result_f(self->current_fiber, value);
+    return true;
 }
 
 /**
@@ -329,16 +323,16 @@ WY_INLINE wy_error wy_context_tail_call_exec_fn(wy_context* self, wy_exec_fn fn,
 }
 
 /**
- * Call `fn` with `args`, resuming at `result_cb` with `result_count` results
+ * Call `fn` with `args`, resuming at `result_cb` with the one result
  *
- * Reserve `result_count` return slots for the function call and value with
- * the given arguments.
+ * Reserve the return slot for the function call and value with the given
+ * arguments.
  */
-WY_INLINE wy_error wy_context_call_continue(wy_context* self, wy_exec_fn_c_call result_cb, wy_exec_fn_c_call fn, const wy_value* args, wy_uword arg_count, wy_uword result_count)
+WY_INLINE wy_error wy_context_call_continue(wy_context* self, wy_exec_fn_c_call result_cb, wy_exec_fn_c_call fn, const wy_value* args, wy_uword arg_count)
 {
     if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
     if (arg_count > 0 && args == WY_NULL) { return WY_ERR_INVAL; }
-    return wy_fiber_exec_continue_c_call_f(self->current_fiber, result_cb, fn, args, arg_count, result_count);
+    return wy_fiber_exec_continue_c_call_f(self->current_fiber, result_cb, fn, args, arg_count);
 }
 
 /**
@@ -346,12 +340,12 @@ WY_INLINE wy_error wy_context_call_continue(wy_context* self, wy_exec_fn_c_call 
  *
  * @see wy_context_call_continue
  */
-WY_INLINE wy_error wy_context_call_continue_exec_fn(wy_context* self, wy_exec_fn result_cb, wy_exec_fn fn, const wy_value* args, wy_uword arg_count, wy_uword result_count)
+WY_INLINE wy_error wy_context_call_continue_exec_fn(wy_context* self, wy_exec_fn result_cb, wy_exec_fn fn, const wy_value* args, wy_uword arg_count)
 {
     if (self == WY_NULL || self->current_fiber == WY_NULL) { return WY_ERR_INVAL; }
     if (arg_count > 0 && args == WY_NULL) { return WY_ERR_INVAL; }
     if (wy_exec_fn_is_empty(&result_cb) || wy_exec_fn_is_empty(&fn)) { return WY_ERR_INVAL; }
-    return wy_fiber_exec_continue_f(self->current_fiber, result_cb, fn, args, arg_count, result_count);
+    return wy_fiber_exec_continue_f(self->current_fiber, result_cb, fn, args, arg_count);
 }
 
 

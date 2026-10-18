@@ -58,9 +58,9 @@
 #
 # A function dict (an element of "functions"):
 #   { "n": str, "p": list of param dicts, "l": int, "c": int, "f": int,
-#     "t": list | nil, "k": int | nil, "r": int | nil }
+#     "t": list | nil, "k": int | nil }
 # A param dict: { "n": str, "d": int | nil }
-# (`t`/`k`/`r`/`d` nil means "omit this key", matching wyc-format.md 8.5's
+# (`t`/`k`/`d` nil means "omit this key", matching wyc-format.md 8.5's
 # optional fields exactly.)
 
 import wyrm::cbor::*
@@ -82,7 +82,7 @@ SEC_FREE := 11
 # the last change to the .wyc format was published. Every change to the
 # container, a section's shape, a key or a value encoding sets a new one, here
 # and as WY_IMAGE_VERSION in include/wyrm/image.h; a loader accepts only its own.
-WYC_VERSION := 340739680
+WYC_VERSION := 340758572
 
 # All section ids this milestone's writer knows how to emit, in ascending
 # order. Building sections in this exact order also means the `sections()`
@@ -124,14 +124,13 @@ fn make_param(name: str, default: int | nil = nil) -> dict:
 # `_function_doc`, exactly as pypoc's image.py does for its dataclasses.
 fn make_function(name: str, params: list | nil = nil, nlocals: int = 0,
                   code_offset: int = 0, flags: int = 0,
-                  dispatch: list | nil = nil, ncaptures: int | nil = nil,
-                  nresults: int | nil = nil) -> dict:
+                  dispatch: list | nil = nil, ncaptures: int | nil = nil) -> dict:
     var p: list
     if params is nil:
         p = []
     else:
         p = params
-    return {"name": name, "params": p, "nlocals": nlocals, "code_offset": code_offset, "flags": flags, "dispatch": dispatch, "ncaptures": ncaptures, "nresults": nresults}
+    return {"name": name, "params": p, "nlocals": nlocals, "code_offset": code_offset, "flags": flags, "dispatch": dispatch, "ncaptures": ncaptures}
 
 # --------------------------------------------------------------------------
 # section document builders
@@ -162,7 +161,7 @@ fn _function_doc(func: dict) -> dict:
     doc["l"] = func["nlocals"]
     doc["c"] = func["code_offset"]
     doc["f"] = func["flags"]
-    # t/k/r are optional on the wire and omitted when empty/zero/1 - the
+    # t/k are optional on the wire and omitted when empty/zero - the
     # same falsy omission pypoc's image.py does.
     if func["dispatch"] is not nil:
         if len(func["dispatch"]) > 0:
@@ -170,9 +169,6 @@ fn _function_doc(func: dict) -> dict:
     if func["ncaptures"] is not nil:
         if func["ncaptures"] > 0:
             doc["k"] = func["ncaptures"]
-    if func["nresults"] is not nil:
-        if func["nresults"] != 1:
-            doc["r"] = func["nresults"]
     return doc
 
 fn _function_docs(image: dict) -> list:

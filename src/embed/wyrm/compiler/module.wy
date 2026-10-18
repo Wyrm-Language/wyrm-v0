@@ -762,8 +762,11 @@ fn compile_module(program_node, module_name: str, source_file = nil, check: bool
         if fr is error:
             return fr
 
-    # Module init returns no values: the loader calls it for its effects.
-    e := _emit_pack(init, 'return, a0=0, f=0)
+    # Module init returns nil: the loader calls it for its effects.
+    e0 := _emit_pack(init, 'lnil, a0=0)
+    if e0 is error:
+        return e0
+    e := _emit_pack(init, 'return, a0=0)
     if e is error:
         return e
     p := init ! patch_labels()
@@ -1050,7 +1053,7 @@ fn _compile_snippet_body(session: SessionContext, program_node, expander) -> dic
     if p is error:
         return p
 
-    init_index := image ! add_function(name, nil, init.high, 0, 0, nil, 0, 1, nil)
+    init_index := image ! add_function(name, nil, init.high, 0, 0, nil, 0, nil)
     if init_index is error:
         return init_index
 

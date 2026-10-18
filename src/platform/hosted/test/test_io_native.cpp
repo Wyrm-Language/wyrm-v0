@@ -23,6 +23,7 @@
 #include <wyrm/vm.h>
 
 #include <test_common/test_fiber_fixture.h>
+#include <test_common/test_call.h>
 
 /**
  * The natives under std/io.wy (`__open`, `__read`, ...; epic 5 M4): open/read/write/lseek/dup2/close/flush as
@@ -81,12 +82,12 @@ wy_string* make_string(wy_context* ctx, const char* text)
     return s;
 }
 
-/** Call `native(args...)`, capturing `nres` results, via one hand-packed
+/** Call `native(args...)`, capturing its one result, via one hand-packed
  * bytecode function: LCONST the native and every arg from statics, CALL,
- * RETURN. `native` and `args` become statics 0..argc; results land at
- * L0..L(nres-1). */
+ * RETURN. `native` and `args` become statics 0..argc; the result lands at
+ * L0. */
 std::vector<wy_value> call_native(wy_context* ctx, wy_value native,
-    const std::vector<wy_value>& args, wy_uword nres)
+    const std::vector<wy_value>& args)
 {
     std::vector<wy_value> statics;
     statics.push_back(native);
@@ -96,20 +97,19 @@ std::vector<wy_value> call_native(wy_context* ctx, wy_value native,
     for (wy_uword i = 0; i <= args.size(); i++) {
         code.push_back(enc1(WY_OP_LCONST, (wy_u8) i, (wy_u16) i));  // L_i <- static_i
     }
-    code.push_back(enc2a(WY_OP_CALL, (wy_u8) args.size(), 0));      // base=L0, argc=args.size()
-    code.push_back(enc2b((wy_u16) nres, 0));
-    code.push_back(enc1(WY_OP_RETURN, (wy_u8) nres, 0));            // return L0..L(nres-1)
+    code.push_back(enc1(WY_OP_CALL, (wy_u8) args.size(), 0));       // base=L0, argc=args.size()
+    code.push_back(enc1(WY_OP_RETURN, 0, 0));                       // return L0
 
-    std::vector<wy_function_proto> protos = {proto_at(0, (wy_u16) (args.size() + 1 + nres), 0)};
+    std::vector<wy_function_proto> protos = {proto_at(0, (wy_u16) (args.size() + 2), 0)};
     wy_module* module = make_code_module(ctx, code, protos, statics);
     REQUIRE_EQ(wy_context_module_register(ctx, module, nullptr), WY_ERR_NONE);
 
     wy_function* fn0 = WY_NULL;
     REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn0), WY_ERR_NONE);
 
-    std::vector<wy_value> out(nres);
-    wy_error err = wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
-        WY_NULL, 0, out.data(), nres);
+    std::vector<wy_value> out(1);
+    wy_error err = test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn0),
+        WY_NULL, 0, out.data(), 1);
     REQUIRE_EQ(err, WY_ERR_NONE);
     return out;
 }
@@ -170,23 +170,23 @@ TEST_SUITE("io_native")
         wy_value lseek_fn = native_value(ctx, io, "__lseek");
         wy_value close_fn = native_value(ctx, io, "__close");
 
-        auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+")}, 1);
+        auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+")});
         REQUIRE_EQ(opened[0].type, WY_TYPE_TAG_WORD);
         wy_word handle = opened[0].data.word;
 
-        auto written = call_native(ctx, write_fn, {wy_value_word(handle), str_value(ctx, "hello wyrm")}, 1);
+        auto written = call_native(ctx, write_fn, {wy_value_word(handle), str_value(ctx, "hello wyrm")});
         REQUIRE_EQ(written[0].type, WY_TYPE_TAG_WORD);
         CHECK_EQ(written[0].data.word, 10);
 
-        auto sought = call_native(ctx, lseek_fn, {wy_value_word(handle), wy_value_word(0), wy_value_word(0)}, 1);
+        auto sought = call_native(ctx, lseek_fn, {wy_value_word(handle), wy_value_word(0), wy_value_word(0)});
         REQUIRE_EQ(sought[0].type, WY_TYPE_TAG_WORD);
         CHECK_EQ(sought[0].data.word, 0);
 
-        auto read_back = call_native(ctx, read_fn, {wy_value_word(handle), wy_value_word(-1)}, 1);
+        auto read_back = call_native(ctx, read_fn, {wy_value_word(handle), wy_value_word(-1)});
         REQUIRE_EQ(read_back[0].type, WY_TYPE_TAG_STR);
         CHECK_EQ(std::string(read_back[0].data.str->str, read_back[0].data.str->len), "hello wyrm");
 
-        auto closed = call_native(ctx, close_fn, {wy_value_word(handle)}, 1);
+        auto closed = call_native(ctx, close_fn, {wy_value_word(handle)});
         REQUIRE_EQ(closed[0].type, WY_TYPE_TAG_WORD);
         CHECK_EQ(closed[0].data.word, 0);
     }
@@ -215,24 +215,24 @@ TEST_SUITE("io_native")
         REQUIRE_EQ(wy_bytes_new(ctx, payload, sizeof(payload), &payload_bytes), WY_ERR_NONE);
         wy_value payload_v = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) payload_bytes);
 
-        auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+b")}, 1);
+        auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+b")});
         REQUIRE_EQ(opened[0].type, WY_TYPE_TAG_WORD);
         wy_word handle = opened[0].data.word;
 
-        auto written = call_native(ctx, write_fn, {wy_value_word(handle), payload_v}, 1);
+        auto written = call_native(ctx, write_fn, {wy_value_word(handle), payload_v});
         REQUIRE_EQ(written[0].type, WY_TYPE_TAG_WORD);
         CHECK_EQ(written[0].data.word, (wy_word) sizeof(payload));
 
-        auto sought = call_native(ctx, lseek_fn, {wy_value_word(handle), wy_value_word(0), wy_value_word(0)}, 1);
+        auto sought = call_native(ctx, lseek_fn, {wy_value_word(handle), wy_value_word(0), wy_value_word(0)});
         REQUIRE_EQ(sought[0].type, WY_TYPE_TAG_WORD);
 
-        auto read_back = call_native(ctx, read_bytes_fn, {wy_value_word(handle), wy_value_word(-1)}, 1);
+        auto read_back = call_native(ctx, read_bytes_fn, {wy_value_word(handle), wy_value_word(-1)});
         REQUIRE_EQ(read_back[0].type, WY_TYPE_TAG_BYTES);
         wy_bytes* result = (wy_bytes*) read_back[0].data.gc_object;
         REQUIRE_EQ(result->len, sizeof(payload));
         CHECK_EQ(std::memcmp(result->data, payload, sizeof(payload)), 0);
 
-        auto closed = call_native(ctx, close_fn, {wy_value_word(handle)}, 1);
+        auto closed = call_native(ctx, close_fn, {wy_value_word(handle)});
         REQUIRE_EQ(closed[0].type, WY_TYPE_TAG_WORD);
         CHECK_EQ(closed[0].data.word, 0);
     }
@@ -249,7 +249,7 @@ TEST_SUITE("io_native")
 
         wy_value open_fn = native_value(ctx, io, "__open");
         auto opened = call_native(ctx, open_fn,
-            {str_value(ctx, "/nonexistent/wyrm-io-native-test-path"), str_value(ctx, "r")}, 1);
+            {str_value(ctx, "/nonexistent/wyrm-io-native-test-path"), str_value(ctx, "r")});
         CHECK(is_os_error(ctx, opened[0]));
     }
 
@@ -271,21 +271,21 @@ TEST_SUITE("io_native")
         wy_value close_fn = native_value(ctx, io, "__close");
         wy_value lseek_fn = native_value(ctx, io, "__lseek");
 
-        auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+")}, 1);
+        auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+")});
         wy_word handle = opened[0].data.word;
         wy_word dup_handle = handle + 1000;  // an fd unlikely to be in use
 
-        auto duped = call_native(ctx, dup2_fn, {wy_value_word(handle), wy_value_word(dup_handle)}, 1);
+        auto duped = call_native(ctx, dup2_fn, {wy_value_word(handle), wy_value_word(dup_handle)});
         REQUIRE_EQ(duped[0].type, WY_TYPE_TAG_WORD);
         CHECK_EQ(duped[0].data.word, dup_handle);
 
-        call_native(ctx, write_fn, {wy_value_word(dup_handle), str_value(ctx, "via dup")}, 1);
-        call_native(ctx, lseek_fn, {wy_value_word(handle), wy_value_word(0), wy_value_word(0)}, 1);
-        auto read_back = call_native(ctx, read_fn, {wy_value_word(handle), wy_value_word(-1)}, 1);
+        call_native(ctx, write_fn, {wy_value_word(dup_handle), str_value(ctx, "via dup")});
+        call_native(ctx, lseek_fn, {wy_value_word(handle), wy_value_word(0), wy_value_word(0)});
+        auto read_back = call_native(ctx, read_fn, {wy_value_word(handle), wy_value_word(-1)});
         CHECK_EQ(std::string(read_back[0].data.str->str, read_back[0].data.str->len), "via dup");
 
-        call_native(ctx, close_fn, {wy_value_word(handle)}, 1);
-        call_native(ctx, close_fn, {wy_value_word(dup_handle)}, 1);
+        call_native(ctx, close_fn, {wy_value_word(handle)});
+        call_native(ctx, close_fn, {wy_value_word(dup_handle)});
     }
 
     TEST_CASE("flush on a regular file's handle succeeds") {
@@ -303,14 +303,14 @@ TEST_SUITE("io_native")
         wy_value flush_fn = native_value(ctx, io, "__flush");
         wy_value close_fn = native_value(ctx, io, "__close");
 
-        auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+")}, 1);
+        auto opened = call_native(ctx, open_fn, {str_value(ctx, tf.path.c_str()), str_value(ctx, "w+")});
         wy_word handle = opened[0].data.word;
 
-        auto flushed = call_native(ctx, flush_fn, {wy_value_word(handle)}, 1);
+        auto flushed = call_native(ctx, flush_fn, {wy_value_word(handle)});
         REQUIRE_EQ(flushed[0].type, WY_TYPE_TAG_WORD);
         CHECK_EQ(flushed[0].data.word, 0);
 
-        call_native(ctx, close_fn, {wy_value_word(handle)}, 1);
+        call_native(ctx, close_fn, {wy_value_word(handle)});
     }
 
     TEST_CASE("wy_io_natives_install adds the __ natives to the builtins, and only there") {

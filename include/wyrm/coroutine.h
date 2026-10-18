@@ -42,7 +42,6 @@ struct wy_coroutine
     wy_coroutine* delegate;
     wy_coroutine* outer;
     wy_value* delegate_dst;
-    wy_u16 yield_base;
     wy_u8 state;   /**< wy_co_state */
     wy_value result;
 };

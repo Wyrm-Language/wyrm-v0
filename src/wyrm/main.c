@@ -257,7 +257,7 @@ static wy_error build_bc_(wy_context* context, const char* path,
     };
     wy_value result = wy_value_nil();
     if (wy_context_root_push_f(context, &result) != WY_ERR_NONE) { return WY_ERR_NOMEM; }
-    err = wy_vm_call_sync(context, *fn_slot, args, 5, &result, 1);
+    err = wy_vm_call_sync(context, *fn_slot, args, 5, &result);
     if (err != WY_ERR_NONE) {
         wy_value fault = context->current_fiber->fault;
         *msg = (wy_value_is_error(fault) && fault.data.gc_object != WY_NULL &&

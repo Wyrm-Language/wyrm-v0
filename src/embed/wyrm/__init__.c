@@ -5,7 +5,7 @@
 
 static const uint8_t __init___header[] = {
     0xA3, 0x61, 0x6E, 0x68, 0x5F, 0x5F, 0x69, 0x6E, 0x69, 0x74, 0x5F, 0x5F,
-    0x61, 0x67, 0x00, 0x61, 0x6C, 0x00,
+    0x61, 0x67, 0x00, 0x61, 0x6C, 0x01,
 };
 
 static const uint8_t __init___statics[] = {
@@ -29,7 +29,8 @@ static const uint8_t __init___messages[] = {
 };
 
 static const uint32_t __init___code[] = {
-    0x00000002,                /* 0000  return count=0 */
+    0x00000003,                /* 0000  lnil L0 */
+    0x00000008,                /* 0001  return L0 */
 };
 
 const wy_module_image __init___image = {

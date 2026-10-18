@@ -465,8 +465,6 @@ fn _assign(targets: list, values: list, frame: FnContext) -> nil | error:
     if len(values) != 1:
         return error(str(len(targets)) + " target(s) but " + str(len(values)) + " value(s)")
     value := values[0]
-    if (node_kind(value) == 'apply) and (node_kind((_field(value, 1) catch nil)) != 'bind_msg):
-        return _assign_from_call(targets, value, frame)
     if node_kind(value) == 'tuple:
         items := _pairlist((_tail(value, 1) catch nil))
         if len(items) == len(targets):
@@ -499,23 +497,6 @@ fn _assign_pairwise(targets: list, values: list, frame: FnContext) -> nil | erro
             return e
         i = i + 1
     return frame ! free_to(mark)
-
-# A call asked for as many results as there are targets: the VM backfills
-# missing ones with nil and drops extras (spec 1), so the window is the
-# whole mechanism.
-fn _assign_from_call(targets: list, call_node, frame: FnContext) -> nil | error:
-    base := frame ! mark()
-    r := compile_call(call_node, frame, len(targets))
-    if r is error:
-        return r
-    i := 0
-    n := len(targets)
-    while i < n:
-        e := store_target_reg(targets[i], L(base + i), frame)
-        if e is error:
-            return e
-        i = i + 1
-    return frame ! free_to(base)
 
 # `a, b = e`: pull exactly len(targets) items out of one indexable.
 #
@@ -635,9 +616,9 @@ fn _set_if_unset(name, value_node, frame: FnContext) -> nil | error:
 fn _pass(node, frame: FnContext, result):
     return nil
 
-# `return e` returns one value from wherever it landed; `return a, b`
-# returns a window of them; bare `return` returns a single nil, so a
-# caller asking for one result gets nil rather than a zero-value backfill.
+# `return e` returns one value from wherever it landed; `return a, b` is a
+# tuple like any other, so it returns one value too; bare `return` returns
+# a single nil.
 fn _return(node, frame: FnContext, result):
     value := (_field(node, 1) catch nil)
     if value is nil:
@@ -648,21 +629,6 @@ fn _return(node, frame: FnContext, result):
         if e is error:
             return e
         return frame ! emit_return(reg)
-    if node_kind(value) == 'tuple:
-        # `return 1, 2` and `return (1, 2)` are the same tree, so a
-        # parenthesized tuple return is lowered as a multi-value return.
-        base := frame ! mark()
-        items := _pairlist((_tail(value, 1) catch nil))
-        for item in items:
-            w := compile_into_window(item, frame)
-            if w is error:
-                return w
-        count := len(items)
-        if count > 128:
-            return error(str(count) + " return values, over the 128-result limit")
-        if count > frame.max_results:
-            frame.max_results = count
-        return frame ! emit_return(L(base), count)
     reg := compile_expr(value, frame, nil)
     if reg is error:
         return reg

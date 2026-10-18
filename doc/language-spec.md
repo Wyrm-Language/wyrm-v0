@@ -288,7 +288,7 @@ Assignment uses the `=` operator and requires a declared variable:
 
     foo = 5
 
-Plain `=` multivalue assignment requires all targets to be declared:
+Plain `=` unpacking assignment requires all targets to be declared:
 
     a, b = b, a        # swap
 
@@ -297,12 +297,12 @@ name already declared in the same scope is an error. Declaring a name
 visible from an enclosing scope is permitted and shadows it for the
 duration of the inner scope.
 
-Multiple variables may be declared from a multivalue expression. With
+Multiple variables may be declared from an unpacking expression. With
 `:=`, all target names must be previously undefined:
 
     a, b := f()        # both freshly declared
 
-Multivalue assignment is also legal with the var form:
+Unpacking assignment is also legal with the var form:
 
     var a: int, b: str = f()
 
@@ -447,10 +447,14 @@ If no explicit 'return' is used, the value of the last statement is used:
     fn message() -> str:
         "Hello World"
 
-A function may return multiple values:
+A call produces one value. A function with several things to return returns
+a tuple, and the caller may unpack it (a length or type mismatch is a fault
+at the unpacking site):
 
-    fn message() -> int, str, str:
-        return 1984, "Text Here", "Text Here 2"
+    fn message() -> tuple:
+        return (1984, "Text Here", "Text Here 2")
+
+    a, b, c := message()
 
 Parameters may be specified:
 

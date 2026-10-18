@@ -86,7 +86,7 @@ TEST_SUITE("module")
         wy_module* module = load_fixture(ctx.get_context_ptr(), "hello.wyd", storage);
 
         CHECK_EQ(module->global_count, 2);
-        CHECK_EQ(module->init_nlocals, 3);
+        CHECK_EQ(module->init_nlocals, 4);
 
         REQUIRE_EQ(module->static_count, 2);
         REQUIRE_EQ(module->statics[0].type, WY_TYPE_TAG_STR);
@@ -98,8 +98,8 @@ TEST_SUITE("module")
         const wy_function_proto& greet = module->functions[0];
         CHECK_EQ(wy_strcmp_f(greet.name, "greet"), 0);
         CHECK_EQ(greet.nparams, 1);
-        CHECK_EQ(greet.nlocals, 2);
-        CHECK_EQ(greet.code_offset, 11);
+        CHECK_EQ(greet.nlocals, 3);
+        CHECK_EQ(greet.code_offset, 12);
         CHECK_EQ(greet.flags, 0);
 
         CHECK_EQ(wy_slot_dict_get(&module->exports, intern(ctx.get_context_ptr(), "greet")), 0);
@@ -180,7 +180,7 @@ TEST_SUITE("module")
         REQUIRE_EQ(wy_module_load_image(ctx.get_context_ptr(), &hello_1_image, &module), WY_ERR_NONE);
 
         CHECK_EQ(module->global_count, 1);
-        CHECK_EQ(module->init_nlocals, 2);
+        CHECK_EQ(module->init_nlocals, 3);
         REQUIRE_EQ(module->static_count, 1);
         REQUIRE_EQ(module->statics[0].type, WY_TYPE_TAG_STR);
         CHECK_EQ(wy_strncmp_f(module->statics[0].data.str->str, "Hello World\n", 12), 0);
@@ -232,10 +232,10 @@ TEST_SUITE("loader")
 
     TEST_CASE("a module with copied code still runs its init")
     {
-        // `return` with no values; a header plus this is a complete module.
+        // `return L0`; a header plus this is a complete module.
         const wy_u32 return_word = (wy_u32(WY_OP_RETURN) & 0xFF);
         Bytes original = container({
-            {WY_SEC_HEADER, map({kv("n", text("m")), kv("g", uval(0)), kv("l", uval(0))})},
+            {WY_SEC_HEADER, map({kv("n", text("m")), kv("g", uval(0)), kv("l", uval(1))})},
             {WY_SEC_CODE, code_item({return_word})},
         });
         wy_module_image probe;
@@ -385,8 +385,6 @@ TEST_SUITE("loader")
         CHECK_EQ(with("p", array({map({kv("d", uval(0))})})), WY_ERR_IMAGE);                      // no name
         CHECK_EQ(with("k", uval(3)), WY_ERR_NONE);
         CHECK_EQ(with("k", uval(0x10000)), WY_ERR_IMAGE);
-        CHECK_EQ(with("r", uval(255)), WY_ERR_NONE);
-        CHECK_EQ(with("r", uval(256)), WY_ERR_IMAGE);
         CHECK_EQ(with("t", array({uval(1)})), WY_ERR_NONE);
         CHECK_EQ(with("t", array({uval(2)})), WY_ERR_IMAGE); // past the two globals
         CHECK_EQ(with("t", uval(1)), WY_ERR_IMAGE);          // not an array

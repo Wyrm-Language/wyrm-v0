@@ -20,6 +20,7 @@
 #include <test_common/test_main_loop_fixture.h>
 #include <test_common/test_context_fixture.h>
 #include <test_common/test_fiber_fixture.h>
+#include <test_common/test_call.h>
 
 namespace {
 
@@ -79,7 +80,7 @@ wy_error run_synthetic(wy_context* ctx, const wy_u32* code, wy_uword code_len, w
     wy_function* fn = WY_NULL;
     REQUIRE_EQ(wy_function_new(ctx, module, &proto, WY_NULL, 0, &fn), WY_ERR_NONE);
 
-    return wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), args, argc, out, nres);
+    return test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), args, argc, out, nres);
 }
 
 /**
@@ -169,7 +170,7 @@ wy_error run_fn0(wy_context* ctx, wy_module* module, const wy_value* args, wy_uw
     REQUIRE_EQ(wy_context_module_register(ctx, module, &module_id), WY_ERR_NONE);
     wy_function* fn = WY_NULL;
     REQUIRE_EQ(wy_function_new(ctx, module, &module->functions[0], WY_NULL, 0, &fn), WY_ERR_NONE);
-    return wy_vm_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), args, argc, out, nres);
+    return test_call_sync(ctx, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), args, argc, out, nres);
 }
 
 } // namespace
@@ -238,19 +239,19 @@ TEST_SUITE("wvm") {
         CHECK_EQ(wy_exec_fn_b_code_module_id(fn.c_data), module_id);
 
         // Runs through the fiber loop like any other callable
-        REQUIRE_EQ(wy_fiber_push_continuation(ctx.get_fiber_ptr(), fn, 0), WY_ERR_NONE);
+        REQUIRE_EQ(wy_fiber_push_continuation(ctx.get_fiber_ptr(), fn), WY_ERR_NONE);
         CHECK_EQ(wy_context_exec(ctx.get_context_ptr()), WY_ERR_NONE);
     }
 }
 
 TEST_SUITE("vm dispatch loop") {
-    TEST_CASE("lnil/lbool/lunset load and return backfills the window") {
+    TEST_CASE("lnil/lbool/lunset load their values") {
         test_fiber_fixture ctx;
         const wy_u32 code[] = {
             enc1(WY_OP_LNIL, 0, 0),
             enc1(WY_OP_LBOOL, 1, 1),
             enc1(WY_OP_LUNSET, 0, 2),
-            enc1(WY_OP_RETURN, 3, 0),  // base=0, count=3
+            enc2a(WY_OP_TUPLE, 3, 0), enc2b(0, 0), enc1(WY_OP_RETURN, 0, 0),  // base=0, count=3
         };
         wy_value out[3];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 3, 0, WY_NULL, 0, out, 3), WY_ERR_NONE);
@@ -260,30 +261,17 @@ TEST_SUITE("vm dispatch loop") {
         CHECK(wy_value_is_unset(out[2]));
     }
 
-    TEST_CASE("backfill nil-fills nres past what return actually produced") {
-        test_fiber_fixture ctx;
-        const wy_u32 code[] = {
-            enc1(WY_OP_LBOOL, 1, 0),
-            enc1(WY_OP_RETURN, 1, 0),  // base=0, count=1
-        };
-        wy_value out[3] = { wy_value_word(-1), wy_value_word(-1), wy_value_word(-1) };
-        REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 1, 0, WY_NULL, 0, out, 3), WY_ERR_NONE);
-        CHECK_EQ(out[0].data.flag, true);
-        CHECK_EQ(out[1].type, WY_TYPE_TAG_NIL);
-        CHECK_EQ(out[2].type, WY_TYPE_TAG_NIL);
-    }
-
-    TEST_CASE("return truncates when the caller reserves fewer than count") {
+    TEST_CASE("return delivers the one value of any register") {
         test_fiber_fixture ctx;
         const wy_u32 code[] = {
             enc1(WY_OP_I8, 11, 0),
             enc1(WY_OP_I8, 22, 1),
             enc1(WY_OP_I8, 33, 2),
-            enc1(WY_OP_RETURN, 3, 0),  // base=0, count=3
+            enc1(WY_OP_RETURN, 0, 1),  // return L1
         };
         wy_value out[1];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 3, 0, WY_NULL, 0, out, 1), WY_ERR_NONE);
-        CHECK_EQ(out[0].data.word, 11);
+        CHECK_EQ(out[0].data.word, 22);
     }
 
     TEST_CASE("i8 (compact), i32 (wide) and move round-trip") {
@@ -292,7 +280,7 @@ TEST_SUITE("vm dispatch loop") {
             enc1(WY_OP_I8, (wy_u8) (wy_i32) -5, 0),
             enc2a(WY_OP_I32_WIDE, 0, 1), enc2b(0, 0), // placeholder, patched below
             enc1(WY_OP_MOVE, 0, 2),
-            enc1(WY_OP_RETURN, 3, 0),
+            enc2a(WY_OP_TUPLE, 3, 0), enc2b(0, 0), enc1(WY_OP_RETURN, 0, 0),
         };
         wy_u32 patched[std::size(code)];
         std::copy(std::begin(code), std::end(code), patched);
@@ -312,7 +300,7 @@ TEST_SUITE("vm dispatch loop") {
             enc1(WY_OP_I8, 42, 0),
             enc1(WY_OP_GSET, 0, 0),   // g0 <- L0
             enc1(WY_OP_GGET, 1, 0),   // L1 <- g0
-            enc1(WY_OP_RETURN, 1, 1), // base=1, count=1
+            enc1(WY_OP_RETURN, 0, 1), // base=1, count=1
         };
         wy_value out[1];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 2, 1, WY_NULL, 0, out, 1), WY_ERR_NONE);
@@ -322,7 +310,7 @@ TEST_SUITE("vm dispatch loop") {
     TEST_CASE("gget on an unfilled free slot faults naming it; an unassigned own global reads Unset") {
         const wy_u32 code[] = {
             enc1(WY_OP_GGET, 0, 0),   // L0 <- g0 (never written)
-            enc1(WY_OP_RETURN, 1, 0),
+            enc1(WY_OP_RETURN, 0, 0),
         };
         for (bool free_slot : { true, false }) {
             test_fiber_fixture ctx;
@@ -366,7 +354,7 @@ TEST_SUITE("vm dispatch loop") {
             enc2a(WY_OP_DIV, 0, 5), enc2b(0, 1),
             enc2a(WY_OP_MOD, 0, 6), enc2b(0, 1),
             enc2a(WY_OP_POW, 0, 7), enc2b(0, 1),
-            enc1(WY_OP_RETURN, 6, 2),  // base=2, count=6
+            enc2a(WY_OP_TUPLE, 6, 2), enc2b(2, 0), enc1(WY_OP_RETURN, 0, 2),  // base=2, count=6
         };
         wy_value out[6];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 8, 0, WY_NULL, 0, out, 6), WY_ERR_NONE);
@@ -385,7 +373,7 @@ TEST_SUITE("vm dispatch loop") {
             enc1(WY_OP_I8, 5, 0),
             enc1(WY_OP_I8, 0, 1),
             enc2a(WY_OP_DIV, 0, 2), enc2b(0, 1),
-            enc1(WY_OP_RETURN, 1, 2),
+            enc1(WY_OP_RETURN, 0, 2),
         };
         wy_value out[1];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 3, 0, WY_NULL, 0, out, 1), WY_ERR_NONE);
@@ -400,7 +388,7 @@ TEST_SUITE("vm dispatch loop") {
             enc2a(WY_OP_LT, 0, 2), enc2b(0, 1),
             enc2a(WY_OP_EQ, 0, 3), enc2b(0, 1),
             enc2a(WY_OP_CMP3, 0, 4), enc2b(0, 1),
-            enc1(WY_OP_RETURN, 3, 2),
+            enc2a(WY_OP_TUPLE, 3, 2), enc2b(2, 0), enc1(WY_OP_RETURN, 0, 2),
         };
         wy_value out[3];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 5, 0, WY_NULL, 0, out, 3), WY_ERR_NONE);
@@ -417,7 +405,7 @@ TEST_SUITE("vm dispatch loop") {
             enc1(WY_OP_NEG, 0, 2),
             enc1(WY_OP_INV, 0, 3),
             enc1(WY_OP_NOT, 1, 4),
-            enc1(WY_OP_RETURN, 3, 2),
+            enc2a(WY_OP_TUPLE, 3, 2), enc2b(2, 0), enc1(WY_OP_RETURN, 0, 2),
         };
         wy_value out[3];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 5, 0, WY_NULL, 0, out, 3), WY_ERR_NONE);
@@ -440,7 +428,7 @@ TEST_SUITE("vm dispatch loop") {
             enc1(WY_OP_I8, 1, 0),
             enc1(WY_OP_JMP, 0, 1),
             enc1(WY_OP_I8, 2, 0),
-            enc1(WY_OP_RETURN, 1, 0),
+            enc1(WY_OP_RETURN, 0, 0),
         };
         wy_value out[1];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 2, 0, WY_NULL, 0, out, 1), WY_ERR_NONE);
@@ -459,9 +447,9 @@ TEST_SUITE("vm dispatch loop") {
             enc1(WY_OP_LBOOL, 1, 0),
             enc2a(WY_OP_JT_WIDE, 0, 0), enc2b(0, 0),  // patched: a1(a0-in-wide)=0 via 'a2' field below
             enc1(WY_OP_I8, 1, 1),
-            enc1(WY_OP_RETURN, 1, 1),
+            enc1(WY_OP_RETURN, 0, 1),
             enc1(WY_OP_I8, 9, 1),
-            enc1(WY_OP_RETURN, 1, 1),
+            enc1(WY_OP_RETURN, 0, 1),
         };
         wy_u32 patched[std::size(code)];
         std::copy(std::begin(code), std::end(code), patched);
@@ -484,7 +472,7 @@ TEST_SUITE("vm dispatch loop") {
         const wy_u32 code[] = {
             enc1(WY_OP_LCONST, 0, 0),
             enc1(WY_OP_LSYM, 1, 0),
-            enc1(WY_OP_RETURN, 2, 0),
+            enc2a(WY_OP_TUPLE, 2, 0), enc2b(0, 0), enc1(WY_OP_RETURN, 0, 0),
         };
         wy_value out[2];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 2, 0, WY_NULL, 0, out, 2,
@@ -502,7 +490,7 @@ TEST_SUITE("vm dispatch loop") {
         const wy_u32 callee_code[] = {
             enc1(WY_OP_I8, 2, 1),                       // L1 <- 2
             enc2a(WY_OP_MUL, 0, 1), enc2b(0x8000, 1),    // L1 <- P0 * L1  (P0 is the argument)
-            enc1(WY_OP_RETURN, 1, 1),
+            enc1(WY_OP_RETURN, 0, 1),
         };
 
         // module->functions must be heap-allocated: the finalizer
@@ -525,8 +513,8 @@ TEST_SUITE("vm dispatch loop") {
         const wy_u32 caller_code[] = {
             enc2a(WY_OP_CLOSURE, 0, 0), enc2b(0, 0),   // a1=function index 0, f(=ncaps)=0
             enc1(WY_OP_I8, 5, 1),                       // L1 <- 5 (argument)
-            enc2a(WY_OP_CALL, 1, 0), enc2b(1, 0),        // base=0, argc=1, nres=1
-            enc1(WY_OP_RETURN, 1, 0),
+            enc1(WY_OP_CALL, 1, 0),        // base=0, argc=1, nres=1
+            enc1(WY_OP_RETURN, 0, 0),
         };
         // callee_code is placed right after caller_code in the same module image.
         wy_u32 combined[std::size(caller_code) + std::size(callee_code)];
@@ -544,7 +532,7 @@ TEST_SUITE("vm dispatch loop") {
         REQUIRE_EQ(wy_function_new(context, module, &caller_proto, WY_NULL, 0, &fn), WY_ERR_NONE);
 
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 1), WY_ERR_NONE);
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 1), WY_ERR_NONE);
         CHECK_EQ(out[0].data.word, 10);
     }
 
@@ -572,7 +560,7 @@ TEST_SUITE("vm dispatch loop") {
 
         wy_value args[1] = { wy_value_word(1) };
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), args, 1, out, 1),
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), args, 1, out, 1),
             WY_ERR_FAULT);
         CHECK_EQ(fault_message(ctx.get_fiber_ptr()), "f() missing required argument: 'b'");
     }
@@ -588,13 +576,13 @@ TEST_SUITE("vm dispatch loop") {
             enc1(WY_OP_I8, 5, 1),
             enc2a(WY_OP_CLOSURE, 1, 0), enc2b(1, 1),
             enc1(WY_OP_I8, 2, 1),
-            enc2a(WY_OP_CALL, 1, 0), enc2b(1, 0),
-            enc1(WY_OP_RETURN, 1, 0),
+            enc1(WY_OP_CALL, 1, 0),
+            enc1(WY_OP_RETURN, 0, 0),
         };
         // fn#1: add L0 <- P0 + P1  (P0 = value, P1 = captured amount); return L0
         const wy_u32 callee_code[] = {
             enc2a(WY_OP_ADD, 0, 0), enc2b(0x8000, 0x8001),
-            enc1(WY_OP_RETURN, 1, 0),
+            enc1(WY_OP_RETURN, 0, 0),
         };
 
         wy_u32 combined[std::size(caller_code) + std::size(callee_code)];
@@ -621,7 +609,7 @@ TEST_SUITE("vm dispatch loop") {
         REQUIRE_EQ(wy_function_new(context, module, &module->functions[0], WY_NULL, 0, &fn), WY_ERR_NONE);
 
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 1),
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 1),
             WY_ERR_NONE);
         CHECK_EQ(out[0].data.word, 7);
     }
@@ -646,13 +634,13 @@ TEST_SUITE("vm dispatch loop") {
             enc2a(WY_OP_CLOSURE, 1, 0), enc2b(1, 2),
             enc1(WY_OP_MOVE, 0, 5),
             enc1(WY_OP_I8, 1, 1),
-            enc2a(WY_OP_CALL, 1, 0), enc2b(1, 0),
+            enc1(WY_OP_CALL, 1, 0),
             enc1(WY_OP_MOVE, 0, 6),
             enc1(WY_OP_MOVE, 5, 0),
             enc1(WY_OP_I8, 1, 1),
-            enc2a(WY_OP_CALL, 1, 0), enc2b(1, 0),
+            enc1(WY_OP_CALL, 1, 0),
             enc1(WY_OP_MOVE, 0, 7),
-            enc1(WY_OP_RETURN, 2, 6),
+            enc2a(WY_OP_TUPLE, 2, 6), enc2b(6, 0), enc1(WY_OP_RETURN, 0, 6),
         };
         // fn#1 (bump): the captured cell is P1, the integer step P0.
         //   L0 <- 0; L1 <- P1[L0]; L2 <- P0 + L1; P1[L0] <- L2;
@@ -663,7 +651,7 @@ TEST_SUITE("vm dispatch loop") {
             enc2a(WY_OP_ADD, 0, 2), enc2b(0x8000, 1),
             enc2a(WY_OP_SETIDX, 0, 0x8001), enc2b(0, 2),
             enc2a(WY_OP_GETIDX, 0, 3), enc2b(0x8001, 0),
-            enc1(WY_OP_RETURN, 1, 3),
+            enc1(WY_OP_RETURN, 0, 3),
         };
 
         wy_u32 combined[std::size(caller_code) + std::size(callee_code)];
@@ -690,7 +678,7 @@ TEST_SUITE("vm dispatch loop") {
         REQUIRE_EQ(wy_function_new(context, module, &module->functions[0], WY_NULL, 0, &fn), WY_ERR_NONE);
 
         wy_value out[2];
-        REQUIRE_EQ(wy_vm_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 2),
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 2),
             WY_ERR_NONE);
         CHECK_EQ(out[0].data.word, 11);
         CHECK_EQ(out[1].data.word, 12);
@@ -707,14 +695,14 @@ TEST_SUITE("vm dispatch loop") {
             enc1(WY_OP_I8, 3, 3),
             enc2a(WY_OP_TUPLE, 1, 1), enc2b(3, 0),
             enc2a(WY_OP_NEW_PRIMITIVE, (wy_u8) WY_TYPE_TAG_TABLE, 2), enc2b(0, 0),
-            enc2a(WY_OP_CALL_VA, 0, 0), enc2b(1, 0),
-            enc1(WY_OP_RETURN, 1, 0),
+            enc2a(WY_OP_CALL_VA, 0, 0), enc2b(0, 0),
+            enc1(WY_OP_RETURN, 0, 0),
         };
         // fn#1: L1 <- 2; mul L1 <- P0 * L1; return L1
         const wy_u32 callee_code[] = {
             enc1(WY_OP_I8, 2, 1),
             enc2a(WY_OP_MUL, 0, 1), enc2b(0x8000, 1),
-            enc1(WY_OP_RETURN, 1, 1),
+            enc1(WY_OP_RETURN, 0, 1),
         };
 
         wy_u32 combined[std::size(caller_code) + std::size(callee_code)];
@@ -740,7 +728,7 @@ TEST_SUITE("vm dispatch loop") {
         REQUIRE_EQ(wy_function_new(context, module, &module->functions[0], WY_NULL, 0, &fn), WY_ERR_NONE);
 
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 1),
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 1),
             WY_ERR_NONE);
         CHECK_EQ(out[0].data.word, 6);
     }
@@ -750,15 +738,19 @@ TEST_SUITE("vm dispatch loop") {
         wy_context* context = ctx.get_context_ptr();
 
         // fn#1 (f(a, b, **kw)): return P0, P1, P2  (a, b, the leftover dict)
-        const wy_u32 callee_code[] = { enc1(WY_OP_RETURN, 3, 0x8000) };
+        // return P0..P2 as a tuple: copy them down to L0..L2 first (tuple reads an L window)
+        const wy_u32 callee_code[] = {
+            enc1(WY_OP_MOVE, 0x80, 0), enc1(WY_OP_MOVE, 0x81, 1), enc1(WY_OP_MOVE, 0x82, 2),
+            enc2a(WY_OP_TUPLE, 3, 0), enc2b(0, 0), enc1(WY_OP_RETURN, 0, 0),
+        };
 
         // caller: closure L0 <- fn#1, 0 caps; L3 <- 1; L1 <- tuple(L3);
         //   kw = {b: 2, x: 3} as interleaved pairs L4..L7 (keys are STR
         //   statics, matching the real compiler's call_va encoding - a
         //   keyword dict's keys are plain strings, not interned symbols,
         //   confirmed against pypoc/wypoc/compiler_bc's actual output
-        //   during epic 9); L2 <- dict(L4); call_va base=L0 nres=3;
-        //   return L0, 3
+        //   during epic 9); L2 <- dict(L4); call_va base=L0;
+        //   return L0 (the callee's tuple)
         const wy_u32 caller_code[] = {
             enc2a(WY_OP_CLOSURE, 0, 0), enc2b(1, 0),
             enc1(WY_OP_I8, 1, 3),
@@ -768,8 +760,8 @@ TEST_SUITE("vm dispatch loop") {
             enc1(WY_OP_LCONST, 6, 1),
             enc1(WY_OP_I8, 3, 7),
             enc2a(WY_OP_DICT, 2, 2), enc2b(4, 0),
-            enc2a(WY_OP_CALL_VA, 0, 0), enc2b(3, 0),
-            enc1(WY_OP_RETURN, 3, 0),
+            enc2a(WY_OP_CALL_VA, 0, 0), enc2b(0, 0),
+            enc1(WY_OP_RETURN, 0, 0),
         };
 
         wy_u32 combined[std::size(caller_code) + std::size(callee_code)];
@@ -803,7 +795,7 @@ TEST_SUITE("vm dispatch loop") {
         callee_proto.name = "f";
         callee_proto.code_offset = (wy_u32) std::size(caller_code);
         callee_proto.nparams = 3;
-        callee_proto.nlocals = 0;
+        callee_proto.nlocals = 3;
         callee_proto.flags = WY_FN_KWARGS;
         callee_proto.params = bounds;
 
@@ -817,7 +809,7 @@ TEST_SUITE("vm dispatch loop") {
         REQUIRE_EQ(wy_function_new(context, module, &module->functions[0], WY_NULL, 0, &fn), WY_ERR_NONE);
 
         wy_value out[3];
-        REQUIRE_EQ(wy_vm_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 3),
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 3),
             WY_ERR_NONE);
         CHECK_EQ(out[0].data.word, 1);
         CHECK_EQ(out[1].data.word, 2);
@@ -835,7 +827,7 @@ TEST_SUITE("vm dispatch loop") {
         // fn: add L0 <- P0 + P1; return L0  (b defaults to statics[0] = 10)
         const wy_u32 callee_code[] = {
             enc2a(WY_OP_ADD, 0, 0), enc2b(0x8000, 0x8001),
-            enc1(WY_OP_RETURN, 1, 0),
+            enc1(WY_OP_RETURN, 0, 0),
         };
 
         auto* params = (wy_param*) wy_context_gc_alloc(context, 2 * sizeof(wy_param));
@@ -858,7 +850,7 @@ TEST_SUITE("vm dispatch loop") {
 
         wy_value args[1] = { wy_value_word(5) };
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), args, 1, out, 1),
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), args, 1, out, 1),
             WY_ERR_NONE);
         CHECK_EQ(out[0].data.word, 15);
     }
@@ -868,7 +860,7 @@ TEST_SUITE("vm dispatch loop") {
         wy_context* context = ctx.get_context_ptr();
 
         // fn(a, *rest): return P1 (the rest tuple), 1
-        const wy_u32 callee_code[] = { enc1(WY_OP_RETURN, 1, 0x8001) };
+        const wy_u32 callee_code[] = { enc1(WY_OP_RETURN, 0, 0x8001) };
 
         auto* params = (wy_param*) wy_context_gc_alloc(context, 2 * sizeof(wy_param));
         params[0] = param_named("a");
@@ -888,7 +880,7 @@ TEST_SUITE("vm dispatch loop") {
 
         const wy_value args[] = { wy_value_word(1), wy_value_word(2), wy_value_word(3) };
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), args, 3, out, 1),
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), args, 3, out, 1),
             WY_ERR_NONE);
         REQUIRE_EQ(out[0].type, WY_TYPE_TAG_TUPLE);
         auto* rest = (wy_tuple*) out[0].data.gc_object;
@@ -918,7 +910,7 @@ TEST_SUITE("vm dispatch loop") {
             enc1(WY_OP_LCONST, 8, 2),
             enc1(WY_OP_I8, 2, 9),
             enc2a(WY_OP_DICT, 3, 2), enc2b(4, 0),
-            enc2a(WY_OP_CALL_VA, 0, 0), enc2b(1, 0),
+            enc2a(WY_OP_CALL_VA, 0, 0), enc2b(0, 0),
             enc1(WY_OP_RETURN, 0, 0),
         };
 
@@ -958,7 +950,7 @@ TEST_SUITE("vm dispatch loop") {
         REQUIRE_EQ(wy_function_new(context, module, &module->functions[0], WY_NULL, 0, &fn), WY_ERR_NONE);
 
         wy_value out[1];
-        REQUIRE_EQ(wy_vm_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 1),
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 1),
             WY_ERR_FAULT);
         CHECK_EQ(fault_message(ctx.get_fiber_ptr()), "f() got unexpected keyword argument(s): b, c");
     }
@@ -976,7 +968,7 @@ TEST_SUITE("wvm milestone 1") {
             enc1(WY_OP_I8, 1, 5),
             enc2a(WY_OP_GETIDX, 0, 6), enc2b(2, 4),   // L6 <- L2[0] = 10 (a0=6, a1=2, a2=4)
             enc2a(WY_OP_GETIDX, 0, 7), enc2b(3, 5),   // L7 <- L3[1] = 20 (a0=7, a1=3, a2=5)
-            enc1(WY_OP_RETURN, 2, 6),
+            enc2a(WY_OP_TUPLE, 2, 6), enc2b(6, 0), enc1(WY_OP_RETURN, 0, 6),
         };
         wy_value out[2];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 8, 0, WY_NULL, 0, out, 2), WY_ERR_NONE);
@@ -996,7 +988,7 @@ TEST_SUITE("wvm milestone 1") {
             enc1(WY_OP_I8, 123, 6),                   // L6 <- 123
             enc2a(WY_OP_SETIDX, 0, 4), enc2b(0, 6),   // L4[1] <- L6 (a0=4, a1=0, a2=6)
             enc2a(WY_OP_GETIDX, 0, 7), enc2b(4, 0),   // L7 <- L4[1] = 123
-            enc1(WY_OP_RETURN, 2, 5),                 // return L5, L7
+            enc2a(WY_OP_TUPLE, 2, 5), enc2b(5, 0), enc1(WY_OP_RETURN, 0, 5),                 // return L5, L7
         };
         wy_value out[2];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 8, 0, WY_NULL, 0, out, 2), WY_ERR_NONE);
@@ -1015,7 +1007,7 @@ TEST_SUITE("wvm milestone 1") {
             enc1(WY_OP_I8, 99, 5),
             enc2a(WY_OP_SETIDX, 0, 2), enc2b(3, 5),   // L2[0] <- 99 (a0=2, a1=3, a2=5)
             enc2a(WY_OP_GETIDX, 0, 6), enc2b(2, 3),   // L6 <- L2[0] = 99
-            enc1(WY_OP_RETURN, 2, 4),
+            enc2a(WY_OP_TUPLE, 2, 4), enc2b(4, 0), enc1(WY_OP_RETURN, 0, 4),
         };
         wy_value out[2];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 7, 0, WY_NULL, 0, out, 2), WY_ERR_NONE);
@@ -1040,7 +1032,7 @@ TEST_SUITE("wvm milestone 1") {
             enc2a(WY_OP_GETIDX, 0, 11), enc2b(3, 4),  // L11 <- L3[1] = 99
             enc2a(WY_OP_GETIDX, 0, 12), enc2b(3, 6),  // L12 <- L3[3]: past the end
             enc2a(WY_OP_GETIDX, 0, 13), enc2b(3, 7),  // L13 <- L3[-1]: negative
-            enc1(WY_OP_RETURN, 4, 10),                // return L10..L13
+            enc2a(WY_OP_TUPLE, 4, 10), enc2b(10, 0), enc1(WY_OP_RETURN, 0, 10),                // return L10..L13
         };
         wy_value out[4];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 14, 0, WY_NULL, 0, out, 4), WY_ERR_NONE);
@@ -1061,7 +1053,7 @@ TEST_SUITE("wvm milestone 1") {
             enc2a(WY_OP_ITNEXT, 0, 5), enc2b(3, 1),   // L5 <- next(L3), if exhausted jump +1
             enc1(WY_OP_JMP, 0, 1),                    // skip exhausted case
             enc1(WY_OP_I8, -1, 4),                    // (not reached)
-            enc1(WY_OP_RETURN, 2, 4),                 // return L4, L5
+            enc2a(WY_OP_TUPLE, 2, 4), enc2b(4, 0), enc1(WY_OP_RETURN, 0, 4),                 // return L4, L5
         };
         wy_value out[2];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 6, 0, WY_NULL, 0, out, 2), WY_ERR_NONE);
@@ -1076,7 +1068,7 @@ TEST_SUITE("wvm milestone 1") {
             enc1(WY_OP_I8, 8, 1),
             enc2a(WY_OP_LIST, 2, 2), enc2b(0, 0),     // L2 <- [7, 8]
             enc2a(WY_OP_UNPACK, 2, 3), enc2b(2, 0),   // L3, L4 <- unpack(L2) (a0=3, f=2, a1=2)
-            enc1(WY_OP_RETURN, 2, 3),
+            enc2a(WY_OP_TUPLE, 2, 3), enc2b(3, 0), enc1(WY_OP_RETURN, 0, 3),
         };
         wy_value out[2];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 5, 0, WY_NULL, 0, out, 2), WY_ERR_NONE);
@@ -1084,18 +1076,30 @@ TEST_SUITE("wvm milestone 1") {
         CHECK_EQ(out[1].data.word, 8);
     }
 
-    TEST_CASE("unpack list mismatch") {
+    TEST_CASE("unpack list mismatch is a fault at the unpacking site") {
         test_fiber_fixture ctx;
         const wy_u32 code[] = {
             enc1(WY_OP_I8, 7, 0),
             enc2a(WY_OP_LIST, 1, 1), enc2b(0, 0),     // L1 <- [7]
             enc2a(WY_OP_UNPACK, 2, 2), enc2b(1, 0),   // L2, L3 <- unpack(L1) (a0=2, f=2, a1=1)
-            enc1(WY_OP_RETURN, 2, 2),
+            enc1(WY_OP_I8, 99, 0),                    // never reached
+            enc1(WY_OP_RETURN, 0, 0),
         };
-        wy_value out[2];
-        REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 4, 0, WY_NULL, 0, out, 2), WY_ERR_NONE);
-        CHECK(wy_value_is_error(out[0]));
-        CHECK(wy_value_is_error(out[1]));
+        wy_value out[1];
+        CHECK_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 4, 0, WY_NULL, 0, out, 1), WY_ERR_FAULT);
+        CHECK_EQ(fault_message(ctx.get_fiber_ptr()), "unpack: expected 2 value(s), got 1");
+    }
+
+    TEST_CASE("unpack of a value that cannot be unpacked is a fault") {
+        test_fiber_fixture ctx;
+        const wy_u32 code[] = {
+            enc1(WY_OP_I8, 7, 0),
+            enc2a(WY_OP_UNPACK, 2, 2), enc2b(0, 0),   // L2, L3 <- unpack(7)
+            enc1(WY_OP_RETURN, 0, 0),
+        };
+        wy_value out[1];
+        CHECK_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 4, 0, WY_NULL, 0, out, 1), WY_ERR_FAULT);
+        CHECK_EQ(fault_message(ctx.get_fiber_ptr()), "unpack: cannot unpack this value into 2 target(s)");
     }
 
     TEST_CASE("string getidx decodes a UTF-8 codepoint, not a raw byte") {
@@ -1110,7 +1114,7 @@ TEST_SUITE("wvm milestone 1") {
             enc2a(WY_OP_GETIDX, 0, 2), enc2b(0, 1),   // L2 <- L0[1] = codepoint of 'é' (0xE9)
             enc1(WY_OP_I8, 4, 3),
             enc2a(WY_OP_GETIDX, 0, 3), enc2b(0, 3),   // L3 <- L0[4] = 'o' (in-range only by codepoint count)
-            enc1(WY_OP_RETURN, 2, 2),
+            enc2a(WY_OP_TUPLE, 2, 2), enc2b(2, 0), enc1(WY_OP_RETURN, 0, 2),
         };
         wy_value out[2];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 5, 0, WY_NULL, 0, out, 2,
@@ -1131,7 +1135,7 @@ TEST_SUITE("wvm milestone 1") {
             enc2a(WY_OP_ITNEXT, 0, 2), enc2b(1, 1),   // L2 <- next(L1) = "h"
             enc2a(WY_OP_ITNEXT, 0, 3), enc2b(1, 1),   // L3 <- next(L1) = "é" (2-byte codepoint, one item)
             enc2a(WY_OP_UNPACK, 5, 4), enc2b(0, 0),   // L4..L8 <- unpack(L0) into 5 one-char strings
-            enc1(WY_OP_RETURN, 3, 2),                 // return L2, L3, L4
+            enc2a(WY_OP_TUPLE, 3, 2), enc2b(2, 0), enc1(WY_OP_RETURN, 0, 2),                 // return L2, L3, L4
         };
         wy_value out[3];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 9, 0, WY_NULL, 0, out, 3,
@@ -1153,7 +1157,7 @@ TEST_SUITE("wvm milestone 1") {
             enc2a(WY_OP_IN, 0, 3), enc2b(0, 2),       // L3 <- 5 in L2 (true) (a0=3, a1=0, a2=2)
             enc1(WY_OP_I8, 7, 0),
             enc2a(WY_OP_IN, 0, 4), enc2b(0, 2),       // L4 <- 7 in L2 (false)
-            enc1(WY_OP_RETURN, 2, 3),
+            enc2a(WY_OP_TUPLE, 2, 3), enc2b(3, 0), enc1(WY_OP_RETURN, 0, 3),
         };
         wy_value out[2];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 5, 0, WY_NULL, 0, out, 2), WY_ERR_NONE);
@@ -1185,7 +1189,7 @@ TEST_SUITE("wvm milestone 1") {
             enc1(WY_OP_I8, 1, 2),
             enc1(WY_OP_JMP, 0, 1),
             enc1(WY_OP_I8, 2, 2),
-            enc1(WY_OP_RETURN, 2, 1),
+            enc2a(WY_OP_TUPLE, 2, 1), enc2b(1, 0), enc1(WY_OP_RETURN, 0, 1),
         };
         wy_value out[2];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 4, 0, WY_NULL, 0, out, 2), WY_ERR_NONE);
@@ -1224,14 +1228,15 @@ TEST_SUITE("wvm milestone 1") {
             enc1(WY_OP_LCONST, 2, 2),                 // L2 <- OutOfMemory class
             enc1(WY_OP_MOVE, 0, 3),                   // L3 <- L0 (call window: L3=callee, L4=arg)
             enc1(WY_OP_MOVE, 1, 4),                   // L4 <- L1
-            enc2a(WY_OP_CALL, 1, 3), enc2b(1, 0),     // L3 <- L3(L4) (f=argc=1, a0=base=3, a1=nres=1)
-            enc1(WY_OP_MOVE, 3, 4),                   // L4 <- L3 (save the result out of the call window)
-            enc2a(WY_OP_IS, 0, 5), enc2b(4, 0),       // L5 <- L4 is L0 (the error class)
+            enc1(WY_OP_CALL, 1, 3),                   // L0 <- L3(L4) (f=argc=1, a0=base=3); the call clobbers L0
+            enc1(WY_OP_MOVE, 0, 4),                   // L4 <- L0 (save the result out of the accumulator)
+            enc1(WY_OP_LCONST, 7, 0),                 // L7 <- error class again
+            enc2a(WY_OP_IS, 0, 5), enc2b(4, 7),       // L5 <- L4 is L7 (the error class)
             enc2a(WY_OP_IS, 0, 6), enc2b(4, 2),       // L6 <- L4 is OutOfMemory (false)
-            enc1(WY_OP_RETURN, 3, 4),                 // return L4, L5, L6
+            enc2a(WY_OP_TUPLE, 3, 4), enc2b(4, 0), enc1(WY_OP_RETURN, 0, 4),                 // return L4, L5, L6
         };
         wy_value out[3];
-        REQUIRE_EQ(run_synthetic(c, code, std::size(code), 7, 0, WY_NULL, 0, out, 3,
+        REQUIRE_EQ(run_synthetic(c, code, std::size(code), 8, 0, WY_NULL, 0, out, 3,
             statics, std::size(statics)), WY_ERR_NONE);
         CHECK(wy_value_is_error(out[0]));
         CHECK_EQ(((wy_error_obj*) out[0].data.gc_object)->cls, c->error_class);
@@ -1246,7 +1251,7 @@ TEST_SUITE("wvm milestone 1") {
         const wy_u32 code[] = {
             enc2a(WY_OP_NEW_PRIMITIVE, (wy_u8) WY_TYPE_TAG_LIST, 0), enc2b(0, 0),
             enc2a(WY_OP_NEW_PRIMITIVE, (wy_u8) WY_TYPE_TAG_TABLE, 1), enc2b(0, 0),
-            enc1(WY_OP_RETURN, 2, 0),
+            enc2a(WY_OP_TUPLE, 2, 0), enc2b(0, 0), enc1(WY_OP_RETURN, 0, 0),
         };
         wy_value out[2];
         REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 2, 0, WY_NULL, 0, out, 2), WY_ERR_NONE);
@@ -1269,7 +1274,7 @@ TEST_SUITE("vm defers and fault unwinding") {
             enc2a(WY_OP_DEFER_REG, 2, 0), enc2b(0, 0),
             enc2a(WY_OP_CLOSURE, 0, 0), enc2b(2, 0),
             enc2a(WY_OP_DEFER_REG, 0, 0), enc2b(0, 0),
-            enc1(WY_OP_RETURN, 1, 0x8000),
+            enc1(WY_OP_RETURN, 0, 0x8000),
             /* 17 d1 */
             enc1(WY_OP_I8, 1, 0), enc1(WY_OP_GSET, 0, 3), enc1(WY_OP_GSET, 0, 0), enc1(WY_OP_RETURN, 0, 0),
             /* 21 d2 */
@@ -1312,15 +1317,15 @@ TEST_SUITE("vm defers and fault unwinding") {
             enc2a(WY_OP_CLOSURE, 0, 0), enc2b(3, 0),
             enc2a(WY_OP_DEFER_REG, 1, 0), enc2b(0, 0),
             enc2a(WY_OP_CLOSURE, 0, 1), enc2b(1, 0),
-            enc2a(WY_OP_CALL, 0, 1), enc2b(1, 0),
-            enc1(WY_OP_RETURN, 1, 1),
-            /* 9 inner */
+            enc1(WY_OP_CALL, 0, 1),
+            enc1(WY_OP_RETURN, 0, 0),
+            /* 8 inner */
             enc2a(WY_OP_CLOSURE, 0, 0), enc2b(2, 0),
             enc2a(WY_OP_DEFER_REG, 2, 0), enc2b(0, 0),
             enc1(WY_OP_TRAP, 0, 0),
-            /* 14 d_inner */
+            /* 13 d_inner */
             enc1(WY_OP_I8, 1, 0), enc1(WY_OP_GSET, 0, 1), enc1(WY_OP_RETURN, 0, 0),
-            /* 17 d_outer */
+            /* 16 d_outer */
             enc1(WY_OP_GGET, 0, 1), enc1(WY_OP_I8, 10, 1),
             enc2a(WY_OP_ADD, 0, 0), enc2b(0, 1),
             enc1(WY_OP_GSET, 0, 0), enc1(WY_OP_RETURN, 0, 0),
@@ -1330,8 +1335,8 @@ TEST_SUITE("vm defers and fault unwinding") {
             wy_context* context = ctx.get_context_ptr();
             if (threshold == 0) { context->gc_threshold = 0; context->gc_growth_factor = 0; }
             wy_module* module = make_code_module(context, code, std::size(code), {
-                proto_at(context, "outer", 0, 2), proto_at(context, "inner", 9, 1),
-                proto_at(context, "d_inner", 14, 1), proto_at(context, "d_outer", 17, 2) });
+                proto_at(context, "outer", 0, 2), proto_at(context, "inner", 8, 1),
+                proto_at(context, "d_inner", 13, 1), proto_at(context, "d_outer", 16, 2) });
             give_globals(context, module, 2);
             wy_value* base_top = ctx.get_fiber_ptr()->value_stack.top;
 
@@ -1356,18 +1361,18 @@ TEST_SUITE("vm defers and fault unwinding") {
             enc2a(WY_OP_CLOSURE, 0, 0), enc2b(1, 0),
             enc1(WY_OP_GSET, 0, 1),
             enc1(WY_OP_I8, 120, 1),
-            enc2a(WY_OP_CALL, 1, 0), enc2b(1, 0),
-            enc1(WY_OP_RETURN, 1, 0),
-            /* 9 rec */
+            enc1(WY_OP_CALL, 1, 0),
+            enc1(WY_OP_RETURN, 0, 0),
+            /* 8 rec */
             enc2a(WY_OP_CLOSURE, 0, 0), enc2b(2, 0),
             enc2a(WY_OP_DEFER_REG, 0, 0), enc2b(0, 0),
             enc1(WY_OP_JT, 0x80, 1),
             enc1(WY_OP_TRAP, 1, 0),
             enc1(WY_OP_GGET, 0, 1), enc1(WY_OP_I8, 1, 2),
             enc2a(WY_OP_SUB, 0, 1), enc2b(0x8000, 2),
-            enc2a(WY_OP_CALL, 1, 0), enc2b(1, 0),
-            enc1(WY_OP_RETURN, 1, 0),
-            /* 22 count */
+            enc1(WY_OP_CALL, 1, 0),
+            enc1(WY_OP_RETURN, 0, 0),
+            /* 20 count */
             enc1(WY_OP_GGET, 0, 0), enc1(WY_OP_I8, 1, 1),
             enc2a(WY_OP_ADD, 0, 0), enc2b(0, 1),
             enc1(WY_OP_GSET, 0, 0), enc1(WY_OP_RETURN, 0, 0),
@@ -1377,7 +1382,7 @@ TEST_SUITE("vm defers and fault unwinding") {
             wy_context* context = ctx.get_context_ptr();
             if (threshold == 0) { context->gc_threshold = 0; context->gc_growth_factor = 0; }
             wy_module* module = make_code_module(context, code, std::size(code), {
-                proto_at(context, "main", 0, 3), proto_at(context, "rec", 9, 3, 1), proto_at(context, "count", 22, 2) });
+                proto_at(context, "main", 0, 3), proto_at(context, "rec", 8, 3, 1), proto_at(context, "count", 20, 2) });
             give_globals(context, module, 2);
 
             wy_value out[1];
@@ -1398,7 +1403,7 @@ TEST_SUITE("vm defers and fault unwinding") {
             enc2a(WY_OP_CLOSURE, 0, 0), enc2b(2, 0),
             enc2a(WY_OP_DEFER_REG, 0, 0), enc2b(0, 0),
             enc1(WY_OP_I8, 5, 1),
-            enc1(WY_OP_RETURN, 1, 1),
+            enc1(WY_OP_RETURN, 0, 1),
             /* 10 d_mark */
             enc1(WY_OP_I8, 1, 0), enc1(WY_OP_GSET, 0, 0), enc1(WY_OP_RETURN, 0, 0),
             /* 13 d_trap */
@@ -1435,11 +1440,12 @@ TEST_SUITE("vm construct-on-call and message identities") {
     const wy_u32 construct_code[] = {
         /* 0 main */
         enc1(WY_OP_GGET, 0, 0),
-        enc2a(WY_OP_CALL, 0, 0), enc2b(1, 0),
-        enc1(WY_OP_RETURN, 1, 0),
-        /* 4 init(): this = P0; setattr(this, symbols[0], statics[0]); return */
+        enc1(WY_OP_CALL, 0, 0),
+        enc1(WY_OP_RETURN, 0, 0),
+        /* 3 init(): this = P0; setattr(this, symbols[0], statics[0]); return nil */
         enc1(WY_OP_LCONST, 1, 0),
         enc2a(WY_OP_SETATTR, 0, 0x8000), enc2b(0, 1),
+        enc1(WY_OP_LNIL, 0, 0),
         enc1(WY_OP_RETURN, 0, 0),
     };
 
@@ -1450,7 +1456,7 @@ TEST_SUITE("vm construct-on-call and message identities") {
         wy_symbol x_sym = "x";
         const wy_value statics[] = { wy_value_word(42) };
         wy_module* module = make_code_module(context, construct_code, std::size(construct_code),
-            { proto_at(context, "main", 0, 1, 0), proto_at(context, "init!", 4, 2, 0) },
+            { proto_at(context, "main", 0, 1, 0), proto_at(context, "init!", 3, 2, 0) },
             statics, 1, &x_sym, 1);
         give_globals(context, module, 1);
 
@@ -1480,7 +1486,7 @@ TEST_SUITE("vm construct-on-call and message identities") {
         wy_symbol x_sym = "x";
         // Only functions[0] (main) is used; there is no init function at all.
         wy_module* module = make_code_module(context,
-            construct_code, 4 /* just the main body, words 0..3 */,
+            construct_code, 3 /* just the main body, words 0..2 */,
             { proto_at(context, "main", 0, 1, 0) }, WY_NULL, 0, &x_sym, 1);
         give_globals(context, module, 1);
 
@@ -1508,8 +1514,8 @@ TEST_SUITE("vm construct-on-call and message identities") {
         const wy_u32 code[] = {
             enc1(WY_OP_GGET, 0, 0),
             enc1(WY_OP_I8, 3, 1),
-            enc2a(WY_OP_CALL, 1, 0), enc2b(1, 0),
-            enc1(WY_OP_RETURN, 1, 0),
+            enc1(WY_OP_CALL, 1, 0),
+            enc1(WY_OP_RETURN, 0, 0),
         };
         wy_module* module = make_code_module(context, code, std::size(code),
             { proto_at(context, "main", 0, 2, 0) });
@@ -1573,5 +1579,185 @@ TEST_SUITE("vm construct-on-call and message identities") {
         wy_value another_body = wy_value_object(WY_TYPE_TAG_FUNCTION, msg->overloads[0].body.data.gc_object);
         REQUIRE_EQ(wy_message_add_overload_f(context, msg, 0, WY_NULL, another_body), WY_ERR_NONE);
         CHECK_EQ(msg->overload_count, 2u);
+    }
+}
+
+// The one-result opcodes (project H-single-result D4): `return src` and every
+// call-like op deliver one value to the caller's L0, whatever the call's base.
+namespace {
+
+/** Build a module of [caller | callee] code with the callee as functions[1]. */
+wy_function* make_pair(wy_context* context, const std::vector<wy_u32>& caller,
+    const std::vector<wy_u32>& callee, wy_u16 caller_nlocals, wy_u16 callee_nlocals,
+    wy_u16 callee_nparams)
+{
+    std::vector<wy_u32> combined(caller);
+    combined.insert(combined.end(), callee.begin(), callee.end());
+    auto* code = (wy_u32*) wy_context_gc_alloc(context, sizeof(wy_u32) * combined.size());
+    std::copy(combined.begin(), combined.end(), code);
+
+    wy_function_proto callee_proto = proto_at(context, "callee", (wy_u32) caller.size(), callee_nlocals, callee_nparams);
+    wy_function_proto caller_proto = proto_at(context, "caller", 0, caller_nlocals);
+    wy_module* module = make_code_module(context, code, combined.size(), { caller_proto, callee_proto });
+    wy_function* fn = WY_NULL;
+    REQUIRE_EQ(wy_function_new(context, module, &module->functions[0], WY_NULL, 0, &fn), WY_ERR_NONE);
+    return fn;
+}
+
+} // namespace
+
+TEST_SUITE("single result") {
+    TEST_CASE("call delivers to L0 and leaves the callee slot alone; return reads a P register") {
+        test_fiber_fixture ctx;
+        wy_context* context = ctx.get_context_ptr();
+        // callee(a): return P0
+        const std::vector<wy_u32> callee = { enc1(WY_OP_RETURN, 0, 0x8000) };
+        const std::vector<wy_u32> caller = {
+            enc2a(WY_OP_CLOSURE, 0, 2), enc2b(1, 0),   // L2 <- callee (base 2)
+            enc1(WY_OP_I8, 5, 3),                      // L3 <- 5 (the argument)
+            enc1(WY_OP_I8, 99, 0),                     // L0 <- 99, clobbered by the call
+            enc1(WY_OP_CALL, 1, 2),                    // call base=2 argc=1
+            enc1(WY_OP_MOVE, 0, 4),                    // L4 <- L0, the result
+            enc2a(WY_OP_TUPLE, 3, 5), enc2b(2, 0),     // L5 <- (L2, L3, L4)
+            enc1(WY_OP_RETURN, 0, 5),
+        };
+        wy_function* fn = make_pair(context, caller, callee, 6, 0, 1);
+        wy_value out[3];
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 3),
+            WY_ERR_NONE);
+        CHECK_EQ(out[0].type, WY_TYPE_TAG_FUNCTION);  // the callee slot still holds the callee
+        CHECK_EQ(out[1].data.word, 5);
+        CHECK_EQ(out[2].data.word, 5);                // the result came through L0
+    }
+
+    TEST_CASE("the wide call form takes argc from a1") {
+        test_fiber_fixture ctx;
+        wy_context* context = ctx.get_context_ptr();
+        // callee(a, b): return P1
+        const std::vector<wy_u32> callee = { enc1(WY_OP_RETURN, 0, 0x8001) };
+        const std::vector<wy_u32> caller = {
+            enc2a(WY_OP_CLOSURE, 0, 1), enc2b(1, 0),
+            enc1(WY_OP_I8, 4, 2),
+            enc1(WY_OP_I8, 8, 3),
+            enc2a(WY_OP_CALL_WIDE, 0, 1), enc2b(2, 0),  // call base=1, argc=2 (a1)
+            enc1(WY_OP_RETURN, 0, 0),
+        };
+        wy_function* fn = make_pair(context, caller, callee, 4, 0, 2);
+        wy_value out[1];
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 1),
+            WY_ERR_NONE);
+        CHECK_EQ(out[0].data.word, 8);
+    }
+
+    TEST_CASE("call_va delivers to L0") {
+        test_fiber_fixture ctx;
+        wy_context* context = ctx.get_context_ptr();
+        // callee(x): return P0 * 2 via L1
+        const std::vector<wy_u32> callee = {
+            enc1(WY_OP_I8, 2, 1),
+            enc2a(WY_OP_MUL, 0, 1), enc2b(0x8000, 1),
+            enc1(WY_OP_RETURN, 0, 1),
+        };
+        const std::vector<wy_u32> caller = {
+            enc2a(WY_OP_CLOSURE, 0, 1), enc2b(1, 0),                     // L1 <- callee
+            enc1(WY_OP_I8, 3, 4),
+            enc2a(WY_OP_TUPLE, 1, 2), enc2b(4, 0),                       // L2 <- (3)
+            enc2a(WY_OP_NEW_PRIMITIVE, (wy_u8) WY_TYPE_TAG_TABLE, 3), enc2b(0, 0),  // L3 <- {}
+            enc2a(WY_OP_CALL_VA, 0, 1), enc2b(0, 0),                     // call_va base=1
+            enc1(WY_OP_RETURN, 0, 0),
+        };
+        wy_function* fn = make_pair(context, caller, callee, 5, 2, 1);
+        wy_value out[1];
+        REQUIRE_EQ(test_call_sync(context, wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn), WY_NULL, 0, out, 1),
+            WY_ERR_NONE);
+        CHECK_EQ(out[0].data.word, 6);
+    }
+
+    TEST_CASE("a native leaf call delivers to L0") {
+        test_fiber_fixture ctx;
+        wy_context* context = ctx.get_context_ptr();
+        wy_module* builtins = WY_NULL;
+        REQUIRE_EQ(wy_builtins_new(context, &builtins), WY_ERR_NONE);
+        wy_symbol len_sym = WY_NULL;
+        REQUIRE_EQ(wy_context_intern(context, "len", 3, &len_sym), WY_ERR_NONE);
+        wy_uword slot = wy_slot_dict_get(&builtins->exports, len_sym);
+        REQUIRE_NE(slot, WY_SLOT_INVALID);
+        const wy_value statics[] = { builtins->globals[slot] };
+
+        const wy_u32 code[] = {
+            enc1(WY_OP_LCONST, 3, 0),                  // L3 <- len
+            enc1(WY_OP_I8, 1, 5),
+            enc1(WY_OP_I8, 2, 6),
+            enc2a(WY_OP_TUPLE, 2, 4), enc2b(5, 0),     // L4 <- (1, 2)
+            enc1(WY_OP_CALL, 1, 3),                    // call base=3 argc=1: L0 <- len(L4)
+            enc1(WY_OP_RETURN, 0, 0),
+        };
+        wy_value out[1];
+        REQUIRE_EQ(run_synthetic(context, code, std::size(code), 7, 0, WY_NULL, 0, out, 1, statics, 1), WY_ERR_NONE);
+        CHECK_EQ(out[0].data.word, 2);
+    }
+
+    TEST_CASE("a nested call f(g(x)) copies g's value out of L0 before f's call") {
+        test_fiber_fixture ctx;
+        wy_context* context = ctx.get_context_ptr();
+        // main: L1 <- f; L2 <- g; L3 <- 5; call g -> L0; L2 <- L0; call f(L2) -> L0; return L0
+        const wy_u32 main_code[] = {
+            enc2a(WY_OP_CLOSURE, 0, 1), enc2b(1, 0),
+            enc2a(WY_OP_CLOSURE, 0, 2), enc2b(2, 0),
+            enc1(WY_OP_I8, 5, 3),
+            enc1(WY_OP_CALL, 1, 2),                   // L0 <- g(5)
+            enc1(WY_OP_MOVE, 0, 2),                   // the outer argument slot (base + 1)
+            enc1(WY_OP_CALL, 1, 1),                   // L0 <- f(g(5))
+            enc1(WY_OP_RETURN, 0, 0),
+        };
+        // f(a): P0 + 1; g(a): P0 * 2, both through L1
+        const wy_u32 f_code[] = {
+            enc1(WY_OP_I8, 1, 1), enc2a(WY_OP_ADD, 0, 1), enc2b(0x8000, 1), enc1(WY_OP_RETURN, 0, 1),
+        };
+        const wy_u32 g_code[] = {
+            enc1(WY_OP_I8, 2, 1), enc2a(WY_OP_MUL, 0, 1), enc2b(0x8000, 1), enc1(WY_OP_RETURN, 0, 1),
+        };
+        std::vector<wy_u32> all(std::begin(main_code), std::end(main_code));
+        const wy_u32 f_off = (wy_u32) all.size();
+        all.insert(all.end(), std::begin(f_code), std::end(f_code));
+        const wy_u32 g_off = (wy_u32) all.size();
+        all.insert(all.end(), std::begin(g_code), std::end(g_code));
+        auto* code = (wy_u32*) wy_context_gc_alloc(context, sizeof(wy_u32) * all.size());
+        std::copy(all.begin(), all.end(), code);
+        wy_module* module = make_code_module(context, code, all.size(),
+            { proto_at(context, "main", 0, 4), proto_at(context, "f", f_off, 2, 1), proto_at(context, "g", g_off, 2, 1) });
+        wy_value out[1];
+        REQUIRE_EQ(run_fn0(context, module, WY_NULL, 0, out, 1), WY_ERR_NONE);
+        CHECK_EQ(out[0].data.word, 11);
+    }
+
+    TEST_CASE("a native that returns a tuple delivers it as the one value; unpack takes it apart") {
+        test_fiber_fixture ctx;
+        wy_context* context = ctx.get_context_ptr();
+        struct local {
+            static wy_error pair(wy_context* c, wy_value* args, wy_uword, wy_value* out) {
+                wy_value items[2] = { args[0], wy_value_word(args[0].data.word * 2) };
+                wy_tuple* tup = WY_NULL;
+                wy_error err = wy_tuple_new(c, items, 2, &tup);
+                if (err != WY_ERR_NONE) { return err; }
+                *out = wy_value_object(WY_TYPE_TAG_TUPLE, (wy_object*) tup);
+                return WY_ERR_NONE;
+            }
+        };
+        wy_native* native = WY_NULL;
+        REQUIRE_EQ(wy_native_leaf_new(context, "pair", 1, 1, local::pair, &native), WY_ERR_NONE);
+        const wy_value statics[] = { wy_value_object(WY_TYPE_TAG_NATIVE, (wy_object*) native) };
+        const wy_u32 code[] = {
+            enc1(WY_OP_LCONST, 1, 0),                  // L1 <- pair
+            enc1(WY_OP_I8, 4, 2),                      // L2 <- 4
+            enc1(WY_OP_CALL, 1, 1),                    // L0 <- pair(4) = (4, 8)
+            enc2a(WY_OP_UNPACK, 2, 3), enc2b(0, 0),    // L3, L4 <- unpack(L0)
+            enc2a(WY_OP_TUPLE, 2, 5), enc2b(3, 0),     // L5 <- (L3, L4)
+            enc1(WY_OP_RETURN, 0, 5),
+        };
+        wy_value out[2];
+        REQUIRE_EQ(run_synthetic(context, code, std::size(code), 6, 0, WY_NULL, 0, out, 2, statics, 1), WY_ERR_NONE);
+        CHECK_EQ(out[0].data.word, 4);
+        CHECK_EQ(out[1].data.word, 8);
     }
 }

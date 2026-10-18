@@ -57,7 +57,6 @@ wy_fiber* wy_fiber_create(wy_context* context, wy_uword stack_len, wy_uword fram
     fiber->coroutine = WY_NULL;
     fiber->pending_native_dst = WY_NULL;
     fiber->pending_native_base_count = 0;
-    fiber->pending_native_nres = 0;
 
     fiber->current_frame = WY_MEM_INFO_BEGIN_PTR(wy_frame, &fiber->frame_memory);
     wy_memset(fiber->current_frame, 0, sizeof(wy_frame));
@@ -65,7 +64,6 @@ wy_fiber* wy_fiber_create(wy_context* context, wy_uword stack_len, wy_uword fram
     fiber->current_frame->ret_kind = WY_RET_RESERVED;
     fiber->current_frame->restore_base = wy_stack_base_f(&fiber->value_stack);
     fiber->current_frame->native = wy_exec_fn_create_empty();
-    fiber->current_frame->ret_nres = 0;
 
     wy_context_object_init_header_f(context, &fiber->object, &wy_type_fiber);
     return fiber;
@@ -252,11 +250,11 @@ static wy_error next_children_iter(wy_context* context, wy_object* object, wy_wo
 
 
 /**
- * Push a call frame, reserving the caller's result slots
+ * Push a call frame, reserving the caller's one result slot
  *
  * @memberof wy_fiber
  */
-wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn, wy_uword result_count)
+wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn)
 {
     WY_ASSERT(self != WY_NULL && !wy_exec_fn_is_empty(&fn));
 
@@ -265,8 +263,8 @@ wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn, wy_uword result_co
         return WY_ERR_STACK_OVERFLOW;
     }
 
-    /* Results live below the base, so they are reserved before rebasing. */
-    wy_error last_error = wy_stack_reserve_f(&self->value_stack, result_count);
+    /* The result lives below the base, so it is reserved before rebasing. */
+    wy_error last_error = wy_stack_reserve_f(&self->value_stack, 1);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
     wy_memset(new_frame, 0, sizeof(wy_frame));
@@ -274,7 +272,6 @@ wy_error wy_fiber_push_frame_f(wy_fiber* self, wy_exec_fn fn, wy_uword result_co
     new_frame->ret_kind = WY_RET_RESERVED;
     new_frame->native = fn;
     new_frame->restore_base = wy_stack_base_f(&self->value_stack);
-    new_frame->ret_nres = (wy_u16) result_count;
 
     wy_stack_base_restore_f(&self->value_stack, wy_stack_top_f(&self->value_stack));
     self->current_frame = new_frame;

@@ -321,16 +321,16 @@ static wy_error write_joined_(wy_context* context, wy_value* args, wy_uword argc
  * format_value_, followed by a trailing "\n". Confirmed byte-exact against
  * test/bytecode/{arith,control_flow,multiret}.out.
  */
-wy_error wy_builtin_println_body_f(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+wy_error wy_builtin_println_body_f(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     wy_error err = write_joined_(context, args, argc, true);
-    for (wy_uword i = 0; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_nil();
     return err;
 }
 
-static wy_error builtin_println_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_println_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
-    return wy_builtin_println_body_f(context, args, argc, out, nres);
+    return wy_builtin_println_body_f(context, args, argc, out);
 }
 
 /*
@@ -341,10 +341,10 @@ static wy_error builtin_println_(wy_context* context, wy_value* args, wy_uword a
  * (the trailing "\n" is a literal argument, joined with its own leading
  * space like any other argument).
  */
-static wy_error builtin_print_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_print_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     wy_error err = write_joined_(context, args, argc, false);
-    for (wy_uword i = 0; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_nil();
     return err;
 }
 
@@ -390,104 +390,101 @@ static const char* type_name_(wy_value v)
     }
 }
 
-static wy_error builtin_cons_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_cons_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     wy_pair* p = wy_pair_cons_f(context, args[0], args[1]);
     if (p == WY_NULL) { return WY_ERR_NOMEM; }
-    out[0] = wy_value_object(WY_TYPE_TAG_PAIR, (wy_object*) p);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_object(WY_TYPE_TAG_PAIR, (wy_object*) p);
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_car_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_car_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     wy_value x = args[0];
     wy_error err = WY_ERR_NONE;
     if (x.type == WY_TYPE_TAG_PAIR) {
-        out[0] = ((wy_pair*) x.data.gc_object)->car;
+        *out = ((wy_pair*) x.data.gc_object)->car;
     } else if (x.type == WY_TYPE_TAG_NIL) {
-        err = write_error_value_(context, "car: cannot take car of '() (the empty list)", &out[0]);
+        err = write_error_value_(context, "car: cannot take car of '() (the empty list)", out);
     } else if (x.type == WY_TYPE_TAG_LIST) {
         wy_list* l = (wy_list*) x.data.gc_object;
-        if (l->count == 0) { err = write_error_value_(context, "car: empty list/array/string has no first element", &out[0]); }
-        else { out[0] = l->items[0]; }
+        if (l->count == 0) { err = write_error_value_(context, "car: empty list/array/string has no first element", out); }
+        else { *out = l->items[0]; }
     } else if (x.type == WY_TYPE_TAG_TUPLE) {
         wy_tuple* t = (wy_tuple*) x.data.gc_object;
-        if (t->count == 0) { err = write_error_value_(context, "car: empty list/array/string has no first element", &out[0]); }
-        else { out[0] = t->items[0]; }
+        if (t->count == 0) { err = write_error_value_(context, "car: empty list/array/string has no first element", out); }
+        else { *out = t->items[0]; }
     } else if (x.type == WY_TYPE_TAG_STR) {
         wy_string* s = x.data.str;
         if (s->len == 0) {
-            err = write_error_value_(context, "car: empty list/array/string has no first element", &out[0]);
+            err = write_error_value_(context, "car: empty list/array/string has no first element", out);
         } else {
             wy_uword seq_len = wy_utf8_offset_at_f(s->str, s->len, 1);
             wy_string* ch = WY_NULL;
             err = wy_string_new(context, s->str, seq_len, &ch);
-            if (err == WY_ERR_NONE) { out[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) ch); }
+            if (err == WY_ERR_NONE) { *out = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) ch); }
         }
     } else {
         char msg[96];
         snprintf(msg, sizeof(msg), "car: not a pair/list/array/string (got %s)", type_name_(x));
-        err = write_error_value_(context, msg, &out[0]);
+        err = write_error_value_(context, msg, out);
     }
     if (err != WY_ERR_NONE) { return err; }
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_cdr_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_cdr_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     wy_value x = args[0];
     wy_error err = WY_ERR_NONE;
     if (x.type == WY_TYPE_TAG_PAIR) {
-        out[0] = ((wy_pair*) x.data.gc_object)->cdr;
+        *out = ((wy_pair*) x.data.gc_object)->cdr;
     } else if (x.type == WY_TYPE_TAG_NIL) {
-        err = write_error_value_(context, "cdr: cannot take cdr of '() (the empty list)", &out[0]);
+        err = write_error_value_(context, "cdr: cannot take cdr of '() (the empty list)", out);
     } else if (x.type == WY_TYPE_TAG_LIST) {
         wy_list* l = (wy_list*) x.data.gc_object;
         if (l->count == 0) {
-            err = write_error_value_(context, "cdr: empty list/array/string has no rest", &out[0]);
+            err = write_error_value_(context, "cdr: empty list/array/string has no rest", out);
         } else {
             wy_list* rest = WY_NULL;
             err = wy_list_new(context, l->count - 1, &rest);
             for (wy_uword i = 1; err == WY_ERR_NONE && i < l->count; i++) {
                 err = wy_list_push(context, rest, l->items[i]);
             }
-            if (err == WY_ERR_NONE) { out[0] = wy_value_object(WY_TYPE_TAG_LIST, (wy_object*) rest); }
+            if (err == WY_ERR_NONE) { *out = wy_value_object(WY_TYPE_TAG_LIST, (wy_object*) rest); }
         }
     } else if (x.type == WY_TYPE_TAG_TUPLE) {
         wy_tuple* t = (wy_tuple*) x.data.gc_object;
         if (t->count == 0) {
-            err = write_error_value_(context, "cdr: empty list/array/string has no rest", &out[0]);
+            err = write_error_value_(context, "cdr: empty list/array/string has no rest", out);
         } else {
             wy_tuple* rest = WY_NULL;
             err = wy_tuple_new(context, &t->items[1], t->count - 1, &rest);
-            if (err == WY_ERR_NONE) { out[0] = wy_value_object(WY_TYPE_TAG_TUPLE, (wy_object*) rest); }
+            if (err == WY_ERR_NONE) { *out = wy_value_object(WY_TYPE_TAG_TUPLE, (wy_object*) rest); }
         }
     } else if (x.type == WY_TYPE_TAG_STR) {
         wy_string* s = x.data.str;
         if (s->len == 0) {
-            err = write_error_value_(context, "cdr: empty list/array/string has no rest", &out[0]);
+            err = write_error_value_(context, "cdr: empty list/array/string has no rest", out);
         } else {
             wy_uword byte_off = wy_utf8_offset_at_f(s->str, s->len, 1);
             wy_string* rest = WY_NULL;
             err = wy_string_new(context, s->str + byte_off, s->len - byte_off, &rest);
-            if (err == WY_ERR_NONE) { out[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) rest); }
+            if (err == WY_ERR_NONE) { *out = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) rest); }
         }
     } else {
         char msg[96];
         snprintf(msg, sizeof(msg), "cdr: not a pair/list/array/string (got %s)", type_name_(x));
-        err = write_error_value_(context, msg, &out[0]);
+        err = write_error_value_(context, msg, out);
     }
     if (err != WY_ERR_NONE) { return err; }
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_reverse_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_reverse_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     wy_value node = args[0];
@@ -499,12 +496,11 @@ static wy_error builtin_reverse_(wy_context* context, wy_value* args, wy_uword a
         chain = wy_value_object(WY_TYPE_TAG_PAIR, (wy_object*) cell);
         node = p->cdr;
     }
-    out[0] = chain;
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = chain;
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_nreverse_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_nreverse_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     wy_value container = args[0];
@@ -517,9 +513,9 @@ static wy_error builtin_nreverse_(wy_context* context, wy_value* args, wy_uword 
                 l->items[j] = tmp;
             }
         }
-        out[0] = container;
+        *out = container;
     } else if (container.type == WY_TYPE_TAG_NIL) {
-        out[0] = container;
+        *out = container;
     } else if (container.type == WY_TYPE_TAG_PAIR) {
         wy_value prev = wy_value_nil();
         wy_value node = container;
@@ -530,45 +526,41 @@ static wy_error builtin_nreverse_(wy_context* context, wy_value* args, wy_uword 
             prev = node;
             node = next;
         }
-        out[0] = prev;
+        *out = prev;
     } else {
         return WY_ERR_BAD_TYPE;
     }
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_set_car_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_set_car_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_PAIR) { return WY_ERR_BAD_TYPE; }
     ((wy_pair*) args[0].data.gc_object)->car = args[1];
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_set_cdr_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_set_cdr_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_PAIR) { return WY_ERR_BAD_TYPE; }
     ((wy_pair*) args[0].data.gc_object)->cdr = args[1];
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_tuple_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_tuple_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     wy_tuple* t = WY_NULL;
     wy_error err = wy_tuple_new(context, args, argc, &t);
     if (err != WY_ERR_NONE) { return err; }
-    out[0] = wy_value_object(WY_TYPE_TAG_TUPLE, (wy_object*) t);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_object(WY_TYPE_TAG_TUPLE, (wy_object*) t);
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_copy_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_copy_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     wy_value x = args[0];
@@ -578,7 +570,7 @@ static wy_error builtin_copy_(wy_context* context, wy_value* args, wy_uword argc
         wy_pair* p = (wy_pair*) x.data.gc_object;
         wy_pair* np = wy_pair_cons_f(context, p->car, p->cdr);
         if (np == WY_NULL) { return WY_ERR_NOMEM; }
-        out[0] = wy_value_object(WY_TYPE_TAG_PAIR, (wy_object*) np);
+        *out = wy_value_object(WY_TYPE_TAG_PAIR, (wy_object*) np);
         break;
     }
     case WY_TYPE_TAG_LIST: {
@@ -589,7 +581,7 @@ static wy_error builtin_copy_(wy_context* context, wy_value* args, wy_uword argc
             err = wy_list_push(context, nl, l->items[i]);
         }
         if (err != WY_ERR_NONE) { return err; }
-        out[0] = wy_value_object(WY_TYPE_TAG_LIST, (wy_object*) nl);
+        *out = wy_value_object(WY_TYPE_TAG_LIST, (wy_object*) nl);
         break;
     }
     case WY_TYPE_TAG_TUPLE: {
@@ -597,7 +589,7 @@ static wy_error builtin_copy_(wy_context* context, wy_value* args, wy_uword argc
         wy_tuple* nt = WY_NULL;
         err = wy_tuple_new(context, t->items, t->count, &nt);
         if (err != WY_ERR_NONE) { return err; }
-        out[0] = wy_value_object(WY_TYPE_TAG_TUPLE, (wy_object*) nt);
+        *out = wy_value_object(WY_TYPE_TAG_TUPLE, (wy_object*) nt);
         break;
     }
     case WY_TYPE_TAG_TABLE: {
@@ -609,21 +601,20 @@ static wy_error builtin_copy_(wy_context* context, wy_value* args, wy_uword argc
                 d->dense[i].value.type, d->dense[i].value.data);
         }
         if (err != WY_ERR_NONE) { return err; }
-        out[0] = wy_value_object(WY_TYPE_TAG_TABLE, (wy_object*) nd);
+        *out = wy_value_object(WY_TYPE_TAG_TABLE, (wy_object*) nd);
         break;
     }
     case WY_TYPE_TAG_NIL: case WY_TYPE_TAG_BOOL: case WY_TYPE_TAG_WORD:
     case WY_TYPE_TAG_UWORD: case WY_TYPE_TAG_FLOAT: case WY_TYPE_TAG_STR:
-        out[0] = x;
+        *out = x;
         break;
     default:
         return WY_ERR_BAD_TYPE;
     }
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_substr_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_substr_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_STR) { return WY_ERR_BAD_TYPE; }
@@ -647,23 +638,21 @@ static wy_error builtin_substr_(wy_context* context, wy_value* args, wy_uword ar
     wy_string* sub = WY_NULL;
     wy_error err = wy_string_new(context, s->str + byte_start, byte_end - byte_start, &sub);
     if (err != WY_ERR_NONE) { return err; }
-    out[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) sub);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) sub);
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_append_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_append_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_LIST) { return WY_ERR_BAD_TYPE; }
     wy_error err = wy_list_push(context, (wy_list*) args[0].data.gc_object, args[1]);
     if (err != WY_ERR_NONE) { return err; }
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_resize_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_resize_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_LIST) { return WY_ERR_BAD_TYPE; }
@@ -679,12 +668,11 @@ static wy_error builtin_resize_(wy_context* context, wy_value* args, wy_uword ar
             if (err != WY_ERR_NONE) { return err; }
         }
     }
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_expand_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_expand_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_LIST) { return WY_ERR_BAD_TYPE; }
@@ -696,20 +684,18 @@ static wy_error builtin_expand_(wy_context* context, wy_value* args, wy_uword ar
         wy_error err = wy_list_push(context, l, args[1]);
         if (err != WY_ERR_NONE) { return err; }
     }
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error builtin_remove_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_remove_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_TABLE) { return WY_ERR_BAD_TYPE; }
     wy_value removed;
     wy_error err = wy_dict_remove(context, (wy_dict*) args[0].data.gc_object, args[1].type, args[1].data, &removed);
     if (err != WY_ERR_NONE) { return err; }
-    out[0] = removed;
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = removed;
     return WY_ERR_NONE;
 }
 
@@ -725,7 +711,7 @@ static wy_error builtin_remove_(wy_context* context, wy_value* args, wy_uword ar
  * native here except car/cdr, an argument error is a VM fault
  * (WY_ERR_BAD_TYPE), mirroring the reference's host TypeError.
  */
-static wy_error builtin_len_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_len_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     wy_value x = args[0];
@@ -761,8 +747,7 @@ static wy_error builtin_len_(wy_context* context, wy_value* args, wy_uword argc,
     default:
         return WY_ERR_BAD_TYPE;
     }
-    out[0] = wy_value_word((wy_word) n);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_word((wy_word) n);
     return WY_ERR_NONE;
 }
 
@@ -784,7 +769,7 @@ static bool bytes_arg_is_int_(wy_value v)
     return v.type == WY_TYPE_TAG_WORD || v.type == WY_TYPE_TAG_UWORD;
 }
 
-static wy_error bytes_construct_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_construct_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     wy_value v = args[0];
@@ -810,12 +795,11 @@ static wy_error bytes_construct_(wy_context* context, wy_value* args, wy_uword a
     } else {
         return WY_ERR_BAD_TYPE;
     }
-    out[0] = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) b);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) b);
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_append_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_append_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -843,12 +827,11 @@ static wy_error bytes_append_(wy_context* context, wy_value* args, wy_uword argc
     } else {
         return WY_ERR_BAD_TYPE;
     }
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_resize_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_resize_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -862,12 +845,11 @@ static wy_error bytes_resize_(wy_context* context, wy_value* args, wy_uword argc
         wy_memset(b->data + b->len, 0, (wy_uword) n - b->len);
     }
     b->len = (wy_uword) n;
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_slice_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_slice_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -879,12 +861,11 @@ static wy_error bytes_slice_(wy_context* context, wy_value* args, wy_uword argc,
     wy_bytes* out_b = WY_NULL;
     wy_error err = wy_bytes_new(context, b->data + start, (wy_uword) count, &out_b);
     if (err != WY_ERR_NONE) { return err; }
-    out[0] = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) out_b);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) out_b);
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_copy_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_copy_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -892,8 +873,7 @@ static wy_error bytes_copy_(wy_context* context, wy_value* args, wy_uword argc, 
     wy_bytes* out_b = WY_NULL;
     wy_error err = wy_bytes_new(context, b->data, b->len, &out_b);
     if (err != WY_ERR_NONE) { return err; }
-    out[0] = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) out_b);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) out_b);
     return WY_ERR_NONE;
 }
 
@@ -929,7 +909,7 @@ static bool bytes_valid_utf8_(const wy_u8* data, wy_uword len)
     return true;
 }
 
-static wy_error bytes_to_str_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_to_str_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -938,8 +918,7 @@ static wy_error bytes_to_str_(wy_context* context, wy_value* args, wy_uword argc
     wy_string* s = WY_NULL;
     wy_error err = wy_string_new(context, (const char*) b->data, b->len, &s);
     if (err != WY_ERR_NONE) { return err; }
-    out[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) s);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) s);
     return WY_ERR_NONE;
 }
 
@@ -965,7 +944,7 @@ static wy_u64 bytes_read_le_(const wy_u8* data, wy_uword at, wy_uword width)
     return bits;
 }
 
-static wy_error bytes_pack_u8_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_pack_u8_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -977,12 +956,11 @@ static wy_error bytes_pack_u8_(wy_context* context, wy_value* args, wy_uword arg
     wy_error err = bytes_pack_bounds_(b, args[1], 1, &at);
     if (err != WY_ERR_NONE) { return err; }
     b->data[at] = (wy_u8) v;
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_pack_i32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_pack_i32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -994,12 +972,11 @@ static wy_error bytes_pack_i32_(wy_context* context, wy_value* args, wy_uword ar
     wy_error err = bytes_pack_bounds_(b, args[1], 4, &at);
     if (err != WY_ERR_NONE) { return err; }
     bytes_write_le_(b->data, at, bits, 4);
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_pack_u32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_pack_u32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -1010,12 +987,11 @@ static wy_error bytes_pack_u32_(wy_context* context, wy_value* args, wy_uword ar
     wy_error err = bytes_pack_bounds_(b, args[1], 4, &at);
     if (err != WY_ERR_NONE) { return err; }
     bytes_write_le_(b->data, at, bits, 4);
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_pack_f32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_pack_f32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -1027,12 +1003,11 @@ static wy_error bytes_pack_f32_(wy_context* context, wy_value* args, wy_uword ar
     wy_error err = bytes_pack_bounds_(b, args[1], 4, &at);
     if (err != WY_ERR_NONE) { return err; }
     bytes_write_le_(b->data, at, bits, 4);
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_pack_f64_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_pack_f64_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -1044,12 +1019,11 @@ static wy_error bytes_pack_f64_(wy_context* context, wy_value* args, wy_uword ar
     wy_error err = bytes_pack_bounds_(b, args[1], 8, &at);
     if (err != WY_ERR_NONE) { return err; }
     bytes_write_le_(b->data, at, bits, 8);
-    out[0] = args[0];
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = args[0];
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_unpack_u8_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_unpack_u8_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -1057,12 +1031,11 @@ static wy_error bytes_unpack_u8_(wy_context* context, wy_value* args, wy_uword a
     wy_uword at;
     wy_error err = bytes_pack_bounds_(b, args[1], 1, &at);
     if (err != WY_ERR_NONE) { return err; }
-    out[0] = wy_value_word(b->data[at]);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_word(b->data[at]);
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_unpack_i32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_unpack_i32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -1072,12 +1045,11 @@ static wy_error bytes_unpack_i32_(wy_context* context, wy_value* args, wy_uword 
     if (err != WY_ERR_NONE) { return err; }
     wy_u32 bits = (wy_u32) bytes_read_le_(b->data, at, 4);
     wy_i32 v; wy_memcpy(&v, &bits, sizeof(v));
-    out[0] = wy_value_word(v);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_word(v);
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_unpack_u32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_unpack_u32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -1086,12 +1058,11 @@ static wy_error bytes_unpack_u32_(wy_context* context, wy_value* args, wy_uword 
     wy_error err = bytes_pack_bounds_(b, args[1], 4, &at);
     if (err != WY_ERR_NONE) { return err; }
     wy_u32 bits = (wy_u32) bytes_read_le_(b->data, at, 4);
-    out[0] = wy_value_word((wy_word) bits);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_word((wy_word) bits);
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_unpack_f32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_unpack_f32_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -1101,12 +1072,11 @@ static wy_error bytes_unpack_f32_(wy_context* context, wy_value* args, wy_uword 
     if (err != WY_ERR_NONE) { return err; }
     wy_u32 bits = (wy_u32) bytes_read_le_(b->data, at, 4);
     float f; wy_memcpy(&f, &bits, sizeof(f));
-    out[0] = wy_value_float((wy_float) f);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_float((wy_float) f);
     return WY_ERR_NONE;
 }
 
-static wy_error bytes_unpack_f64_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error bytes_unpack_f64_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context); WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_BYTES) { return WY_ERR_BAD_TYPE; }
@@ -1116,8 +1086,7 @@ static wy_error bytes_unpack_f64_(wy_context* context, wy_value* args, wy_uword 
     if (err != WY_ERR_NONE) { return err; }
     wy_u64 bits = bytes_read_le_(b->data, at, 8);
     double d; wy_memcpy(&d, &bits, sizeof(d));
-    out[0] = wy_value_float((wy_float) d);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_float((wy_float) d);
     return WY_ERR_NONE;
 }
 
@@ -1125,15 +1094,14 @@ static wy_error bytes_unpack_f64_(wy_context* context, wy_value* args, wy_uword 
  * end; empty when begin >= end), as an iterator: `for x in range(a, b)`
  * and `next(r)` both work on it. Native, so a for-loop over it never
  * switches fibers. Arguments must be integers. */
-static wy_error builtin_range_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_range_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     if (args[0].type != WY_TYPE_TAG_WORD || args[1].type != WY_TYPE_TAG_WORD) { return WY_ERR_BAD_TYPE; }
     wy_iterator* it = WY_NULL;
     wy_error err = wy_iterator_new_range(context, args[0].data.word, args[1].data.word, &it);
     if (err != WY_ERR_NONE) { return err; }
-    if (nres > 0) { out[0] = wy_value_object(WY_TYPE_TAG_ITER, (wy_object*) it); }
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_object(WY_TYPE_TAG_ITER, (wy_object*) it);
     return WY_ERR_NONE;
 }
 
@@ -1184,7 +1152,7 @@ static wy_exec_state builtin_next_exec_(wy_context* context, wy_primitive c_data
         } else if (err != WY_ERR_NONE) {
             return coroutine_fault_(context, fiber, "next: iterator failed");
         }
-        wy_context_set_result(context, 0, item);
+        wy_context_set_result(context, item);
         return WY_EXEC_DONE;
     }
     if (co_v.type != WY_TYPE_TAG_COROUTINE) {
@@ -1192,11 +1160,11 @@ static wy_exec_state builtin_next_exec_(wy_context* context, wy_primitive c_data
     }
     wy_coroutine* co = wy_coroutine_innermost_f((wy_coroutine*) co_v.data.gc_object);
     if (co->state == WY_CO_DONE) {
-        wy_context_set_result(context, 0, coroutine_stop_iteration_value_(context));
+        wy_context_set_result(context, coroutine_stop_iteration_value_(context));
         return WY_EXEC_DONE;
     }
     if (co->state == WY_CO_SUSPENDED) {
-        co->fiber->current_frame->l[co->yield_base] = wy_value_nil();
+        co->fiber->current_frame->l[0] = wy_value_nil();
     }
     co->resumer = fiber;
     co->state = WY_CO_RUNNING;
@@ -1221,13 +1189,13 @@ static wy_exec_state builtin_send_exec_(wy_context* context, wy_primitive c_data
     }
     wy_coroutine* co = wy_coroutine_innermost_f((wy_coroutine*) co_v.data.gc_object);
     if (co->state == WY_CO_DONE) {
-        wy_context_set_result(context, 0, coroutine_stop_iteration_value_(context));
+        wy_context_set_result(context, coroutine_stop_iteration_value_(context));
         return WY_EXEC_DONE;
     }
     if (co->state == WY_CO_CREATED) {
         return coroutine_fault_(context, fiber, "send: coroutine has not started (call next first)");
     }
-    co->fiber->current_frame->l[co->yield_base] = send_v;
+    co->fiber->current_frame->l[0] = send_v;
     co->resumer = fiber;
     co->state = WY_CO_RUNNING;
     co->fiber->pending = wy_exec_fn_create(wy_vm_run, wy_primitive_null());
@@ -1266,12 +1234,11 @@ typedef struct builtin_leaf_entry_
 
 /* Scalar conversion used by imported code as well as ordinary modules.
  * Container/instance string dispatch remains part of the broader builtin work. */
-static wy_error builtin_str_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_str_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
     wy_value value = args[0];
-    if (nres == 0) { return WY_ERR_NONE; }
-    if (value.type == WY_TYPE_TAG_STR) { out[0] = value; return WY_ERR_NONE; }
+    if (value.type == WY_TYPE_TAG_STR) { *out = value; return WY_ERR_NONE; }
     char buffer[WY_BUILTIN_FMT_BUF_SIZE];
     const char* text = buffer;
     wy_uword len;
@@ -1300,14 +1267,14 @@ static wy_error builtin_str_(wy_context* context, wy_value* args, wy_uword argc,
         /* Containers render as println does (a pair list in D2 form). */
         wy_string* rendered = WY_NULL;
         wy_error err = format_to_string_(context, value, &rendered);
-        if (err == WY_ERR_NONE) { out[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) rendered); }
+        if (err == WY_ERR_NONE) { *out = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) rendered); }
         return err;
     }
     default: return WY_ERR_BAD_TYPE;
     }
     wy_string* result = WY_NULL;
     wy_error err = wy_string_new(context, text, len, &result);
-    if (err == WY_ERR_NONE) { out[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) result); }
+    if (err == WY_ERR_NONE) { *out = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) result); }
     return err;
 }
 
@@ -1315,18 +1282,17 @@ static wy_error builtin_str_(wy_context* context, wy_value* args, wy_uword argc,
  * symbol value; what pypoc's runtime provides as a plain builtin and every
  * front-end module (decode.wy, parser.wy, the compiler's own scope reads)
  * takes for granted. A symbol argument answers itself, like `str` does. */
-static wy_error builtin_sym_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_sym_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
-    if (nres == 0) { return WY_ERR_NONE; }
     wy_value value = args[0];
-    if (value.type == WY_TYPE_TAG_SYMBOL) { out[0] = value; return WY_ERR_NONE; }
+    if (value.type == WY_TYPE_TAG_SYMBOL) { *out = value; return WY_ERR_NONE; }
     if (value.type != WY_TYPE_TAG_STR) { return WY_ERR_BAD_TYPE; }
     wy_string* text = (wy_string*) value.data.gc_object;
     wy_symbol sym;
     wy_error err = wy_context_intern(context, text->str, text->len, &sym);
     if (err != WY_ERR_NONE) { return err; }
-    out[0] = wy_value_symbol(sym);
+    *out = wy_value_symbol(sym);
     return WY_ERR_NONE;
 }
 
@@ -1427,15 +1393,14 @@ static wy_error int_from_text_(const char* text, wy_uword len, wy_word* out)
  * `int(value, 0)`), a float truncated toward zero, an integer answering
  * itself. What decode.wy's `decode_int` and every numeric-literal
  * transform take for granted on the front-end side. */
-static wy_error builtin_int_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_int_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context);
     WY_UNUSED(argc);
-    if (nres == 0) { return WY_ERR_NONE; }
     wy_value value = args[0];
-    if (value.type == WY_TYPE_TAG_WORD) { out[0] = value; return WY_ERR_NONE; }
+    if (value.type == WY_TYPE_TAG_WORD) { *out = value; return WY_ERR_NONE; }
     if (value.type == WY_TYPE_TAG_FLOAT) {
-        out[0] = wy_value_word((wy_word) value.data.fp);
+        *out = wy_value_word((wy_word) value.data.fp);
         return WY_ERR_NONE;
     }
     if (value.type == WY_TYPE_TAG_STR) {
@@ -1443,7 +1408,7 @@ static wy_error builtin_int_(wy_context* context, wy_value* args, wy_uword argc,
         wy_word parsed = 0;
         wy_error err = int_from_text_(text->str, text->len, &parsed);
         if (err != WY_ERR_NONE) { return err; }
-        out[0] = wy_value_word(parsed);
+        *out = wy_value_word(parsed);
         return WY_ERR_NONE;
     }
     return WY_ERR_BAD_TYPE;
@@ -1452,14 +1417,13 @@ static wy_error builtin_int_(wy_context* context, wy_value* args, wy_uword argc,
 /* `float(text)` - the numeric cast into a double: a string parsed with
  * strtod, an integer widened, a float answering itself. The float-literal
  * transform (parser.wy's _mk_float) runs through it. */
-static wy_error builtin_float_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_float_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
-    if (nres == 0) { return WY_ERR_NONE; }
     wy_value value = args[0];
-    if (value.type == WY_TYPE_TAG_FLOAT) { out[0] = value; return WY_ERR_NONE; }
+    if (value.type == WY_TYPE_TAG_FLOAT) { *out = value; return WY_ERR_NONE; }
     if (value.type == WY_TYPE_TAG_WORD) {
-        out[0] = wy_value_float((double) value.data.word);
+        *out = wy_value_float((double) value.data.word);
         return WY_ERR_NONE;
     }
     if (value.type == WY_TYPE_TAG_STR) {
@@ -1474,7 +1438,7 @@ static wy_error builtin_float_(wy_context* context, wy_value* args, wy_uword arg
         if (end == buffer) { return WY_ERR_BAD_TYPE; }
         while (*end == ' ' || *end == '\t') { end++; }
         if (*end != '\0') { return WY_ERR_BAD_TYPE; }
-        out[0] = wy_value_float(parsed);
+        *out = wy_value_float(parsed);
         return WY_ERR_NONE;
     }
     return WY_ERR_BAD_TYPE;
@@ -1484,24 +1448,23 @@ static wy_error builtin_float_(wy_context* context, wy_value* args, wy_uword arg
  * `str(e)` is not the way to get this (stringifying an error value is the
  * one native call this VM refuses), and compilers/drivers need to print
  * compile errors. A non-error argument answers nil. */
-static wy_error builtin_error_message_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_error_message_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(context);
     WY_UNUSED(argc);
-    if (nres == 0) { return WY_ERR_NONE; }
     wy_value value = args[0];
     if (value.type != WY_TYPE_TAG_ERROR) {
-        out[0] = wy_value_nil();
+        *out = wy_value_nil();
         return WY_ERR_NONE;
     }
     wy_error_obj* obj = (wy_error_obj*) value.data.gc_object;
     if (obj->what == WY_NULL) {
-        out[0] = wy_value_nil();
+        *out = wy_value_nil();
         return WY_ERR_NONE;
     }
     wy_string* result = WY_NULL;
     wy_error err = wy_string_new(context, obj->what->str, obj->what->len, &result);
-    if (err == WY_ERR_NONE) { out[0] = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) result); }
+    if (err == WY_ERR_NONE) { *out = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) result); }
     return err;
 }
 
@@ -1512,12 +1475,11 @@ static wy_error builtin_error_message_(wy_context* context, wy_value* args, wy_u
  * dependency's exports first. A namespace package exports nothing. An
  * error value when the module can't be found or loaded here.
  */
-static wy_error builtin_module_exports_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_module_exports_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
-    if (nres == 0) { return WY_ERR_NONE; }
     if (args[0].type != WY_TYPE_TAG_STR) {
-        return write_error_value_(context, "module_exports: the path must be a string", &out[0]);
+        return write_error_value_(context, "module_exports: the path must be a string", out);
     }
     wy_module* module = WY_NULL;
     wy_error err = wy_link_import(context, args[0].data.str, &module);
@@ -1526,7 +1488,7 @@ static wy_error builtin_module_exports_(wy_context* context, wy_value* args, wy_
         char text[256];
         snprintf(text, sizeof(text), "module_exports: cannot load '%.*s' (error %d)",
             (int) args[0].data.str->len, args[0].data.str->str, (int) err);
-        return write_error_value_(context, text, &out[0]);
+        return write_error_value_(context, text, out);
     }
     wy_list* names = WY_NULL;
     err = wy_list_new(context, module->exports.entry_count, &names);
@@ -1563,7 +1525,7 @@ static wy_error builtin_module_exports_(wy_context* context, wy_value* args, wy_
         }
         names->items[j] = key;
     }
-    out[0] = held;
+    *out = held;
     return WY_ERR_NONE;
 }
 
@@ -1571,16 +1533,14 @@ static wy_error builtin_module_exports_(wy_context* context, wy_value* args, wy_
  * `tree_box(x)`: wrap the sexpr `x` in a `TreeBase` instance (its one
  * `__tree` slot), the receiver a decorator message is dispatched on.
  */
-static wy_error builtin_tree_box_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_tree_box_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
-    if (nres == 0) { return WY_ERR_NONE; }
     wy_instance* inst = WY_NULL;
     wy_error err = wy_instance_new_f(context, context->tree_base_class, &inst);
     if (err != WY_ERR_NONE) { return err; }
     inst->slots[0] = args[0];
-    out[0] = wy_value_object(WY_TYPE_TAG_INSTANCE, (wy_object*) inst);
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = wy_value_object(WY_TYPE_TAG_INSTANCE, (wy_object*) inst);
     return WY_ERR_NONE;
 }
 
@@ -1588,17 +1548,15 @@ static wy_error builtin_tree_box_(wy_context* context, wy_value* args, wy_uword 
  * `sexpr(x)`: the tree a `TreeBase` box carries; anything else passes
  * through unchanged (so it is the identity on a tree that already is one).
  */
-static wy_error builtin_sexpr_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_sexpr_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
-    if (nres == 0) { return WY_ERR_NONE; }
     wy_value x = args[0];
     if (x.type == WY_TYPE_TAG_INSTANCE) {
         wy_instance* inst = (wy_instance*) x.data.gc_object;
         if (inst->cls == context->tree_base_class) { x = inst->slots[0]; }
     }
-    out[0] = x;
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
+    *out = x;
     return WY_ERR_NONE;
 }
 
@@ -1610,11 +1568,9 @@ static wy_error builtin_sexpr_(wy_context* context, wy_value* args, wy_uword arg
  * wyrm caller then calls it with ordinary arguments. Answers an error value
  * when the name is not visible in `scope` or no overload matches.
  */
-static wy_error builtin_bind_message_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out, wy_uword nres)
+static wy_error builtin_bind_message_(wy_context* context, wy_value* args, wy_uword argc, wy_value* out)
 {
     WY_UNUSED(argc);
-    if (nres == 0) { return WY_ERR_NONE; }
-    for (wy_uword i = 1; i < nres; i++) { out[i] = wy_value_nil(); }
     if (args[0].type != WY_TYPE_TAG_MODULE) { return WY_ERR_BAD_TYPE; }
     wy_module* scope = (wy_module*) args[0].data.gc_object;
 
@@ -1632,7 +1588,7 @@ static wy_error builtin_bind_message_(wy_context* context, wy_value* args, wy_uw
     wy_error err = wy_module_message_lookup_f(context, scope, name, &msg);
     if (err != WY_ERR_NONE) { return err; }
     if (msg == WY_NULL) {
-        return write_error_value_(context, "bind_message: no such message in scope", &out[0]);
+        return write_error_value_(context, "bind_message: no such message in scope", out);
     }
 
     wy_value recv = args[1];
@@ -1644,17 +1600,17 @@ static wy_error builtin_bind_message_(wy_context* context, wy_value* args, wy_uw
         n = tup->count;
     }
     if (n == 0 || n > WY_DISPATCH_MAX_RECEIVERS) {
-        return write_error_value_(context, "bind_message: bad receiver count", &out[0]);
+        return write_error_value_(context, "bind_message: bad receiver count", out);
     }
     const wy_overload* ov = WY_NULL;
     char fault_msg[256];
     if (wy_dispatch_resolve_f(msg, receivers, n, WY_NULL, &ov, fault_msg, sizeof(fault_msg)) != WY_ERR_NONE) {
-        return write_error_value_(context, fault_msg, &out[0]);
+        return write_error_value_(context, fault_msg, out);
     }
     wy_bound_msg* bm = WY_NULL;
     err = wy_bound_msg_new_f(context, recv, msg, ov->body, &bm);
     if (err != WY_ERR_NONE) { return err; }
-    out[0] = wy_value_object(WY_TYPE_TAG_BOUND_MSG, (wy_object*) bm);
+    *out = wy_value_object(WY_TYPE_TAG_BOUND_MSG, (wy_object*) bm);
     return WY_ERR_NONE;
 }
 

@@ -326,11 +326,6 @@ static wy_error decode_function_(wy_context* context, wy_module* module, wy_cbor
     if (last_error != WY_ERR_NONE) { return last_error; }
     if (found) { out->ncaptures = (wy_u16) number; }
 
-    out->nresults = 1;
-    last_error = opt_field_uint_(doc, "r", 0xFFu, &number, &found);
-    if (last_error != WY_ERR_NONE) { return last_error; }
-    if (found) { out->nresults = (wy_u8) number; }
-
     wy_cbor_reader reader;
     wy_uword nparams;
     last_error = field_array_(doc, "p", &reader, &nparams);
@@ -766,7 +761,7 @@ wy_error wy_module_run_init(wy_context* context, wy_module* module)
     module->state = WY_MODULE_INITIALISING;
 
     wy_value callee = wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) init_fn);
-    last_error = wy_vm_call_sync(context, callee, WY_NULL, 0, WY_NULL, 0);
+    last_error = wy_vm_call_sync(context, callee, WY_NULL, 0, WY_NULL);
 
     module->state = (last_error == WY_ERR_NONE) ? WY_MODULE_READY : WY_MODULE_FAILED;
     return last_error;
@@ -1218,7 +1213,7 @@ wy_error wy_module_run_function(wy_context* context, wy_module* module, wy_uword
     /* Never touches module->state: one faulting input must not poison the session. */
     wy_value callee = wy_value_object(WY_TYPE_TAG_FUNCTION, (wy_object*) fn);
     wy_value result = wy_value_nil();
-    err = wy_vm_call_sync(context, callee, WY_NULL, 0, &result, 1);
+    err = wy_vm_call_sync(context, callee, WY_NULL, 0, &result);
     if (err == WY_ERR_NONE && out_result != WY_NULL) { *out_result = result; }
     return err;
 }

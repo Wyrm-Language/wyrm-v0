@@ -181,7 +181,7 @@ static wy_exec_state io_open_exec_(wy_context* context, wy_primitive c_data)
         io_set_binary_(fd, mode_str->len > 0 && mode_str->str[mode_str->len - 1] == 'b');
         result = wy_value_word(fd);
     }
-    wy_context_set_result(context, 0, result);
+    wy_context_set_result(context, result);
     return WY_EXEC_DONE;
 }
 
@@ -225,7 +225,7 @@ static bool read_into_buffer_(wy_context* context, wy_word handle, wy_word size,
                 native_fault_(context, "read: out of memory building OSError");
                 return false;
             }
-            wy_context_set_result(context, 0, result);
+            wy_context_set_result(context, result);
             return false;
         }
         if (n == 0) { break; }
@@ -267,7 +267,7 @@ static wy_exec_state io_read_exec_(wy_context* context, wy_primitive c_data)
         if (err != WY_ERR_NONE) { return native_fault_(context, "read: out of memory building result"); }
         result = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) result_str);
     }
-    wy_context_set_result(context, 0, result);
+    wy_context_set_result(context, result);
     return WY_EXEC_DONE;
 }
 
@@ -286,7 +286,7 @@ static wy_exec_state io_write_exec_(wy_context* context, wy_primitive c_data)
      * hook it is the real descriptor. */
     if (handle == 1 && context->io.write != WY_NULL) {
         context->io.write(context, (const char*) data, data_len, context->io.ud);
-        wy_context_set_result(context, 0, wy_value_word((wy_word) data_len));
+        wy_context_set_result(context, wy_value_word((wy_word) data_len));
         return WY_EXEC_DONE;
     }
     wy_uword total = 0;
@@ -295,12 +295,12 @@ static wy_exec_state io_write_exec_(wy_context* context, wy_primitive c_data)
         if (n < 0) {
             wy_value result;
             if (os_error_value_(context, errno, &result) != WY_ERR_NONE) { return native_fault_(context, "write: out of memory building OSError"); }
-            wy_context_set_result(context, 0, result);
+            wy_context_set_result(context, result);
             return WY_EXEC_DONE;
         }
         total += (wy_uword) n;
     }
-    wy_context_set_result(context, 0, wy_value_word((wy_word) total));
+    wy_context_set_result(context, wy_value_word((wy_word) total));
     return WY_EXEC_DONE;
 }
 
@@ -318,7 +318,7 @@ static wy_exec_state io_lseek_exec_(wy_context* context, wy_primitive c_data)
     } else {
         result = wy_value_word((wy_word) pos);
     }
-    wy_context_set_result(context, 0, result);
+    wy_context_set_result(context, result);
     return WY_EXEC_DONE;
 }
 
@@ -336,7 +336,7 @@ static wy_exec_state io_dup2_exec_(wy_context* context, wy_primitive c_data)
     } else {
         result = wy_value_word(rc);
     }
-    wy_context_set_result(context, 0, result);
+    wy_context_set_result(context, result);
     return WY_EXEC_DONE;
 }
 
@@ -353,7 +353,7 @@ static wy_exec_state io_close_exec_(wy_context* context, wy_primitive c_data)
     } else {
         result = wy_value_word(0);
     }
-    wy_context_set_result(context, 0, result);
+    wy_context_set_result(context, result);
     return WY_EXEC_DONE;
 }
 
@@ -370,7 +370,7 @@ static wy_exec_state io_flush_exec_(wy_context* context, wy_primitive c_data)
     if (fsync((int) handle) < 0 && errno != EINVAL && errno != ENOTSUP) {
         if (os_error_value_(context, errno, &result) != WY_ERR_NONE) { return native_fault_(context, "flush: out of memory building OSError"); }
     }
-    wy_context_set_result(context, 0, result);
+    wy_context_set_result(context, result);
     return WY_EXEC_DONE;
 }
 

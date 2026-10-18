@@ -201,12 +201,13 @@ returns" for the shape of that path).
 ### Call/stack model
 
 `wy_fiber` implements a reserved-result-slot calling convention (see the
-doctest names in `src/test/test_fiber.cpp`: "push_frame_f reserves results
-below the new base", "results land in the reserved slots, in reverse order",
-"a tail call returns through the frame it reused"). Callers reserve N result
-slots before the call; the callee writes into them via
-`wy_context_set_result`/`wy_context_result_n`; unwritten slots are refused if
-read. `wy_context_call_continue`/`wy_context_call_continue_exec_fn` chain a
+doctest names in `src/test/test_fiber.cpp`: "push_frame_f reserves the result
+below the new base", "the result lands in the reserved slot below the base",
+"a tail call returns through the frame it reused"). A call has exactly one
+result (design `runtime.md` D12), so every pushed frame reserves one slot; the
+callee writes it with `wy_context_set_result` (or reads the slot with
+`wy_context_result`); an unwritten slot reads back as Unset. A callee with
+several things to return builds a tuple. `wy_context_call_continue`/`wy_context_call_continue_exec_fn` chain a
 call followed by a continuation callback — this is how multi-step C-native
 sequences (like `main.c`'s mul-then-print) are expressed without recursion.
 
