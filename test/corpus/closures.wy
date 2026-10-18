@@ -27,3 +27,12 @@ println(tick(1))
 println(tick(1))
 
 println(doubled(21))
+
+# Calling a call's result directly: the inner call's window must not shift
+# the outer call's arguments.
+fn curried(a):
+    return fn(b) { fn(c) { [a, b, c] } }
+
+println(adder(5)(2))
+println(curried(1)(2)(3))
+println(adder(1)(adder(10)(20)))

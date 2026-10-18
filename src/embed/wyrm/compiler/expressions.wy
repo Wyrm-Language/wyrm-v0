@@ -641,6 +641,11 @@ fn _compile_call(node, frame: FnContext, nres: int) -> int | error:
         r2 := compile_expr(func_node, frame, window)
         if r2 is error:
             return r2
+    # A callee that is itself a call (`g(5)(7)`) leaves its own window held
+    # above ours; the arguments must start at window+1.
+    fw := frame ! free_to(window + 1)
+    if fw is error:
+        return fw
     for arg in args:
         w := compile_into_window(arg, frame)
         if w is error:
