@@ -16,6 +16,7 @@
 #include <wyrm/opcode.h>
 #include <wyrm/platform/hosted/import_fs.h>
 #include <wyrm/value.h>
+#include <test_common/module_build.h>
 #include <test_common/test_fiber_fixture.h>
 
 #include "../embed/builtins.h"
@@ -102,7 +103,7 @@ TEST_SUITE("link") {
         wy_module* module = make_module_with_globals(context, 0);
         module->code = code;
         module->code_len = std::size(code);
-        module->init_nlocals = 0;
+        wy_test_set_module_init(context, module, 0);
 
         CHECK_EQ(wy_module_run_init(context, module), WY_ERR_NONE);
         CHECK_EQ(module->state, WY_MODULE_READY);
@@ -116,7 +117,7 @@ TEST_SUITE("link") {
         wy_module* module = make_module_with_globals(context, 0);
         module->code = code;
         module->code_len = std::size(code);
-        module->init_nlocals = 0;
+        wy_test_set_module_init(context, module, 0);
 
         CHECK_EQ(wy_module_run_init(context, module), WY_ERR_FAULT);
         CHECK_EQ(module->state, WY_MODULE_FAILED);
@@ -154,7 +155,7 @@ wy_module* named_module(wy_context* ctx, const char* name, wy_uword globals,
     mod->name = symbol(ctx, name);
     mod->code = code;
     mod->code_len = words;
-    mod->init_nlocals = 4;
+    wy_test_set_module_init(ctx, mod, 4);
     REQUIRE_EQ(wy_context_module_register(ctx, mod, nullptr), WY_ERR_NONE);
     return mod;
 }
@@ -189,7 +190,7 @@ TEST_SUITE("link") {
         const wy_u32 code[] = {enc1(WY_OP_GGET, 0, 0), enc1(WY_OP_RETURN, 0, 0)};
         mod->code = code;
         mod->code_len = std::size(code);
-        mod->init_nlocals = 1;
+        wy_test_set_module_init(ctx, mod, 1);
         CHECK_EQ(wy_module_run_init(ctx, mod), WY_ERR_FAULT);
         CHECK_EQ(ctx->current_fiber->fault.data.gc_object, marker);
         REQUIRE_EQ(wy_link_fill(ctx, mod, 0, wy_value_word(1), 1, c), WY_ERR_NONE);
@@ -220,7 +221,7 @@ TEST_SUITE("link") {
         const wy_u32 code[] = {enc1(WY_OP_GGET, 0, 0), enc1(WY_OP_GSET, 0, 1), enc1(WY_OP_RETURN, 0, 0)};
         mod->code = code;
         mod->code_len = std::size(code);
-        mod->init_nlocals = 1;
+        wy_test_set_module_init(ctx, mod, 1);
         REQUIRE_EQ(wy_module_run_init(ctx, mod), WY_ERR_NONE);
         CHECK_EQ(mod->globals[1].data.word, 5);
 
@@ -245,7 +246,7 @@ TEST_SUITE("link") {
         const wy_u32 code[] = {enc1(WY_OP_LNIL, 0, 0), enc1(WY_OP_GSET, 0, 0), enc1(WY_OP_RETURN, 0, 0)};
         mod->code = code;
         mod->code_len = std::size(code);
-        mod->init_nlocals = 1;
+        wy_test_set_module_init(ctx, mod, 1);
         CHECK_EQ(wy_module_run_init(ctx, mod), WY_ERR_FAULT);
         CHECK_EQ(exporter.data.word, 1);
     }
@@ -310,6 +311,31 @@ TEST_SUITE("link") {
         CHECK_EQ(wy_module_run_init(ctx, b), WY_ERR_LINK);
     }
 
+    TEST_CASE("importing a registered module that has no functions faults: it has no init function") {
+        test_fiber_fixture fix;
+        auto* ctx = fix.get_context_ptr();
+        const wy_u32 code[] = {enc1(WY_OP_IMPORT, 0, 0), enc1(WY_OP_RETURN, 0, 0)};
+        // Hand-built and registered, but with no functions table at all; the
+        // loader never produces such a module.
+        auto* dep = make_module_with_globals(ctx, 0);
+        dep->name = symbol(ctx, "empty");
+        dep->code = code;
+        dep->code_len = std::size(code);
+        REQUIRE_EQ(wy_context_module_register(ctx, dep, nullptr), WY_ERR_NONE);
+        CHECK_EQ(dep->function_count, 0u);
+        CHECK_EQ(wy_module_init_proto_(dep), nullptr);
+
+        auto* mod = named_module(ctx, "user", 0, code, std::size(code));
+        import_static(ctx, mod, "empty");
+        CHECK_EQ(wy_module_run_init(ctx, mod), WY_ERR_FAULT);
+        CHECK_EQ(mod->state, WY_MODULE_FAILED);
+        CHECK_EQ(dep->state, WY_MODULE_LOADED);  // never started
+        REQUIRE(wy_value_is_error(ctx->current_fiber->fault));
+        auto* error = reinterpret_cast<wy_error_obj*>(ctx->current_fiber->fault.data.gc_object);
+        REQUIRE_NE(error, nullptr);
+        CHECK(std::string(error->what->str, error->what->len).find("has no init function") != std::string::npos);
+    }
+
     TEST_CASE("wildcard inline init copies excepts and exports only") {
         test_fiber_fixture fix;
         auto* ctx = fix.get_context_ptr();
@@ -354,7 +380,7 @@ TEST_SUITE("link") {
         cls->module = owner;
         name_slot(ctx, &cls->statics, "value", 1);
         wy_function* fn;
-        REQUIRE_EQ(wy_function_new(ctx, owner, &owner->init_proto, nullptr, 0, &fn), WY_ERR_NONE);
+        REQUIRE_EQ(wy_function_new(ctx, owner, &owner->functions[0], nullptr, 0, &fn), WY_ERR_NONE);
         const wy_value receivers[] = {
             wy_value_object(WY_TYPE_TAG_MODULE, reinterpret_cast<wy_object*>(owner)),
             wy_value_object(WY_TYPE_TAG_CLASS, reinterpret_cast<wy_object*>(cls)),
@@ -533,7 +559,7 @@ TEST_SUITE("link") {
         for (unsigned i = 0; i < 4; i++) {
             std::string name = "depth" + std::to_string(i);
             modules[i] = named_module(ctx, name.c_str(), 0, code, std::size(code));
-            modules[i]->init_nlocals = 400;
+            wy_test_set_module_init(ctx, modules[i], 400);
             std::string next = "depth" + std::to_string(i + 1);
             import_static(ctx, modules[i], next.c_str());
         }

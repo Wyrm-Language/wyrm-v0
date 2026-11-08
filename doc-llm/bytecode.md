@@ -70,7 +70,7 @@ CBOR encoded sections (the wire encoding, doc-llm/llm-bytecode.md section 4.1; a
 BYTE CODE:
 
   - an array of u32 values encoded as described
-  - bytecode offset 0 is start of global run; 
+  - function 0 is the module init routine (the global run); the compiler lays its code out first
 
 
 ### C File

@@ -59,7 +59,7 @@ run init — is epic 2):
 
 | Field(s) | Source section | Notes |
 |---|---|---|
-| `name`, `global_count`, `init_nlocals` | `header` (id 1, required) | `v` must be 1; `n` is interned via `wy_context_intern`. |
+| `name`, `global_count` | `header` (id 1, required) | `v` must be 1; `n` is interned via `wy_context_intern`. |
 | `globals`, `fill_layer`, `fill_source` | header's `g`, then `slot_defaults` (id 3) | All Unset until `slot_defaults` applies constant defaults. `fill_layer`/`fill_source` are epic 2's three-layer-fill bookkeeping (§7.2); always 0/NULL out of epic 1. |
 | `symbols` | `symbols` (id 4) | Interned strings; other sections reference them by index. |
 | `statics` | `statics` (id 2) | `wy_value` per entry: string → `wy_string`, int32 → `WY_TYPE_TAG_WORD`, double → `WY_TYPE_TAG_FLOAT`, bool → `WY_TYPE_TAG_BOOL`, null → `WY_TYPE_TAG_NIL`, binary → `wy_string` flagged `WY_GC_FLAG_BINARY` (placeholder until the `bytes` type, epic 7). |
@@ -175,14 +175,14 @@ heap, and is lazily committed on hosted systems.
 | API | Purpose |
 |---|---|
 | `wy_module_session_new(ctx, &config, &m)` | reserve everything, name it `__repl__`, register it |
-| `wy_module_extend(ctx, m, &image, &init)` | append a delta image; all-or-nothing; base counts must match |
+| `wy_module_extend(ctx, m, &image, &init)` | append a delta image; all-or-nothing; base counts must match; `init` is the function index that runs the input |
 | `wy_module_run_function(ctx, m, index, &result)` | run one function without touching module state |
 | `wy_session_check_room(m, table, n)` | would `n` more elements fit (`WY_ERR_SESSION_FULL` if not) |
 | `wy_context_module_unregister(ctx, m)` | drop the session from the registry so a collection frees it |
 
 A delta image is an ordinary container whose header carries `d: 1`, the module's counts before
-the delta (`bc bf bs by bk bm bg`), the total globals after (`g`) and the input's function index
-(`i`); sections hold only new items and every reference is absolute. The compiler side
+the delta (`bc bf bs by bk bm bg`), the total globals after (`g`); the delta's first new function
+(`functions[bf]`) runs the input. Sections hold only new items and every reference is absolute. The compiler side
 (`SessionContext`, `compile_snippet`) and the driver (`src/wyrm/repl.c`) are described in
 `doc-llm/history/repl/repl-plan.md`. If the loader refuses a delta the compiler already counted, call
 `session_undo` (compile_source.wy) so the two sides stay in step; `repl.c` does.

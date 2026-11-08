@@ -137,7 +137,6 @@ struct wy_module
     wy_symbol name;
     wy_module_state state;
     wy_string* import_path;    /**< full cache key, without symbol truncation */
-    wy_function_proto init_proto; /**< stable prototype for inline init frames */
 
     const wy_u8* image;    /**< the whole file this module was loaded from */
     wy_uword image_len;
@@ -146,7 +145,6 @@ struct wy_module
     const wy_u32* code;     /**< points into `image`, or at `owned_code` when `image` doesn't hold it aligned */
     wy_u32* owned_code;     /**< aligned copy of the code, allocated by load_image and freed by finalize; else NULL */
     wy_uword code_len;      /**< word count */
-    wy_u16 init_nlocals;    /**< L-frame size for code word offset 0 */
 
     wy_value* globals;      /**< global_count entries, all Unset until slot_defaults/init */
     wy_uword global_count;
@@ -231,11 +229,22 @@ wy_error wy_module_load_image(wy_context* context, const wy_module_image* image,
 wy_error wy_module_load_bytes(wy_context* context, const wy_u8* data, wy_uword len, bool take_ownership, wy_module** out);
 
 /**
- * Load step 6 (wyc-format.md §7.1): run the module's top-level init code -
- * word offset 0 of `code`, a zero-argument, zero-capture call with
- * `nlocals = init_nlocals` - synchronously via wy_vm_call_sync. Host entry
- * only: VM imports push init frames inline. READY/BUILTIN is a no-op;
- * INITIALISING returns CYCLE and FAILED returns LINK.
+ * The module's init routine: `functions[0]`, whose shape the loader has checked
+ * (no parameters, captures or dispatch types, no flags). WY_NULL for a module
+ * with no functions, which the loader never produces; only a module built by
+ * hand can be one.
+ */
+static inline const wy_function_proto* wy_module_init_proto_(const wy_module* module)
+{
+    return module->function_count > 0 ? &module->functions[0] : WY_NULL;
+}
+
+/**
+ * Load step 6 (wyc-format.md §7.1): run the module's init routine,
+ * `functions[0]`, synchronously via wy_vm_call_sync. Host entry only: VM
+ * imports push init frames inline. READY/BUILTIN is a no-op; INITIALISING
+ * returns CYCLE and FAILED returns LINK. WY_ERR_IMAGE for a module with no
+ * init routine.
  *
  * On success sets `module->state = WY_MODULE_READY`; on a fault sets it to
  * WY_MODULE_FAILED (the fault value is left on `context->current_fiber->fault`

@@ -3,7 +3,7 @@
 # Wyrm port of pypoc/wypoc/compiler_bc/module.py: the module pipeline that
 # turns a parsed program into a finished image - declare pass, hoisted
 # imports, the top-level walk (init code), per-item static flushes, and the
-# layout pass that places init at offset 0 and every function body after it.
+# layout pass that places init (function 0) and every other body after it.
 # This is where the compiler becomes end-to-end runnable: `compile_module`
 # answers the image dict `image.wy`'s `to_wyc()` serializes, and (with
 # `check`) `verify.wy` has already blessed.
@@ -46,11 +46,9 @@
 #    this compiler does not enforce.
 #
 # 5. The image is the dict `image.wy` consumes (what its `sections()`/
-#    `to_wyc()` encode), assembled here - init's words, then each pending
-#    body at its code offset, then the exports/free documents derived from
-#    the global slots' flags. Three non-serialized keys ride along:
-#    "module_uses" (init's own message references), "init_nlocals" (the
-#    init region's frame size, same value as the header's "l"), and
+#    `to_wyc()` encode), assembled here - each pending body at its code offset
+#    (init, function 0, first), then the exports/free documents derived from
+#    the global slots' flags. One non-serialized key rides along:
 #    "unlowered" (the stub report: [function name, reason] per body that
 #    would not lower and became a trapping stub - compiler-side only,
 #    never serialized, read by compiler_main.wy's STUB lines and epic
@@ -609,10 +607,8 @@ fn _flush_statics(module: ModuleContext) -> nil | error:
 
 fn _assemble(module: ModuleContext) -> dict | error:
     image := module.image
-    init := module.init_ctx
+    module ! finish_init()
     code := []
-    for w in init.code:
-        code ! append(w)
     for entry in module.pending:
         fn_entry := image.functions[entry[0]]
         fn_entry["code_offset"] = len(code)
@@ -636,18 +632,12 @@ fn _assemble(module: ModuleContext) -> dict | error:
     for name in module.reexported:
         if not (name in exports):
             exports[name] = module.reexported[name]
-    uses := []
-    for u in init.uses:
-        uses ! append(u)
     stubs := []
     for s in image.unlowered:
         stubs ! append(s)
     img := {}
     img["name"] = image.module_name
     img["globals"] = len(image.globals)
-    img["init_l"] = init.high
-    img["init_nlocals"] = init.high
-    img["module_uses"] = uses
     img["unlowered"] = stubs
     img["statics"] = image.statics
     img["slot_defaults"] = nil
@@ -706,6 +696,9 @@ fn compile_module(program_node, module_name: str, source_file = nil, check: bool
     module := ModuleContext(module_name, source_file)
     module.slot_optimization = slot_optimization
     module.stub_unlowered = stub_unlowered
+    ri := module ! reserve_init()
+    if ri is error:
+        return ri
     body := cdr(program_node)
     if node_kind(program_node) != 'module:
         return error("compile_module needs a 'module node")
@@ -789,8 +782,7 @@ fn compile_module(program_node, module_name: str, source_file = nil, check: bool
 # global slots, statics, symbols, functions, classes and - crucially - message
 # identities keep their absolute numbering from one input to the next. Each
 # input compiles into a *delta*: the tail of every pool beyond what earlier
-# inputs left, an init of its own as a function-table entry (the delta
-# header's `i`), and code offsets that continue where the last input's code
+# inputs left, an init of its own as the delta's first function, and code offsets that continue where the last input's code
 # ended. Nothing about the ordinary compile_module path changes.
 #
 # Each input is a scope nested in the ones before it (ModuleContext.
@@ -942,7 +934,6 @@ fn _compile_snippet_body(session: SessionContext, program_node, expander) -> dic
     module.session_filled = []
     module.pending = []
     module.pending_statics = []
-    image.module_uses = []
     image.unlowered = []
     module.init_ctx = FnContext(module, name, nil, nil, 0, true, nil)
 
@@ -952,6 +943,10 @@ fn _compile_snippet_body(session: SessionContext, program_node, expander) -> dic
     wm_globals := len(image.globals)
     wm_functions := len(image.functions)
     wm_classes := len(image.classes)
+
+    ri := module ! reserve_init()
+    if ri is error:
+        return ri
 
     body := cdr(program_node)
     if _has_decorate(body):
@@ -1053,17 +1048,12 @@ fn _compile_snippet_body(session: SessionContext, program_node, expander) -> dic
     if p is error:
         return p
 
-    init_index := image ! add_function(name, nil, init.high, 0, 0, nil, 0, nil)
-    if init_index is error:
-        return init_index
+    module ! finish_init()
 
-    # Lay out: this input's init, then each pending body, at offsets that
+    # Lay out each pending body (this input's init first), at offsets that
     # continue the session's code.
     base := session.code_len
     code := []
-    for w in init.code:
-        code ! append(w)
-    image.functions[init_index]["code_offset"] = base
     for entry in module.pending:
         fn_entry := image.functions[entry[0]]
         fn_entry["code_offset"] = base + len(code)
@@ -1086,9 +1076,6 @@ fn _compile_snippet_body(session: SessionContext, program_node, expander) -> dic
     img := {}
     img["name"] = "__repl__"
     img["globals"] = len(image.globals)
-    img["init_l"] = init.high
-    img["init_nlocals"] = init.high
-    img["module_uses"] = []
     img["unlowered"] = _from(image.unlowered, 0)
     img["statics"] = _from(image.statics, wm_statics)
     img["slot_defaults"] = nil
@@ -1101,7 +1088,7 @@ fn _compile_snippet_body(session: SessionContext, program_node, expander) -> dic
     if len(free) > 0:
         img["free"] = free
     img["code"] = code
-    img["delta"] = {"bc": base, "bf": wm_functions, "bs": wm_statics, "by": wm_symbols, "bk": wm_classes, "bm": wm_messages, "bg": wm_globals, "i": init_index}
+    img["delta"] = {"bc": base, "bf": wm_functions, "bs": wm_statics, "by": wm_symbols, "bk": wm_classes, "bm": wm_messages, "bg": wm_globals}
 
     session.code_len = base + len(code)
     session.last_undo = module.session_undo

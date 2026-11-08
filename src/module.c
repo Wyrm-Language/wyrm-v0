@@ -170,10 +170,6 @@ static wy_error module_load_section_header_(wy_context* context, wy_module* modu
     last_error = field_uint_(doc, "g", 0x7FFFFFFFu, &nglobals);
     if (last_error != WY_ERR_NONE) { return last_error; }
 
-    wy_u32 init_nlocals;
-    last_error = field_uint_(doc, "l", 0xFFFFu, &init_nlocals);
-    if (last_error != WY_ERR_NONE) { return last_error; }
-    module->init_nlocals = (wy_u16) init_nlocals;
 
     // `u` (referenced-name set) is a writer artifact from before binding was
     // per-name; wyc-format.md §8.1 says a loader MUST ignore it.
@@ -375,12 +371,19 @@ static wy_error decode_function_(wy_context* context, wy_module* module, wy_cbor
     return WY_ERR_NONE;
 }
 
+/* Whether an entry may be a module's init routine: the loader and the session
+ * call it with no arguments and no closure, so nothing else about it can vary. */
+static bool function_is_init_shaped_(const wy_function_proto* proto)
+{
+    return proto->nparams == 0 && proto->ncaptures == 0 && proto->ndispatch == 0 && proto->flags == 0;
+}
+
 static wy_error module_load_section_functions_(wy_context* context, wy_module* module, wy_section_ref section)
 {
     wy_cbor_reader reader;
     wy_error last_error = open_section_array_(section, &reader, &module->function_count);
     if (last_error != WY_ERR_NONE) { return last_error; }
-    if (module->function_count == 0) { return WY_ERR_NONE; }
+    if (module->function_count == 0) { return WY_ERR_IMAGE; }  // functions[0] is the init routine
 
     module->functions = wy_context_gc_alloc(context, sizeof(wy_function_proto) * module->function_count);
     if (module->functions == WY_NULL) { return WY_ERR_NOMEM; }
@@ -395,6 +398,7 @@ static wy_error module_load_section_functions_(wy_context* context, wy_module* m
         last_error = decode_function_(context, module, item, &module->functions[i]);
         if (last_error != WY_ERR_NONE) { return last_error; }
     }
+    if (!function_is_init_shaped_(&module->functions[0])) { return WY_ERR_IMAGE; }
     return WY_ERR_NONE;
 }
 
@@ -754,9 +758,10 @@ wy_error wy_module_run_init(wy_context* context, wy_module* module)
     }
     last_error = wy_link_fill_from_builtins(context, module, context->builtins);
     if (last_error != WY_ERR_NONE) { return last_error; }
-    module->init_proto.nlocals = module->init_nlocals;
+    const wy_function_proto* init_proto = wy_module_init_proto_(module);
+    if (init_proto == WY_NULL) { return WY_ERR_IMAGE; }
     wy_function* init_fn = WY_NULL;
-    last_error = wy_function_new(context, module, &module->init_proto, WY_NULL, 0, &init_fn);
+    last_error = wy_function_new(context, module, init_proto, WY_NULL, 0, &init_fn);
     if (last_error != WY_ERR_NONE) { return last_error; }
     module->state = WY_MODULE_INITIALISING;
 
@@ -942,9 +947,9 @@ const wy_object_type wy_module_type = {
  *   bc code words, bf functions, bs statics, by symbols, bk classes,
  *   bm messages, bg globals
  *
- * plus `g` (the total global count after the delta) and `i` (the absolute
- * index of the function that runs this input). Every section holds only the
- * new items; every cross-reference is absolute, so the same decoders that load
+ * plus `g` (the total global count after the delta). The delta's first
+ * function runs this input, as `functions[0]` does for a module. Every section
+ * holds only the new items; every cross-reference is absolute, so the same decoders that load
  * an ordinary module check them against the growing tables. Jumps are
  * ip-relative, so the code is relocatable. A delta whose base counts differ
  * from the module's is refused: that is the guard against the compiling side
@@ -955,7 +960,6 @@ typedef struct session_delta_
 {
     wy_uword base_code, base_functions, base_statics, base_symbols, base_classes, base_messages, base_globals;
     wy_uword globals_after;
-    wy_uword init_function;
     wy_uword new_code, new_functions, new_statics, new_symbols, new_classes, new_messages;
 } session_delta_;
 
@@ -992,7 +996,6 @@ static wy_error delta_read_(const wy_module* module, const wy_module_image* imag
     if ((err = delta_header_uint_(doc, "bm", &d->base_messages)) != WY_ERR_NONE) { return err; }
     if ((err = delta_header_uint_(doc, "bg", &d->base_globals)) != WY_ERR_NONE) { return err; }
     if ((err = delta_header_uint_(doc, "g", &d->globals_after)) != WY_ERR_NONE) { return err; }
-    if ((err = delta_header_uint_(doc, "i", &d->init_function)) != WY_ERR_NONE) { return err; }
 
     /* The desync guard: the delta was compiled against exactly this module. */
     if (d->base_code != module->code_len || d->base_functions != module->function_count
@@ -1012,9 +1015,7 @@ static wy_error delta_read_(const wy_module* module, const wy_module_image* imag
     if ((err = delta_section_count_(image->sections[WY_SEC_CLASSES], &d->new_classes)) != WY_ERR_NONE) { return err; }
     if ((err = delta_section_count_(image->sections[WY_SEC_MESSAGES], &d->new_messages)) != WY_ERR_NONE) { return err; }
 
-    if (d->init_function < d->base_functions || d->init_function >= d->base_functions + d->new_functions) {
-        return WY_ERR_IMAGE;  /* the input's function must be one of this delta's */
-    }
+    if (d->new_functions == 0) { return WY_ERR_IMAGE; }  /* the first one runs this input */
     return WY_ERR_NONE;
 }
 
@@ -1136,6 +1137,7 @@ wy_error wy_module_extend(wy_context* context, wy_module* module, const wy_modul
             wy_memset(slot, 0, sizeof(*slot));
             module->session_fill_functions_ = module->function_count + 1;  /* the entry may own partial allocations */
             err = decode_function_(context, module, item, slot);
+            if (err == WY_ERR_NONE && i == 0 && !function_is_init_shaped_(slot)) { err = WY_ERR_IMAGE; }
             if (err == WY_ERR_NONE) { module->function_count++; }
         }
     }
@@ -1197,7 +1199,7 @@ wy_error wy_module_extend(wy_context* context, wy_module* module, const wy_modul
     err = wy_session_refill_(context, module);
     if (err != WY_ERR_NONE) { return err; }
 
-    if (out_init_function != WY_NULL) { *out_init_function = d.init_function; }
+    if (out_init_function != WY_NULL) { *out_init_function = d.base_functions; }
     return WY_ERR_NONE;
 }
 

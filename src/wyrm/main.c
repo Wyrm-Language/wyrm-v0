@@ -45,10 +45,9 @@ static void io_write_stdout_(wy_context* context, const char* bytes, wy_uword le
  */
 static void print_sections(const wy_module* module)
 {
-    printf("header n=%s v=1 g=%lu l=%u",
+    printf("header n=%s v=1 g=%lu",
         module->name != WY_NULL ? module->name : "",
-        (unsigned long) module->global_count,
-        module->init_nlocals);
+        (unsigned long) module->global_count);
 
     if (module->static_count > 0) { printf(" | statics %lu", (unsigned long) module->static_count); }
     if (module->symbol_count > 0) { printf(" | symbols %lu", (unsigned long) module->symbol_count); }

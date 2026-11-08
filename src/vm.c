@@ -166,7 +166,7 @@ static wy_error push_bytecode_call_bind_f(wy_context* ctx, wy_function* fn,
         - (has_varargs ? 1u : 0u) - (has_kwargs ? 1u : 0u);
     const wy_uword p_count = this_count + (wy_uword) proto->nparams + fn->ncaps;
     const wy_uword total = p_count + proto->nlocals;
-    const wy_symbol fname = (proto->name != WY_NULL) ? proto->name : "<init>";
+    const wy_symbol fname = (proto->name != WY_NULL) ? proto->name : "<anonymous>";
 
     wy_fiber* fiber = ctx->current_fiber;
     WY_ASSERT(proto->nparams == 0 || proto->params != WY_NULL);
@@ -948,12 +948,16 @@ reload:;
                 ip = next_ip;
                 break;
             }
-            dep->init_proto.nlocals = dep->init_nlocals;
+            const wy_function_proto* init_proto = wy_module_init_proto_(dep);
+            if (init_proto == WY_NULL) {
+                fault_v = fault_value_f(ctx, "import: module has no init function");
+                goto do_fault;
+            }
             /* Only push_bytecode_call_bind_f reads this temporary callable.
              * The persistent prototype and module are owned by the frame. */
             wy_function init_fn = {0};
             init_fn.module = dep;
-            init_fn.proto = &dep->init_proto;
+            init_fn.proto = init_proto;
             char fault_msg[WY_VM_CALL_FAULT_MSG];
             err = push_bytecode_call_bind_f(ctx, &init_fn, 0, WY_NULL, WY_NULL, 0,
                 WY_NULL, dst, star ? WY_RET_IMPORT_STAR : WY_RET_IMPORT,

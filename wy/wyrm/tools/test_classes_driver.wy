@@ -128,14 +128,14 @@ fn walk_toplevel(module_node, module: ModuleContext) -> nil | error:
             return r
     return nil
 
-# pypoc module.py's `_assemble`: init at offset 0, then each pending body;
-# then the image dict sections()/to_wyc() consume.
+# pypoc module.py's `_assemble`: each pending body in order (init is function 0,
+# reserved first, so it lands at offset 0); then the image dict sections()/
+# to_wyc() consume. `finish_init` fills init's table entry (frame size) now
+# that its body is done.
 fn assemble(module: ModuleContext) -> dict:
     image := module.image
-    init := module.init_ctx
+    module ! finish_init()
     code := []
-    for w in init.code:
-        code ! append(w)
     for entry in module.pending:
         fn_entry := image.functions[entry[0]]
         fn_entry["code_offset"] = len(code)
@@ -155,7 +155,6 @@ fn assemble(module: ModuleContext) -> dict:
     img["name"] = image.module_name
     img["version"] = 1
     img["globals"] = len(image.globals)
-    img["init_l"] = init.high
     img["statics"] = image.statics
     img["slot_defaults"] = nil
     img["symbols"] = image.symbols
@@ -199,6 +198,7 @@ fn compile_fixture(what: str, module_node, module: ModuleContext, path: str):
 CLASSES_MODULE := $['module, $['class_def, 'Shape, nil, $[$['slot_def, 'name, $['type, 'str], $['str, "shape"], nil], $['slot_def, 'sides, $['type, 'int], $['int, 0], nil], $['fn_def, 'init, nil, $[$['param, 'label, nil, nil], $['param, 'count, nil, nil]], nil, $[$['set, $['attr, 'this, 'name], 'label], $['set, $['attr, 'this, 'sides], 'count]]], $['fn_def, 'describe, nil, nil, nil, $[$['return, $['attr, 'this, 'name]]]], $['fn_def, 'corners, nil, nil, nil, $[$['return, $['attr, 'this, 'sides]]]]]], $['class_def, 'Square, $['Shape], $[$['slot_def, 'size, $['type, 'int], $['int, 1], nil], $['fn_def, 'init, nil, $[$['param, 'edge, nil, nil]], nil, $[$['set, $['attr, 'this, 'name], $['str, "square"]], $['set, $['attr, 'this, 'sides], $['int, 4]], $['set, $['attr, 'this, 'size], 'edge]]], $['fn_def, 'area, nil, nil, nil, $[$['return, $['binop, '*, $['attr, 'this, 'size], $['attr, 'this, 'size]]]]]]], $['define, 'square, $['type, 'auto], $['call, 'Square, $[$['int, 3]]]], $['expr_stmt, $['call, 'println, $[$['message, 'square, 'describe, nil, 'send], $['message, 'square, 'corners, nil, 'send], $['message, 'square, 'area, nil, 'send]]]], $['define, 'plain, $['type, 'auto], $['call, 'Shape, $[$['str, "blob"], $['int, 7]]]], $['expr_stmt, $['call, 'println, $[$['message, 'plain, 'describe, nil, 'send], $['message, 'plain, 'corners, nil, 'send]]]]]
 
 mod_c := ModuleContext("classes", nil)
+mod_c ! reserve_init()
 mod_c.stub_unlowered = false
 compile_fixture("classes.wy", CLASSES_MODULE, mod_c, "/tmp/m5_classes.wyc")
 
@@ -207,7 +207,7 @@ shape := mod_c.image.classes[0]
 square := mod_c.image.classes[1]
 check("Shape: two slots", len(shape["slots"]), 2)
 check("Shape: name default is static 0 (\"shape\" deduped first)", shape["slots"][0]["default"], 0)
-check("Shape: init is function 0", shape["init"], 0)
+check("Shape: init is function 1 (the module init is function 0)", shape["init"], 1)
 check("Shape: two message-map entries (describe, corners)", len(shape["messages"]), 2)
 check("Square: superclass is Shape's global slot", square["superclass"], mod_c ! global_index("Shape"))
 check("Square: own slot after inherited ones", mod_c ! slot_index("Square", "size"), 2)
@@ -230,6 +230,7 @@ check_true("message sends compile to `msg`", has_op(init_dis, "msg"))
 MESSAGES_MODULE := $['module, $['class_def, 'Meters, nil, $[$['slot_def, 'value, $['type, 'int], $['int, 0], nil], $['fn_def, 'init, nil, $[$['param, 'v, nil, nil]], nil, $[$['set, $['attr, 'this, 'value], 'v]]]]], $['fn_def, 'doubled, $['Meters], nil, nil, $[$['return, $['binop, '*, $['attr, 'this, 'value], $['int, 2]]]]], $['fn_def, 'scaled, $['Meters], $[$['param, 'factor, nil, nil]], nil, $[$['return, $['binop, '*, $['attr, 'this, 'value], 'factor]]]], $['define, 'one, $['type, 'auto], $['call, 'Meters, $[$['int, 21]]]], $['expr_stmt, $['call, 'println, $[$['message, 'one, 'doubled, nil, 'send]]]], $['expr_stmt, $['call, 'println, $[$['message, 'one, 'scaled, $[$['int, 3]], 'send]]]], $['define, 'bound, $['type, 'auto], $['message, 'one, 'doubled, nil, 'bound]], $['expr_stmt, $['call, 'println, $[$['call, 'bound, nil]]]]]
 
 mod_m := ModuleContext("messages", nil)
+mod_m ! reserve_init()
 mod_m.stub_unlowered = false
 compile_fixture("messages.wy", MESSAGES_MODULE, mod_m, "/tmp/m5_messages.wyc")
 

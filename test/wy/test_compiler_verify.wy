@@ -29,7 +29,7 @@ fn expect_ok(what: str, image: dict):
     println("PASS " + what)
 
 fn base_image(code: list) -> dict:
-    # One function body at offset 0, init empty. nlocals 4, pframe 2
+    # One function body at offset 0 (function 0). nlocals 4, pframe 2
     # (one param + one dispatch slot). Built field by field: a wyrm dict
     # literal has to fit on one physical line.
     param := {"name": "a", "default": nil}
@@ -46,9 +46,6 @@ fn base_image(code: list) -> dict:
     img["name"] = "t"
     img["version"] = 1
     img["globals"] = 2
-    img["init_l"] = 0
-    img["init_nlocals"] = 0
-    img["module_uses"] = []
     img["statics"] = nil
     img["symbols"] = ["a"]
     img["functions"] = [fn_entry]
@@ -100,7 +97,6 @@ msg_image["statics"] = ["x"]
 expect_fail("unlisted message read refused", msg_image, "without listing it")
 
 # -- and the same image with the uses set filled passes --
-msg_image["module_uses"] = []
 fn_entry := msg_image["functions"][0]
 fn_entry["uses"] = [0]
 expect_ok("listed message read accepted", msg_image)

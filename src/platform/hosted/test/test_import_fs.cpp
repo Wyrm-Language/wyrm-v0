@@ -73,9 +73,10 @@ std::string image_for(const std::string& source, std::uint32_t version = WY_IMAG
 {
     using namespace wy_test_cbor;
     Bytes b = container({
-        {WY_SEC_HEADER, map({kv("n", text("m")), kv("g", uval(0)), kv("l", uval(0))})},
+        {WY_SEC_HEADER, map({kv("n", text("m")), kv("g", uval(0))})},
         {WY_SEC_STATICS, array({text(source)})},
-        {WY_SEC_CODE, code_item({})},
+        {WY_SEC_FUNCTIONS, array({init_function(0, 0)})},
+        {WY_SEC_CODE, code_item({0})},
     }, version);
     return std::string(b.begin(), b.end());
 }

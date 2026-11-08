@@ -76,7 +76,7 @@ struct wy_frame
 
     const wy_u32* ip;                 /**< saved on every exit from the loop (BYTECODE only) */
     wy_module* module;                /**< BYTECODE only */
-    const wy_function_proto* proto;   /**< BYTECODE only; NULL for module init */
+    const wy_function_proto* proto;   /**< BYTECODE only; a module's init routine is functions[0] */
 
     wy_exec_fn native;   /**< NATIVE: the continuation to run once the call returns */
     wy_pair* defers;     /**< (closure . mode) chain, most recent first (BYTECODE only) */

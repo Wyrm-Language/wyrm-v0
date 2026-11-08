@@ -36,7 +36,6 @@
 # src/*.c wires CLI argv into a wy-visible global/builtin).
 
 import cbor::*
-import opcodes::*
 import image::*
 import std::io
 
@@ -49,36 +48,45 @@ import std::io
 OUT_PATH := "/tmp/hello_built.wyc"
 
 fn build_hello_image() -> dict:
-    img := make_image("hello", 2, 3)
+    img := make_image("hello", 2)
     img["statics"] = ["Hello ", "World"]
-    img["functions"] = [make_function("greet", [make_param("name")], 2, 11, 0)]
+    # functions[0] is the module init (4 locals, code offset 0); greet is functions[1]
+    img["functions"] = [make_function("<init>", [], 4, 0, 0), make_function("greet", [make_param("name")], 3, 12, 0)]
     img["exports"] = {"greet": 0}
     img["free"] = {"println": 1}
 
+    # The words `wyrm --disasm` shows for test/corpus/hello.wy: the init routine
+    # (functions[0]) at offset 0, then greet at offset 12.
     words := []
-    # -- module init (offset 0) --
-    for w in pack("closure"):                                  # A8 00 00 00 00 00 00 00
+    # -- module init (functions[0], offset 0) --
+    for w in pack('closure, a0=1, a1=1):
         words!append(w)
-    for w in pack("gset", f=0, a0=0):                           # 43 00 00 00      gset g0 <- L0
+    for w in pack('gset, f=1, a0=0):
         words!append(w)
-    for w in pack("gget", f=0, a0=1):                           # 42 00 01 00      gget L0 <- g1
+    for w in pack('gget, f=1, a0=1):
         words!append(w)
-    for w in pack("gget", f=1, a0=0):                           # 42 01 00 00      gget L1 <- g0
+    for w in pack('gget, f=2, a0=0):
         words!append(w)
-    for w in pack("lconst", f=2, a0=1):                         # 46 02 01 00      lconst L2 <- static#1
+    for w in pack('lconst, f=3, a0=1):
         words!append(w)
-    for w in pack("call", f=1, a0=L(1), a1=1):                  # call base=L1 argc=1 nres=1
+    for w in pack('call, f=1, a0=2):
         words!append(w)
-    for w in pack("call", f=1, a0=L(0), a1=1):                  # call base=L0 argc=1 nres=1
+    for w in pack('move, f=0, a0=2):
         words!append(w)
-    for w in pack("return", f=0, a0=0):                         # 02 00 00 00      return count=0
+    for w in pack('call, f=1, a0=1):
         words!append(w)
-    # -- greet (offset 11) --
-    for w in pack("lconst", f=0, a0=0):                         # 46 00 00 00      lconst L0 <- static#0
+    for w in pack('move, f=0, a0=1):
         words!append(w)
-    for w in pack("add", f=0, a0=L(1), a1=L(0), a2=P(0)):       # add L1 <- L0 + P0
+    for w in pack('lnil, f=0, a0=0):
         words!append(w)
-    for w in pack("return", f=1, a0=1):                         # 02 01 01 00      return L1 count=1
+    for w in pack('return, f=0, a0=0):
+        words!append(w)
+    # -- greet (functions[1], offset 12) --
+    for w in pack('lconst, f=1, a0=0):
+        words!append(w)
+    for w in pack('add, f=0, a0=2, a1=1, a2=P(0)):
+        words!append(w)
+    for w in pack('return, f=0, a0=2):
         words!append(w)
 
     img["code"] = words

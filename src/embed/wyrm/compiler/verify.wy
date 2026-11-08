@@ -18,13 +18,10 @@
 #
 # 1. The image is the dict module.wy assembles, not a ModuleImage object:
 #    functions are long-key dicts ("name"/"params"/"nlocals"/"code_offset"/
-#    "ncaptures"/"dispatch"/"uses"), the init region's frame size is
-#    "init_nlocals" (same value as the header's "l"), init's own message
-#    references are "module_uses" - all three non-serialized keys module.wy
-#    adds for exactly this consumer (the third is "unlowered", the stub
-#    report, which verify ignores) - and the globals table is the header's
-#    *count* (an int), not a list, since the wire format records only how
-#    many global slots exist.
+#    "ncaptures"/"dispatch"/"uses"), init among them as entry 0; "unlowered",
+#    the stub report, rides along and verify ignores it; and the globals table
+#    is the header's *count* (an int), not a list, since the wire format
+#    records only how many global slots exist.
 #
 # 2. Refusals are `error` values naming the region and word offset, where
 #    verify.py raises CompileError; the message text is the same.
@@ -50,7 +47,7 @@ fn verify(image: dict) -> nil | error:
 # ---------------------------------------------------------------------------
 # regions
 
-# Split the code array into the init routine and each function body. Bodies
+# Split the code array into each function's body (init is one of them). Bodies
 # are laid out end to end in code-offset order, so each one runs to the
 # start of the next.
 fn _regions(image: dict) -> list | error:
@@ -76,12 +73,6 @@ fn _regions(image: dict) -> list | error:
         i = i + 1
     code_len := len(image["code"])
     regions := []
-    init_end := code_len
-    if len(offsets) > 0:
-        init_end = offsets[0]
-    regions ! append({"name": "<init>", "start": 0, "end": init_end,
-                      "nlocals": image["init_nlocals"], "pframe": 0,
-                      "uses": image["module_uses"]})
     k := 0
     while k < len(offsets):
         entry := fns[k]

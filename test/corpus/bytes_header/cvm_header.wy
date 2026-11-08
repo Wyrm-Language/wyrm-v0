@@ -6,9 +6,9 @@ import std::io
 
 out := bytes(0)
 
-# map(3): {"n": "hello", "g": 2, "l": 3}, keys in the order the compiler
-# writes them. 0xA3 is the map header for three pairs.
-out!append(163)
+# map(2): {"n": "hello", "g": 2}, keys in the order the compiler writes
+# them. 0xA2 is the map header for two pairs.
+out!append(162)
 
 # "n": "hello"  (text(1) "n", text(5) "hello")
 out!append(97)
@@ -20,11 +20,6 @@ out!append("hello")
 out!append(97)
 out!append("g")
 out!append(2)
-
-# "l": 3
-out!append(97)
-out!append("l")
-out!append(3)
 
 handle := std::io::open("bytes_header.bin", "wb")
 

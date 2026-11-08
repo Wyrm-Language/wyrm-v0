@@ -42,6 +42,16 @@ touching `src/vm*.c`, `src/embed/wyrm/*.wy`, or the self-hosted compiler.
   files, rebuild, run `regen_builtins.py` again (the output can differ in the free names of
   modules that import the changed module, until this second pass) and again with
   `--check`. Set `WY_IMAGE_VERSION` and `WYC_VERSION` to the publish time.
+  **A simpler route, when the old and new images can be told apart at load time:** a temporary
+  loader that accepts both, which needs no helper images (init as `functions[0]` went this way;
+  an old image was the one whose header had `l`). (1) Add the dual loader, set both version
+  constants, and change the compiler and writer. (2) Every committed `.c` under `src/embed/`
+  that pins the version with a `_Static_assert` (each container and `wyrm_builtins_table.c`) stops
+  the build, so `sed` the old number to the new one across them; the first regen rewrites them. Build
+  only the binary (`ninja -C buildDir src/wyrm/wyrm`): the tests don't compile yet. (3) Run `regen_builtins.py` and rebuild, twice, deleting `__wycache__` each time; old
+  stage0 builds a new gen1, and gen1 writes the new stage0. (4) `--check` must be clean. (5) Delete
+  the temporary code, rebuild and `--check` again: the strict loader proves nothing still needs the
+  old format.
 - **Changing the calling convention is a bootstrap too** (project H, one result per call;
   the accumulator L0). stage0 is bytecode in the old convention and is also the compiler that has to
   emit the new one. What worked, in order: (1) land the compiler change that is compatible with the

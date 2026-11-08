@@ -87,6 +87,7 @@ struct harness
     wy_value pieces = {};           // scratch list, rooted
     wy_value fn_new = {}, fn_compile = {}, fn_tree = {}, fn_pieces = {}, fn_undo = {};
     std::string last_error;
+    wy_uword last_init = 0;         // the function index wy_module_extend reported for the last input
 
     explicit harness(const std::string& root = std::string(WY_TEST_FIXTURE_DIR), wy_uword gc_threshold = WY_CONTEXT_GC_THRESHOLD_DEFAULT,
         wy_uword code_words = 0)
@@ -176,6 +177,7 @@ struct harness
         wy_uword init = 0;
         err = wy_module_extend(ctx, host, &image, &init);
         if (err != WY_ERR_NONE) { last_error = "extend"; return err; }
+        last_init = init;
         wy_value result = wy_value_nil();
         err = wy_module_run_function(ctx, host, init, &result);
         if (err != WY_ERR_NONE) { last_error = "run"; return err; }
@@ -270,6 +272,28 @@ TEST_SUITE("session-compile")
         CHECK_EQ(v.data.word, 42);
         REQUIRE_EQ(h.input("println(x)"), WY_ERR_NONE);
         CHECK_EQ(h.out, "40\n");
+    }
+
+    TEST_CASE("an input runs through its own first function, which is the first one it adds")
+    {
+        harness h;
+        for (int i = 0; i < 3; i++) {
+            const wy_uword functions_before = h.host->function_count;
+            const wy_uword code_before = h.host->code_len;
+            wy_value v = wy_value_nil();
+            // Each input also defines a function, so the init entry is not the only new one.
+            REQUIRE_EQ(h.input("fn f" + std::to_string(i) + "():\n    return " + std::to_string(i) + "\n" + std::to_string(40 + i), &v), WY_ERR_NONE);
+            CHECK_EQ(h.last_init, functions_before);
+            CHECK_GT(h.host->function_count, functions_before + 1);
+            const wy_function_proto& init = h.host->functions[h.last_init];
+            CHECK_EQ(init.nparams, 0);
+            CHECK_EQ(init.ncaptures, 0);
+            CHECK_EQ(init.ndispatch, 0);
+            CHECK_EQ(init.flags, 0);
+            CHECK_EQ(init.code_offset, code_before);  // its code is the first thing this input added
+            REQUIRE_EQ(v.type, WY_TYPE_TAG_WORD);
+            CHECK_EQ(v.data.word, 40 + i);
+        }
     }
 
     TEST_CASE("functions defined in one input are callable from the next")

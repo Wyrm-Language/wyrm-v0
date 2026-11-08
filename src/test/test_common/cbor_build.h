@@ -122,6 +122,14 @@ inline Bytes code_item(const std::vector<std::uint32_t>& words)
     return byte_string(raw);
 }
 
+// A function table entry shaped for a module's init routine (functions[0]):
+// no parameters, captures, dispatch types or flags. `code_offset` must be
+// inside the module's code.
+inline Bytes init_function(unsigned nlocals = 1, unsigned code_offset = 0)
+{
+    return map({kv("n", text("<init>")), kv("l", uval(nlocals)), kv("c", uval(code_offset)), kv("f", uval(0)), kv("p", array({}))});
+}
+
 struct Section
 {
     std::uint8_t id;

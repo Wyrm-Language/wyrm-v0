@@ -28,7 +28,6 @@
 # driver's header comment).
 
 import cbor::*
-import opcodes::*
 import image::*
 import std::io
 
@@ -36,34 +35,43 @@ WYA_PATH := "/tmp/hello_built.wy_a"
 C_PATH := "/tmp/hello_built.c"
 
 fn build_hello_image() -> dict:
-    img := make_image("hello", 2, 3)
+    img := make_image("hello", 2)
     img["statics"] = ["Hello ", "World"]
-    img["functions"] = [make_function("greet", [make_param("name")], 2, 11, 0)]
+    # functions[0] is the module init (4 locals, code offset 0); greet is functions[1]
+    img["functions"] = [make_function("<init>", [], 4, 0, 0), make_function("greet", [make_param("name")], 3, 12, 0)]
     img["exports"] = {"greet": 0}
     img["free"] = {"println": 1}
 
+    # The words `wyrm --disasm` shows for test/corpus/hello.wy: the init routine
+    # (functions[0]) at offset 0, then greet at offset 12.
     words := []
-    for w in pack("closure"):
+    for w in pack('closure, a0=1, a1=1):
         words!append(w)
-    for w in pack("gset", f=0, a0=0):
+    for w in pack('gset, f=1, a0=0):
         words!append(w)
-    for w in pack("gget", f=0, a0=1):
+    for w in pack('gget, f=1, a0=1):
         words!append(w)
-    for w in pack("gget", f=1, a0=0):
+    for w in pack('gget, f=2, a0=0):
         words!append(w)
-    for w in pack("lconst", f=2, a0=1):
+    for w in pack('lconst, f=3, a0=1):
         words!append(w)
-    for w in pack("call", f=1, a0=L(1), a1=1):
+    for w in pack('call, f=1, a0=2):
         words!append(w)
-    for w in pack("call", f=1, a0=L(0), a1=1):
+    for w in pack('move, f=0, a0=2):
         words!append(w)
-    for w in pack("return", f=0, a0=0):
+    for w in pack('call, f=1, a0=1):
         words!append(w)
-    for w in pack("lconst", f=0, a0=0):
+    for w in pack('move, f=0, a0=1):
         words!append(w)
-    for w in pack("add", f=0, a0=L(1), a1=L(0), a2=P(0)):
+    for w in pack('lnil, f=0, a0=0):
         words!append(w)
-    for w in pack("return", f=1, a0=1):
+    for w in pack('return, f=0, a0=0):
+        words!append(w)
+    for w in pack('lconst, f=1, a0=0):
+        words!append(w)
+    for w in pack('add, f=0, a0=2, a1=1, a2=P(0)):
+        words!append(w)
+    for w in pack('return, f=0, a0=2):
         words!append(w)
 
     img["code"] = words

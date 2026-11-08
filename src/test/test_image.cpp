@@ -31,7 +31,7 @@ std::vector<wy_u8> read_hello_wyd()
     return std::vector<wy_u8>(s.begin(), s.end());
 }
 
-Bytes header_section() { return map({kv("n", text("m")), kv("g", uval(0)), kv("l", uval(0))}); }
+Bytes header_section() { return map({kv("n", text("m")), kv("g", uval(0))}); }
 
 // The smallest valid file: a header and an (empty) code section.
 std::vector<Section> minimal_sections()
@@ -54,7 +54,7 @@ TEST_SUITE("image")
         REQUIRE_GT(blob.size(), 11u);
         Bytes pre = preamble();
         CHECK(std::equal(pre.begin(), pre.end(), blob.begin()));
-        CHECK_EQ(WY_IMAGE_VERSION, 340758572u);
+        CHECK_EQ(WY_IMAGE_VERSION, 342561947u);
         wy_module_image image;
 
         REQUIRE_EQ(wy_image_from_bytes(blob.data(), blob.size(), &image), WY_ERR_NONE);
@@ -78,7 +78,7 @@ TEST_SUITE("image")
         REQUIRE_EQ(parse(blob, &image), WY_ERR_NONE);
         // A structured section is the item itself ...
         CHECK_EQ(image.sections[WY_SEC_HEADER].len, header_section().size());
-        CHECK_EQ(image.sections[WY_SEC_HEADER].data[0], 0xA3);
+        CHECK_EQ(image.sections[WY_SEC_HEADER].data[0], 0xA2);
         CHECK_GE(image.sections[WY_SEC_HEADER].data, blob.data() + 11);
         // ... and code is the words inside its byte string.
         CHECK_EQ(image.sections[WY_SEC_CODE].len, 8u);

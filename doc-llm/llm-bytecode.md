@@ -89,9 +89,9 @@ ordinary slot of the frame, so it is a GC root, visible to a debugger, and
 saved with the frame when a coroutine suspends. A frame's `nlocals` counts
 L0.
 
-Module code offset 0 is the **module init routine**: it runs at import, after
-the loader has processed the sections (see §6). It is an ordinary function
-with 0 parameters and returns nil (`lnil L0; return L0`).
+`functions[0]` is the **module init routine**: it runs at import, after the
+loader has processed the sections (see §6). It is an ordinary function with 0
+parameters and returns nil (`lnil L0; return L0`).
 
 ### 1.1 Limits
 
@@ -374,14 +374,9 @@ not applicable; there are no `-1` sentinels.
 ```
 { n: str        module name (fully qualified, "::"-separated)
   g: uint       module global slot count
-  l: uint       L-frame size of the init routine (locals + temps high-water)
   u: [uint]     module-level referenced-name set: reloc idxs used by module
                 init code, bound by its `resolve` instruction (§6.2) }
 ```
-
-The init routine is code offset 0 and has no `functions` entry of its own, so
-`l` is where its frame size lives — the loader needs it to call init the same
-way it calls anything else (§6.1 step 6).
 
 ### 4.3 `statics`
 
@@ -404,7 +399,11 @@ literals). Deduplicated; order defines the index space.
 
 ### 4.6 `functions`
 
-Array; entry *i* defines function index *i*.
+Array; entry *i* defines function index *i*. The section is required and
+non-empty. Entry 0 is the module init routine (conventionally named `<init>`);
+it takes no parameters, captures nothing, has no dispatch types and `f` = 0,
+and the loader rejects an image whose entry 0 breaks that (`WY_ERR_IMAGE`).
+Every other function's index is therefore at least 1.
 
 ```
 { n: str        name ("!" suffix convention marks messages, e.g. "greet!")
@@ -478,8 +477,9 @@ Raw array of `u32` words, § 2 encoding, little-endian. In `.c` it is a
 multiple of 4; the bytes sit wherever the sections before them end, so a
 loader that finds them misaligned in memory copies them to an aligned
 `wy_allocator` buffer that the module owns, and otherwise uses them in place.
-Word offset 0 is the module init entry point. Function bodies follow,
-located by the `c` field of their `functions` entries. No padding between
+Every function body, init included, is located by the `c` field of its
+`functions` entry. The compiler lays init's code out first, so it sits at word
+offset 0 in a compiled module, but a reader must use `c`, not the offset. No padding between
 functions is required; `noop` is available if an implementation wants
 alignment.
 
@@ -563,10 +563,10 @@ load-time I/O. Emission rules:
   valid C identifier (else `CompileError`).
 - Every structured section becomes
   `static const uint8_t {enc}_{section}[] = { ... };`: the section's CBOR item,
-  byte for byte as it appears in a `.wyc`. The `.c` container has no preamble
-  and no version; the generated builtin table carries a
-  `_Static_assert(WY_IMAGE_VERSION == <version>u, ...)` so an embed built for
-  another version fails to compile.
+  byte for byte as it appears in a `.wyc`. The `.c` container has no preamble,
+  so it carries `_Static_assert(WY_IMAGE_VERSION == <version>u, ...)` after its
+  includes: a container written for another version fails to compile. The
+  generated builtin table carries the same check.
 - The code section becomes `static const uint32_t {enc}_code[] = { ... };`
   — `uint32_t`, not bytes, so alignment and host byte order are correct by
   construction (Appendix B, D5). One instruction per source line with the
@@ -618,7 +618,8 @@ any version other than its own: it never reads an old or unknown format.
 It doesn't parse the preamble as general CBOR.
 
 The map's keys are the section ids of §4; `header` (1) and `code` (8) are
-required, and an unknown id is rejected. A structured section is written
+required by the container, and an unknown id is rejected. The module loader
+additionally requires a non-empty `functions` (5) (§4.6). A structured section is written
 directly as the map value, so a section reference is the byte span of that
 value inside the file and is read in place. `code` is a byte string of
 little-endian `u32` words (§4.9). The loader validates the whole file once:
@@ -631,8 +632,8 @@ Any change to the format (the container, a section's shape, a key, a value
 encoding) sets a new version, in `WY_IMAGE_VERSION` (`include/wyrm/image.h`)
 and `WYC_VERSION` (`src/embed/wyrm/image.wy`) together. Every version from
 2^16 seconds up to 2^32 - 1 (the year 2152) needs the 4-byte argument, so the
-preamble is always 11 bytes. The current version is 340758572 (`0x144F902C`,
-2026-10-18 23:09:32Z).
+preamble is always 11 bytes. The current version is 342561947 (`0x146B149B`,
+2026-11-08 20:05:47Z).
 
 Canonical byte order for the code words is little-endian (a big-endian MCU
 target byte-swaps code at load, or uses the `.c` container which is
@@ -659,7 +660,7 @@ Given an image, the loader:
 3. Interns every `symbols` entry.
 4. Allocates the relocation bind table (`nrelocs` slots, all *unbound*).
 5. Registers `functions` and `classes` as prototypes (no execution).
-6. Publishes the module object under its name, **then** runs code offset 0
+6. Publishes the module object under its name, **then** runs `functions[0]`
    as a zero-arg call. (Publishing first is what detects an import cycle:
    an import that finds the module still initialising faults. The one
    exception is a prefix load - the trailing-`::` spelling `import` emits
@@ -1089,8 +1090,9 @@ println(greet("World"))
 Image: 1 global (`g0` = greet), statics `#0` = `"Hello "`, `#1` = `"World"`,
 symbol `#0` = `"println"`, relocation `#0` = `{t:3, p:[0]}` (function
 `println`), header `u:[0]` (init references `println`), function `#0` =
-greet (1 param, `l:3`, code word offset 12, no `u` — its body references
-nothing external).
+`<init>` (no parameters, `l:4`, code word offset 0), function `#1` = greet (1
+param, `l:3`, code word offset 12, no `u` — its body references nothing
+external).
 
 The full `statics` and `code` sections as `.wy_a` (header, symbols,
 functions, relocations elided with `…` here; a real emitter always writes
@@ -1111,14 +1113,15 @@ SECTION symbols
 0010: 6C 6E 00 00
 
 SECTION functions
-; …  [0] greet  p:[name]  l:3  c:12  f:0
+; …  [0] <init>  p:[]  l:4  c:0  f:0
+; …  [1] greet  p:[name]  l:3  c:12  f:0
 
 SECTION relocations
 ; …  [0] function println
 
 SECTION code
-; module init (l:4). The compiler copies each call's value out of L0 at once.
-0000: A8 00 01 00 00 00 00 00                         ; closure L1 <- fn#0, 0 caps
+; fn <init> (word offset 0, l:4). The compiler copies each call's value out of L0 at once.
+0000: A8 00 01 00 00 00 01 00                         ; closure L1 <- fn#1, 0 caps
 0008: 43 01 00 00                                     ; gset g0 <- L1        (greet)
 000C: 42 01 01 00                                     ; gget L1 <- g1        (println, a free name)
 0010: 42 02 00 00                                     ; gget L2 <- g0        (greet)

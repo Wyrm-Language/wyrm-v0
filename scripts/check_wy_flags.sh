@@ -26,6 +26,19 @@ grep -q "wyrm: wrote $WORK/out/hello.wyd" "$WORK/bc.log"
 cmp "$WORK/out/hello.wyd" "$WORK/cache$WORK/hello.wyd"
 "$WYRM" --disasm "$WORK/out/hello.wyd" >/dev/null
 
+# A .c container pins the format version: it builds against this tree's header,
+# and one written for any other version fails to compile.
+grep -q '^_Static_assert(WY_IMAGE_VERSION == [0-9]*u,' "$WORK/out/hello.c"
+if command -v "${CC:-cc}" >/dev/null 2>&1; then
+    "${CC:-cc}" -std=c11 -I"$ROOT/include" -c "$WORK/out/hello.c" -o "$WORK/hello.o"
+    sed 's/^_Static_assert(WY_IMAGE_VERSION == [0-9]*u,/_Static_assert(WY_IMAGE_VERSION == 1u,/' \
+        "$WORK/out/hello.c" > "$WORK/stale.c"
+    if "${CC:-cc}" -std=c11 -I"$ROOT/include" -c "$WORK/stale.c" -o "$WORK/stale.o" 2>/dev/null; then
+        echo "wy-flags: a .c container for another format version compiled" >&2
+        exit 1
+    fi
+fi
+
 # --build-bc usage contract.
 if "$WYRM" --build-bc --emit wya "$WORK/hello.wy" 2>/dev/null; then
     echo "wy-flags: --emit wya should be refused (known gap)" >&2

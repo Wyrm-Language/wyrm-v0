@@ -26,11 +26,11 @@
 #
 #   "name"    : str            module name, "::"-separated       (header n)
 #   "globals" : int            module global slot count            (header g)
-#   "init_l"  : int            init routine's L-frame size          (header l)
 #   "statics"       : list | nil   array elements, or nil if none
 #   "slot_defaults" : dict | nil   {global slot index (int): value}, or nil
 #   "symbols"       : list | nil   list of str, or nil
-#   "functions"     : list | nil   list of function dicts (see below), or nil
+#   "functions"     : list         list of function dicts (see below);
+#                                  entry 0 is the module's init routine
 #   "classes"       : list | nil   list of ready-to-encode dicts, or nil
 #   "messages"      : list | nil   list of ready-to-encode dicts, or nil
 #   "exports"       : dict | nil   {name: global slot index}, or nil
@@ -82,7 +82,7 @@ SEC_FREE := 11
 # the last change to the .wyc format was published. Every change to the
 # container, a section's shape, a key or a value encoding sets a new one, here
 # and as WY_IMAGE_VERSION in include/wyrm/image.h; a loader accepts only its own.
-WYC_VERSION := 340758572
+WYC_VERSION := 342561947
 
 # All section ids this milestone's writer knows how to emit, in ascending
 # order. Building sections in this exact order also means the `sections()`
@@ -112,8 +112,8 @@ COMMENT_COLUMN := 54
 # --------------------------------------------------------------------------
 # constructors
 
-fn make_image(name: str, globals_count: int, init_l: int) -> dict:
-    return {"name": name, "globals": globals_count, "init_l": init_l, "statics": nil, "slot_defaults": nil, "symbols": nil, "functions": nil, "classes": nil, "messages": nil, "exports": nil, "free": nil, "code": []}
+fn make_image(name: str, globals_count: int) -> dict:
+    return {"name": name, "globals": globals_count, "statics": nil, "slot_defaults": nil, "symbols": nil, "functions": nil, "classes": nil, "messages": nil, "exports": nil, "free": nil, "code": []}
 
 fn make_param(name: str, default: int | nil = nil) -> dict:
     return {"name": name, "default": default}
@@ -136,14 +136,14 @@ fn make_function(name: str, params: list | nil = nil, nlocals: int = 0,
 # section document builders
 
 fn _header_doc(image: dict) -> dict:
-    doc := {"n": image["name"], "g": image["globals"], "l": image["init_l"]}
+    doc := {"n": image["name"], "g": image["globals"]}
     # A REPL session delta (doc-llm/history/repl/repl-plan.md): `d` marks it, `bc`..`bg` are the
-    # module's counts before the delta (the loader refuses a mismatch), `i` is
-    # the absolute index of the function that runs this input.
+    # module's counts before the delta (the loader refuses a mismatch). The
+    # delta's first function runs this input.
     delta := (image["delta"] catch nil)
     if not (delta is nil):
         doc["d"] = 1
-        for key in ["bc", "bf", "bs", "by", "bk", "bm", "bg", "i"]:
+        for key in ["bc", "bf", "bs", "by", "bk", "bm", "bg"]:
             doc[key] = delta[key]
     return doc
 
@@ -618,7 +618,6 @@ fn _annotate(rec: dict, image: dict, global_names: dict) -> str:
 
 fn _code_listing(image: dict) -> list | error:
     starts := {}
-    starts[0] = "module init"
     functions := image["functions"]
     if functions is not nil:
         for func in functions:
@@ -739,6 +738,9 @@ fn to_c(image: dict, header_include: str = "wyrm/image.h") -> str | error:
     out!append("")
     out!append("#include <stdint.h>")
     out!append("#include " + quote + header_include + quote)
+    out!append("")
+    # A .c container has no preamble for a loader to check, so the compiler checks instead.
+    out!append("_Static_assert(WY_IMAGE_VERSION == " + str(WYC_VERSION) + "u, " + quote + "compiled module is for another .wyc format version; recompile it" + quote + ");")
     out!append("")
     for id in ALL_SECTION_IDS:
         payload := secs[id] catch nil

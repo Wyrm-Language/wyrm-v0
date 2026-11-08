@@ -58,14 +58,25 @@ wy_symbol intern(wy_context* context, const char* text)
 using namespace wy_test_cbor;
 
 // A header for a module with `globals` global slots.
-Bytes header_with(int globals) { return map({kv("n", text("m")), kv("g", uval(globals)), kv("l", uval(2))}); }
+Bytes header_with(int globals) { return map({kv("n", text("m")), kv("g", uval(globals))}); }
 
 // Load `sections` as a file; the error, or WY_ERR_NONE with `*module` set.
 wy_error load_sections(wy_context* context, const std::vector<Section>& sections, wy_module** module)
 {
-    // A fresh copy for each load: the module keeps pointers into it.
+    // A fresh copy for each load: the module keeps pointers into it. A module
+    // needs an init routine, functions[0]: give it the plain one unless the
+    // caller supplies a functions section.
+    std::vector<Section> all = sections;
+    bool has_functions = false;
+    for (const Section& s : sections) { has_functions = has_functions || s.id == WY_SEC_FUNCTIONS; }
+    if (!has_functions) {
+        // Sections go in ascending id order.
+        auto at = all.begin();
+        while (at != all.end() && at->id < WY_SEC_FUNCTIONS) { ++at; }
+        all.insert(at, {WY_SEC_FUNCTIONS, array({init_function()})});
+    }
     static std::vector<Bytes> keep;
-    keep.push_back(container(sections));
+    keep.push_back(container(all));
     return wy_module_load_bytes(context, keep.back().data(), keep.back().size(), false, module);
 }
 
@@ -86,7 +97,7 @@ TEST_SUITE("module")
         wy_module* module = load_fixture(ctx.get_context_ptr(), "hello.wyd", storage);
 
         CHECK_EQ(module->global_count, 2);
-        CHECK_EQ(module->init_nlocals, 4);
+        CHECK_EQ(module->functions[0].nlocals, 4);
 
         REQUIRE_EQ(module->static_count, 2);
         REQUIRE_EQ(module->statics[0].type, WY_TYPE_TAG_STR);
@@ -94,8 +105,12 @@ TEST_SUITE("module")
         REQUIRE_EQ(module->statics[1].type, WY_TYPE_TAG_STR);
         CHECK_EQ(wy_strncmp_f(module->statics[1].data.str->str, "World", 5), 0);
 
-        REQUIRE_EQ(module->function_count, 1);
-        const wy_function_proto& greet = module->functions[0];
+        REQUIRE_EQ(module->function_count, 2);
+        const wy_function_proto& init = module->functions[0];  // the init routine comes first
+        CHECK_EQ(wy_strcmp_f(init.name, "<init>"), 0);
+        CHECK_EQ(init.code_offset, 0);
+        CHECK_EQ(init.nparams, 0);
+        const wy_function_proto& greet = module->functions[1];
         CHECK_EQ(wy_strcmp_f(greet.name, "greet"), 0);
         CHECK_EQ(greet.nparams, 1);
         CHECK_EQ(greet.nlocals, 3);
@@ -117,7 +132,7 @@ TEST_SUITE("module")
         const wy_class_proto& shape = module->class_protos[0];
         CHECK_EQ(wy_strcmp_f(shape.name, "Shape"), 0);
         CHECK_EQ(shape.super_slot, -1);
-        CHECK_EQ(shape.init_fn, 0);
+        CHECK_EQ(shape.init_fn, 1);
         REQUIRE_EQ(shape.nslots, 2);
         CHECK_EQ(wy_strcmp_f(shape.slots[0].name, "name"), 0);
         CHECK_EQ(shape.slots[0].default_static, 0);
@@ -125,22 +140,29 @@ TEST_SUITE("module")
         CHECK_EQ(shape.slots[1].default_static, 1);
         REQUIRE_EQ(shape.nmsgs, 2);
         CHECK_EQ(wy_strcmp_f(shape.msgs[0].name, "describe"), 0);
-        CHECK_EQ(shape.msgs[0].fn, 1);
+        CHECK_EQ(shape.msgs[0].fn, 2);
         CHECK_EQ(wy_strcmp_f(shape.msgs[1].name, "corners"), 0);
-        CHECK_EQ(shape.msgs[1].fn, 2);
+        CHECK_EQ(shape.msgs[1].fn, 3);
         CHECK_EQ(shape.nstatics, 0);
 
         const wy_class_proto& square = module->class_protos[1];
         CHECK_EQ(wy_strcmp_f(square.name, "Square"), 0);
         CHECK_EQ(square.super_slot, 0);  // Shape's global slot
-        CHECK_EQ(square.init_fn, 3);
+        CHECK_EQ(square.init_fn, 4);
         REQUIRE_EQ(square.nslots, 1);
         CHECK_EQ(wy_strcmp_f(square.slots[0].name, "size"), 0);
         CHECK_EQ(square.slots[0].default_static, 2);
         REQUIRE_EQ(square.nmsgs, 1);
-        CHECK_EQ(wy_strcmp_f(square.msgs[0].name, "area"), 0);
-        CHECK_EQ(square.msgs[0].fn, 4);
+        CHECK_EQ(wy_strcmp_f(square.msgs[0].name, "area"), 0);  // a message method is named with its `!`
+        CHECK_EQ(square.msgs[0].fn, 5);
         CHECK_EQ(square.nstatics, 0);
+
+        // The init routine is functions[0]; the compiled functions follow it.
+        REQUIRE_GT(module->function_count, 5u);
+        CHECK_EQ(wy_strcmp_f(module->functions[0].name, "<init>"), 0);
+        CHECK_EQ(module->functions[0].code_offset, 0);
+        CHECK_EQ(wy_strcmp_f(module->functions[square.msgs[0].fn].name, "area!"), 0);  // a message method is named with its `!`
+        CHECK_GT(module->functions[square.msgs[0].fn].code_offset, 0);
 
         REQUIRE_EQ(module->message_count, 3);
         REQUIRE_EQ(module->messages[0].path_len, 1);
@@ -180,7 +202,7 @@ TEST_SUITE("module")
         REQUIRE_EQ(wy_module_load_image(ctx.get_context_ptr(), &hello_1_image, &module), WY_ERR_NONE);
 
         CHECK_EQ(module->global_count, 1);
-        CHECK_EQ(module->init_nlocals, 3);
+        CHECK_EQ(module->functions[0].nlocals, 3);
         REQUIRE_EQ(module->static_count, 1);
         REQUIRE_EQ(module->statics[0].type, WY_TYPE_TAG_STR);
         CHECK_EQ(wy_strncmp_f(module->statics[0].data.str->str, "Hello World\n", 12), 0);
@@ -235,7 +257,8 @@ TEST_SUITE("loader")
         // `return L0`; a header plus this is a complete module.
         const wy_u32 return_word = (wy_u32(WY_OP_RETURN) & 0xFF);
         Bytes original = container({
-            {WY_SEC_HEADER, map({kv("n", text("m")), kv("g", uval(0)), kv("l", uval(1))})},
+            {WY_SEC_HEADER, map({kv("n", text("m")), kv("g", uval(0))})},
+            {WY_SEC_FUNCTIONS, array({init_function()})},
             {WY_SEC_CODE, code_item({return_word})},
         });
         wy_module_image probe;
@@ -269,7 +292,7 @@ TEST_SUITE("loader")
                 text("héllo"), uval(0), uval(0x123456789ull), integer(-1), integer(INT64_MIN + 1),
                 float64(2.5), boolean(true), boolean(false), nil(), byte_string({0, 255, 1}),
             })},
-            {WY_SEC_CODE, code_item({})},
+            {WY_SEC_CODE, code_item({0})},
         }, &module), WY_ERR_NONE);
         REQUIRE_EQ(module->static_count, 10u);
         CHECK_EQ(module->statics[0].type, WY_TYPE_TAG_STR);
@@ -299,7 +322,7 @@ TEST_SUITE("loader")
         REQUIRE_EQ(load_sections(ctx, {
             {WY_SEC_HEADER, header_with(3)},
             {WY_SEC_SLOT_DEFAULTS, map({Pair{uval(2), integer(7)}, Pair{uval(0), text("d")}})},
-            {WY_SEC_CODE, code_item({})},
+            {WY_SEC_CODE, code_item({0})},
         }, &module), WY_ERR_NONE);
         REQUIRE_EQ(module->global_count, 3u);
         CHECK_EQ(module->globals[2].data.word, 7);
@@ -308,9 +331,9 @@ TEST_SUITE("loader")
 
         // A string key, as the BSON writer spelled them, is refused, and so is
         // a slot past the module's globals.
-        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(3)}, {WY_SEC_SLOT_DEFAULTS, map({kv("2", integer(7))})}, {WY_SEC_CODE, code_item({})}}), WY_ERR_IMAGE);
-        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(3)}, {WY_SEC_SLOT_DEFAULTS, map({Pair{uval(3), integer(7)}})}, {WY_SEC_CODE, code_item({})}}), WY_ERR_IMAGE);
-        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(3)}, {WY_SEC_SLOT_DEFAULTS, map({Pair{uval(1), array({})}})}, {WY_SEC_CODE, code_item({})}}), WY_ERR_IMAGE);
+        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(3)}, {WY_SEC_SLOT_DEFAULTS, map({kv("2", integer(7))})}, {WY_SEC_CODE, code_item({0})}}), WY_ERR_IMAGE);
+        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(3)}, {WY_SEC_SLOT_DEFAULTS, map({Pair{uval(3), integer(7)}})}, {WY_SEC_CODE, code_item({0})}}), WY_ERR_IMAGE);
+        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(3)}, {WY_SEC_SLOT_DEFAULTS, map({Pair{uval(1), array({})}})}, {WY_SEC_CODE, code_item({0})}}), WY_ERR_IMAGE);
     }
 
     TEST_CASE("statics and symbols refuse values of the wrong type")
@@ -318,7 +341,7 @@ TEST_SUITE("loader")
         test_context_fixture fix;
         wy_context* ctx = fix.get_context_ptr();
         auto with = [&](std::uint8_t id, const Bytes& value) {
-            return load_sections(ctx, {{WY_SEC_HEADER, header_with(0)}, {id, value}, {WY_SEC_CODE, code_item({})}});
+            return load_sections(ctx, {{WY_SEC_HEADER, header_with(0)}, {id, value}, {WY_SEC_CODE, code_item({0})}});
         };
         CHECK_EQ(with(WY_SEC_STATICS, array({array({})})), WY_ERR_IMAGE);
         CHECK_EQ(with(WY_SEC_STATICS, array({map({})})), WY_ERR_IMAGE);
@@ -334,19 +357,21 @@ TEST_SUITE("loader")
         test_context_fixture fix;
         wy_context* ctx = fix.get_context_ptr();
         auto with = [&](const Bytes& header) {
-            return load_sections(ctx, {{WY_SEC_HEADER, header}, {WY_SEC_CODE, code_item({})}});
+            return load_sections(ctx, {{WY_SEC_HEADER, header}, {WY_SEC_CODE, code_item({0})}});
         };
-        CHECK_EQ(with(map({kv("n", text("m")), kv("g", uval(1)), kv("l", uval(2))})), WY_ERR_NONE);
+        CHECK_EQ(with(map({kv("n", text("m")), kv("g", uval(1))})), WY_ERR_NONE);
         // `u` and any other extra key are ignored; the version is not a key.
-        CHECK_EQ(with(map({kv("n", text("m")), kv("g", uval(1)), kv("l", uval(2)), kv("u", array({uval(0)}))})), WY_ERR_NONE);
-        CHECK_EQ(with(map({kv("g", uval(1)), kv("l", uval(2))})), WY_ERR_IMAGE);                       // no name
-        CHECK_EQ(with(map({kv("n", text("m")), kv("l", uval(2))})), WY_ERR_IMAGE);                     // no g
-        CHECK_EQ(with(map({kv("n", text("m")), kv("g", uval(1))})), WY_ERR_IMAGE);                     // no l
-        CHECK_EQ(with(map({kv("n", uval(5)), kv("g", uval(1)), kv("l", uval(2))})), WY_ERR_IMAGE);     // name not text
-        CHECK_EQ(with(map({kv("n", text("m")), kv("g", integer(-1)), kv("l", uval(2))})), WY_ERR_IMAGE);
-        CHECK_EQ(with(map({kv("n", text("m")), kv("g", float64(1.0)), kv("l", uval(2))})), WY_ERR_IMAGE);
-        CHECK_EQ(with(map({kv("n", text("m")), kv("g", uval(1)), kv("l", uval(0x10000))})), WY_ERR_IMAGE);
-        CHECK_EQ(with(map({kv("n", text("m")), kv("g", uval(0x80000000ull)), kv("l", uval(2))})), WY_ERR_IMAGE);
+        CHECK_EQ(with(map({kv("n", text("m")), kv("g", uval(1)), kv("u", array({uval(0)}))})), WY_ERR_NONE);
+        // The init frame size lives in functions[0] now. A stale header `l` is
+        // just another unknown key: it is not read, whatever it holds.
+        CHECK_EQ(with(map({kv("n", text("m")), kv("g", uval(1)), kv("l", uval(2))})), WY_ERR_NONE);
+        CHECK_EQ(with(map({kv("n", text("m")), kv("g", uval(1)), kv("l", uval(0x10000))})), WY_ERR_NONE);
+        CHECK_EQ(with(map({kv("g", uval(1))})), WY_ERR_IMAGE);                                         // no name
+        CHECK_EQ(with(map({kv("n", text("m"))})), WY_ERR_IMAGE);                                       // no g
+        CHECK_EQ(with(map({kv("n", uval(5)), kv("g", uval(1))})), WY_ERR_IMAGE);                       // name not text
+        CHECK_EQ(with(map({kv("n", text("m")), kv("g", integer(-1))})), WY_ERR_IMAGE);
+        CHECK_EQ(with(map({kv("n", text("m")), kv("g", float64(1.0))})), WY_ERR_IMAGE);
+        CHECK_EQ(with(map({kv("n", text("m")), kv("g", uval(0x80000000ull))})), WY_ERR_IMAGE);
         CHECK_EQ(with(array({})), WY_ERR_IMAGE);
     }
 
@@ -359,7 +384,7 @@ TEST_SUITE("loader")
             return load_sections(ctx, {
                 {WY_SEC_HEADER, header_with(2)},
                 {WY_SEC_STATICS, array({text("s")})},
-                {WY_SEC_FUNCTIONS, array({entry})},
+                {WY_SEC_FUNCTIONS, array({init_function(1, 0), entry})},
                 {WY_SEC_CODE, code_item({1, 2, 3})},
             });
         };
@@ -390,14 +415,92 @@ TEST_SUITE("loader")
         CHECK_EQ(with("t", uval(1)), WY_ERR_IMAGE);          // not an array
     }
 
+    TEST_CASE("a module needs a functions section with at least one entry")
+    {
+        test_context_fixture fix;
+        wy_context* ctx = fix.get_context_ptr();
+        // Built by hand, not through load_sections, which would supply the init routine.
+        auto load = [&](const std::vector<Section>& sections) {
+            static std::vector<Bytes> keep;
+            keep.push_back(container(sections));
+            wy_module* module = nullptr;
+            return wy_module_load_bytes(ctx, keep.back().data(), keep.back().size(), false, &module);
+        };
+        CHECK_EQ(load({{WY_SEC_HEADER, header_with(0)}, {WY_SEC_CODE, code_item({0})}}), WY_ERR_IMAGE);
+        CHECK_EQ(load({{WY_SEC_HEADER, header_with(0)}, {WY_SEC_FUNCTIONS, array({})}, {WY_SEC_CODE, code_item({0})}}), WY_ERR_IMAGE);
+        CHECK_EQ(load({{WY_SEC_HEADER, header_with(0)}, {WY_SEC_FUNCTIONS, array({init_function()})}, {WY_SEC_CODE, code_item({0})}}), WY_ERR_NONE);
+    }
+
+    TEST_CASE("functions[0] must be shaped like an init routine; the same entry at index 1 loads")
+    {
+        test_context_fixture fix;
+        wy_context* ctx = fix.get_context_ptr();
+        auto entry = [](const std::vector<Pair>& extra) {
+            std::vector<Pair> pairs = {kv("n", text("f")), kv("l", uval(1)), kv("c", uval(0)), kv("p", array({}))};
+            std::vector<Pair> out;
+            for (const Pair& p : pairs) {
+                bool overridden = false;
+                for (const Pair& e : extra) { overridden = overridden || e.first == p.first; }
+                if (!overridden) { out.push_back(p); }
+            }
+            for (const Pair& e : extra) { out.push_back(e); }
+            bool has_flags = false;
+            for (const Pair& e : out) { has_flags = has_flags || e.first == text("f"); }
+            if (!has_flags) { out.push_back(kv("f", uval(0))); }
+            return map(out);
+        };
+        auto load = [&](const std::vector<Bytes>& functions) {
+            return load_sections(ctx, {
+                {WY_SEC_HEADER, header_with(1)},
+                {WY_SEC_STATICS, array({text("s")})},
+                {WY_SEC_FUNCTIONS, array(functions)},
+                {WY_SEC_CODE, code_item({1, 2})},
+            });
+        };
+        const std::vector<std::pair<std::string, std::vector<Pair>>> bad = {
+            {"parameter", {kv("p", array({map({kv("n", text("a"))})}))}},
+            {"capture", {kv("k", uval(1))}},
+            {"dispatch type", {kv("t", array({uval(0)}))}},
+            {"flag 1", {kv("f", uval(1))}},
+            {"flag 2", {kv("f", uval(2))}},
+            {"flag 4", {kv("f", uval(4))}},
+            {"flag 8", {kv("f", uval(8))}},
+        };
+        for (const auto& b : bad) {
+            CAPTURE(b.first);
+            CHECK_EQ(load({entry(b.second)}), WY_ERR_IMAGE);
+            CHECK_EQ(load({init_function(), entry(b.second)}), WY_ERR_NONE);
+        }
+        CHECK_EQ(load({entry({})}), WY_ERR_NONE);  // the baseline entry is a valid init
+    }
+
+    TEST_CASE("wy_module_run_init on a module with no functions is WY_ERR_IMAGE and changes no state")
+    {
+        test_fiber_fixture fix;
+        wy_context* ctx = fix.get_context_ptr();
+        wy_module* module = wy_module_new_f(ctx);
+        const wy_u32 code[] = {0};
+        module->code = code;
+        module->code_len = 1;
+        REQUIRE_EQ(module->function_count, 0u);
+        CHECK_EQ(wy_module_init_proto_(module), nullptr);
+        const wy_module_state before = module->state;
+        CHECK_EQ(wy_module_run_init(ctx, module), WY_ERR_IMAGE);
+        // It stops before the module becomes INITIALISING, so it is neither READY nor FAILED.
+        CHECK_EQ(module->state, before);
+        CHECK_EQ(module->state, WY_MODULE_LOADED);
+        CHECK_EQ(module->function_count, 0u);
+        CHECK_EQ(wy_module_run_init(ctx, module), WY_ERR_IMAGE);  // and it can be asked again
+    }
+
     TEST_CASE("classes and messages decode and are range checked")
     {
         test_context_fixture fix;
         wy_context* ctx = fix.get_context_ptr();
         auto fn = map({kv("n", text("f")), kv("l", uval(1)), kv("c", uval(0)), kv("f", uval(0)), kv("p", array({}))});
         auto cls = [](std::vector<Pair> extra) {
-            std::vector<Pair> pairs = {kv("n", text("C")), kv("sl", array({map({kv("n", text("x")), kv("d", uval(0)), kv("g", uval(0))})})),
-                kv("m", array({map({kv("y", uval(1)), kv("f", uval(0))})})), kv("st", array({map({kv("n", text("S")), kv("g", uval(1))})}))};
+            std::vector<Pair> pairs = {kv("n", text("C")), kv("sl", array({map({kv("n", text("x")), kv("d", uval(0)), kv("g", uval(1))})})),
+                kv("m", array({map({kv("y", uval(1)), kv("f", uval(1))})})), kv("st", array({map({kv("n", text("S")), kv("g", uval(1))})}))};
             for (const Pair& p : extra) { pairs.push_back(p); }
             return map(pairs);
         };
@@ -407,24 +510,24 @@ TEST_SUITE("loader")
                 {WY_SEC_HEADER, header_with(2)},
                 {WY_SEC_STATICS, array({integer(5)})},
                 {WY_SEC_SYMBOLS, array({text("a"), text("b")})},
-                {WY_SEC_FUNCTIONS, array({fn})},
+                {WY_SEC_FUNCTIONS, array({init_function(), fn})},   // fn is function 1
                 {WY_SEC_CLASSES, array({klass})},
                 {WY_SEC_MESSAGES, array({map({kv("p", array({uval(0), uval(1)}))})})},
                 {WY_SEC_CODE, code_item({1})},
             }, out != nullptr ? out : &local);
         };
         wy_module* module = nullptr;
-        REQUIRE_EQ(load(cls({kv("s", uval(1)), kv("i", uval(0))}), &module), WY_ERR_NONE);
+        REQUIRE_EQ(load(cls({kv("s", uval(1)), kv("i", uval(1))}), &module), WY_ERR_NONE);
         REQUIRE_EQ(module->class_count, 1u);
         const wy_class_proto& proto = module->class_protos[0];
         CHECK_EQ(proto.super_slot, 1);
-        CHECK_EQ(proto.init_fn, 0);
+        CHECK_EQ(proto.init_fn, 1);
         REQUIRE_EQ(proto.nslots, 1u);
         CHECK_EQ(proto.slots[0].default_static, 0);
-        CHECK_EQ(proto.slots[0].getter_fn, 0);
+        CHECK_EQ(proto.slots[0].getter_fn, 1);
         CHECK_EQ(proto.slots[0].setter_fn, -1);
         REQUIRE_EQ(proto.nmsgs, 1u);
-        CHECK_EQ(proto.msgs[0].fn, 0u);
+        CHECK_EQ(proto.msgs[0].fn, 1u);
         REQUIRE_EQ(proto.nstatics, 1u);
         CHECK_EQ(proto.statics[0].global, 1u);
         REQUIRE_EQ(module->message_count, 1u);
@@ -433,18 +536,18 @@ TEST_SUITE("loader")
 
         CHECK_EQ(load(cls({})), WY_ERR_NONE);
         CHECK_EQ(load(cls({kv("s", uval(2))})), WY_ERR_IMAGE);    // past the two globals
-        CHECK_EQ(load(cls({kv("i", uval(1))})), WY_ERR_IMAGE);    // past the one function
+        CHECK_EQ(load(cls({kv("i", uval(2))})), WY_ERR_IMAGE);    // past the two functions
         CHECK_EQ(load(map({kv("n", text("C"))})), WY_ERR_IMAGE);  // sl, m and st are required
         CHECK_EQ(load(map({kv("n", text("C")), kv("sl", array({})), kv("m", array({})), kv("st", array({}))})), WY_ERR_NONE);
         CHECK_EQ(load(map({kv("n", text("C")), kv("sl", array({})), kv("m", array({map({kv("y", uval(2)), kv("f", uval(0))})})), kv("st", array({}))})), WY_ERR_IMAGE);
-        CHECK_EQ(load(map({kv("n", text("C")), kv("sl", array({})), kv("m", array({map({kv("y", uval(0)), kv("f", uval(1))})})), kv("st", array({}))})), WY_ERR_IMAGE);
+        CHECK_EQ(load(map({kv("n", text("C")), kv("sl", array({})), kv("m", array({map({kv("y", uval(0)), kv("f", uval(2))})})), kv("st", array({}))})), WY_ERR_IMAGE);
         CHECK_EQ(load(map({kv("n", text("C")), kv("sl", array({map({kv("n", text("x")), kv("d", uval(1))})})), kv("m", array({})), kv("st", array({}))})), WY_ERR_IMAGE);
         CHECK_EQ(load(map({kv("n", text("C")), kv("sl", array({})), kv("m", array({})), kv("st", array({map({kv("n", text("S")), kv("g", uval(2))})}))})), WY_ERR_IMAGE);
         // A message path indexes the symbols.
         CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(0)}, {WY_SEC_SYMBOLS, array({text("a")})},
-            {WY_SEC_MESSAGES, array({map({kv("p", array({uval(1)}))})})}, {WY_SEC_CODE, code_item({})}}), WY_ERR_IMAGE);
+            {WY_SEC_MESSAGES, array({map({kv("p", array({uval(1)}))})})}, {WY_SEC_CODE, code_item({0})}}), WY_ERR_IMAGE);
         CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(0)}, {WY_SEC_SYMBOLS, array({text("a")})},
-            {WY_SEC_MESSAGES, array({map({kv("p", array({}))})})}, {WY_SEC_CODE, code_item({})}}), WY_ERR_IMAGE);
+            {WY_SEC_MESSAGES, array({map({kv("p", array({}))})})}, {WY_SEC_CODE, code_item({0})}}), WY_ERR_IMAGE);
     }
 
     TEST_CASE("exports and free name global slots")
@@ -454,7 +557,7 @@ TEST_SUITE("loader")
         wy_module* module = nullptr;
         REQUIRE_EQ(load_sections(ctx, {
             {WY_SEC_HEADER, header_with(2)},
-            {WY_SEC_CODE, code_item({})},
+            {WY_SEC_CODE, code_item({0})},
             {WY_SEC_EXPORTS, map({kv("a", uval(0))})},
             {WY_SEC_FREE, map({kv("b", uval(1)), kv("c", uval(0))})},
         }, &module), WY_ERR_NONE);
@@ -462,12 +565,12 @@ TEST_SUITE("loader")
         CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx, "b")), 1u);
         CHECK_EQ(wy_slot_dict_get(&module->free_names, intern(ctx, "c")), 0u);
 
-        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(2)}, {WY_SEC_CODE, code_item({})}, {WY_SEC_EXPORTS, map({kv("a", uval(2))})}}), WY_ERR_IMAGE);
-        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(2)}, {WY_SEC_CODE, code_item({})}, {WY_SEC_EXPORTS, map({kv("a", text("0"))})}}), WY_ERR_IMAGE);
+        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(2)}, {WY_SEC_CODE, code_item({0})}, {WY_SEC_EXPORTS, map({kv("a", uval(2))})}}), WY_ERR_IMAGE);
+        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(2)}, {WY_SEC_CODE, code_item({0})}, {WY_SEC_EXPORTS, map({kv("a", text("0"))})}}), WY_ERR_IMAGE);
         // An integer key is not a name.
-        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(2)}, {WY_SEC_CODE, code_item({})}, {WY_SEC_EXPORTS, map({Pair{uval(1), uval(0)}})}}), WY_ERR_IMAGE);
+        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(2)}, {WY_SEC_CODE, code_item({0})}, {WY_SEC_EXPORTS, map({Pair{uval(1), uval(0)}})}}), WY_ERR_IMAGE);
         // A name twice is a duplicate.
-        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(2)}, {WY_SEC_CODE, code_item({})}, {WY_SEC_EXPORTS, map({kv("a", uval(0)), kv("a", uval(1))})}}), WY_ERR_IMAGE);
+        CHECK_EQ(load_sections(ctx, {{WY_SEC_HEADER, header_with(2)}, {WY_SEC_CODE, code_item({0})}, {WY_SEC_EXPORTS, map({kv("a", uval(0)), kv("a", uval(1))})}}), WY_ERR_IMAGE);
     }
 
     TEST_CASE("every built fixture loads")

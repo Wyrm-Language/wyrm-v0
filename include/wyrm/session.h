@@ -106,7 +106,7 @@ void wy_session_free_(wy_allocator* allocator, struct wy_session* session);
  * for a non-session module.
  *
  * @param out_init_function set to the absolute index of the function that runs
- *   this input (the delta header's `i`); may be NULL.
+ *   this input (the delta's first function); may be NULL.
  */
 wy_error wy_module_extend(wy_context* context, wy_module* module, const wy_module_image* image, wy_uword* out_init_function);
 

@@ -31,11 +31,10 @@ struct Delta
 {
     std::int32_t bc = 0, bf = 0, bs = 0, by = 0, bk = 0, bm = 0, bg = 0;
     std::int32_t g = 0;   // globals after
-    std::int32_t init = 0;
     bool delta_marker = true;
     std::vector<wy_u32> code;
     // functions: name, nlocals, absolute code offset
-    struct Fn { std::string name; int nlocals; int code_offset; };
+    struct Fn { std::string name; int nlocals; int code_offset; int nparams = 0; };
     std::vector<Fn> fns;
     std::vector<std::pair<std::string, int>> exports;
     std::vector<std::string> statics;   // string statics
@@ -48,8 +47,6 @@ Bytes build_delta(const Delta& d)
     std::vector<Pair> header = {kv("n", text("__repl__"))};
     if (d.delta_marker) { header.push_back(kv("d", uval(1))); }
     header.push_back(kv("g", uval(d.g)));
-    header.push_back(kv("l", uval(1)));
-    header.push_back(kv("i", uval(d.init)));
     header.push_back(kv("bc", uval(d.bc))); header.push_back(kv("bf", uval(d.bf)));
     header.push_back(kv("bs", uval(d.bs))); header.push_back(kv("by", uval(d.by)));
     header.push_back(kv("bk", uval(d.bk))); header.push_back(kv("bm", uval(d.bm)));
@@ -57,8 +54,10 @@ Bytes build_delta(const Delta& d)
 
     std::vector<Bytes> fn_docs;
     for (const auto& f : d.fns) {
+        std::vector<Bytes> params;
+        for (int i = 0; i < f.nparams; i++) { params.push_back(map({kv("n", text("p" + std::to_string(i)))})); }
         fn_docs.push_back(map({kv("n", text(f.name)), kv("l", uval(f.nlocals)), kv("c", uval(f.code_offset)),
-            kv("f", uval(0)), kv("p", array({}))}));
+            kv("f", uval(0)), kv("p", array(params))}));
     }
     std::vector<Pair> exp;
     for (const auto& e : d.exports) { exp.push_back(kv(e.first, uval(e.second))); }
@@ -268,7 +267,7 @@ TEST_SUITE("session")
         REQUIRE_EQ(wy_module_session_new(ctx, &config, &session), WY_ERR_NONE);
 
         Delta d1;
-        d1.g = 1; d1.init = 0;
+        d1.g = 1;
         d1.code = returns_const(5);
         d1.fns = {{"main1", 1, 0}};
         d1.exports = {{"x", 0}};
@@ -286,7 +285,7 @@ TEST_SUITE("session")
         const wy_u32 first_word = session->code[0];
 
         Delta d2;
-        d2.bc = 2; d2.bf = 1; d2.bg = 1; d2.g = 2; d2.init = 1;
+        d2.bc = 2; d2.bf = 1; d2.bg = 1; d2.g = 2;
         d2.code = returns_const(9);
         d2.fns = {{"main2", 1, 2}};          // absolute offset: after the first delta's code
         d2.exports = {{"x", 1}};             // shadows x with a new slot
@@ -322,10 +321,10 @@ TEST_SUITE("session")
         stale.bc = 0;
         CHECK_EQ(extend_with(ctx, session, build_delta(stale)), WY_ERR_IMAGE);
         Delta ahead = d;        // believes there are more functions than there are
-        ahead.bc = 2; ahead.bf = 5; ahead.bg = 1; ahead.g = 2; ahead.init = 5;
+        ahead.bc = 2; ahead.bf = 5; ahead.bg = 1; ahead.g = 2;
         CHECK_EQ(extend_with(ctx, session, build_delta(ahead)), WY_ERR_IMAGE);
         Delta plain = d;        // not marked as a delta at all
-        plain.bc = 2; plain.bf = 1; plain.bg = 1; plain.g = 2; plain.init = 1; plain.delta_marker = false;
+        plain.bc = 2; plain.bf = 1; plain.bg = 1; plain.g = 2; plain.delta_marker = false;
         CHECK_EQ(extend_with(ctx, session, build_delta(plain)), WY_ERR_IMAGE);
 
         CHECK_EQ(session->code_len, 2u);
@@ -345,22 +344,57 @@ TEST_SUITE("session")
         Delta bad;
         bad.g = 1; bad.code = returns_const(1);
         bad.fns = {{"ok", 1, 0}, {"broken", 1, 99}};   // second function's code offset is out of range
-        bad.init = 0;
         CHECK_EQ(extend_with(ctx, session, build_delta(bad)), WY_ERR_IMAGE);
         CHECK_EQ(session->code_len, 0u);
         CHECK_EQ(session->function_count, 0u);
         CHECK_EQ(session->global_count, 0u);
 
-        Delta noinit = bad;      // init function index outside this delta
-        noinit.fns = {{"ok", 1, 0}};
-        noinit.init = 3;
+        Delta noinit = bad;      // a delta with no new function has no input to run
+        noinit.fns = {};
         CHECK_EQ(extend_with(ctx, session, build_delta(noinit)), WY_ERR_IMAGE);
+        CHECK_EQ(session->code_len, 0u);
         CHECK_EQ(session->function_count, 0u);
+        CHECK_EQ(session->global_count, 0u);
 
         Delta good;
         good.g = 1; good.code = returns_const(7); good.fns = {{"m", 1, 0}};
         REQUIRE_EQ(extend_with(ctx, session, build_delta(good)), WY_ERR_NONE);
         CHECK_EQ(run_int(ctx, session, 0), 7);
+    }
+
+    TEST_CASE("a delta whose first function takes a parameter is refused and changes nothing")
+    {
+        test_fiber_fixture fix;
+        wy_context* ctx = fix.get_context_ptr();
+        wy_session_config config = small_config(64);
+        wy_module* session = WY_NULL;
+        REQUIRE_EQ(wy_module_session_new(ctx, &config, &session), WY_ERR_NONE);
+
+        Delta d1;
+        d1.g = 1; d1.code = returns_const(1); d1.fns = {{"m", 1, 0}};
+        REQUIRE_EQ(extend_with(ctx, session, build_delta(d1)), WY_ERR_NONE);
+
+        Delta bad;
+        bad.bc = 2; bad.bf = 1; bad.bg = 1; bad.g = 2;
+        bad.code = returns_const(2);
+        bad.fns = {{"m2", 1, 2, 1}};         // first new function takes a parameter
+        CHECK_EQ(extend_with(ctx, session, build_delta(bad)), WY_ERR_IMAGE);
+        CHECK_EQ(session->code_len, 2u);
+        CHECK_EQ(session->function_count, 1u);
+        CHECK_EQ(session->global_count, 1u);
+        CHECK_EQ(session->static_count, 0u);
+        CHECK_EQ(session->symbol_count, 0u);
+        CHECK_EQ(session->class_count, 0u);
+        CHECK_EQ(session->message_count, 0u);
+
+        Delta good = bad;
+        good.fns = {{"m2", 1, 2}};
+        wy_uword init = 99;
+        REQUIRE_EQ(extend_with(ctx, session, build_delta(good), &init), WY_ERR_NONE);
+        CHECK_EQ(init, 1u);
+        CHECK_EQ(session->function_count, 2u);
+        CHECK_EQ(run_int(ctx, session, 1), 2);
+        CHECK_EQ(run_int(ctx, session, 0), 1);
     }
 
     TEST_CASE("an extend that would overrun a reservation is refused before anything changes")
@@ -377,7 +411,7 @@ TEST_SUITE("session")
         REQUIRE_EQ(extend_with(ctx, session, build_delta(d1)), WY_ERR_NONE);
 
         Delta d2;
-        d2.bc = 2; d2.bf = 1; d2.bg = 1; d2.g = 2; d2.init = 1;
+        d2.bc = 2; d2.bf = 1; d2.bg = 1; d2.g = 2;
         d2.code = returns_const(2); d2.fns = {{"m2", 1, 2}};
         CHECK_EQ(extend_with(ctx, session, build_delta(d2)), WY_ERR_SESSION_FULL);
         CHECK_EQ(session->code_len, 2u);
@@ -398,7 +432,7 @@ TEST_SUITE("session")
         REQUIRE_EQ(extend_with(ctx, session, build_delta(d1)), WY_ERR_NONE);
 
         Delta d2;
-        d2.bc = 2; d2.bf = 1; d2.bg = 1; d2.g = 1; d2.init = 1;
+        d2.bc = 2; d2.bf = 1; d2.bg = 1; d2.g = 1;
         d2.code = {enc1(WY_OP_TRAP, 5, 0)};              // `trap(5)`
         d2.fns = {{"boom", 1, 2}};
         REQUIRE_EQ(extend_with(ctx, session, build_delta(d2)), WY_ERR_NONE);
@@ -431,7 +465,7 @@ TEST_SUITE("session")
         CHECK_EQ(session->symbol_count, 2u);
 
         Delta d2;
-        d2.bc = 2; d2.bf = 1; d2.bs = 1; d2.by = 2; d2.bg = 1; d2.g = 1; d2.init = 1;
+        d2.bc = 2; d2.bf = 1; d2.bs = 1; d2.by = 2; d2.bg = 1; d2.g = 1;
         d2.code = returns_static(1);                    // static 1 is this delta's first
         d2.fns = {{"b", 1, 2}};
         d2.statics = {"second"}; d2.symbols = {"gamma"};
@@ -451,7 +485,7 @@ TEST_SUITE("session")
 
         // A third delta still numbers from the running totals (this one reuses static 0).
         Delta d3;
-        d3.bc = 4; d3.bf = 2; d3.bs = 2; d3.by = 3; d3.bg = 1; d3.g = 1; d3.init = 2;
+        d3.bc = 4; d3.bf = 2; d3.bs = 2; d3.by = 3; d3.bg = 1; d3.g = 1;
         d3.code = returns_static(0); d3.fns = {{"c", 1, 4}};
         d3.statics = {"third"};
         REQUIRE_EQ(extend_with(ctx, session, build_delta(d3)), WY_ERR_NONE);

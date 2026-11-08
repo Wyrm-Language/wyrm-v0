@@ -12,6 +12,7 @@
 #include <wyrm/opcode.h>
 #include <wyrm/string.h>
 #include <wyrm/vm.h>
+#include <test_common/module_build.h>
 #include <test_common/test_fiber_fixture.h>
 #include <test_common/test_call.h>
 
@@ -194,7 +195,7 @@ TEST_SUITE("coroutine") {
         dep->name = symbol(ctx, "b");
         dep->code = dep_code;
         dep->code_len = std::size(dep_code);
-        dep->init_nlocals = 1;
+        wy_test_set_module_init(ctx, dep, 1);
         dep->global_count = 1;
         dep->globals = (wy_value*) wy_context_gc_alloc(ctx, sizeof(wy_value));
         dep->globals[0] = wy_value_unset();

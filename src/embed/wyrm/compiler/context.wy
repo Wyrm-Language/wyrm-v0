@@ -191,9 +191,6 @@ class ModuleImage:
     slot functions: list
     slot classes: list
     slot code: list
-    slot init_nlocals: int
-    # The messages init sends. Compiler-side only, never serialized.
-    slot module_uses: list
     slot debug
     # (function name, reason) for every body that would not lower and became
     # a trapping stub. Not part of the image format.
@@ -213,8 +210,6 @@ class ModuleImage:
         this.functions = []
         this.classes = []
         this.code = []
-        this.init_nlocals = 0
-        this.module_uses = []
         this.debug = nil
         this.unlowered = []
         this._static_index = {}
@@ -1092,6 +1087,8 @@ class ModuleContext:
     # context.py calls this `init`; a wyrm class's own constructor owns that
     # name, so the module-init frame is `init_ctx` here.
     slot init_ctx: FnContext
+    # init's index in the function table, once reserve_init has run.
+    slot init_index
     # [function index, FnContext] laid out after init
     slot pending: list
     # REPL session state (module.wy's SessionContext); all nil/empty outside a
@@ -1145,6 +1142,7 @@ class ModuleContext:
         this.promoted_arities = {}
         this.stub_unlowered = false
         this.init_ctx = FnContext(this, "<init>", nil, nil, 0, true, nil)
+        this.init_index = nil
         this.pending = []
         this.session_declared = nil
         this.session_pending = {}
@@ -1443,6 +1441,26 @@ fn [ModuleContext] builtins() -> list:
 
 fn [ModuleContext] add_pending(index: int, fn_ctx: FnContext) -> nil:
     (this.pending) ! append([index, fn_ctx])
+    return nil
+
+# Give init its function-table entry, before anything else can take one: the
+# image's first function (a session input's first new one) is its init. Like
+# any body, the index is reserved first and the rest filled in by finish_init
+# once the body is compiled; being first in `pending` lays its code out first.
+fn [ModuleContext] reserve_init() -> nil | error:
+    init := this.init_ctx
+    index := (this.image) ! add_function(init.name)
+    if index is error:
+        return index
+    this.init_index = index
+    this ! add_pending(index, init)
+    return nil
+
+fn [ModuleContext] finish_init() -> nil:
+    init := this.init_ctx
+    entry := this.image.functions[this.init_index]
+    entry["nlocals"] = init.high
+    entry["uses"] = init.uses
     return nil
 
 
