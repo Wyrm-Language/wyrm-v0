@@ -392,9 +392,9 @@ TEST_SUITE("builtins") {
         REQUIRE_EQ(wy_bytes_new(ctx, (const wy_u8*) "hi!", 3, &b), WY_ERR_NONE);
         check_len(wy_value_object(WY_TYPE_TAG_BYTES, (wy_object*) b), 3);
 
-        // str: Unicode codepoints, not UTF-8 bytes.
+        // str: bytes.
         wy_string* s = WY_NULL;
-        REQUIRE_EQ(wy_string_new(ctx, "héllo", 6, &s), WY_ERR_NONE);  // 5 codepoints, 6 bytes
+        REQUIRE_EQ(wy_string_new(ctx, "hello", 5, &s), WY_ERR_NONE);
         check_len(wy_value_object(WY_TYPE_TAG_STR, (wy_object*) s), 5);
 
         // nil and nil-terminated pair chains; '() alone is 0.
@@ -537,10 +537,8 @@ TEST_SUITE("builtins") {
         // Same real-opcode path as the bytes!pack_u32 case above: `module`
         // never reg_msg's "substr", so the WY_OP_MSG resolution must fall back
         // onto ctx->builtins's message_table and land on the PTYPE(STR)
-        // overload install_native_messages_ registers. Uses codepoint offsets,
-        // not bytes: "h\xC3\xA9llo" ! substr(1, 3) is "\xC3\xA9ll", so a
-        // byte-indexed implementation would fail this.
-        static const char hello_utf8[] = "h\xC3\xA9llo";
+        // overload install_native_messages_ registers.
+        static const char hello[] = "hello";
         test_fiber_fixture fix;
         auto* ctx = fix.get_context_ptr();
         wy_module* builtins = WY_NULL;
@@ -548,7 +546,7 @@ TEST_SUITE("builtins") {
         ctx->builtins = builtins;
 
         wy_string* s = WY_NULL;
-        REQUIRE_EQ(wy_string_new(ctx, hello_utf8, sizeof(hello_utf8) - 1, &s), WY_ERR_NONE);
+        REQUIRE_EQ(wy_string_new(ctx, hello, sizeof(hello) - 1, &s), WY_ERR_NONE);
 
         const wy_u32 code[] = {
             enc1(WY_OP_GGET, 0, 0),              // L0 <- G0 (str receiver)
@@ -583,17 +581,15 @@ TEST_SUITE("builtins") {
         REQUIRE_EQ(err, WY_ERR_NONE);
         REQUIRE_EQ(out[0].type, WY_TYPE_TAG_STR);
         wy_string* sub = out[0].data.str;
-        CHECK_EQ(std::string(sub->str, sub->len), "\xC3\xA9ll");
+        CHECK_EQ(std::string(sub->str, sub->len), "ell");
     }
 
     TEST_CASE("msg_va delivers the native overload's value to L0") {
         // Same real-opcode path as the bytes!pack_u32 case above: `module`
         // never reg_msg's "substr", so the WY_OP_MSG resolution must fall back
         // onto ctx->builtins's message_table and land on the PTYPE(STR)
-        // overload install_native_messages_ registers. Uses codepoint offsets,
-        // not bytes: "h\xC3\xA9llo" ! substr(1, 3) is "\xC3\xA9ll", so a
-        // byte-indexed implementation would fail this.
-        static const char hello_utf8[] = "h\xC3\xA9llo";
+        // overload install_native_messages_ registers.
+        static const char hello[] = "hello";
         test_fiber_fixture fix;
         auto* ctx = fix.get_context_ptr();
         wy_module* builtins = WY_NULL;
@@ -601,7 +597,7 @@ TEST_SUITE("builtins") {
         ctx->builtins = builtins;
 
         wy_string* s = WY_NULL;
-        REQUIRE_EQ(wy_string_new(ctx, hello_utf8, sizeof(hello_utf8) - 1, &s), WY_ERR_NONE);
+        REQUIRE_EQ(wy_string_new(ctx, hello, sizeof(hello) - 1, &s), WY_ERR_NONE);
 
         const wy_u32 code[] = {
             enc1(WY_OP_GGET, 0, 0),              // L0 <- G0 (str receiver)
@@ -638,7 +634,7 @@ TEST_SUITE("builtins") {
         REQUIRE_EQ(err, WY_ERR_NONE);
         REQUIRE_EQ(out[0].type, WY_TYPE_TAG_STR);
         wy_string* sub = out[0].data.str;
-        CHECK_EQ(std::string(sub->str, sub->len), "\xC3\xA9ll");
+        CHECK_EQ(std::string(sub->str, sub->len), "ell");
     }
 
     TEST_CASE("error_message answers the message text of an error value, nil otherwise") {

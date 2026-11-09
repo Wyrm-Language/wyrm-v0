@@ -325,15 +325,13 @@ wy_error wy_vm_getidx_f(wy_context* ctx, wy_value obj, wy_value idx, wy_value* o
         if (idx.type != WY_TYPE_TAG_WORD && idx.type != WY_TYPE_TAG_UWORD) {
             return make_error_value_f(ctx, "string index must be an integer", out);
         }
+        // A byte index (project stdlib.md D1), so reading a string in order is linear. The rest of
+        // D1 hasn't landed: there is no fault for an index that isn't on a codepoint boundary.
         wy_uword target = (wy_uword) as_word_(idx);
         wy_string* s = obj.data.str;
-        wy_uword offset = 0, i = 0;
-        for (; offset < s->len && i < target; i++) {
-            offset += wy_utf8_decode_f(s->str, s->len, offset, &(wy_u32){0});
-        }
-        if (offset >= s->len || i != target) return make_error_value_f(ctx, "string index out of range", out);
+        if (target >= s->len) return make_error_value_f(ctx, "string index out of range", out);
         wy_u32 cp;
-        wy_utf8_decode_f(s->str, s->len, offset, &cp);
+        wy_utf8_decode_f(s->str, s->len, target, &cp);
         *out = wy_value_word((wy_word) cp);
         return WY_ERR_NONE;
     }

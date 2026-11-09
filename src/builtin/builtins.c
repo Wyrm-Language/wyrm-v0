@@ -625,18 +625,17 @@ static wy_error builtin_substr_(wy_context* context, wy_value* args, wy_uword ar
     wy_string* s = args[0].data.str;
     wy_word start = args[1].type == WY_TYPE_TAG_UWORD ? (wy_word) args[1].data.uword : args[1].data.word;
     wy_word count = args[2].type == WY_TYPE_TAG_UWORD ? (wy_word) args[2].data.uword : args[2].data.word;
-    wy_uword ncp = wy_utf8_codepoint_count_f(s->str, s->len);
 
+    // Byte offsets (project stdlib.md D1). Not yet D1's substr(begin, end), and there is no fault
+    // for an offset that isn't on a codepoint boundary.
     wy_word clip_start = start < 0 ? 0 : start;
-    if ((wy_uword) clip_start > ncp) { clip_start = (wy_word) ncp; }
+    if ((wy_uword) clip_start > s->len) { clip_start = (wy_word) s->len; }
     wy_word end = count < 0 ? clip_start : clip_start + count;
-    if ((wy_uword) end > ncp) { end = (wy_word) ncp; }
+    if ((wy_uword) end > s->len) { end = (wy_word) s->len; }
     if (end < clip_start) { end = clip_start; }
 
-    wy_uword byte_start = wy_utf8_offset_at_f(s->str, s->len, (wy_uword) clip_start);
-    wy_uword byte_end = wy_utf8_offset_at_f(s->str, s->len, (wy_uword) end);
     wy_string* sub = WY_NULL;
-    wy_error err = wy_string_new(context, s->str + byte_start, byte_end - byte_start, &sub);
+    wy_error err = wy_string_new(context, s->str + clip_start, (wy_uword) (end - clip_start), &sub);
     if (err != WY_ERR_NONE) { return err; }
     *out = wy_value_object(WY_TYPE_TAG_STR, (wy_object*) sub);
     return WY_ERR_NONE;
@@ -721,7 +720,7 @@ static wy_error builtin_len_(wy_context* context, wy_value* args, wy_uword argc,
         n = 0;
         break;
     case WY_TYPE_TAG_STR:
-        n = wy_utf8_codepoint_count_f(x.data.str->str, x.data.str->len);
+        n = x.data.str->len;
         break;
     case WY_TYPE_TAG_LIST:
         n = ((wy_list*) x.data.gc_object)->count;

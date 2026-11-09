@@ -3,7 +3,7 @@
 ## Builtin Functions
 
   - len(x): Return number of elements within a collection. For a str this counts
-    Unicode codepoints (not UTF-8 bytes), matching Python's `len`; a list/tuple
+    UTF-8 bytes, not codepoints; a list/tuple
     counts items, a dict counts entries (keys), bytes counts bytes, and a Pair
     chain counts cons cells out to the terminating nil (`()` alone is 0). An
     improper list (one whose final cdr isn't nil) has no well-defined length
@@ -15,9 +15,10 @@
 
 Messages:
 
-  - substr(start: int, count: int) -> str: Return the count Unicode codepoints of
-    s starting at 0-based codepoint offset start, e.g. "asdf" ! substr(1, 2) gives
-    "sd". A start or count running past either end clips rather than faulting.
+  - substr(start: int, count: int) -> str: Return the count bytes of s starting at
+    0-based byte offset start, e.g. "asdf" ! substr(1, 2) gives "sd". A start or
+    count running past either end clips rather than faulting. An offset inside a
+    multi-byte character isn't checked yet, so the result can be invalid UTF-8.
 
 ### bytes
 

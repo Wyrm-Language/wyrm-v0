@@ -1102,28 +1102,6 @@ TEST_SUITE("wvm milestone 1") {
         CHECK_EQ(fault_message(ctx.get_fiber_ptr()), "unpack: cannot unpack this value into 2 target(s)");
     }
 
-    TEST_CASE("string getidx decodes a UTF-8 codepoint, not a raw byte") {
-        test_fiber_fixture ctx;
-        wy_string* str = WY_NULL;
-        // "h\xC3\xA9llo" = "héllo": 5 codepoints, 6 bytes ('é' is 2 bytes).
-        REQUIRE_EQ(wy_string_new(ctx.get_context_ptr(), "h\xC3\xA9llo", 6, &str), WY_ERR_NONE);
-        const wy_value statics[] = { wy_value_object(WY_TYPE_TAG_STR, (wy_object*) str) };
-        const wy_u32 code[] = {
-            enc1(WY_OP_LCONST, 0, 0),                 // L0 <- "héllo"
-            enc1(WY_OP_I8, 1, 1),
-            enc2a(WY_OP_GETIDX, 0, 2), enc2b(0, 1),   // L2 <- L0[1] = codepoint of 'é' (0xE9)
-            enc1(WY_OP_I8, 4, 3),
-            enc2a(WY_OP_GETIDX, 0, 3), enc2b(0, 3),   // L3 <- L0[4] = 'o' (in-range only by codepoint count)
-            enc2a(WY_OP_TUPLE, 2, 2), enc2b(2, 0), enc1(WY_OP_RETURN, 0, 2),
-        };
-        wy_value out[2];
-        REQUIRE_EQ(run_synthetic(ctx.get_context_ptr(), code, std::size(code), 5, 0, WY_NULL, 0, out, 2,
-            statics, std::size(statics)), WY_ERR_NONE);
-        CHECK_EQ(out[0].type, WY_TYPE_TAG_WORD);
-        CHECK_EQ(out[0].data.word, 0xE9);
-        CHECK_EQ(out[1].data.word, 'o');
-    }
-
     TEST_CASE("string iter/unpack yield one-character substrings, not byte codes") {
         test_fiber_fixture ctx;
         wy_string* str = WY_NULL;
