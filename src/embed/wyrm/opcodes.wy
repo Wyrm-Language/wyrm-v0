@@ -256,7 +256,7 @@ DIGITS := "0123456789ABCDEF"
 
 # UTF-8 encode one codepoint (mirrors decode.wy's _encode_codepoint - the
 # C VM has no chr()-style builtin).
-fn _char_from_cp(cp: int) -> str:
+fn _char_from_cp_slow(cp: int) -> str:
     if cp < 0x80:
         b := bytes(1)
         b!pack_u8(0, cp)
@@ -280,17 +280,45 @@ fn _char_from_cp(cp: int) -> str:
         b!pack_u8(3, 0x80 | (cp & 0x3F))
         return b!to_str()
 
+# The one-character strings for the ASCII range, built once: callers build
+# strings a character at a time, and the bytes/pack/to_str round trip above
+# was the dominant cost of that.
+fn _ascii_strs() -> list:
+    out := []
+    cp := 0
+    while cp < 128:
+        out ! append(_char_from_cp_slow(cp))
+        cp = cp + 1
+    return out
+
+_ASCII_STRS := _ascii_strs()
+
+fn _char_from_cp(cp: int) -> str:
+    if cp < 0x80:
+        return _ASCII_STRS[cp]
+    return _char_from_cp_slow(cp)
+
 fn _hex_digits(value: int, min_digits: int) -> str:
     out := ""
     n := value
     while n > 0 or len(out) < min_digits:
         d := n & 0xF
-        out = _char_from_cp(DIGITS[d]) + out
+        out = _ASCII_STRS[DIGITS[d]] + out
         n = n >> 4
     return out
 
+fn _hex2_strs() -> list:
+    out := []
+    b := 0
+    while b < 256:
+        out ! append(_hex_digits(b, 2))
+        b = b + 1
+    return out
+
+_HEX2_STRS := _hex2_strs()
+
 fn _hex2(value: int) -> str:
-    return _hex_digits(value & 0xFF, 2)
+    return _HEX2_STRS[value & 0xFF]
 
 # Decode the instruction at words[offset]. Returns
 #   { "entry": dict, "is_wide": bool, "fields": dict, "nwords": int }

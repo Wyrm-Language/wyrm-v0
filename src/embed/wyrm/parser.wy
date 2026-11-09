@@ -21,27 +21,30 @@ class Parser:
     slot buffer: str
     slot tokens: list
     slot pos: int
+    slot last: int
     slot cache_hits: dict
-    slot cache_misses: list
+    slot cache_misses: dict
 
     fn init(buffer: str):
         this.buffer = buffer
         this.tokens = TokenStream(buffer) ! scan()
         this.pos = 0
+        this.last = len(this.tokens) - 1
         this.cache_hits = {}
-        this.cache_misses = []
+        this.cache_misses = {}
 
     fn peek(n: int) -> Token:
         idx := this.pos + n
-        last := len(this.tokens) - 1
-        if idx > last:
-            idx = last
+        if idx > this.last:
+            idx = this.last
         return this.tokens[idx]
 
     fn advance() -> Token:
-        t := this ! peek(0)
-        this.pos = this.pos + 1
-        return t
+        idx := this.pos
+        this.pos = idx + 1
+        if idx > this.last:
+            idx = this.last
+        return this.tokens[idx]
 
     fn mark() -> int:
         return this.pos
@@ -49,11 +52,8 @@ class Parser:
     fn reset(mark: int):
         this.pos = mark
 
-    fn _cache_key(id: int, pos: int) -> str:
-        return str(id) + ":" + str(pos)
-
     fn get_cache(id: int, pos: int):
-        key := this ! _cache_key(id, pos)
+        key := pos * 1000003 + id
         if key in this.cache_hits:
             entry := this.cache_hits[key]
             this.pos = entry[1]
@@ -63,16 +63,14 @@ class Parser:
         return 'NO_CACHE
 
     fn put_hit(id: int, pos: int, end_pos: int, result):
-        key := this ! _cache_key(id, pos)
-        this.cache_hits[key] = [result, end_pos]
+        this.cache_hits[pos * 1000003 + id] = [result, end_pos]
 
     fn put_miss(id: int, pos: int):
-        key := this ! _cache_key(id, pos)
-        this.cache_misses ! append(key)
+        this.cache_misses[pos * 1000003 + id] = true
 
     fn clear():
         this.cache_hits = {}
-        this.cache_misses = []
+        this.cache_misses = {}
 
 fn _as_list(expr):
     return $[expr]
@@ -84,10 +82,10 @@ fn _as_list(expr):
 #>  _Example_: `true`, `false`
 #>
 fn [Parser] bool_literal():
-    @accept apply_if(_as_list, $[value('true, 'TOK_KW_TRUE) | value('false, 'TOK_KW_FALSE)])
+    @accept_nomemo apply_if(_as_list, $[value('true, 'TOK_KW_TRUE) | value('false, 'TOK_KW_FALSE)])
 
 fn [Parser] nil_literal():
-    @accept apply_if(_as_list, value('nil, 'TOK_KW_NIL))
+    @accept_nomemo apply_if(_as_list, value('nil, 'TOK_KW_NIL))
 
 
 fn [Parser] xid() -> sym:
@@ -108,14 +106,14 @@ fn [Parser] qualified_name():
 
 # symbol_literal
 fn [Parser] symbol_literal():
-    @accept apply_if(_mk_sym, text('TOK_LITERAL_SYM))
+    @accept_nomemo apply_if(_mk_sym, text('TOK_LITERAL_SYM))
 
 fn _mk_sym(text):
     return $['sym, decode_sym(text)]
 
 # string literal
 fn [Parser] string_literal():
-    @accept apply_if(_mk_string, text('TOK_STR))
+    @accept_nomemo apply_if(_mk_string, text('TOK_STR))
 
 fn _mk_string(text):
     return $['str, decode_str(text)]
@@ -129,7 +127,7 @@ fn _mk_float(text):
     return $['float, decode_float(text)]
 
 fn [Parser] number_literal():
-    @accept $[apply_if(_mk_int, text('TOK_LITERAL_INT)) | apply_if(_mk_float, text('TOK_LITERAL_FLOAT))]
+    @accept_nomemo $[apply_if(_mk_int, text('TOK_LITERAL_INT)) | apply_if(_mk_float, text('TOK_LITERAL_FLOAT))]
 
 #>  ```ebnf
 #>    char_literal    ::= "\" , ( ( any_char - ( control_char | " " ) ) | identifier ) ;
@@ -152,7 +150,7 @@ fn _mk_char(text):
     return $['char, named]
 
 fn [Parser] char_literal():
-    @accept apply_if(_mk_char, text('TOK_LITERAL_CHAR))
+    @accept_nomemo apply_if(_mk_char, text('TOK_LITERAL_CHAR))
 
 # -----------------------------------------------------------------------------
 #>  ## Program Structure
@@ -1090,7 +1088,7 @@ fn $_catch_fn(expr):
 #>  _Example_: `file := open('badfile.txt') catch open('goodfile.txt')`
 #>
 fn [Parser] catch_expr():
-    @accept apply_if($_catch_fn, or_expr, opt($[~'TOK_KW_CATCH, expression]))
+    @accept_nomemo apply_if($_catch_fn, or_expr, opt($[~'TOK_KW_CATCH, expression]))
 
 fn $_mk_or(expr):
     rest := cdr(expr)
@@ -1102,7 +1100,7 @@ fn $_mk_or(expr):
 #>    or_expr ::= logical_expr , { "or", logical_expr }
 #>  ```
 fn [Parser] or_expr():
-    @accept apply_if($_mk_or, cons(and_expr, many(~'TOK_KW_OR, and_expr)))
+    @accept_nomemo apply_if($_mk_or, cons(and_expr, many(~'TOK_KW_OR, and_expr)))
 
 fn $_mk_and(expr):
     rest := cdr(expr)
@@ -1114,7 +1112,7 @@ fn $_mk_and(expr):
 #>    and_expr ::= or_expr , { "and" , or_expr }
 #>  ```
 fn [Parser] and_expr():
-    @accept apply_if($_mk_and, cons(not_expr, many(~'TOK_KW_AND, not_expr)))
+    @accept_nomemo apply_if($_mk_and, cons(not_expr, many(~'TOK_KW_AND, not_expr)))
 
 fn $_mk_not(expr):
     $['not, expr]
@@ -1123,7 +1121,7 @@ fn $_mk_not(expr):
 #>    not_expr ::= "not" , not_expr | comparison
 #>  ```
 fn [Parser] not_expr():
-    @accept $[apply_if($_mk_not, ~'TOK_KW_NOT, not_expr) | comparison]
+    @accept_nomemo $[apply_if($_mk_not, ~'TOK_KW_NOT, not_expr) | comparison]
 
 # Comparison
 
@@ -1147,14 +1145,18 @@ fn $_mk_in(expr):
 #>    comp_op         ::= "<=" | ">=" | "<=>" | "<" | ">" | "==" | "!=" ;
 #>  ```
 fn [Parser] comparison():
-    @accept $[
+    @accept_nomemo $[
         apply_if($_mk_is, $[binary_expr, ~'TOK_KW_IS, bool('TOK_KW_NOT), type_expression])
         | apply_if($_mk_comparison, $[binary_expr, comp_op, binary_expr])
         | apply_if($_mk_in, $[binary_expr, bool('TOK_KW_NOT), ~'TOK_KW_IN, binary_expr])
         | binary_expr
     ]
 
+_COMP_OP_KINDS := ('TOK_LE, 'TOK_GE, 'TOK_SPACESHIP, 'TOK_LT, 'TOK_GT, 'TOK_DEQUAL, 'TOK_NE)
+
 fn [Parser] comp_op():
+    if (this ! peek(0)).kind not in _COMP_OP_KINDS:
+        return 'NO_MATCH
     @accept $[ value('<=, 'TOK_LE) |
                value('>=, 'TOK_GE) |
                value('<=>, 'TOK_SPACESHIP) |
@@ -1210,7 +1212,12 @@ fn $_binary_expr(expr):
 fn [Parser] binary_expr():
     @accept apply_if($_binary_expr, cons(unary_expr, manyflat($[binary_op, unary_expr])))
 
+_BINARY_OP_KINDS := ('TOK_OR, 'TOK_XOR, 'TOK_AND, 'TOK_LSHIFT, 'TOK_RSHIFT,
+                    'TOK_PLUS, 'TOK_MINUS, 'TOK_MUL, 'TOK_DIV, 'TOK_MOD)
+
 fn [Parser] binary_op():
+    if (this ! peek(0)).kind not in _BINARY_OP_KINDS:
+        return 'NO_MATCH
     @accept $[ value('|, 'TOK_OR)
             | value('^, 'TOK_XOR)
             | value('&, 'TOK_AND)
@@ -1239,7 +1246,7 @@ fn $_mk_invert(expr):
 #>                       | power_expr ;
 #>  ```
 fn [Parser] unary_expr():
-    @accept $[
+    @accept_nomemo $[
         apply_if($_mk_neg, $[~'TOK_MINUS, unary_expr])
         | apply_if($_mk_pos, $[~'TOK_PLUS, unary_expr])
         | apply_if($_mk_invert, $[~'TOK_TILDE, unary_expr])
@@ -1254,7 +1261,7 @@ fn $_mk_exp(expr):
 #>    power_expr      ::= postfix_expr , [ "**" , unary_expr ] ;       (* right-assoc *)
 #>  ```
 fn [Parser] power_expr():
-    @accept $[
+    @accept_nomemo $[
         apply_if($_mk_exp, $[postfix_expr, ~'TOK_EXPONENT, unary_expr])
         | postfix_expr
     ]
@@ -1300,20 +1307,24 @@ fn $_mk_postfix(expr):
 fn [Parser] postfix_expr():
     @accept apply_if($_mk_postfix, cons(primary, many(postfix_op)))
 
+_POSTFIX_KINDS := ('TOK_LPAREN, 'TOK_LBRACKET, 'TOK_DOT, 'TOK_BANG)
+
 fn [Parser] postfix_op():
+    if (this ! peek(0)).kind not in _POSTFIX_KINDS:
+        return 'NO_MATCH
     @accept $[call_op | index_op | attr_op | bind_msg_op]
 
 fn [Parser] call_op():
-    @accept  $[~'TOK_LPAREN, cons(push('call_op), opt(arg_list)), ~'TOK_RPAREN]
+    @accept_nomemo  $[~'TOK_LPAREN, cons(push('call_op), opt(arg_list)), ~'TOK_RPAREN]
 
 fn [Parser] index_op():
-    @accept $[~'TOK_LBRACKET, push('index_op), expression, ~'TOK_RBRACKET]
+    @accept_nomemo $[~'TOK_LBRACKET, push('index_op), expression, ~'TOK_RBRACKET]
 
 fn [Parser] attr_op():
-    @accept $[~'TOK_DOT, push('attr_op), xid]
+    @accept_nomemo $[~'TOK_DOT, push('attr_op), xid]
 
 fn [Parser] bind_msg_op():
-    @accept $[~'TOK_BANG, push('bind_msg_op), xid]
+    @accept_nomemo $[~'TOK_BANG, push('bind_msg_op), xid]
 
 #>  ```ebnf
 #>    arg_list        ::= argument , { "," , argument } , [ "," ] ;
@@ -1372,10 +1383,14 @@ fn [Parser] argument():
 #>  _Example_: `v := @accept 'TOK_XID` (see decorator in parser.wy)
 #>
 fn [Parser] decorated_expr():
-    @accept apply_if($_mk_stmt, cons(decorator, many(decorator)), expression)
+    @accept_nomemo apply_if($_mk_stmt, cons(decorator, many(decorator)), expression)
 
 fn [Parser] primary():
-    @accept $[ literal
+    # An identifier can only start a qualified_name (no other alternative
+    # begins with 'TOK_XID); skip the literal/decorator attempts before it.
+    if (this ! peek(0)).kind == 'TOK_XID:
+        return this ! qualified_name()
+    @accept_nomemo $[ literal
              | decorated_expr
              | qualified_name
              | apply_if(_mk_tuple_one, $[~'TOK_LPAREN, expression, ~'TOK_COMMA, ~'TOK_RPAREN])
@@ -1408,7 +1423,7 @@ fn [Parser] primary():
 #>                       | "..." ;
 #>  ```
 fn [Parser] literal():
-    @accept $[ nil_literal
+    @accept_nomemo $[ nil_literal
                | number_literal
                | bool_literal
                | string_literal

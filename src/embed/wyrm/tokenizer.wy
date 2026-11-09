@@ -141,10 +141,17 @@ _HARD_KEYWORDS := [
     ("yield", 'TOK_KW_YIELD)
 ]
 
-fn _lookup_keyword(text: str) -> sym | nil:
+fn _keyword_kinds() -> dict:
+    out := {}
     for entry in _HARD_KEYWORDS:
-        if entry[0] == text:
-            return entry[1]
+        out[entry[0]] = entry[1]
+    return out
+
+_KEYWORD_KINDS := _keyword_kinds()
+
+fn _lookup_keyword(text: str) -> sym | nil:
+    if text in _KEYWORD_KINDS:
+        return _KEYWORD_KINDS[text]
     return nil
 
 class Token:
@@ -558,6 +565,13 @@ class Scanner:
             return this ! _scan_finish_str(this.cur_pos + 3, false, (\", \", \"))
         if next_c == \":
             return this ! _scan_finish_str(this.cur_pos + 1, true, (\",))
+
+        # A letter or "_" starts no operator, char literal or number: it is
+        # an identifier (a "$" may start an operator, so it is not included).
+        if is_xid_start(next_c):
+            token = this ! _scan_xid_token()
+            if token != nil:
+                return token
 
         # Triple characters
         if next_next_c != 'EOF and next_next_next_c != 'EOF:

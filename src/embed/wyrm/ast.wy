@@ -164,10 +164,10 @@ fn mk_this_send(name: sym):
 # template substitution must leave them alone (the port's names are bare
 # symbols: `tok.kind` must not lose its `kind` when a hole is named `kind`).
 # attr and bind_msg fields name members.
-fn _s_subst(node, hole, repl):
+fn _s_subst(node, holes: dict):
     if node is sym:
-        if node == hole:
-            return repl
+        if node in holes:
+            return holes[node]
         return node
     if not (node is pair):
         return node
@@ -176,37 +176,40 @@ fn _s_subst(node, hole, repl):
         return node
     if head == 'attr:
         # (attr obj name)
-        return $['attr, _s_subst(cadr(node), hole, repl), caddr(node)]
+        return $['attr, _s_subst(cadr(node), holes), caddr(node)]
     if head == 'bind_msg:
         # (bind_msg receiver selector)
-        return $['bind_msg, _s_subst(cadr(node), hole, repl), caddr(node)]
+        return $['bind_msg, _s_subst(cadr(node), holes), caddr(node)]
     # Any other pair - a node or a list of nodes/names alike; a kind symbol
     # never equals a hole, so every element (the head too) is substituted.
-    return _s_subst_tail(node, hole, repl)
+    return _s_subst_tail(node, holes)
 
 # The rest of a node's fields (or a list of nodes): each element substituted,
 # cells rebuilt, without treating a cell's first element as a node head.
-fn _s_subst_tail(cells, hole, repl):
+fn _s_subst_tail(cells, holes: dict):
     if cells is pair:
-        return cons(_s_subst(car(cells), hole, repl), _s_subst_tail(cdr(cells), hole, repl))
-    return _s_subst(cells, hole, repl)
+        return cons(_s_subst(car(cells), holes), _s_subst_tail(cdr(cells), holes))
+    return _s_subst(cells, holes)
 
 # `tree` with every reference to `hole` replaced by `repl`.
 fn s_substitute(tree, hole, repl):
-    return _s_subst(tree, hole, repl)
+    holes := {}
+    holes[hole] = repl
+    return _s_subst(tree, holes)
 
 # Given a template function, substitute the given arguments into its body
-# and answer the statements as a `do`.
+# and answer the statements as a `do`. All in one walk of the template: what's
+# substituted is never walked again, which nested templates would make quadratic,
+# and a name in an argument can't be mistaken for a later hole.
 fn mk_expand_n(tmpl_ast, *subs) -> pair:
+    holes := {}
+    for sub in subs:
+        hole := try (car(sub) catch sub[0])
+        holes[hole] = try (cdr(sub) catch sub[1])
     body := s_fn_body(sexpr(tmpl_ast))
     out := []
     for stmt in s_body_items(body):
-        expanded := stmt
-        for sub in subs:
-            hole := try (car(sub) catch sub[0])
-            repl := try (cdr(sub) catch sub[1])
-            expanded = s_substitute(expanded, hole, repl)
-        out ! append(expanded)
+        out ! append(_s_subst(stmt, holes))
     return mk_do(chain(out))
 
 # @brief Build expansion of template function AST (1 type)

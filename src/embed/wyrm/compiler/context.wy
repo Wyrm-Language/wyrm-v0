@@ -752,7 +752,9 @@ fn [FnContext] push_block(owner) -> bool:
     n := len(this.block_slots)
     while i < n:
         entry := this.block_slots[i]
-        if (entry[2] == false) and same_node(entry[0], owner):
+        # `==` first: where it's structural (wypoc) it's far cheaper than walking the
+        # tree here, which nested blocks would make quadratic. Elsewhere it's just false.
+        if (entry[2] == false) and ((entry[0] == owner) or same_node(entry[0], owner)):
             entry[2] = true
             (this.scope_stack) ! append(i)
             return true

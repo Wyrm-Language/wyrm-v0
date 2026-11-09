@@ -23,19 +23,19 @@ fn is_alpha_upper(c: int) -> bool:
     return c >= \A and c <= \Z
 
 fn is_alpha(c: int) -> bool:
-    return is_alpha_lower(c) or is_alpha_upper(c)
+    return (c >= \a and c <= \z) or (c >= \A and c <= \Z)
 
 fn is_space(c: int) -> bool:
-    return c in (\space, \newline, \tab, \return, \formfeed)
+    return c == \space or c == \newline or c == \tab or c == \return or c == \formfeed
 
 fn is_xid_start(c: int) -> bool:
-    return is_alpha(c) or c == \_
+    return (c >= \a and c <= \z) or (c >= \A and c <= \Z) or c == \_
 
 fn is_xid_continue(c: int) -> bool:
-    return is_xid_start(c) or is_digit(c)
+    return (c >= \a and c <= \z) or (c >= \A and c <= \Z) or c == \_ or (c >= \0 and c <= \9)
 
 fn is_wy_xid_start(c: int) -> bool:
-    return is_xid_start(c) or c == \$
+    return (c >= \a and c <= \z) or (c >= \A and c <= \Z) or c == \_ or c == \$
 
 fn is_wy_xid_continue(c: int) -> bool:
-    return is_xid_continue(c) or c == \$
+    return (c >= \a and c <= \z) or (c >= \A and c <= \Z) or c == \_ or (c >= \0 and c <= \9) or c == \$

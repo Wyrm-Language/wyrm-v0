@@ -507,6 +507,15 @@ fn [TreeBase] accept():
         pair('seq_expr, seq))
 
 
+# @brief the same matcher as `@accept`, without the packrat memo
+#
+# For rules reached at most once per token position (a single caller that is
+# itself memoized, or a leaf), where the memo's lookups cost more than they save.
+fn [TreeBase] accept_nomemo():
+    s := sexpr(this)
+    elements := _sequence_elements(s)
+    return _build_sequence_expr(elements)
+
 @template
 fn $_expect(match_expr, desc):
     r := match_expr

@@ -16,9 +16,7 @@
 # The listing writers call `opcodes!disassemble` for code text (image-free);
 # the image-dependent `(note)` hints are added here by `_annotate`, which
 # reads each record's `fields`/`operands` and this module's own pools. The C
-# VM's builtins message table registers no `str` methods, so `s ! substr(...)`
-# faults - every string operation here goes through `s[i]` (a codepoint int)
-# and `opcodes!`'s `_char_from_cp` instead.
+# VM indexes strings by byte: `s[i]` is an int, and `substr` copies a run.
 #
 # --------------------------------------------------------------------------
 # Data shape: a "module image" is a plain `dict` (no wyrm dataclasses exist
@@ -409,24 +407,27 @@ fn _static_kind(value) -> str:
 
 fn _escape_str(value: str) -> str:
     out := ""
+    start := 0
     i := 0
     n := len(value)
     while i < n:
         c := value[i]
+        escape := nil
         if c == 92:
-            out = out + _char_from_cp(92) + _char_from_cp(92)
+            escape = _char_from_cp(92) + _char_from_cp(92)
         elif c == 34:
-            out = out + _char_from_cp(92) + _char_from_cp(34)
+            escape = _char_from_cp(92) + _char_from_cp(34)
         elif c == 10:
-            out = out + _char_from_cp(92) + "n"
+            escape = _char_from_cp(92) + "n"
         elif c == 13:
-            out = out + _char_from_cp(92) + "r"
+            escape = _char_from_cp(92) + "r"
         elif c == 9:
-            out = out + _char_from_cp(92) + "t"
-        else:
-            out = out + _char_from_cp(c)
+            escape = _char_from_cp(92) + "t"
+        if escape is not nil:
+            out = out + value ! substr(start, i - start) + escape
+            start = i + 1
         i = i + 1
-    return out
+    return out + value ! substr(start, n - start)
 
 fn _static_repr(value) -> str | error:
     if value is str:
@@ -567,12 +568,15 @@ fn _hex_listing(payload: bytes, annotations: dict) -> list:
 # in the code can reference.
 fn _global_names(image: dict) -> dict:
     names := {}
-    if image["exports"] is not nil:
-        for name in image["exports"]:
-            names[image["exports"][name]] = name
-    if image["free"] is not nil:
-        for name in image["free"]:
-            names[image["free"][name]] = name
+    # Either key may be absent (compile_module sets them only when non-empty).
+    exports := image["exports"] catch nil
+    if exports is not nil:
+        for name in exports:
+            names[exports[name]] = name
+    free := image["free"] catch nil
+    if free is not nil:
+        for name in free:
+            names[free[name]] = name
     return names
 
 fn _describe(image: dict, kind: str, index: int, global_names: dict) -> str | nil:
@@ -697,6 +701,7 @@ fn _replace_all(text: str, needle: str, replacement: str) -> str:
     i := 0
     n := len(text)
     nn := len(needle)
+    start := 0
     while i < n:
         matched := true
         j := 0
@@ -706,12 +711,12 @@ fn _replace_all(text: str, needle: str, replacement: str) -> str:
                 break
             j = j + 1
         if matched:
-            out = out + replacement
+            out = out + text ! substr(start, i - start) + replacement
             i = i + nn
+            start = i
         else:
-            out = out + _char_from_cp(text[i])
             i = i + 1
-    return out
+    return out + text ! substr(start, n - start)
 
 # C block comments have no escapes and end at the first "*/", so annotation
 # text that quotes a string constant containing "*/" (image.wy's own header
