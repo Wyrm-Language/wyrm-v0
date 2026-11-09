@@ -8,10 +8,14 @@
 # never committed: scripts/embed_stage.py runs this during the build (project
 # design/plans/I-generated-images.md).
 #
-#     wyrm [-I<tree> ...] embed_build.wy[d] <src/embed root> <out-dir> [<scope-dir>]
+#     wyrm [-I<tree> ...] embed_build.wy[d] <src/embed root> <out-dir> [option...]
 #
-# <scope-dir>: expansion scope images from a wyrm_bootstrap on an older image format
-# (wyrm::compiler::tree_build).
+# --scopes DIR: expansion scope images from a wyrm_bootstrap on an older image format
+#     (wyrm::compiler::tree_build).
+# --only REL: compile this one module and write no table, so a slow interpreter can
+#     compile modules in parallel. --tables then writes the table and the unity file.
+# --native-parse: parse with the interpreter's own parser (wypoc's `__parse_tree`),
+#     which builds the same tree as wyrm::parser and is far faster there.
 #
 # std::expand stays a host module installed by src/wyrm/main.c and is
 # deliberately absent. An expansion VM (epic 10a D10) imports the embedded
@@ -30,12 +34,14 @@ import wyrm::compiler::tree_build::*
 # table rows pointing at the same images.
 ALIAS_SYMBOLS := ["cbor", "opcodes"]
 
+native_parse := false
+
 fn basename(path: str) -> str:
     last := 0
     i := 0
     n := len(path)
     while i < n:
-        if path[i] == 47:  # '/'
+        if substr(path, i, 1) == "/":
             last = i + 1
         i = i + 1
     return substr(path, last, n - last)
@@ -64,7 +70,7 @@ fn join_lines(lines: list) -> str:
     return out + "\n"
 
 fn write_text(path: str, text: str) -> bool:
-    f := std::io::open(path, "wb")
+    f := std::io::open(path, "w")
     if f is error:
         println("EMBED-FAIL " + path + " (open for write)")
         return false
@@ -92,7 +98,7 @@ fn read_embed_list(src_root: str):
     i := 0
     n := len(text)
     while i < n:
-        if text[i] == 10:  # newline
+        if substr(text, i, 1) == "\n":
             if i > begin:
                 rows ! append(substr(text, begin, i - begin))
             begin = i + 1
@@ -113,7 +119,11 @@ fn embed_one(src_root: str, out_dir: str, rel: str):
     f!close()
     if src is error:
         return error("unreadable")
-    tree := Parser(src)!program()
+    tree := nil
+    if native_parse:
+        tree = src ! __parse_tree()
+    else:
+        tree = Parser(src)!program()
     if tree is error:
         return error("parse")
     img := compile_module(tree, name, path, true, false, false, false, expand_decorators)
@@ -129,11 +139,34 @@ fn embed_one(src_root: str, out_dir: str, rel: str):
     return file_stem
 
 args := __ARGS
-if (len(args) != 2) and (len(args) != 3):
-    println("usage: embed_build.wyd <embed-src-root> <out-dir> [<scope-dir>]")
+only := nil
+tables_only := false
+usage_error := len(args) < 2
+arg := 2
+while (not usage_error) and (arg < len(args)):
+    if args[arg] == "--native-parse":
+        native_parse = true
+        arg = arg + 1
+    elif args[arg] == "--tables":
+        tables_only = true
+        arg = arg + 1
+    elif (args[arg] == "--scopes") and (arg + 1 < len(args)):
+        set_expansion_scopes(args[arg + 1])
+        arg = arg + 2
+    elif (args[arg] == "--only") and (arg + 1 < len(args)):
+        only = args[arg + 1]
+        arg = arg + 2
+    else:
+        usage_error = true
+if usage_error:
+    println("usage: embed_build.wyd <embed-src-root> <out-dir> [--scopes DIR] [--only REL] [--tables] [--native-parse]")
+elif only is not nil:
+    got := embed_one(args[0], args[1], only)
+    if got is error:
+        println("EMBED-FAIL " + only + " (" + str(error_message(got)) + ")")
+    else:
+        println("embed_build: done (" + only + ")")
 else:
-    if len(args) == 3:
-        set_expansion_scopes(args[2])
     q := _char_from_cp(34)  # wy strings have no \" escape; image.wy does the same dance
     src_root := args[0]
     out_dir := args[1]
@@ -146,7 +179,11 @@ else:
         embed_list = []
         failed = 1
     for rel in embed_list:
-        got := embed_one(src_root, out_dir, rel)
+        got := nil
+        if tables_only:
+            got = c_file_stem(rel)
+        else:
+            got = embed_one(src_root, out_dir, rel)
         if got is error:
             println("EMBED-FAIL " + rel + " (" + str(error_message(got)) + ")")
             failed = failed + 1

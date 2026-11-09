@@ -13,7 +13,7 @@ Currently public domain licensed.
 
 ## Commands
 
-- **Setup:** `meson setup buildDir -Dwyrm_bootstrap=/path/to/wyrm` (see "Embedded Images")
+- **Setup:** `meson setup buildDir -Dwyrm_bootstrap=/path/to/wyrm`, or with a wypoc `wyrm` on `PATH` (see "Embedded Images")
 - **Build:** `meson compile -C buildDir`
 - **Test:** `meson test -C buildDir`
 
@@ -119,7 +119,8 @@ the build (`scripts/embed_stage.py`), so a `.wy` change under `src/embed/` just 
 `src/embed/modules.txt` lists the modules in dependency order; add a new module there.
 
 ```sh
-meson setup buildDir -Dwyrm_bootstrap=PATH  # absolute, or relative to the source root; PATH lookup is never used
+meson setup buildDir                        # uses the wyrm on PATH (usually wypoc: about 3 minutes)
+meson setup buildDir -Dwyrm_bootstrap=PATH  # a C wyrm (about 20 s) or a wypoc; a bare name comes from PATH, else absolute or relative to the source root
 meson setup buildDir -Dembed_prebuilt=DIR   # a generated tree instead; needs only a C compiler
 ninja -C buildDir wyrm_bootstrap            # builds src/embed/wyrm_bootstrap; copy it out to keep it
 ninja -C buildDir embed-regen               # force a regeneration and rebuild the binary
@@ -131,7 +132,13 @@ meson setup buildDir -Dbootstrap_stages=2   # embed stage 2 in this tree
 A release tarball (`meson dist`) carries a generated tree in `src/embed/prebuilt/`, used
 automatically when neither option is set. `scripts/wyrm_bootstrap_min.txt` holds the oldest image
 version a `wyrm_bootstrap` may write. The sources under `src/embed/` must compile on it, so raise
-that when they need a newer language feature or native, and publish a new one first. Design:
+that when they need a newer language feature or native, and publish a new one first.
+
+wypoc (a current one: `../wypoc`) needs no prebuilt binary. It runs the compiler from source and
+writes the same bytes as a C `wyrm_bootstrap`, so `src/embed/` has to keep running on it too. Its
+`--mode bootstrap` path has no regular gate: run it after changing how the compiler reads exports,
+expands decorators or uses builtins, by setting up a tree with `-Dwyrm_bootstrap=../wypoc/.venv/bin/wyrm`
+and running `ninja embed-check`. Design:
 project `design/plans/I-generated-images.md`.
 
 ## The `.wyc` Format Version

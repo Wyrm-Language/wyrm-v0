@@ -7,10 +7,13 @@ design/plans/I-generated-images.md). Meson runs this; nothing it writes is commi
   compiler's output. On a wyrm one image format behind, the binary also writes what
   its own VM has to load (embed_build and the expansion scopes), because gen1
   writes the new format.
+  A wypoc can't load images at all, so there it runs the compiler from source and
+  writes the images directly, one process per module (D10).
 --mode self: --wyrm was built from these sources, so its embedded compiler writes
   the images directly.
---probe [--min FILE]: print the image version --wyrm writes; fail if it can't write
-  images, or is older than the version in FILE.
+--probe [--min FILE]: print the image version --wyrm writes, or "source" for a wypoc
+  that can run the compiler from source; fail if it can do neither, or is older than
+  the version in FILE.
 --compare A B: fail unless two generated trees hold the same bytes.
 --regen BUILD DIR...: delete generated trees, then rebuild the binary.
 --dist DIR [TARGET]: for `meson dist`: build TARGET, then copy generated tree DIR to
@@ -18,6 +21,7 @@ design/plans/I-generated-images.md). Meson runs this; nothing it writes is commi
 """
 
 import argparse
+import concurrent.futures
 import filecmp
 import os
 import re
@@ -31,6 +35,14 @@ GENERATED_ROOT = ("embedded_images.c", "wyrm_builtins_table.c")
 IMAGE_PREAMBLE = b"\x82\x64WYCR\x1a"
 MIN_FILE = "wyrm_bootstrap_min.txt"
 HOST_ONLY_IMPORT = "std::io"  # expansion.wy's HOST_ONLY_IMPORTS
+SOURCE_BOOTSTRAP = "source"
+# Fails on a wypoc without what the compiler needs: its checker rejects the names, and
+# the send has no answer.
+SOURCE_PROBE = """import std::expand
+x := [bind_message, tree_box, error_message, substr]
+("v := 1" ! __parse_tree()) catch exit(1)
+println("wyrm-source-bootstrap")
+"""
 
 
 def die(message):
@@ -170,6 +182,24 @@ def write_scopes(wyrm, embed, rows, scopes):
         check_output([wyrm] + source_roots + ["--build-bc", "-o", scopes, scope_source])
 
 
+def generate_from_source(wyrm, embed, rows, new):
+    """A wypoc: no gen1 tree, since it can't load one, so the compiler runs from source
+    and writes the final images itself. It reads module exports from the sources, which
+    are the tree being built (D5), so modules needn't compile in order: one process per
+    module, largest first. The tables come first: they load the compiler once, which
+    fills wypoc's AST cache (__wycache__ beside the sources), so no process has to parse
+    the compiler itself."""
+    make_out_dirs(new, rows)
+    tool = os.path.join(os.path.dirname(os.path.dirname(embed)), "wy", "wyrm", "tools", "embed_build.wy")
+    base = [wyrm] + ["-I" + r for r in tree_roots(embed)] + [tool, embed, new]
+    check_output(base + ["--tables"], "embed_build: done")
+    order = sorted(rows, key=lambda rel: -os.path.getsize(os.path.join(embed, rel)))
+    with concurrent.futures.ThreadPoolExecutor(os.cpu_count() or 1) as pool:
+        jobs = [pool.submit(check_output, base + ["--native-parse", "--only", rel], "embed_build: done") for rel in order]
+        for job in concurrent.futures.as_completed(jobs):
+            job.result()
+
+
 def generate(mode, wyrm, root, out):
     embed = os.path.join(root, "src", "embed")
     rows = read_modules(embed)
@@ -182,7 +212,10 @@ def generate(mode, wyrm, root, out):
     os.makedirs(work)
     os.makedirs(new)
     start = time.time()
-    if mode == "self":
+    version = None if mode == "self" else probe_version(wyrm)
+    if version == SOURCE_BOOTSTRAP:
+        generate_from_source(wyrm, embed, rows, new)
+    elif mode == "self":
         make_out_dirs(new, rows)
         check_output([wyrm, "--cache-dir", os.path.join(work, "cache"), tool, embed, new], "embed_build: done")
     else:
@@ -190,7 +223,6 @@ def generate(mode, wyrm, root, out):
         compile_mirror(wyrm, os.path.join(embed, "wyrm", "tools", "compiler_main.wy"), tree_roots(embed),
                        tree, embed, rows, os.path.join(work, "cache"))
         print("embed_stage: gen1 tree in %.0fs" % (time.time() - start), flush=True)
-        version = probe_version(wyrm)
         if version == source_version(embed):
             emit_from_tree(wyrm, root, tree, new, work)
         else:
@@ -201,7 +233,7 @@ def generate(mode, wyrm, root, out):
             check_output([wyrm] + ["-I" + r for r in tree_roots(embed)] + ["--build-bc", "-o", work, tool])
             make_out_dirs(new, rows)
             check_output([wyrm] + ["-I" + r for r in tree_roots(tree)]
-                         + [os.path.join(work, "embed_build.wyd"), embed, new, scopes], "embed_build: done")
+                         + [os.path.join(work, "embed_build.wyd"), embed, new, "--scopes", scopes], "embed_build: done")
     # Replace the outputs together: the unity file includes the per-module files.
     for name in os.listdir(new):
         dst = os.path.join(out, name)
@@ -210,7 +242,15 @@ def generate(mode, wyrm, root, out):
         os.replace(os.path.join(new, name), dst)
     shutil.rmtree(new)
     shutil.rmtree(work)
-    print("embed_stage: %s images in %.0fs" % (mode, time.time() - start), flush=True)
+    print("embed_stage: %s images in %.0fs" % (version if version == SOURCE_BOOTSTRAP else mode, time.time() - start), flush=True)
+
+
+def can_run_from_source(wyrm, scratch):
+    source = os.path.join(scratch, "source_probe.wy")
+    with open(source, "w") as f:
+        f.write(SOURCE_PROBE)
+    r = subprocess.run([wyrm, source], capture_output=True, text=True)
+    return r.returncode == 0 and "wyrm-source-bootstrap" in r.stdout
 
 
 def probe_version(wyrm):
@@ -223,7 +263,10 @@ def probe_version(wyrm):
                            capture_output=True, text=True)
         image = os.path.join(scratch, "probe.wyd")
         if r.returncode != 0 or not os.path.exists(image):
-            die("%s cannot write images: %s" % (wyrm, (r.stderr or r.stdout).strip()[-400:]))
+            if can_run_from_source(wyrm, scratch):
+                return SOURCE_BOOTSTRAP
+            die("%s cannot write images, and isn't a wypoc that can run the compiler from source "
+                "(update it if it is one): %s" % (wyrm, (r.stderr or r.stdout).strip()[-400:]))
         with open(image, "rb") as f:
             raw = f.read(11)
     if not raw.startswith(IMAGE_PREAMBLE):
@@ -233,7 +276,7 @@ def probe_version(wyrm):
 
 def probe(wyrm, min_file):
     version = probe_version(wyrm)
-    if min_file:
+    if min_file and version != SOURCE_BOOTSTRAP:
         with open(min_file) as f:
             rows = [line.strip() for line in f if line.strip() and not line.startswith("#")]
         if version < int(rows[0]):

@@ -1,8 +1,8 @@
 # The images the wyrm binary embeds are build output, never committed (project
 # design/plans/I-generated-images.md).
 #
-#   stage1: wyrm_bootstrap, a preexisting wyrm, generates them from the .wy sources
-#           (or -Dembed_prebuilt supplies a generated tree).
+#   stage1: wyrm_bootstrap, a preexisting wyrm or wypoc, generates them from the .wy
+#           sources (or -Dembed_prebuilt supplies a generated tree).
 #   stage2: wyrm-stage1, built from stage1's images, generates them again.
 #
 # libwyrmhost embeds the stage -Dbootstrap_stages picks. Each stage has its own
@@ -33,11 +33,13 @@ if get_option('hosted')
     if bootstrap_path == '' and prebuilt_path == '' and fs.exists('prebuilt/embedded_images.c')
         prebuilt_path = 'src/embed/prebuilt'
     endif
-    if bootstrap_path == '' and prebuilt_path == ''
+    # With nothing named, the wyrm on PATH. It's usually wypoc, which generates the images
+    # from source: no prebuilt binary is needed, but it takes minutes.
+    if bootstrap_path == '' and prebuilt_path == '' and not find_program('wyrm', required: false).found()
         error('The embedded images are generated, and this tree has nothing to generate them with. '
-              + 'Set -Dwyrm_bootstrap=/path/to/wyrm (`ninja wyrm_bootstrap` in another tree builds one), '
-              + 'or -Dembed_prebuilt=DIR with a generated tree (a release tarball carries one). '
-              + 'The wyrm on PATH is not used: it can be wypoc, which cannot write images.')
+              + 'Put a wypoc `wyrm` on PATH, or set -Dwyrm_bootstrap=/path/to/wyrm (a wypoc, or a C wyrm: '
+              + '`ninja wyrm_bootstrap` in another tree builds one, and takes seconds where wypoc takes '
+              + 'minutes), or -Dembed_prebuilt=DIR with a generated tree (a release tarball carries one).')
     endif
 
     if prebuilt_path != ''
@@ -49,13 +51,21 @@ if get_option('hosted')
                                      embed_stage1_dir / 'wyrm_builtins_table.c')
         embed_stage1_depends = []
     else
-        wyrm_bootstrap = find_program(meson.project_source_root() / bootstrap_path)
+        if bootstrap_path == ''
+            bootstrap_path = 'wyrm'
+        endif
+        # A bare name comes from PATH; anything else is a path from the source root.
+        if bootstrap_path.contains('/')
+            wyrm_bootstrap = find_program(meson.project_source_root() / bootstrap_path)
+        else
+            wyrm_bootstrap = find_program(bootstrap_path)
+        endif
         bootstrap_probe = run_command(embed_stage, '--probe', '--wyrm', wyrm_bootstrap,
                                       '--min', files('../../scripts/wyrm_bootstrap_min.txt'), check: false)
         if bootstrap_probe.returncode() != 0
             error('-Dwyrm_bootstrap=' + bootstrap_path + ': ' + bootstrap_probe.stderr().strip())
         endif
-        message('wyrm_bootstrap writes image version ' + bootstrap_probe.stdout().strip())
+        message('wyrm_bootstrap ' + wyrm_bootstrap.full_path() + ': image version ' + bootstrap_probe.stdout().strip())
 
         subdir('stage1')
         embed_stage1_dir = meson.current_build_dir() / 'stage1'

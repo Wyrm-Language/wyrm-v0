@@ -20,7 +20,7 @@ touching `src/vm*.c`, `src/embed/wyrm/*.wy`, or the self-hosted compiler.
 ## Generations of the self-hosted compiler
 
 - **gen0 / stage0** = the compiler images embedded in the binary (generated into
-  `<build>/src/embed/stage{1,2}/`, see `scripts/embed_stage.py`). pypoc is no longer involved. (History: gen0 used to be a pypoc-compiled
+  `<build>/src/embed/stage{1,2}/`, see `scripts/embed_stage.py`). A build generates them from a C `wyrm_bootstrap`, or from wypoc, which runs the compiler from source and writes the same bytes. (History: gen0 used to be a pypoc-compiled
   *amalgam* of all compiler modules concatenated into one module; that driver and
   `run_corpus_sweep.py` are gone.)
 - **gen1** = stage0 compiling the current `src/embed/` sources into separate `.wyd` modules
@@ -172,9 +172,9 @@ Symptom -> usual cause seen so far:
 - `len(x)` and indexing errors: out-of-range indexing is a *catchable* error.
 - A line starting with `(` after a block is now a new statement; older notes saying to avoid
   it (or bind through a local) describe the pre-fix parser.
-- These compiler `.wy` files run reliably only on the C VM, not pypoc's interpreter
-  (`opcodes.wy` uses constructs the interpreter cannot run). Use the drivers under
-  `wy/wyrm/tools/` and the amalgam pattern; pypoc `--check`/`--build-bc` is fine for syntax.
+- These compiler `.wy` files run on both the C VM and wypoc, and a wypoc bootstrap holds them to the
+  same output. `-I` doesn't override a module the binary has built in, so to measure an edit to
+  a compiler module on the C VM, rebuild, or copy it under another package name.
 
 ## Process lessons
 

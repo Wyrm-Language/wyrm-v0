@@ -31,7 +31,7 @@ option('wyrm',
 option('wyrm_bootstrap',
        type: 'string',
        value: '',
-       description: 'A preexisting wyrm that generates the embedded images. Absolute, or relative to the source root. `ninja wyrm_bootstrap` builds one.',
+       description: 'A preexisting wyrm or wypoc that generates the embedded images: a bare name from PATH, else absolute or relative to the source root. Default: the wyrm on PATH. `ninja wyrm_bootstrap` builds a C one.',
 )
 
 option('embed_prebuilt',
