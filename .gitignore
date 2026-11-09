@@ -39,3 +39,6 @@ pypoc/
 # Stray outputs from running scripts in the repo root
 io_file.tmp
 stderr.log
+
+# Embedded images in a release tarball (scripts/embed_stage.py --dist)
+/src/embed/prebuilt/

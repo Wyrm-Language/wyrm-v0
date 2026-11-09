@@ -13,7 +13,7 @@ Currently public domain licensed.
 
 ## Commands
 
-- **Setup:** `meson setup buildDir`
+- **Setup:** `meson setup buildDir -Dwyrm_bootstrap=/path/to/wyrm` (see "Embedded Images")
 - **Build:** `meson compile -C buildDir`
 - **Test:** `meson test -C buildDir`
 
@@ -23,8 +23,8 @@ takes ~370s debug vs ~185s release). Unless you need debug information
 (gdb/lldb, `-O0` stepping), use one of:
 
 ```sh
-meson setup buildDir -Dbuildtype=release -Db_ndebug=false  # release + WY_ASSERT checks (default choice)
-meson setup buildDir -Dbuildtype=release                   # release, asserts off (perf baselines, pre-merge)
+meson setup buildDir -Dbuildtype=release -Db_ndebug=false -Dwyrm_bootstrap=PATH  # release + WY_ASSERT checks (default choice)
+meson setup buildDir -Dbuildtype=release -Dwyrm_bootstrap=PATH                   # release, asserts off (perf baselines, pre-merge)
 ```
 
 Plain release sets `b_ndebug=if-release`, which disables `WY_ASSERT`; use the
@@ -73,9 +73,7 @@ Tests check behavior, plus our own compiler's self-consistency:
   target (`scripts/build_fixtures.py`) compiles from `test/corpus` with the
   build tree's own compiler on every build.
 - `selfcompile`: gen1 (the binary's stage0 compiles current `src/embed/`) == gen2
-  byte-for-byte, and the result equals the committed stage0 in
-  `src/embed/**.c`. After changing `src/embed/` sources, regenerate
-  stage0 with `python3 scripts/regen_builtins.py` and commit.
+  byte-for-byte, and what they generate equals the images this binary embeds.
 - `wy-tests`, `scripts/check_parser_truth.py`: run under the external wyrm.
 - `wy-cbor` (`scripts/check_cbor.sh`): the `.wyc` encoder (`src/embed/wyrm/cbor.wy`) against the
   wire encoding's worked examples, byte for byte.
@@ -112,6 +110,29 @@ To test a script for syntax:
 ```sh
 ./buildDir/src/wyrm/wyrm --check script_path.wy
 ```
+
+## Embedded Images
+
+The images the binary embeds (the compiler and library modules in `src/embed/`) are build
+output and aren't committed. A preexisting wyrm, the **`wyrm_bootstrap`**, generates them during
+the build (`scripts/embed_stage.py`), so a `.wy` change under `src/embed/` just needs a rebuild.
+`src/embed/modules.txt` lists the modules in dependency order; add a new module there.
+
+```sh
+meson setup buildDir -Dwyrm_bootstrap=PATH  # absolute, or relative to the source root; PATH lookup is never used
+meson setup buildDir -Dembed_prebuilt=DIR   # a generated tree instead; needs only a C compiler
+ninja -C buildDir wyrm_bootstrap            # builds src/embed/wyrm_bootstrap; copy it out to keep it
+ninja -C buildDir embed-regen               # force a regeneration and rebuild the binary
+ninja -C buildDir stage1                    # generate up to a stage (also stage2)
+ninja -C buildDir embed-check               # fail unless stage 1 and stage 2 hold the same bytes
+meson setup buildDir -Dbootstrap_stages=2   # embed stage 2 in this tree
+```
+
+A release tarball (`meson dist`) carries a generated tree in `src/embed/prebuilt/`, used
+automatically when neither option is set. `scripts/wyrm_bootstrap_min.txt` holds the oldest image
+version a `wyrm_bootstrap` may write. The sources under `src/embed/` must compile on it, so raise
+that when they need a newer language feature or native, and publish a new one first. Design:
+project `design/plans/I-generated-images.md`.
 
 ## The `.wyc` Format Version
 

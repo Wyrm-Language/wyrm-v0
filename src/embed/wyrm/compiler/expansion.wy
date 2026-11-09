@@ -22,10 +22,12 @@
 # expansion VM resolves them through the parent's import hook).
 
 import std::expand
+import std::io
 import wyrm::image::*
 import wyrm::compiler::context::*
 import wyrm::compiler::analysis::*
 import wyrm::compiler::module::*
+import wyrm::compiler::tree_build
 
 fn _ex_pairs_from(items):
     result := nil
@@ -59,9 +61,19 @@ fn _host_only_import(stmt) -> bool:
             return true
     return false
 
-# `body`: the statements of the module being compiled. Answers the expanded
-# `$['module, ...]` tree, or an error value naming the module.
-fn expand_decorators(body, module_name: str):
+# The scope image the running VM can load, written ahead of time by a
+# wyrm_bootstrap on an older image format, whose VM can't load what to_wyc writes
+# (project design/plans/I-generated-images.md D6). `<dir>/<module>.wyd`.
+fn _read_scope(dir: str, module_name: str):
+    path := dir + "/" + module_name + ".wyd"
+    f := std::io::open(path, "rb")
+    if f is error:
+        return error("decorator expansion of '" + module_name + "': no scope image at " + path)
+    blob := f ! read_bytes(-1)
+    f ! close()
+    return blob
+
+fn _write_scope(body, module_name: str):
     imports := []
     for stmt in PREDEFINED_IMPORTS:
         imports ! append(stmt)
@@ -76,6 +88,19 @@ fn expand_decorators(body, module_name: str):
     blob := to_wyc(scope_img)
     if blob is error:
         return error("decorator expansion of '" + module_name + "': cannot serialize its imports")
+    return blob
+
+# `body`: the statements of the module being compiled. Answers the expanded
+# `$['module, ...]` tree, or an error value naming the module.
+fn expand_decorators(body, module_name: str):
+    dir := wyrm::compiler::tree_build::expansion_scopes()
+    blob := nil
+    if dir is nil:
+        blob = _write_scope(body, module_name)
+    else:
+        blob = _read_scope(dir, module_name)
+    if blob is error:
+        return blob
     expanded := std::expand::expand(cons('module, body), blob, "wyrm::compiler::expand")
     if expanded is error:
         return error("decorator expansion of '" + module_name + "' failed: " + str(error_message(expanded)))

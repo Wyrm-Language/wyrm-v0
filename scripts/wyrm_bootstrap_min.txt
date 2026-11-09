@@ -1,0 +1,4 @@
+# The oldest image version a wyrm_bootstrap may write (scripts/embed_stage.py --probe).
+# Raise it when src/embed needs a language feature or native newer than this; publish a
+# new wyrm_bootstrap first (project design/plans/I-generated-images.md D8).
+340758572

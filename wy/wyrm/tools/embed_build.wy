@@ -1,26 +1,22 @@
 # wy/wyrm/tools/embed_build.wy - epic 11 M1
 #
-# Emits the builtin module table's checked-in C sources: for every module on
-# the embed list it compiles the .wy source (exactly like compiler_main does:
-# parse, compile_module strict, the decorator expander on) and writes the
+# Emits the builtin module table's C sources: for every module in
+# src/embed/modules.txt it compiles the .wy source (exactly like compiler_main
+# does: parse, compile_module strict, the decorator expander on) and writes the
 # static wy_module_image C array via wyrm::image's to_c(), plus the generated
-# table .c and the unity-include .c that meson compiles. Output goes to
-# src/embed/ (each image .c beside its .wy source) via
-# scripts/regen_builtins.py; the files are checked in,
-# so neither the build nor meson test ever needs a compiler or Python to
-# produce them.
+# table .c and the unity-include .c that meson compiles. They are build output,
+# never committed: scripts/embed_stage.py runs this during the build (project
+# design/plans/I-generated-images.md).
 #
-# Run it against a self-compiled compiler tree (see regen_builtins.py):
+#     wyrm [-I<tree> ...] embed_build.wy[d] <src/embed root> <out-dir> [<scope-dir>]
 #
-#     ./buildDir/src/wyrm/wyrm -I<tree> -I<tree>/wyrm -I<tree>/wyrm/compiler \
-#         <tree-out>/wyrm/tools/embed_build.wyd <src/embed root> <out-dir>
+# <scope-dir>: expansion scope images from a wyrm_bootstrap on an older image format
+# (wyrm::compiler::tree_build).
 #
-# Every embedded image is .wyd provenance: the wyrm-hosted compiler built it
-# (the gen0 amalgam that bootstraps the tree is pypoc's, but it is not
-# embedded), and so is std::io (over the host natives). std::expand stays a
-# host module installed by src/wyrm/main.c and is deliberately absent. An
-# expansion VM (epic 10a D10) imports the embedded std::io fine but has no
-# `__open`/`__read`/... natives, so it still cannot do any I/O.
+# std::expand stays a host module installed by src/wyrm/main.c and is
+# deliberately absent. An expansion VM (epic 10a D10) imports the embedded
+# std::io fine but has no `__open`/`__read`/... natives, so it still cannot do
+# any I/O.
 
 import std::io
 import wyrm::parser::*
@@ -28,13 +24,7 @@ import wyrm::compiler::module::*
 import wyrm::compiler::expansion::*
 import wyrm::image::*
 import wyrm::opcodes::*
-
-# The embed list: [path relative to src/embed/, virtual import path]. The order is
-# the table's row order. These are SELF_SOURCES (run_selfcompile.py), with the
-# package wyrm/__init__.wy. A package with no code needs no row: the rows
-# filed under it make it a namespace package (design/modules.md M1), so
-# `import wyrm::compiler::module` resolves `wyrm::compiler` with no file.
-EMBED := [["std/ctype.wy", "std::ctype"], ["std/io.wy", "std::io"], ["std/pairs.wy", "std::pairs"], ["wyrm/_dsl.wy", "wyrm::_dsl"], ["wyrm/ast.wy", "wyrm::ast"], ["wyrm/cbor.wy", "wyrm::cbor"], ["wyrm/decode.wy", "wyrm::decode"], ["wyrm/image.wy", "wyrm::image"], ["wyrm/opcodes.wy", "wyrm::opcodes"], ["wyrm/parser.wy", "wyrm::parser"], ["wyrm/sexp_print.wy", "wyrm::sexp_print"], ["wyrm/template.wy", "wyrm::template"], ["wyrm/tokenizer.wy", "wyrm::tokenizer"], ["wyrm/compiler/analysis.wy", "wyrm::compiler::analysis"], ["wyrm/compiler/classes.wy", "wyrm::compiler::classes"], ["wyrm/compiler/context.wy", "wyrm::compiler::context"], ["wyrm/compiler/expand.wy", "wyrm::compiler::expand"], ["wyrm/compiler/expansion.wy", "wyrm::compiler::expansion"], ["wyrm/compiler/expressions.wy", "wyrm::compiler::expressions"], ["wyrm/compiler/functions.wy", "wyrm::compiler::functions"], ["wyrm/compiler/handlers.wy", "wyrm::compiler::handlers"], ["wyrm/compiler/module.wy", "wyrm::compiler::module"], ["wyrm/compiler/statements.wy", "wyrm::compiler::statements"], ["wyrm/compiler/verify.wy", "wyrm::compiler::verify"], ["wyrm/tools/compile_source.wy", "wyrm::tools::compile_source"], ["wyrm/tools/compiler_main.wy", "wyrm::tools::compiler_main"], ["wyrm/__init__.wy", "wyrm"]]
+import wyrm::compiler::tree_build::*
 
 # Package-relative spellings (`cbor::*`/`opcodes::*`, not wyrm::cbor): extra
 # table rows pointing at the same images.
@@ -85,6 +75,32 @@ fn write_text(path: str, text: str) -> bool:
         return false
     return true
 
+# The embed list, src/embed/modules.txt: one path per line, relative to src/embed and in
+# dependency order. Its order is also the table's row order. A package with no code needs
+# no row: the rows filed under it make it a namespace package (design/modules.md M1), so
+# `import wyrm::compiler::module` resolves `wyrm::compiler` with no file.
+fn read_embed_list(src_root: str):
+    f := std::io::open(src_root + "/modules.txt", "r")
+    if f is error:
+        return error("modules.txt: unreadable")
+    text := f!readall()
+    f!close()
+    if text is error:
+        return error("modules.txt: unreadable")
+    rows := []
+    begin := 0
+    i := 0
+    n := len(text)
+    while i < n:
+        if text[i] == 10:  # newline
+            if i > begin:
+                rows ! append(substr(text, begin, i - begin))
+            begin = i + 1
+        i = i + 1
+    if n > begin:
+        rows ! append(substr(text, begin, n - begin))
+    return rows
+
 # Compile one embed-list module and write its image .c; answers the .c file
 # stem, or an error value.
 fn embed_one(src_root: str, out_dir: str, rel: str):
@@ -103,6 +119,7 @@ fn embed_one(src_root: str, out_dir: str, rel: str):
     img := compile_module(tree, name, path, true, false, false, false, expand_decorators)
     if img is error:
         return error("compile: " + str(error_message(img)))
+    note_tree_image(rel, img)
     text := to_c(img)
     if text is error:
         return error("to_c: " + str(error_message(text)))
@@ -112,28 +129,34 @@ fn embed_one(src_root: str, out_dir: str, rel: str):
     return file_stem
 
 args := __ARGS
-if len(args) != 2:
-    println("usage: embed_build.wyd <embed-src-root> <out-dir>")
+if (len(args) != 2) and (len(args) != 3):
+    println("usage: embed_build.wyd <embed-src-root> <out-dir> [<scope-dir>]")
 else:
+    if len(args) == 3:
+        set_expansion_scopes(args[2])
     q := _char_from_cp(34)  # wy strings have no \" escape; image.wy does the same dance
     src_root := args[0]
     out_dir := args[1]
-    unity := ["/* Generated by wy/wyrm/tools/embed_build.wy - every embedded image", "   translation unit in one include, so meson lists exactly one file.", "   Do not edit; regenerate with scripts/regen_builtins.py. */", ""]
+    unity := ["/* Generated by wy/wyrm/tools/embed_build.wy - every embedded image", "   translation unit in one include, so meson lists exactly one file. Do not edit. */", ""]
     rows := []
     failed := 0
-    for row in EMBED:
-        rel := row[0]
+    embed_list := read_embed_list(src_root)
+    if embed_list is error:
+        println("EMBED-FAIL " + str(error_message(embed_list)))
+        embed_list = []
+        failed = 1
+    for rel in embed_list:
         got := embed_one(src_root, out_dir, rel)
         if got is error:
             println("EMBED-FAIL " + rel + " (" + str(error_message(got)) + ")")
             failed = failed + 1
         else:
             # row: [virtual import path, image symbol stem, .c file stem]
-            rows ! append([row[1], stem(basename(rel)), got])
+            rows ! append([module_path_of(rel), stem(basename(rel)), got])
             unity ! append("#include " + q + got + ".c" + q)
     for sym in ALIAS_SYMBOLS:
         rows ! append([sym, sym, ""])
-    tbl := ["/* Generated by wy/wyrm/tools/embed_build.wy (scripts/regen_builtins.py) - do not edit. */", "", "#include <wyrm/image.h>", "#include <wyrm/platform/hosted/import_fs.h>", "", "/* The embedded images were generated for this format version; a stale table fails the build. */", "_Static_assert(WY_IMAGE_VERSION == " + str(WYC_VERSION) + "u, " + q + "embedded images are for another .wyc version; run scripts/regen_builtins.py" + q + ");", "", "/* Image symbols, defined in embedded_images.c's translation units: */", ""]
+    tbl := ["/* Generated by wy/wyrm/tools/embed_build.wy - do not edit. */", "", "#include <wyrm/image.h>", "#include <wyrm/platform/hosted/import_fs.h>", "", "/* The embedded images were generated for this format version; a stale table fails the build. */", "_Static_assert(WY_IMAGE_VERSION == " + str(WYC_VERSION) + "u, " + q + "embedded images are for another .wyc version; regenerate them" + q + ");", "", "/* Image symbols, defined in embedded_images.c's translation units: */", ""]
     for row in rows:
         if row[2] != "":
             tbl ! append("extern const wy_module_image " + row[1] + "_image;")

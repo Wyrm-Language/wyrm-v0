@@ -27,3 +27,22 @@ option('wyrm',
        value: 'enabled',
        description: 'Enable wyrm standalone interpreter'
 )
+
+option('wyrm_bootstrap',
+       type: 'string',
+       value: '',
+       description: 'A preexisting wyrm that generates the embedded images. Absolute, or relative to the source root. `ninja wyrm_bootstrap` builds one.',
+)
+
+option('embed_prebuilt',
+       type: 'string',
+       value: '',
+       description: 'A generated tree of embedded images, instead of -Dwyrm_bootstrap. Needs only a C compiler. Absolute, or relative to the source root.',
+)
+
+option('bootstrap_stages',
+       type: 'combo',
+       choices: ['1', '2'],
+       value: '1',
+       description: '1: embed what wyrm_bootstrap generates. 2: embed what a wyrm built from that generates.',
+)

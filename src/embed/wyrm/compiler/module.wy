@@ -63,6 +63,7 @@ import wyrm::compiler::functions::*
 import wyrm::compiler::classes::*
 import wyrm::compiler::handlers::*
 import wyrm::compiler::verify::*
+import wyrm::compiler::tree_build
 
 # ---------------------------------------------------------------------------
 # small local helpers - copied rather than imported; see analysis.wy's
@@ -301,7 +302,11 @@ fn _declare_module_names(body, module: ModuleContext) -> nil | error:
 # A dependency that can't be loaded here - a host-registered module the
 # compiling machine doesn't have - is left unknown, and a name that might
 # come from it isn't refused.
-fn _read_dependency_exports(body, module: ModuleContext) -> nil | error:
+#
+# A module this build has already compiled answers from the build
+# (tree_build.wy). An expansion scope is the exception: this VM's import hook
+# loads it, so it has to bind to the modules that hook finds.
+fn _read_dependency_exports(body, module: ModuleContext, module_name: str) -> nil | error:
     for node in body:
         kind := node_kind(node)
         if (kind != 'import) and (kind != 'import_static):
@@ -310,7 +315,11 @@ fn _read_dependency_exports(body, module: ModuleContext) -> nil | error:
         if shape is error:
             return shape
         path := _join_path(shape[0])
-        names := module_exports(path)
+        names := nil
+        if module_name != "__expand_scope__":
+            names = wyrm::compiler::tree_build::tree_exports_of(path)
+        if names is nil:
+            names = module_exports(path)
         if names is error:
             if shape[3]:
                 module.wildcard_unknown = true
@@ -718,7 +727,7 @@ fn compile_module(program_node, module_name: str, source_file = nil, check: bool
     d := _declare_module_names(body, module)
     if d is error:
         return d
-    r := _read_dependency_exports(body, module)
+    r := _read_dependency_exports(body, module, module_name)
     if r is error:
         return r
     c := _collect_definitions(body, module)

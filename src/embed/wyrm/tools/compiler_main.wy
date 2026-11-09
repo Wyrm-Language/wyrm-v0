@@ -41,6 +41,7 @@ import wyrm::compiler::classes::*
 import wyrm::compiler::verify::*
 import wyrm::compiler::module::*
 import wyrm::compiler::expansion::*
+import wyrm::compiler::tree_build::*
 
 fn basename(path: str) -> str:
     last := 0
@@ -58,7 +59,8 @@ fn stem(name: str) -> str:
         return substr(name, 0, n - 3)
     return name
 
-fn compile_one(out_dir: str, path: str) -> bool:
+# `rel`: the module's path under the tree being built (mirror mode), or nil.
+fn compile_one(out_dir: str, path: str, rel) -> bool:
     name := stem(basename(path))
     f := std::io::open(path, "r")
     if f is error:
@@ -82,6 +84,8 @@ fn compile_one(out_dir: str, path: str) -> bool:
     if img is error:
         println("REFUSED " + name + " (compile: " + str(error_message(img)) + ")")
         return false
+    if rel is not nil:
+        note_tree_image(rel, img)
     # Stub report (epic 10 M7 / 10a scan item 1): every body that would
     # not lower and became a trapping stub, with the lowering refusal as
     # the reason. compile_module records these on the image's "unlowered"
@@ -126,7 +130,7 @@ fn compile_one_mirror(src_root: str, out_dir: str, rel: str) -> bool:
             out_rel = out_rel + "/" + seg
             last = i + 1
         i = i + 1
-    return compile_one(out_rel, src_root + "/" + rel)
+    return compile_one(out_rel, src_root + "/" + rel, rel)
 
 args := __ARGS
 if len(args) < 1:
@@ -141,7 +145,7 @@ else:
     i = i + 1
     while i < len(args):
         if mirror_root == "":
-            compile_one(out_dir, args[i])
+            compile_one(out_dir, args[i], nil)
         else:
             compile_one_mirror(mirror_root, out_dir, args[i])
         i = i + 1

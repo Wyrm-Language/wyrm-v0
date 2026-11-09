@@ -19,39 +19,30 @@ touching `src/vm*.c`, `src/embed/wyrm/*.wy`, or the self-hosted compiler.
 
 ## Generations of the self-hosted compiler
 
-- **gen0 / stage0** = the compiler images embedded in the binary (`src/embed/**.c`,
-  committed). pypoc is no longer involved. (History: gen0 used to be a pypoc-compiled
+- **gen0 / stage0** = the compiler images embedded in the binary (generated into
+  `<build>/src/embed/stage{1,2}/`, see `scripts/embed_stage.py`). pypoc is no longer involved. (History: gen0 used to be a pypoc-compiled
   *amalgam* of all compiler modules concatenated into one module; that driver and
   `run_corpus_sweep.py` are gone.)
 - **gen1** = stage0 compiling the current `src/embed/` sources into separate `.wyd` modules
   (`compiler_main.wy` run in-process by the binary). Output tree first on the import path,
   so decorator expansion loads this compiler's own tree shapes.
 - **gen2** = gen1 compiling them again. Bar: gen1 == gen2 byte-for-byte, then the fresh
-  tree's embedded-table emit == committed stage0 (`scripts/run_selfcompile.py`;
-  `SELFCOMPILE_KEEP=<dir>` keeps the trees). After a compiler change, regenerate stage0
-  with `scripts/regen_builtins.py`.
-- **Changing the `.wyc` format is a bootstrap.** The binary's embedded stage0 writes images
-  and its loader reads them, so writer and loader cannot switch in one step. Land the new
-  writer (`image.wy`, `cbor.wy`) first with the old loader still in the binary, build, and
-  regenerate the embedded images with the old binary: `regen_builtins.py` cannot run as is,
-  because gen1 then writes the new format (its `embed_build.wyd`, and the `.wyd` that
-  decorator expansion hands the host) and the old loader rejects it. Run `embed_build` from
-  a `--build-bc` of its source against the gen1 tree (stage0 writes that one in the old
-  format), and for expansion point a scratch copy of `compiler/expansion.wy` at a copy of
-  the old `image.wy`'s `to_wyc`. Then land the new loader with those regenerated `.c`
-  files, rebuild, run `regen_builtins.py` again (the output can differ in the free names of
-  modules that import the changed module, until this second pass) and again with
-  `--check`. Set `WY_IMAGE_VERSION` and `WYC_VERSION` to the publish time.
-  **A simpler route, when the old and new images can be told apart at load time:** a temporary
-  loader that accepts both, which needs no helper images (init as `functions[0]` went this way;
-  an old image was the one whose header had `l`). (1) Add the dual loader, set both version
-  constants, and change the compiler and writer. (2) Every committed `.c` under `src/embed/`
-  that pins the version with a `_Static_assert` (each container and `wyrm_builtins_table.c`) stops
-  the build, so `sed` the old number to the new one across them; the first regen rewrites them. Build
-  only the binary (`ninja -C buildDir src/wyrm/wyrm`): the tests don't compile yet. (3) Run `regen_builtins.py` and rebuild, twice, deleting `__wycache__` each time; old
-  stage0 builds a new gen1, and gen1 writes the new stage0. (4) `--check` must be clean. (5) Delete
-  the temporary code, rebuild and `--check` again: the strict loader proves nothing still needs the
-  old format.
+  tree's embedded-table emit == the images this binary embeds (`scripts/run_selfcompile.py`;
+  `SELFCOMPILE_KEEP=<dir>` keeps the trees). A compiler change only needs a rebuild: the build
+  regenerates the images.
+- **Exports come from the tree being built** (`compiler/tree_build.wy`). A build compiles
+  `src/embed/modules.txt` in dependency order and records each module's exports, so one pass
+  reaches the fixed point after any compiler change. Before this, `module_exports` answered from
+  the running compiler's loaded copy, and a renamed helper took five passes to leave the images.
+- **Changing the `.wyc` format is automatic, with a `wyrm_bootstrap` still on the old format.**
+  Change the writer, the loader and both version constants together and rebuild. The new compiler
+  runs on the old VM and writes the new format, because the old VM never loads what it writes. Two
+  things it does have to load are written by the bootstrap instead, once
+  `scripts/embed_stage.py` sees that its probed version differs from the sources': `embed_build`,
+  and the expansion scope of each module with decorators (`expansion.wy` reads them through
+  `tree_build.wy`). Then `ninja stage2`, `ninja embed-check` and `meson test`. Publish a new
+  `wyrm_bootstrap` when the old one stops working. This route was tested crossing init as
+  `functions[0]`; a change that stops the new compiler running on the old VM needs more steps.
 - **Changing the calling convention is a bootstrap too** (project H, one result per call;
   the accumulator L0). stage0 is bytecode in the old convention and is also the compiler that has to
   emit the new one. What worked, in order: (1) land the compiler change that is compatible with the
@@ -67,7 +58,9 @@ touching `src/vm*.c`, `src/embed/wyrm/*.wy`, or the self-hosted compiler.
   opcodes and rerun `regen_builtins.py` (no change expected); (7) bump the `.wyc` version through a
   temporary loader that accepts both versions, one regen pass, then restore the strict loader.
   Frames of old and new convention can call each other throughout: the result goes wherever the
-  *caller's* instruction said (`ret_dst`).
+  *caller's* instruction said (`ret_dst`). These steps predate generated images: `regen_builtins.py`
+  is now a rebuild (`ninja embed-regen` to force it) with a fresh `ninja wyrm_bootstrap` between
+  steps, and the repeated passes in (5) came from stale exports, which are fixed.
 - **Stale `__wycache__/*.wyd`** (untracked) from before a bytecode change make the tools that run
   from source fail with "unknown or unimplemented opcode" until the cache is deleted or the image
   version changes. After an opcode change, `find . -name __wycache__ -prune -exec rm -rf {} +`.

@@ -1,0 +1,79 @@
+# wyrm/compiler/tree_build.wy
+#
+# What a build of the embedded images tells the compiler (project
+# design/plans/I-generated-images.md).
+#
+# The exports of the modules compiled so far (D5), so a module's imports are read
+# from the tree being built. Without this, `module_exports(path)` answers from the
+# running compiler's own loaded copy of that module, and a compiler's output then
+# depends on the compiler that ran it: a renamed helper survives in re-exports for
+# several generations. A build compiles src/embed/modules.txt in dependency order
+# and calls note_tree_image after each module. compile_module consults
+# tree_exports_of first and falls back on module_exports for anything else: an
+# ordinary compile notes nothing, so it behaves as before.
+#
+# Where a wyrm_bootstrap one image format behind left the expansion scopes (D6).
+#
+# This is its own module because compiler_main.wy runs from source on top of a
+# wyrm_bootstrap's compiled modules. An older bootstrap has no such module in its
+# table, so it compiles this one from source; a function added to a module the
+# bootstrap already has would be undefined there. Keep it free of imports.
+
+_NOTED := {}
+
+# "wyrm/compiler/module.wy" -> "wyrm::compiler::module"; a package's
+# "wyrm/__init__.wy" -> "wyrm".
+fn module_path_of(rel: str) -> str:
+    stop := len(rel) - 3  # every row ends in ".wy"
+    if (stop >= 9) and ((rel ! substr(stop - 9, 9)) == "/__init__"):
+        stop = stop - 9
+    out := ""
+    i := 0
+    while i < stop:
+        if rel[i] == 47:  # '/'
+            out = out + "::"
+        else:
+            out = out + (rel ! substr(i, 1))
+        i = i + 1
+    return out
+
+# The compiler numbers slots in the order it reads a module's exports, so this
+# must be the order `module_exports` answers: sorted by byte.
+fn _sorted_names(exports) -> list:
+    names := []
+    for name in exports:
+        j := len(names)
+        names ! append(name)
+        while (j > 0) and (name < names[j - 1]):
+            names[j] = names[j - 1]
+            j = j - 1
+        names[j] = name
+    return names
+
+# Record the image just compiled from `rel`, a path under src/embed.
+fn note_tree_image(rel: str, img) -> nil:
+    exports := img["exports"] catch nil
+    if exports is nil:
+        exports = {}
+    _NOTED[module_path_of(rel)] = _sorted_names(exports)
+    return nil
+
+# The sorted export names of the module at import path `path`, or nil when this
+# build hasn't compiled it.
+fn tree_exports_of(path: str):
+    if path in _NOTED:
+        return _NOTED[path]
+    return nil
+
+_SCOPES := {}
+
+# Expansion reads each module's scope image from `dir` instead of writing one.
+fn set_expansion_scopes(dir: str) -> nil:
+    _SCOPES["dir"] = dir
+    return nil
+
+# The directory set above, or nil on an ordinary compile.
+fn expansion_scopes():
+    if "dir" in _SCOPES:
+        return _SCOPES["dir"]
+    return nil

@@ -54,12 +54,12 @@ if check_parser_truth.found()
          env: {'WYRM_BUILD_DIR': meson.project_build_root()})
 endif
 
-# The self-hosted compiler on the C VM: the binary's embedded stage0 compiles
-# the current wy/ sources (gen1), gen1 compiles them again (gen2), and the two
-# trees must be byte-identical and match the committed stage0
-# (src/wyrm/embedded/). No pypoc; see the script header.
+# The self-hosted compiler on the C VM: the binary's embedded stage0 compiles the
+# current src/embed sources (gen1), gen1 compiles them again (gen2), the two trees
+# must be byte-identical, and what they generate must match the images this tree
+# embeds. No pypoc; see the script header.
 run_selfcompile = find_program('scripts/run_selfcompile.py', required: false)
 if run_selfcompile.found()
     test('selfcompile', run_selfcompile, suite: 'compiler', timeout: 1800, workdir: meson.project_source_root(),
-         env: {'WYRM_BUILD_DIR': meson.project_build_root()})
+         env: {'WYRM_BUILD_DIR': meson.project_build_root(), 'WYRM_EMBED_DIR': embed_final_dir})
 endif
